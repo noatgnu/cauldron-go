@@ -1,0 +1,71 @@
+<h2 mat-dialog-title>Import Data File</h2>
+
+<mat-dialog-content>
+  @if (!selectedFile()) {
+    <div class="select-file-container">
+      <p>Select a CSV or TSV file to import</p>
+      <button mat-raised-button color="primary" (click)="selectFile()" [disabled]="loading()">
+        <mat-icon>folder_open</mat-icon>
+        Select File
+      </button>
+    </div>
+  } @else if (loading()) {
+    <div class="loading-container">
+      <mat-spinner diameter="40"></mat-spinner>
+      <p>Loading file preview...</p>
+    </div>
+  } @else if (preview()) {
+    <div class="preview-container">
+      <div class="file-info">
+        <div class="info-row">
+          <mat-icon>insert_drive_file</mat-icon>
+          <div>
+            <div class="file-name">{{ selectedFile().split('/').pop() }}</div>
+            <div class="file-details">
+              {{ preview()!.totalRows }} rows, {{ preview()!.headers.length }} columns ({{ preview()!.fileType.toUpperCase() }})
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="preview-table">
+        <h3>Preview (first 10 rows, first 5 columns)</h3>
+        <table mat-table [dataSource]="preview()!.rows">
+          @for (column of getDisplayedColumns(); track column; let i = $index) {
+            <ng-container [matColumnDef]="column">
+              <th mat-header-cell *matHeaderCellDef>{{ column }}</th>
+              <td mat-cell *matCellDef="let row">{{ row[i] }}</td>
+            </ng-container>
+          }
+          <tr mat-header-row *matHeaderRowDef="getDisplayedColumns()"></tr>
+          <tr mat-row *matRowDef="let row; columns: getDisplayedColumns();"></tr>
+        </table>
+      </div>
+
+      <button mat-button (click)="selectFile()" [disabled]="loading() || importing()">
+        <mat-icon>change_circle</mat-icon>
+        Choose Different File
+      </button>
+    </div>
+  }
+
+  @if (error()) {
+    <div class="error-message">
+      <mat-icon color="warn">error</mat-icon>
+      <span>{{ error() }}</span>
+    </div>
+  }
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button (click)="cancel()" [disabled]="importing()">Cancel</button>
+  <button mat-raised-button color="primary" (click)="importFile()"
+          [disabled]="!selectedFile() || loading() || importing()">
+    @if (importing()) {
+      <mat-spinner diameter="16"></mat-spinner>
+      Importing...
+    } @else {
+      Import
+    }
+  </button>
+</mat-dialog-actions>

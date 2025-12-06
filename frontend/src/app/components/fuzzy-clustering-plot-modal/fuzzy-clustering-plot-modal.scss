@@ -1,0 +1,33 @@
+.fuzzy-viewer {
+  display: flex;
+  gap: 20px;
+  min-height: 600px;
+}
+
+.plot-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.controls-panel {
+  width: 300px;
+  flex-shrink: 0;
+}
+
+.controls-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.full-width {
+  width: 100%;
+}
+
+mat-dialog-content {
+  padding: 20px;
+  overflow: visible;
+}

@@ -1,0 +1,148 @@
+name: Build R and Python Environment for macOS arm64
+
+on:
+  release:
+    types: [created]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up dependencies
+        run: |
+          /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" || true
+          brew update
+          brew install --cask xquartz
+          brew install gfortran pkg-config libpng jpeg xz pcre2 curl harfbuzz fribidi libx11 libxext libxrender libxtst cairo tcl-tk hdf5 c-blosc hiredis open-mpi lzo bzip2
+
+      - name: Add Homebrew to PATH
+        run: echo "/opt/homebrew/bin" >> $GITHUB_PATH
+
+      - name: Set up PATH
+        run: |
+          echo "$(brew --prefix gcc)/bin" >> $GITHUB_PATH
+          echo "/opt/homebrew/opt/jpeg/bin" >> $GITHUB_PATH
+          echo "/opt/homebrew/opt/open-mpi/bin" >> $GITHUB_PATH
+          echo "$(brew --prefix hdf5)/bin" >> $GITHUB_PATH
+          echo "$(brew --prefix lzo)/bin" >> $GITHUB_PATH
+          echo "$(brew --prefix c-blosc)/bin" >> $GITHUB_PATH
+          echo "$(brew --prefix bzip2)/bin" >> $GITHUB_PATH
+
+      - name: Compile R
+        env:
+          CPPFLAGS: -I/opt/homebrew/include -I/opt/X11/include -I/opt/homebrew/opt/jpeg/include -I/opt/homebrew/include
+          LDFLAGS: -L/opt/X11/lib -L/opt/homebrew/opt/jpeg/lib -L/opt/homebrew/opt/lzo/lib -L/opt/homebrew/lib
+          LZO_DIR: $(brew --prefix lzo)
+          BZIP2_DIR: $(brew --prefix bzip2)
+          BLOSC_DIR: $(brew --prefix c-blosc)
+          HDF5_DIR: $(brew --prefix hdf5)
+          CFLAGS: -I/opt/homebrew/opt/lzo/include
+          TCL_LIBRARY: /opt/homebrew/opt/tcl-tk/lib
+          TK_LIBRARY: /opt/homebrew/opt/tcl-tk/lib
+          PKG_CONFIG_PATH: /opt/homebrew/opt/jpeg/lib/pkgconfig
+          C_INCLUDE_PATH: /opt/homebrew/Cellar/lzo/2.10/include/lzo:/opt/homebrew/Cellar/lzo/2.10/include/
+          LIBRARY_PATH: /opt/homebrew/lib
+        run: |
+          curl -O https://cran.r-project.org/src/base/R-4/R-4.4.1.tar.gz
+          tar -xzvf R-4.4.1.tar.gz
+          cd R-4.4.1
+          ./configure --prefix=${{ github.workspace }}/bin/darwin/R-Portable/ --enable-R-shlib --with-blas --with-lapack --with-tcltk --with-mpi
+          make -j$(nproc)
+          make install
+
+      - name: Set up writable permissions for R library
+        run: |
+          chmod -R 777 ${{ github.workspace }}/bin/darwin/R-Portable
+
+      - name: Set up R R_LIBS_USER
+        run: |
+          echo "R_LIBS_USER=${{ github.workspace }}/bin/darwin/R-Portable/lib" >> $GITHUB_ENV
+
+      - name: Install R packages
+        env:
+          CPPFLAGS: -I/opt/homebrew/include -I/opt/X11/include -I/opt/homebrew/opt/jpeg/include -I/opt/homebrew/include
+          LDFLAGS: -L/opt/X11/lib -L/opt/homebrew/opt/jpeg/lib -L/opt/homebrew/opt/lzo/lib -L/opt/homebrew/lib
+          LZO_DIR: $(brew --prefix lzo)
+          BZIP2_DIR: $(brew --prefix bzip2)
+          BLOSC_DIR: $(brew --prefix c-blosc)
+          HDF5_DIR: $(brew --prefix hdf5)
+          CFLAGS: -I/opt/homebrew/opt/lzo/include
+          TCL_LIBRARY: /opt/homebrew/opt/tcl-tk/lib
+          TK_LIBRARY: /opt/homebrew/opt/tcl-tk/lib
+          PKG_CONFIG_PATH: /opt/homebrew/opt/jpeg/lib/pkgconfig
+          C_INCLUDE_PATH: /opt/homebrew/Cellar/lzo/2.10/include/lzo:/opt/homebrew/Cellar/lzo/2.10/include/
+          LIBRARY_PATH: /opt/homebrew/lib
+        run: ${{ github.workspace }}/bin/darwin/R-Portable/bin/Rscript scripts/r/install_packages.R
+
+      - name: Download Portable Python
+        run: |
+          curl -LO https://github.com/indygreg/python-build-standalone/releases/download/20241016/cpython-3.11.10+20241016-aarch64-apple-darwin-install_only.tar.gz
+
+      - name: Extract Python
+        run: |
+          tar -xzf cpython-3.11.10+20241016-aarch64-apple-darwin-install_only.tar.gz -C bin/darwin --no-same-owner --no-same-permissions
+
+      - name: Install Python Packages
+        env:
+          CPPFLAGS: -I/opt/homebrew/include -I/opt/X11/include -I/opt/homebrew/opt/jpeg/include -I/opt/homebrew/include
+          LDFLAGS: -L/opt/X11/lib -L/opt/homebrew/opt/jpeg/lib -L/opt/homebrew/opt/lzo/lib -L/opt/homebrew/lib
+          LZO_DIR: /opt/homebrew/opt/lzo
+          CFLAGS: -I/opt/homebrew/opt/lzo/include
+          TCL_LIBRARY: /opt/homebrew/opt/tcl-tk/lib
+          TK_LIBRARY: /opt/homebrew/opt/tcl-tk/lib
+          PKG_CONFIG_PATH: /opt/homebrew/opt/jpeg/lib/pkgconfig
+          HDF5_DIR: /opt/homebrew/opt/hdf5
+          BLOSC_DIR: /opt/homebrew/opt/c-blosc
+          C_INCLUDE_PATH: /opt/homebrew/Cellar/lzo/2.10/include/lzo:/opt/homebrew/Cellar/lzo/2.10/include/
+          LIBRARY_PATH: /opt/homebrew/lib
+          R_HOME: ${{ github.workspace }}/bin/darwin/R-Portable
+        run: |
+          ${{ github.workspace }}/bin/darwin/python/bin/python3 -m pip install --upgrade pip
+          ${{ github.workspace }}/bin/darwin/python/bin/python3 -m pip install -r scripts/requirements.txt
+
+      - name: Compress Python directory
+        run: tar -czf python-darwin-arm64.tar.gz bin/darwin/python
+
+      - name: Compress R-Portable directory
+        run: tar -czf r-portable-darwin-arm64.tar.gz bin/darwin/R-Portable
+
+      - name: Upload Python Archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-darwin-arm64
+          path: python-darwin-arm64.tar.gz
+          retention-days: 30
+
+      - name: Upload R-Portable Archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: r-portable-darwin-arm64
+          path: r-portable-darwin-arm64.tar.gz
+          retention-days: 30
+
+      - name: Upload Python to Release
+        if: github.event_name == 'release'
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: python-darwin-arm64.tar.gz
+          asset_name: python-darwin-arm64.tar.gz
+          asset_content_type: application/tar+gzip
+
+      - name: Upload R to Release
+        if: github.event_name == 'release'
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: r-portable-darwin-arm64.tar.gz
+          asset_name: r-portable-darwin-arm64.tar.gz
+          asset_content_type: application/tar+gzip

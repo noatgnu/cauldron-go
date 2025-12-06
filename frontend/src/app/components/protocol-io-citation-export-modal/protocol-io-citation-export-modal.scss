@@ -1,0 +1,13 @@
+.protocol-io-form {
+  display: flex;
+  flex-direction: column;
+  min-width: 500px;
+}
+
+.full-width {
+  width: 100%;
+}
+
+mat-dialog-content {
+  overflow: visible;
+}

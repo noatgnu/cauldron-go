@@ -1,0 +1,129 @@
+<div class="analysis-container">
+  <mat-card class="analysis-card">
+    <mat-card-header>
+      <mat-card-title>
+        <mat-icon>straighten</mat-icon>
+        Normalization Analysis
+      </mat-card-title>
+    </mat-card-header>
+    <app-environment-indicator [python]="true"></app-environment-indicator>
+    <mat-card-content>
+      <form [formGroup]="form" class="analysis-form">
+        <div class="form-section">
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Input Data File</mat-label>
+            <input matInput readonly formControlName="filePath">
+          </mat-form-field>
+          <div class="file-actions">
+            <button mat-raised-button color="primary" type="button" (click)="openFile()">
+              Browse
+            </button>
+            <div class="file-selector">
+              <app-imported-file-selection
+                (columns)="updateColumns($event)"
+                (selected)="updateFormWithSelected($event, 'filePath')">
+              </app-imported-file-selection>
+            </div>
+          </div>
+        </div>
+
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Runtime Environment</mat-label>
+          <mat-select formControlName="runtime">
+            <mat-option value="r">R (supports NA cells)</mat-option>
+            <mat-option value="python">Python</mat-option>
+          </mat-select>
+          <mat-hint>R version can handle NA cells natively</mat-hint>
+        </mat-form-field>
+
+        @if (columns.length > 0) {
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Sample Columns</mat-label>
+            <mat-select formControlName="columnsName" multiple>
+              @for (col of columns; track col) {
+                <mat-option [value]="col">{{ col }}</mat-option>
+              }
+            </mat-select>
+            <mat-hint>Select columns to normalize</mat-hint>
+          </mat-form-field>
+        }
+
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Scaler Type</mat-label>
+          <mat-select formControlName="scalerType">
+            <mat-option value="robust">Robust</mat-option>
+            <mat-option value="standard">Standard</mat-option>
+            <mat-option value="minmax">MinMax</mat-option>
+            <mat-option value="quantile">Quantile</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        <div class="checkbox-field">
+          <mat-checkbox formControlName="withCentering">
+            With Centering
+          </mat-checkbox>
+        </div>
+
+        <div class="checkbox-field">
+          <mat-checkbox formControlName="withScaling">
+            With Scaling
+          </mat-checkbox>
+        </div>
+
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Number of Quantiles</mat-label>
+          <input matInput type="number" formControlName="nQuantiles" min="1">
+          <mat-hint>For quantile scaler (default: 1000)</mat-hint>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Output Distribution</mat-label>
+          <mat-select formControlName="outputDistribution">
+            <mat-option value="uniform">Uniform</mat-option>
+            <mat-option value="normal">Normal</mat-option>
+          </mat-select>
+          <mat-hint>For quantile scaler</mat-hint>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Norm</mat-label>
+          <mat-select formControlName="norm">
+            <mat-option value="l1">L1</mat-option>
+            <mat-option value="l2">L2</mat-option>
+            <mat-option value="max">Max</mat-option>
+          </mat-select>
+          <mat-hint>For normalizer</mat-hint>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Power Transform Method</mat-label>
+          <mat-select formControlName="powerMethod">
+            <mat-option value="yeo-johnson">Yeo-Johnson</mat-option>
+            <mat-option value="box-cox">Box-Cox</mat-option>
+          </mat-select>
+          <mat-hint>For power transformer</mat-hint>
+        </mat-form-field>
+      </form>
+    </mat-card-content>
+    <mat-card-actions align="end">
+      <button mat-button (click)="reset()" [disabled]="running()">Reset</button>
+      <button mat-button (click)="loadExample()" [disabled]="running()">Load Example</button>
+      <button mat-raised-button color="primary" (click)="submit()"
+              [disabled]="form.invalid || running()">
+        @if (running()) {
+          <mat-spinner diameter="16"></mat-spinner>
+          Running...
+        } @else {
+          <mat-icon>play_arrow</mat-icon>
+          Run Analysis
+        }
+      </button>
+      @if (createdJobId) {
+        <button mat-raised-button color="accent" (click)="viewJob()">
+          <mat-icon>visibility</mat-icon>
+          View Job
+        </button>
+      }
+    </mat-card-actions>
+  </mat-card>
+</div>

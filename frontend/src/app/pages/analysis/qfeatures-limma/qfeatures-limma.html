@@ -1,0 +1,101 @@
+<div class="analysis-container">
+  <mat-card class="analysis-card">
+    <mat-card-header>
+      <mat-card-title>
+        <mat-icon>biotech</mat-icon>
+        QFeatures + Limma Analysis
+      </mat-card-title>
+    </mat-card-header>
+    <app-environment-indicator [pythonWithR]="true"></app-environment-indicator>
+    <mat-card-content>
+      <form [formGroup]="form" class="analysis-form">
+        <div class="form-section">
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Input Data File</mat-label>
+            <input matInput readonly formControlName="inputFile">
+          </mat-form-field>
+          <div class="file-actions">
+            <button mat-raised-button color="primary" type="button" (click)="openFile('inputFile')">
+              Browse
+            </button>
+            <div class="file-selector">
+              <app-imported-file-selection
+                (columns)="updateColumns($event)"
+                (selected)="updateFormWithSelected($event, 'inputFile')">
+              </app-imported-file-selection>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Annotation File</mat-label>
+            <input matInput readonly formControlName="annotationFile">
+          </mat-form-field>
+          <div class="file-actions">
+            <button mat-raised-button color="primary" type="button" (click)="openFile('annotationFile')">
+              Browse
+            </button>
+            <div class="file-selector">
+              <app-imported-file-selection
+                (selected)="updateFormWithSelected($event, 'annotationFile')">
+              </app-imported-file-selection>
+            </div>
+          </div>
+        </div>
+
+        @if (columns.length > 0) {
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Index Column</mat-label>
+            <mat-select formControlName="indexCol">
+              @for (col of columns; track col) {
+                <mat-option [value]="col">{{ col }}</mat-option>
+              }
+            </mat-select>
+            <mat-hint>Select the column containing protein/feature identifiers</mat-hint>
+          </mat-form-field>
+        }
+
+        <div class="form-section">
+          <mat-form-field appearance="outline">
+            <mat-label>P-value Cutoff</mat-label>
+            <input matInput type="number" formControlName="pvalCutoff" step="0.01" min="0" max="1">
+            <mat-hint>Significance threshold (0-1)</mat-hint>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Fold Change Cutoff</mat-label>
+            <input matInput type="number" formControlName="fcCutoff" step="0.1" min="0">
+            <mat-hint>Minimum fold change threshold</mat-hint>
+          </mat-form-field>
+        </div>
+
+        <div class="checkbox-field">
+          <mat-checkbox formControlName="log2">
+            Log2 Transform
+          </mat-checkbox>
+        </div>
+      </form>
+    </mat-card-content>
+    <mat-card-actions align="end">
+      <button mat-button (click)="loadExample()" [disabled]="running()">Load Example</button>
+      <button mat-button (click)="reset()" [disabled]="running()">Reset</button>
+      <button mat-raised-button color="primary" (click)="submit()"
+              [disabled]="form.invalid || running()">
+        @if (running()) {
+          <mat-spinner diameter="16"></mat-spinner>
+          Running...
+        } @else {
+          <mat-icon>play_arrow</mat-icon>
+          Run Analysis
+        }
+      </button>
+      @if (createdJobId) {
+        <button mat-raised-button color="accent" (click)="viewJob()">
+          <mat-icon>visibility</mat-icon>
+          View Job
+        </button>
+      }
+    </mat-card-actions>
+  </mat-card>
+</div>

@@ -1,0 +1,178 @@
+<div class="violin-plot-container">
+  <mat-card>
+    <mat-card-header>
+      <mat-card-title>Violin Plot</mat-card-title>
+    </mat-card-header>
+    <mat-card-content>
+      <form [formGroup]="form">
+        <app-imported-file-selection
+          (filePathChange)="form.controls['filePath'].setValue($event)"
+          (columnsChange)="updateColumns($event)">
+        </app-imported-file-selection>
+
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Select Columns for Violin Plot</mat-label>
+          <mat-select formControlName="selectedCols" multiple (selectionChange)="onColumnsChange($event)">
+            @for (col of columns; track col) {
+              <mat-option [value]="col">{{ col }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+
+        <mat-expansion-panel>
+          <mat-expansion-panel-header>
+            <mat-panel-title>
+              <mat-icon>settings</mat-icon>
+              Global Plot Settings
+            </mat-panel-title>
+          </mat-expansion-panel-header>
+
+          <div class="settings-grid">
+            <mat-form-field appearance="outline">
+              <mat-label>Plot Title</mat-label>
+              <input matInput formControlName="plotTitle">
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>X Axis Title</mat-label>
+              <input matInput formControlName="xAxisTitle">
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Y Axis Title</mat-label>
+              <input matInput formControlName="yAxisTitle">
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Orientation</mat-label>
+              <mat-select formControlName="orientation">
+                <mat-option value="v">Vertical</mat-option>
+                <mat-option value="h">Horizontal</mat-option>
+              </mat-select>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Violin Mode</mat-label>
+              <mat-select formControlName="violinMode">
+                <mat-option value="group">Group</mat-option>
+                <mat-option value="overlay">Overlay</mat-option>
+              </mat-select>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Bandwidth (0 = auto)</mat-label>
+              <input matInput type="number" formControlName="bandwidth" min="0" step="0.1">
+            </mat-form-field>
+
+            <mat-checkbox formControlName="showLegend">Show Legend</mat-checkbox>
+          </div>
+        </mat-expansion-panel>
+
+        @if (traceConfigs().length > 0) {
+          <mat-expansion-panel>
+            <mat-expansion-panel-header>
+              <mat-panel-title>
+                <mat-icon>palette</mat-icon>
+                Trace Customization ({{ traceConfigs().length }} traces)
+              </mat-panel-title>
+            </mat-expansion-panel-header>
+
+            <div class="traces-container">
+              @for (config of traceConfigs(); track config.column; let i = $index) {
+                <div class="trace-config">
+                  <h4>{{ config.name }}</h4>
+                  <div class="trace-settings">
+                    <mat-form-field appearance="outline">
+                      <mat-label>Trace Name</mat-label>
+                      <input matInput [value]="config.name"
+                             (input)="updateTraceConfig(i, 'name', $any($event.target).value)">
+                    </mat-form-field>
+
+                    <mat-form-field appearance="outline">
+                      <mat-label>Line Color</mat-label>
+                      <input matInput type="color" [value]="config.color"
+                             (input)="updateTraceConfig(i, 'color', $any($event.target).value)">
+                    </mat-form-field>
+
+                    <mat-form-field appearance="outline">
+                      <mat-label>Fill Color</mat-label>
+                      <input matInput type="color" [value]="config.fillColor"
+                             (input)="updateTraceConfig(i, 'fillColor', $any($event.target).value)">
+                    </mat-form-field>
+
+                    <mat-form-field appearance="outline">
+                      <mat-label>Points Mode</mat-label>
+                      <mat-select [value]="config.pointsMode"
+                                  (selectionChange)="updateTraceConfig(i, 'pointsMode', $event.value)">
+                        <mat-option value="all">All Points</mat-option>
+                        <mat-option value="outliers">Outliers Only</mat-option>
+                        <mat-option value="suspectedoutliers">Suspected Outliers</mat-option>
+                        <mat-option value="false">No Points</mat-option>
+                      </mat-select>
+                    </mat-form-field>
+
+                    <mat-form-field appearance="outline">
+                      <mat-label>Jitter (0-1)</mat-label>
+                      <input matInput type="number" [value]="config.jitter"
+                             min="0" max="1" step="0.1"
+                             (input)="updateTraceConfig(i, 'jitter', parseFloat($any($event.target).value))">
+                    </mat-form-field>
+
+                    <mat-form-field appearance="outline">
+                      <mat-label>Point Size</mat-label>
+                      <input matInput type="number" [value]="config.pointSize"
+                             min="1" max="20" step="1"
+                             (input)="updateTraceConfig(i, 'pointSize', parseInt($any($event.target).value))">
+                    </mat-form-field>
+
+                    <mat-form-field appearance="outline">
+                      <mat-label>Bandwidth (0 = auto)</mat-label>
+                      <input matInput type="number" [value]="config.bandwidth"
+                             min="0" step="0.1"
+                             (input)="updateTraceConfig(i, 'bandwidth', parseFloat($any($event.target).value))">
+                    </mat-form-field>
+
+                    <mat-checkbox [checked]="config.showBox"
+                                  (change)="updateTraceConfig(i, 'showBox', $event.checked)">
+                      Show Box Plot
+                    </mat-checkbox>
+
+                    <mat-checkbox [checked]="config.showMeanLine"
+                                  (change)="updateTraceConfig(i, 'showMeanLine', $event.checked)">
+                      Show Mean Line
+                    </mat-checkbox>
+                  </div>
+                </div>
+              }
+            </div>
+          </mat-expansion-panel>
+        }
+
+        <div class="action-buttons">
+          <button mat-raised-button color="primary" (click)="generatePlot()" [disabled]="form.invalid">
+            <mat-icon>bar_chart</mat-icon>
+            Generate Plot
+          </button>
+          <button mat-raised-button (click)="loadExample()">
+            <mat-icon>description</mat-icon>
+            Load Example
+          </button>
+          <button mat-raised-button (click)="reset()">
+            <mat-icon>refresh</mat-icon>
+            Reset
+          </button>
+          @if (plotData !== null) {
+            <button mat-raised-button color="accent" (click)="exportToSVG()">
+              <mat-icon>save</mat-icon>
+              Export to SVG
+            </button>
+          }
+        </div>
+      </form>
+    </mat-card-content>
+  </mat-card>
+
+  <div class="plot-container">
+    <div id="violin-plot-div" class="plotly-plot"></div>
+  </div>
+</div>

@@ -1,0 +1,8 @@
+<div class="d-flex justify-content-around">
+  <div class="d-flex flex-grow-1 justify-content-center align-items-center">
+    <plotly-plot [data]="graphData" [layout]="graphLayout" [updateOnlyWithRevision]="true" [revision]="revision"></plotly-plot>
+  </div>
+  <div class="flex-grow-0" style="max-width: 300px;">
+    <button mat-raised-button color="primary" (click)="drawPlot()">Update</button>
+  </div>
+</div>

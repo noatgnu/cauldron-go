@@ -1,0 +1,80 @@
+<h2 mat-dialog-title>Generate Condition Based CV Data for DIA-NN</h2>
+
+<mat-dialog-content>
+  <form [formGroup]="form" class="diann-cv-form">
+    <div class="form-section">
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>File path (Reports.pr_matrix.tsv)</mat-label>
+        <input matInput readonly formControlName="pr_matrix_file">
+      </mat-form-field>
+      <div class="file-actions">
+        <button mat-raised-button color="primary" type="button" (click)="browse('pr_matrix_file')">
+          Browse
+        </button>
+        <div class="file-selector">
+          <app-imported-file-selection
+            (selected)="updateFormWithSelected($event, 'pr_matrix_file')">
+          </app-imported-file-selection>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>File path (Reports.pg_matrix.tsv)</mat-label>
+        <input matInput readonly formControlName="pg_matrix_file">
+      </mat-form-field>
+      <div class="file-actions">
+        <button mat-raised-button color="primary" type="button" (click)="browse('pg_matrix_file')">
+          Browse
+        </button>
+        <div class="file-selector">
+          <app-imported-file-selection
+            (selected)="updateFormWithSelected($event, 'pg_matrix_file')">
+          </app-imported-file-selection>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>File path (Reports.log.txt)</mat-label>
+        <input matInput readonly formControlName="log_file">
+      </mat-form-field>
+      <div class="file-actions">
+        <button mat-raised-button color="primary" type="button" (click)="browse('log_file')">
+          Browse
+        </button>
+        <div class="file-selector">
+          <app-imported-file-selection
+            (selected)="updateFormWithSelected($event, 'log_file')">
+          </app-imported-file-selection>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>File path (annotation.txt)</mat-label>
+        <input matInput readonly formControlName="annotation_file">
+      </mat-form-field>
+      <div class="file-actions">
+        <button mat-raised-button color="primary" type="button" (click)="browse('annotation_file')">
+          Browse
+        </button>
+        <div class="file-selector">
+          <app-imported-file-selection
+            (selected)="updateFormWithSelected($event, 'annotation_file')">
+          </app-imported-file-selection>
+        </div>
+      </div>
+    </div>
+  </form>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button (click)="close()">Close</button>
+  <button mat-raised-button color="primary" (click)="submit()">
+    Submit
+  </button>
+</mat-dialog-actions>

@@ -1,0 +1,69 @@
+<h2 mat-dialog-title>Check Peptide in Library</h2>
+
+<mat-dialog-content>
+  <form [formGroup]="form" class="check-peptide-form">
+    <div class="file-section">
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Input File</mat-label>
+        <input matInput formControlName="file_path" readonly>
+      </mat-form-field>
+      <div class="file-actions">
+        <button mat-raised-button color="primary" type="button" (click)="openFile('file_path')">
+          Browse
+        </button>
+        <div class="flex-grow">
+          <app-imported-file-selection
+            (columns)="updateColumns($event)"
+            (selected)="updateFormWithSelected($event, 'file_path')">
+          </app-imported-file-selection>
+        </div>
+      </div>
+    </div>
+
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>Peptide Column</mat-label>
+      <mat-select formControlName="peptide_column">
+        @for (col of columns; track col) {
+          <mat-option [value]="col">{{col}}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <div class="file-section">
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>FASTA Library</mat-label>
+        <input matInput formControlName="fasta_file" readonly>
+      </mat-form-field>
+      <div class="file-actions">
+        <button mat-raised-button color="primary" type="button" (click)="openFile('fasta_file')">
+          Browse
+        </button>
+        <div class="flex-grow">
+          <app-imported-file-selection
+            (columns)="updateColumns($event)"
+            (selected)="updateFormWithSelected($event, 'fasta_file')">
+          </app-imported-file-selection>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-row">
+      <mat-form-field appearance="outline" class="half-width">
+        <mat-label>Missed Cleavage</mat-label>
+        <input matInput type="number" formControlName="miss_cleavage">
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="half-width">
+        <mat-label>Minimum Length</mat-label>
+        <input matInput type="number" formControlName="min_length">
+      </mat-form-field>
+    </div>
+  </form>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button (click)="close()">Cancel</button>
+  <button mat-raised-button color="primary" (click)="submit()">
+    Submit
+  </button>
+</mat-dialog-actions>

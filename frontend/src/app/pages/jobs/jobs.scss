@@ -1,0 +1,149 @@
+.jobs-container {
+  flex: 1;
+  padding: 16px;
+  overflow-y: auto;
+
+  h1 {
+    font-size: 24px;
+    font-weight: 500;
+    margin-bottom: 24px;
+  }
+}
+
+.loading-container,
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 48px;
+  color: rgba(0, 0, 0, 0.6);
+
+  mat-icon {
+    font-size: 64px;
+    width: 64px;
+    height: 64px;
+    margin-bottom: 16px;
+    opacity: 0.5;
+  }
+
+  p {
+    margin: 4px 0;
+    font-size: 14px;
+  }
+
+  .empty-state-hint {
+    font-size: 13px;
+    opacity: 0.7;
+  }
+}
+
+.jobs-table {
+  width: 100%;
+  font-size: 13px;
+
+  th {
+    font-weight: 500;
+    font-size: 12px;
+    color: rgba(0, 0, 0, 0.6);
+  }
+
+  td, th {
+    padding: 12px;
+  }
+
+  tr.mat-mdc-row:hover {
+    background-color: #f5f5f5;
+  }
+
+  tr.in-progress {
+    background-color: rgba(25, 118, 210, 0.05);
+  }
+
+  .status-icon {
+    font-size: 20px;
+    width: 20px;
+    height: 20px;
+  }
+
+  .job-name-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+
+    > div:first-child {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .job-name {
+      flex: 1;
+      font-weight: 500;
+    }
+
+    .error-icon,
+    .warning-icon {
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+      flex-shrink: 0;
+    }
+  }
+
+  .environment-label {
+    font-size: 12px;
+    color: rgba(0, 0, 0, 0.7);
+  }
+
+  .created-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+
+    .completed-text {
+      font-size: 11px;
+      color: rgba(0, 0, 0, 0.6);
+    }
+  }
+
+  .clickable {
+    cursor: pointer;
+  }
+
+  .action-buttons {
+    display: flex;
+    gap: 4px;
+
+    button {
+      width: 32px;
+      height: 32px;
+
+      mat-icon {
+        font-size: 18px;
+        width: 18px;
+        height: 18px;
+      }
+    }
+  }
+
+  .progress-info {
+    margin-top: 4px;
+
+    small {
+      display: block;
+      font-size: 11px;
+      color: rgba(0, 0, 0, 0.6);
+      margin-bottom: 4px;
+    }
+
+    mat-progress-bar {
+      height: 4px;
+    }
+  }
+
+  mat-progress-bar {
+    margin-top: 4px;
+    height: 4px;
+  }
+}

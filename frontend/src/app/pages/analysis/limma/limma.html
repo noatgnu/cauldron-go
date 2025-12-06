@@ -1,0 +1,156 @@
+<div class="analysis-container">
+  <mat-card class="analysis-card">
+    <mat-card-header>
+      <mat-card-title>
+        <mat-icon>biotech</mat-icon>
+        Limma Differential Analysis
+      </mat-card-title>
+    </mat-card-header>
+    <app-environment-indicator [pythonWithR]="true"></app-environment-indicator>
+    <mat-card-content>
+      <form [formGroup]="form" class="analysis-form">
+        <div class="form-section">
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Input Data File</mat-label>
+            <input matInput readonly formControlName="inputFile">
+          </mat-form-field>
+          <div class="file-actions">
+            <button mat-raised-button color="primary" type="button" (click)="openFile('inputFile')">
+              Browse
+            </button>
+            <div class="file-selector">
+              <app-imported-file-selection
+                (columns)="updateColumns($event)"
+                (selected)="updateFormWithSelected($event, 'inputFile')">
+              </app-imported-file-selection>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Annotation File</mat-label>
+            <input matInput readonly formControlName="annotationFile">
+          </mat-form-field>
+          <div class="file-actions">
+            <button mat-raised-button color="primary" type="button" (click)="openFile('annotationFile')">
+              Browse
+            </button>
+            <div class="file-selector">
+              <app-imported-file-selection
+                (selected)="updateFormWithSelected($event, 'annotationFile')">
+              </app-imported-file-selection>
+            </div>
+          </div>
+        </div>
+
+        @if (columns.length > 0) {
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Index Columns</mat-label>
+            <mat-select formControlName="indexCol" multiple>
+              @for (col of columns; track col) {
+                <mat-option [value]="col">{{ col }}</mat-option>
+              }
+            </mat-select>
+            <mat-hint>Select columns for protein/peptide identifiers</mat-hint>
+          </mat-form-field>
+        }
+
+        <div class="checkbox-field">
+          <mat-checkbox formControlName="log2">
+            Log2 Transformation
+          </mat-checkbox>
+        </div>
+
+        <div class="comparisons-section">
+          <div class="section-header">
+            <h3>Comparisons</h3>
+            <button mat-raised-button color="accent" (click)="addComparison()" type="button">
+              <mat-icon>add</mat-icon>
+              Add Comparison
+            </button>
+          </div>
+
+          @if (comparisons().length > 0) {
+            <table mat-table [dataSource]="comparisons()" class="comparisons-table">
+              <ng-container matColumnDef="conditionA">
+                <th mat-header-cell *matHeaderCellDef>Condition A</th>
+                <td mat-cell *matCellDef="let comparison; let i = index">
+                  <mat-form-field appearance="outline">
+                    <mat-select [(ngModel)]="comparison.condition_A" [ngModelOptions]="{standalone: true}">
+                      @for (condition of conditions(); track condition) {
+                        <mat-option [value]="condition">{{ condition }}</mat-option>
+                      }
+                    </mat-select>
+                  </mat-form-field>
+                </td>
+              </ng-container>
+
+              <ng-container matColumnDef="conditionB">
+                <th mat-header-cell *matHeaderCellDef>Condition B</th>
+                <td mat-cell *matCellDef="let comparison; let i = index">
+                  <mat-form-field appearance="outline">
+                    <mat-select [(ngModel)]="comparison.condition_B" [ngModelOptions]="{standalone: true}">
+                      @for (condition of conditions(); track condition) {
+                        <mat-option [value]="condition">{{ condition }}</mat-option>
+                      }
+                    </mat-select>
+                  </mat-form-field>
+                </td>
+              </ng-container>
+
+              <ng-container matColumnDef="label">
+                <th mat-header-cell *matHeaderCellDef>Label</th>
+                <td mat-cell *matCellDef="let comparison; let i = index">
+                  <mat-form-field appearance="outline">
+                    <input matInput [(ngModel)]="comparison.comparison_label" [ngModelOptions]="{standalone: true}">
+                  </mat-form-field>
+                </td>
+              </ng-container>
+
+              <ng-container matColumnDef="actions">
+                <th mat-header-cell *matHeaderCellDef></th>
+                <td mat-cell *matCellDef="let comparison; let i = index">
+                  <button mat-icon-button color="warn" (click)="removeComparison(i)" type="button">
+                    <mat-icon>delete</mat-icon>
+                  </button>
+                </td>
+              </ng-container>
+
+              <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+              <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+            </table>
+          } @else {
+            <div class="empty-comparisons">
+              <mat-icon>compare_arrows</mat-icon>
+              <p>No comparisons added</p>
+              <p class="hint">Add comparisons to perform differential analysis</p>
+            </div>
+          }
+        </div>
+      </form>
+    </mat-card-content>
+    <mat-card-actions align="end">
+      <button mat-button (click)="reset()" [disabled]="running()">Reset</button>
+      <button mat-button (click)="loadExample()" [disabled]="running()">
+        Load Example
+      </button>
+      <button mat-raised-button color="primary" (click)="submit()"
+              [disabled]="form.invalid || comparisons().length === 0 || running()">
+        @if (running()) {
+          <mat-spinner diameter="16"></mat-spinner>
+          Running...
+        } @else {
+          <mat-icon>play_arrow</mat-icon>
+          Run Analysis
+        }
+      </button>
+      @if (createdJobId) {
+        <button mat-raised-button color="accent" (click)="viewJob()">
+          <mat-icon>visibility</mat-icon>
+          View Job
+        </button>
+      }
+    </mat-card-actions>
+  </mat-card>
+</div>

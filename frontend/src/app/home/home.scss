@@ -1,0 +1,301 @@
+.home-container {
+  display: flex;
+  flex: 1;
+  gap: 16px;
+  padding: 16px;
+}
+
+.jobs-content {
+  flex: 1;
+  overflow-y: auto;
+  min-width: 0;
+}
+
+.system-status {
+  width: 280px;
+  flex-shrink: 0;
+  overflow-y: auto;
+}
+
+.jobs-section {
+  .jobs-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+
+    h2 {
+      font-size: 20px;
+      font-weight: 500;
+      margin: 0;
+    }
+
+    button {
+      font-size: 13px;
+
+      mat-icon {
+        margin-right: 4px;
+        font-size: 18px;
+        width: 18px;
+        height: 18px;
+      }
+    }
+  }
+}
+
+.jobs-table {
+  width: 100%;
+  font-size: 13px;
+
+  th {
+    font-weight: 500;
+    font-size: 12px;
+    color: rgba(0, 0, 0, 0.6);
+  }
+
+  td, th {
+    padding: 8px 12px;
+  }
+
+  tr.mat-mdc-row:hover {
+    background-color: #f5f5f5;
+  }
+
+  tr.in-progress {
+    background-color: rgba(25, 118, 210, 0.05);
+  }
+
+  .status-icon {
+    font-size: 20px;
+    width: 20px;
+    height: 20px;
+  }
+
+  .job-name-cell {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    .job-name {
+      flex: 1;
+    }
+
+    .error-icon {
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+      flex-shrink: 0;
+    }
+  }
+
+  .clickable {
+    cursor: pointer;
+  }
+
+  .action-buttons {
+    display: flex;
+    gap: 4px;
+
+    button {
+      width: 32px;
+      height: 32px;
+
+      mat-icon {
+        font-size: 18px;
+        width: 18px;
+        height: 18px;
+      }
+    }
+  }
+}
+
+.loading-container,
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 64px 16px;
+  color: rgba(0, 0, 0, 0.6);
+
+  mat-icon {
+    font-size: 64px;
+    width: 64px;
+    height: 64px;
+    margin-bottom: 16px;
+    opacity: 0.5;
+  }
+
+  p {
+    margin: 4px 0;
+    font-size: 14px;
+  }
+
+  .empty-state-hint {
+    font-size: 13px;
+    opacity: 0.7;
+  }
+}
+
+.status-card {
+  padding: 16px;
+  margin-bottom: 16px;
+
+  &:first-child {
+    position: sticky;
+    top: 0;
+  }
+
+  mat-card-title {
+    font-size: 16px;
+    font-weight: 500;
+  }
+
+  mat-card-header {
+    margin-bottom: 16px;
+  }
+}
+
+.status-loading {
+  display: flex;
+  justify-content: center;
+  padding: 24px;
+}
+
+.status-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px;
+  background: #f5f5f5;
+  border-radius: 8px;
+  margin-bottom: 12px;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+
+  mat-icon {
+    font-size: 24px;
+    width: 24px;
+    height: 24px;
+    margin-top: 2px;
+  }
+}
+
+.status-info {
+  flex: 1;
+  min-width: 0;
+
+  .status-label {
+    font-size: 12px;
+    font-weight: 500;
+    color: rgba(0, 0, 0, 0.6);
+    margin-bottom: 4px;
+  }
+
+  .status-value {
+    font-size: 13px;
+    color: rgba(0, 0, 0, 0.87);
+    word-break: break-word;
+  }
+
+  .status-path {
+    font-size: 10px;
+    color: rgba(0, 0, 0, 0.54);
+    margin-top: 4px;
+    word-break: break-all;
+    font-family: monospace;
+  }
+}
+
+.empty-files {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  color: rgba(0, 0, 0, 0.6);
+
+  mat-icon {
+    font-size: 48px;
+    width: 48px;
+    height: 48px;
+    margin-bottom: 8px;
+    opacity: 0.5;
+  }
+
+  p {
+    margin: 0;
+    font-size: 12px;
+  }
+}
+
+.files-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.file-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px;
+  background: #f5f5f5;
+  border-radius: 4px;
+  gap: 8px;
+
+  &:hover {
+    background: #eeeeee;
+  }
+}
+
+.file-item-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+
+  mat-icon {
+    font-size: 20px;
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+    color: rgba(0, 0, 0, 0.6);
+  }
+}
+
+.file-item-details {
+  flex: 1;
+  min-width: 0;
+}
+
+.file-item-name {
+  font-size: 12px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-item-preview {
+  font-size: 10px;
+  color: rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.delete-btn {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+
+  mat-icon {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+  }
+}

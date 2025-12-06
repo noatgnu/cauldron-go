@@ -1,0 +1,86 @@
+<h2 mat-dialog-title>Download {{ environment === 'python' ? 'Python' : 'R' }} Portable Environment</h2>
+
+<mat-dialog-content>
+  <form [formGroup]="form" class="download-form">
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>Operating Platform</mat-label>
+      <mat-select formControlName="platform">
+        <mat-option value="win">Windows</mat-option>
+        <mat-option value="linux">Linux</mat-option>
+        <mat-option value="darwin">macOS (M1)</mat-option>
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>Architecture</mat-label>
+      <mat-select formControlName="arch">
+        @if (form.get('platform')?.value === 'darwin') {
+          <mat-option value="arm64">ARM64</mat-option>
+        }
+        @if (form.get('platform')?.value === 'linux') {
+          <mat-option value="x86_64">x86_64</mat-option>
+          <mat-option value="arm64">ARM64</mat-option>
+        }
+        @if (form.get('platform')?.value === 'win') {
+          <mat-option value="x86_64">x86_64</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>Download URL</mat-label>
+      <input matInput formControlName="url" readonly>
+    </mat-form-field>
+  </form>
+
+  <div class="download-actions">
+    <button mat-raised-button color="primary" (click)="download()" [disabled]="downloading">
+      {{ downloading ? 'Downloading...' : 'Download' }}
+    </button>
+  </div>
+
+  @if (downloading || currentPhase) {
+    <div class="overall-progress">
+      <div class="phase-info">
+        <strong>{{ currentPhase }}</strong>
+        <span class="overall-percentage">{{ overallProgress }}%</span>
+      </div>
+      <mat-progress-bar
+        mode="determinate"
+        [value]="overallProgress"
+        class="overall-progress-bar">
+      </mat-progress-bar>
+    </div>
+  }
+
+  @if (getProgressMessages().length > 0) {
+    <div class="terminal">
+      @for (message of getProgressMessages(); track message) {
+        <div class="terminal-line">
+          <pre>{{ message }}</pre>
+          @if (message.startsWith('Downloading')) {
+            <mat-progress-bar
+              mode="determinate"
+              [value]="progressItems[message].percentage">
+            </mat-progress-bar>
+            <small>{{ progressItems[message].percentage.toFixed(1) }}%</small>
+            @if (progressItems[message].downloaded && progressItems[message].downloaded! > 0) {
+              <small> - {{ formatBytes(progressItems[message].downloaded!) }}@if (progressItems[message].total && progressItems[message].total! > 0) { / {{ formatBytes(progressItems[message].total!) }}}</small>
+            }
+          }
+          @if (message.startsWith('Extracting') || message.startsWith('Moving') || message.startsWith('Removing')) {
+            <mat-progress-bar
+              mode="determinate"
+              [value]="progressItems[message].percentage">
+            </mat-progress-bar>
+            <small>{{ progressItems[message].percentage.toFixed(1) }}%</small>
+          }
+        </div>
+      }
+    </div>
+  }
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button (click)="close()">Close</button>
+</mat-dialog-actions>

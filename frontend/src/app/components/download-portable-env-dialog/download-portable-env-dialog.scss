@@ -1,0 +1,84 @@
+.download-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.full-width {
+  width: 100%;
+}
+
+.download-actions {
+  margin-bottom: 16px;
+}
+
+.overall-progress {
+  margin: 24px 0;
+  padding: 16px;
+  background: #f5f5f5;
+  border-radius: 4px;
+  border-left: 4px solid #2196f3;
+
+  .phase-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+
+    strong {
+      font-size: 14px;
+      color: rgba(0, 0, 0, 0.87);
+    }
+
+    .overall-percentage {
+      font-size: 16px;
+      font-weight: 500;
+      color: #2196f3;
+    }
+  }
+
+  .overall-progress-bar {
+    height: 8px;
+  }
+}
+
+.terminal {
+  background: #1e1e1e;
+  color: #d4d4d4;
+  padding: 16px;
+  border-radius: 4px;
+  max-height: 300px;
+  overflow-y: auto;
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+}
+
+.terminal-line {
+  margin-bottom: 12px;
+
+  pre {
+    margin: 0 0 4px 0;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+  }
+
+  small {
+    color: #4caf50;
+    margin-left: 8px;
+  }
+
+  mat-progress-bar {
+    margin: 4px 0;
+  }
+
+  .success-message {
+    color: #4caf50;
+    font-weight: bold;
+  }
+}
+
+mat-dialog-content {
+  min-width: 500px;
+  max-width: 600px;
+}

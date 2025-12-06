@@ -1,0 +1,57 @@
+import { Routes } from '@angular/router';
+import { Home } from './home/home';
+import { Settings } from './pages/settings/settings';
+import { Jobs } from './pages/jobs/jobs';
+import { JobDetail } from './pages/job-detail/job-detail';
+import { Pca } from './pages/analysis/pca/pca';
+import { Imputation } from './pages/analysis/imputation/imputation';
+import { Normalization } from './pages/analysis/normalization/normalization';
+import { Limma } from './pages/analysis/limma/limma';
+import { Phate } from './pages/analysis/phate/phate';
+import { FuzzyClustering } from './pages/analysis/fuzzy-clustering/fuzzy-clustering';
+import { Alphastats } from './pages/analysis/alphastats/alphastats';
+import { QfeaturesLimma } from './pages/analysis/qfeatures-limma/qfeatures-limma';
+import { CorrelationMatrix } from './pages/analysis/correlation-matrix/correlation-matrix';
+import { CvPlot } from './pages/analysis/cv-plot/cv-plot';
+import { EstimationPlot } from './pages/analysis/estimation-plot/estimation-plot';
+import { FoldChangeViolin } from './pages/analysis/fold-change-violin/fold-change-violin';
+import { Maxlfq } from './pages/analysis/maxlfq/maxlfq';
+import { BatchCorrection } from './pages/analysis/batch-correction/batch-correction';
+import { VennDiagram } from './pages/analysis/venn-diagram/venn-diagram';
+import { ViolinPlot } from './pages/analysis/violin-plot/violin-plot';
+import { Uniprot } from './pages/utilities/uniprot/uniprot';
+import { CoverageMap } from './pages/utilities/coverage-map/coverage-map';
+import { PtmRemap } from './pages/utilities/ptm-remap/ptm-remap';
+import { PeptideCheck } from './pages/utilities/peptide-check/peptide-check';
+import { FormatConversion } from './pages/utilities/format-conversion/format-conversion';
+import { Plugins } from './pages/plugins/plugins';
+
+export const routes: Routes = [
+  { path: '', component: Home },
+  { path: 'settings', component: Settings },
+  { path: 'jobs', component: Jobs },
+  { path: 'jobs/:id', component: JobDetail },
+  { path: 'plugins', component: Plugins },
+  { path: 'analysis/pca', component: Pca },
+  { path: 'analysis/imputation', component: Imputation },
+  { path: 'analysis/normalization', component: Normalization },
+  { path: 'analysis/limma', component: Limma },
+  { path: 'analysis/phate', component: Phate },
+  { path: 'analysis/fuzzy-clustering', component: FuzzyClustering },
+  { path: 'analysis/alphastats', component: Alphastats },
+  { path: 'analysis/qfeatures-limma', component: QfeaturesLimma },
+  { path: 'analysis/correlation-matrix', component: CorrelationMatrix },
+  { path: 'analysis/cv-plot', component: CvPlot },
+  { path: 'analysis/estimation-plot', component: EstimationPlot },
+  { path: 'analysis/fold-change-violin', component: FoldChangeViolin },
+  { path: 'analysis/maxlfq', component: Maxlfq },
+  { path: 'analysis/batch-correction', component: BatchCorrection },
+  { path: 'analysis/venn-diagram', component: VennDiagram },
+  { path: 'analysis/violin-plot', component: ViolinPlot },
+  { path: 'utilities/uniprot', component: Uniprot },
+  { path: 'utilities/coverage-map', component: CoverageMap },
+  { path: 'utilities/ptm-remap', component: PtmRemap },
+  { path: 'utilities/peptide-check', component: PeptideCheck },
+  { path: 'utilities/format-conversion', component: FormatConversion },
+  { path: '**', redirectTo: '' }
+];

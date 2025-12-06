@@ -1,0 +1,27 @@
+<h2 mat-dialog-title>
+  <mat-icon>inventory_2</mat-icon>
+  Installed Packages: {{ data.environmentName }}
+</h2>
+
+<mat-dialog-content>
+  @if (loading) {
+    <div class="loading-container">
+      <mat-spinner diameter="40"></mat-spinner>
+      <p>Loading packages...</p>
+    </div>
+  } @else {
+    @if (packages.length > 0) {
+      <mat-list>
+        @for (pkg of packages; track pkg) {
+          <mat-list-item>{{ pkg }}</mat-list-item>
+        }
+      </mat-list>
+    } @else {
+      <p class="no-packages">No packages found</p>
+    }
+  }
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button (click)="close()">Close</button>
+</mat-dialog-actions>

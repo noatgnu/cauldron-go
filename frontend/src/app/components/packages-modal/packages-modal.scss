@@ -1,0 +1,48 @@
+h2[mat-dialog-title] {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  mat-icon {
+    color: #1976d2;
+  }
+}
+
+mat-dialog-content {
+  min-height: 300px;
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  gap: 16px;
+
+  p {
+    margin: 0;
+    color: rgba(0, 0, 0, 0.6);
+  }
+}
+
+.no-packages {
+  text-align: center;
+  padding: 40px;
+  color: rgba(0, 0, 0, 0.5);
+  font-style: italic;
+}
+
+mat-list {
+  mat-list-item {
+    font-family: monospace;
+    font-size: 13px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+
+    &:last-child {
+      border-bottom: none;
+    }
+  }
+}

@@ -1,0 +1,3 @@
+condition_A	condition_B	comparison_label
+BCA_LT-IP	BCA_LT-MockIP	BCA_LT-IP vs BCA_LT-MockIP
+Pepide-CBQCA_LT-IP	Pepide-CBQCA_LT-MockIP	Pepide-CBQCA_LT-IP vs Pepide-CBQCA_LT-MockIP

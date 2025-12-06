@@ -1,0 +1,77 @@
+<h2 mat-dialog-title>Remap PTM Position in Protein</h2>
+
+<mat-dialog-content>
+  <form [formGroup]="form" class="remap-ptm-form">
+    <div class="form-section">
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Input File</mat-label>
+        <input matInput readonly formControlName="file_path">
+      </mat-form-field>
+      <div class="file-actions">
+        <button mat-raised-button color="primary" type="button" (click)="openFile('file_path')">
+          Browse
+        </button>
+        <div class="file-selector">
+          <app-imported-file-selection
+            (columns)="updateColumns($event)"
+            (selected)="updateFormWithSelected($event, 'file_path')">
+          </app-imported-file-selection>
+        </div>
+      </div>
+    </div>
+
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>Peptide Column</mat-label>
+      <mat-select formControlName="peptide_column">
+        <mat-option [value]="null">Select a column</mat-option>
+        @for (col of columns; track col) {
+          <mat-option [value]="col">{{col}}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>Position in Peptide Column</mat-label>
+      <mat-select formControlName="position_in_peptide_column">
+        <mat-option [value]="null">Select a column</mat-option>
+        @for (col of columns; track col) {
+          <mat-option [value]="col">{{col}}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>UniProt Acc Column</mat-label>
+      <mat-select formControlName="uniprot_acc_column">
+        <mat-option [value]="null">Select a column</mat-option>
+        @for (col of columns; track col) {
+          <mat-option [value]="col">{{col}}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <div class="form-section">
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Fasta Library</mat-label>
+        <input matInput formControlName="fasta_file">
+      </mat-form-field>
+      <div class="file-actions">
+        <button mat-raised-button color="primary" type="button" (click)="openFile('fasta_file')">
+          Browse
+        </button>
+        <div class="file-selector">
+          <app-imported-file-selection
+            (selected)="updateFormWithSelected($event, 'fasta_file')">
+          </app-imported-file-selection>
+        </div>
+      </div>
+    </div>
+  </form>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button (click)="close()">Close</button>
+  <button mat-raised-button color="primary" (click)="submit()" [disabled]="!form.valid">
+    Submit
+  </button>
+</mat-dialog-actions>

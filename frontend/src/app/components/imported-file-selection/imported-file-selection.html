@@ -1,0 +1,14 @@
+@if (files().length > 0) {
+  <mat-form-field appearance="outline" class="file-select">
+    <mat-label>Select an imported file</mat-label>
+    <mat-select (selectionChange)="selectFile($event.value)">
+      @for (f of files(); track f.id) {
+        <mat-option [value]="f">{{f.name}}</mat-option>
+      }
+    </mat-select>
+  </mat-form-field>
+} @else {
+  <div class="no-files">
+    <p>No imported files available. Import a file first.</p>
+  </div>
+}

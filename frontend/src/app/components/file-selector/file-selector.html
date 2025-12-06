@@ -1,0 +1,36 @@
+<div class="file-selector-container">
+  <mat-form-field appearance="outline" class="file-select-field">
+    <mat-label>{{ label() }}</mat-label>
+    <mat-select [value]="currentSelection()"
+                (valueChange)="onSelectionChange($event)"
+                [placeholder]="placeholder()">
+      @if (loading()) {
+        <mat-option disabled>
+          <mat-spinner diameter="20"></mat-spinner>
+          Loading files...
+        </mat-option>
+      } @else {
+        @for (file of importedFiles(); track file.id) {
+          <mat-option [value]="file.path">
+            <div class="file-option">
+              <mat-icon>insert_drive_file</mat-icon>
+              <div class="file-info">
+                <div class="file-name">{{ file.name }}</div>
+                <div class="file-details">{{ file.preview }}</div>
+              </div>
+            </div>
+          </mat-option>
+        }
+        @if (importedFiles().length === 0) {
+          <mat-option disabled>No imported files</mat-option>
+        }
+      }
+    </mat-select>
+    <mat-hint>Select from previously imported files</mat-hint>
+  </mat-form-field>
+
+  <button mat-stroked-button (click)="browseFile()" class="browse-button">
+    <mat-icon>folder_open</mat-icon>
+    Browse
+  </button>
+</div>

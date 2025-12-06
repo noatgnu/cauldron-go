@@ -1,0 +1,147 @@
+<h2 mat-dialog-title>Sample Annotation</h2>
+
+<mat-dialog-content>
+  <mat-expansion-panel class="tools-panel">
+    <mat-expansion-panel-header>
+      <mat-panel-title>
+        <mat-icon>auto_fix_high</mat-icon>
+        Auto-Grouping Tools
+      </mat-panel-title>
+    </mat-expansion-panel-header>
+
+    <div class="auto-group-section">
+      <h4>Regex-based Auto-Grouping</h4>
+      <p class="help-text">Apply conditions to samples matching regex patterns</p>
+
+      @for (rule of regexRules; track $index) {
+        <div class="regex-rule">
+          <mat-form-field appearance="outline" class="regex-field">
+            <mat-label>Regex Pattern</mat-label>
+            <input matInput [(ngModel)]="rule.pattern" placeholder="e.g., ^control.*">
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="condition-field">
+            <mat-label>Condition</mat-label>
+            <input matInput [(ngModel)]="rule.condition" placeholder="e.g., Control">
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="batch-field">
+            <mat-label>Batch (Optional)</mat-label>
+            <input matInput [(ngModel)]="rule.batch" placeholder="e.g., 1">
+          </mat-form-field>
+
+          <button mat-icon-button color="warn" (click)="removeRegexRule($index)">
+            <mat-icon>delete</mat-icon>
+          </button>
+        </div>
+      }
+
+      <div class="regex-actions">
+        <button mat-raised-button (click)="addRegexRule()">
+          <mat-icon>add</mat-icon>
+          Add Rule
+        </button>
+        <button mat-raised-button color="primary" (click)="applyRegexRules()">
+          <mat-icon>play_arrow</mat-icon>
+          Apply Rules
+        </button>
+      </div>
+    </div>
+
+    <mat-divider></mat-divider>
+
+    <div class="batch-assign-section">
+      <h4>Batch Assignment</h4>
+      <p class="help-text">Select samples and assign them to a condition</p>
+
+      <div class="batch-assign-controls">
+        <button mat-raised-button (click)="selectAll()">
+          <mat-icon>select_all</mat-icon>
+          Select All
+        </button>
+        <button mat-raised-button (click)="deselectAll()">
+          <mat-icon>deselect</mat-icon>
+          Deselect All
+        </button>
+
+        <mat-form-field appearance="outline" class="batch-condition-field">
+          <mat-label>Condition</mat-label>
+          <input matInput [(ngModel)]="batchCondition" placeholder="Enter condition">
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="batch-batch-field">
+          <mat-label>Batch (Optional)</mat-label>
+          <input matInput [(ngModel)]="batchBatch" placeholder="Enter batch">
+        </mat-form-field>
+
+        <button mat-raised-button color="primary" (click)="applyBatchAssignment()">
+          <mat-icon>check</mat-icon>
+          Apply to Selected
+        </button>
+      </div>
+    </div>
+  </mat-expansion-panel>
+
+  <div class="annotation-table-container">
+    <table class="annotation-table">
+      <thead>
+        <tr>
+          <th><mat-checkbox [(ngModel)]="selectAllCheckbox" (change)="toggleSelectAll()"></mat-checkbox></th>
+          <th>Sample</th>
+          <th>Condition</th>
+          <th>Batch</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (s of annotation; track $index) {
+          <tr [class.selected]="isSelected($index)">
+            <td>
+              <mat-checkbox [(ngModel)]="s.selected"></mat-checkbox>
+            </td>
+            <td>
+              <mat-form-field appearance="outline" class="compact-field">
+                <input matInput [(ngModel)]="s.Sample" [readonly]="mode==='edit'">
+              </mat-form-field>
+            </td>
+            <td>
+              <mat-form-field appearance="outline" class="compact-field">
+                <input matInput [(ngModel)]="s.Condition">
+              </mat-form-field>
+            </td>
+            <td>
+              <mat-form-field appearance="outline" class="compact-field">
+                <input matInput [(ngModel)]="s.Batch">
+              </mat-form-field>
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+
+  <div class="action-buttons">
+    @if (mode === 'create') {
+      <button mat-raised-button color="primary" (click)="addSample()">
+        <mat-icon>add</mat-icon>
+        Add Sample
+      </button>
+      <button mat-raised-button (click)="parseFromClipboard('Sample')">
+        <mat-icon>content_paste</mat-icon>
+        Parse Sample
+      </button>
+    }
+    <button mat-raised-button (click)="parseFromClipboard('Condition')">
+      <mat-icon>content_paste</mat-icon>
+      Parse Condition
+    </button>
+    <button mat-raised-button (click)="parseFromClipboard('Batch')">
+      <mat-icon>content_paste</mat-icon>
+      Parse Batch
+    </button>
+  </div>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button (click)="close()">Close</button>
+  <button mat-raised-button color="primary" (click)="save()">Save</button>
+</mat-dialog-actions>

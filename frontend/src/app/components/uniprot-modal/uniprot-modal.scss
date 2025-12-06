@@ -1,0 +1,38 @@
+.uniprot-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 600px;
+  max-height: 70vh;
+}
+
+.form-row {
+  display: flex;
+  gap: 16px;
+  width: 100%;
+}
+
+.half-width {
+  flex: 1;
+}
+
+.full-width {
+  width: 100%;
+}
+
+.sections-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  max-height: 50vh;
+}
+
+.section-group {
+  display: flex;
+  flex-direction: column;
+}
+
+mat-dialog-content {
+  overflow: visible;
+}

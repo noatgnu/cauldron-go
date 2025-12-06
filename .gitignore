@@ -1,0 +1,126 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+
+# Go workspace file
+go.work
+
+# Dependency directories
+vendor/
+
+# Wails build output
+build/bin/
+build/windows/
+build/darwin/
+build/linux/
+wails_build.log
+
+# Frontend dependencies
+node_modules/
+frontend/node_modules/
+frontend/.angular/
+frontend/dist/
+frontend/.nx/
+.nx/
+
+# IDE and Editor directories
+.idea/
+.vscode/
+.vs/
+*.swp
+*.swo
+*~
+
+# OS specific files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv
+*.egg-info/
+dist/
+build/
+
+# R
+.Rhistory
+.RData
+.Rproj.user
+*.Rproj
+
+# Application logs
+*.log
+app.log
+build_output.log
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+*.db-shm
+*.db-wal
+
+# Temporary files
+temp/
+tmp/
+*.tmp
+
+# Output directories
+outputs/
+output/
+
+# Portable environments (downloaded)
+bin/win/python/
+bin/win/R-Portable/
+bin/linux/python/
+bin/linux/R-Portable/
+bin/darwin/python/
+bin/darwin/R-Portable/
+
+# Keep scripts directory structure
+!scripts/
+
+# Environment files (if you add them later)
+.env
+.env.local
+.env.*.local
+
+# Test coverage
+coverage/
+*.cover
+.coverage
+htmlcov/
+
+# Build artifacts
+*.tar.gz
+*.zip
+
+# Package files
+*.deb
+*.rpm
+*.msi
+*.pkg
+*.dmg
+*.AppImage

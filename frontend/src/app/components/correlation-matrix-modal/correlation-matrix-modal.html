@@ -1,0 +1,136 @@
+<h2 mat-dialog-title>Correlation Matrix</h2>
+
+<mat-dialog-content>
+  <form [formGroup]="form" class="correlation-form">
+    <div class="form-section">
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Input file</mat-label>
+        <input matInput readonly formControlName="file_path">
+      </mat-form-field>
+      <div class="file-actions">
+        <button mat-raised-button color="primary" type="button" (click)="openFile('file_path')">
+          Browse
+        </button>
+        <div class="file-selector">
+          <app-imported-file-selection
+            (columns)="updateColumns($event)"
+            (selected)="updateFormWithSelected($event, 'file_path')">
+          </app-imported-file-selection>
+        </div>
+      </div>
+    </div>
+
+    <mat-checkbox formControlName="plot_only" class="plot-only-checkbox">
+      Plot only (if the input file is already a correlation matrix)
+    </mat-checkbox>
+
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>
+        @if (form.value['plot_only']) {
+          Correlation matrix vertical row name column
+        } @else {
+          Index Column
+        }
+      </mat-label>
+      <mat-select formControlName="index_col">
+        @for (c of columns; track c) {
+          <mat-option [value]="c">{{c}}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>
+        @if (form.value['plot_only']) {
+          Correlation matrix vertical column name
+        } @else {
+          Sample Columns
+        }
+      </mat-label>
+      <mat-select formControlName="sample_cols" multiple>
+        @for (c of columns; track c) {
+          <mat-option [value]="c">{{c}}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    @if (!form.value['plot_only']) {
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Correlation Method</mat-label>
+        <mat-select formControlName="method">
+          @for (m of correlationMethod; track m) {
+            <mat-option [value]="m">{{m}}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+    }
+
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>Sort Order</mat-label>
+      <mat-select formControlName="order">
+        @for (o of orderList; track o) {
+          <mat-option [value]="o">{{o}}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    @if (form.value['order'] === 'hclust') {
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>HClust Method</mat-label>
+        <mat-select formControlName="hclust_method">
+          @for (h of hclusteringMethod; track h) {
+            <mat-option [value]="h">{{h}}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+    }
+
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>Presenting Method</mat-label>
+      <mat-select formControlName="presenting_method">
+        @for (p of presentingMethod; track p) {
+          <mat-option [value]="p">{{p}}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>Correlation Plot Shape</mat-label>
+      <mat-select formControlName="cor_shape">
+        @for (s of correlationPlotShape; track s) {
+          <mat-option [value]="s">{{s}}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>Minimum Color Scale Value</mat-label>
+      <input matInput type="number" formControlName="min_value" max="1" min="0">
+    </mat-form-field>
+
+    <div class="color-ramp-section">
+      <label class="section-label">Color Ramp:</label>
+      <div class="color-list">
+        @for (c of colorRamp; track c; let i = $index) {
+          <div class="color-item">
+            <input type="color" [(ngModel)]="colorRamp[i]" [ngModelOptions]="{standalone: true}" class="color-picker">
+            <button mat-icon-button color="warn" type="button" (click)="removeColor(i)">
+              <mat-icon>remove</mat-icon>
+            </button>
+          </div>
+        }
+      </div>
+      <button mat-raised-button type="button" (click)="addColor()" class="add-color-btn">
+        <mat-icon>add</mat-icon>
+        Add Color
+      </button>
+    </div>
+  </form>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button (click)="close()">Close</button>
+  <button mat-raised-button color="primary" (click)="submit()" [disabled]="!form.valid">
+    Submit
+  </button>
+</mat-dialog-actions>

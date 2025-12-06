@@ -1,0 +1,17 @@
+<h2 mat-dialog-title>Export Protocols.io RIS</h2>
+
+<mat-dialog-content>
+  <form [formGroup]="form" class="protocol-io-form">
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>Protocols.io ID</mat-label>
+      <textarea matInput formControlName="idList" rows="10"></textarea>
+    </mat-form-field>
+  </form>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button (click)="close()">Cancel</button>
+  <button mat-raised-button color="primary" (click)="download()">
+    Export
+  </button>
+</mat-dialog-actions>

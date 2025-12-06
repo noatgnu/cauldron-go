@@ -1,0 +1,38 @@
+<mat-card>
+  <mat-card-header>
+    <mat-card-title>{{ plotTitle || 'Plugin Plot' }}</mat-card-title>
+  </mat-card-header>
+
+  <mat-card-content>
+    @if (loading()) {
+      <div class="loading-container">
+        <mat-spinner diameter="50"></mat-spinner>
+        <p>Loading plot...</p>
+      </div>
+    }
+
+    @if (error() && !loading()) {
+      <div class="error-container">
+        <mat-icon color="warn">error</mat-icon>
+        <p>{{ error() }}</p>
+      </div>
+    }
+
+    @if (!loading() && !error()) {
+      <div class="export-actions">
+        <button mat-raised-button color="accent" (click)="exportToSVG()">
+          <mat-icon>save</mat-icon>
+          Export to SVG
+        </button>
+      </div>
+      <div class="plot-container">
+        <plotly-plot
+          [divId]="getPlotId()"
+          [data]="plotData()"
+          [layout]="plotLayout()"
+          [config]="plotConfig()"
+        ></plotly-plot>
+      </div>
+    }
+  </mat-card-content>
+</mat-card>

@@ -1,0 +1,51 @@
+<h2 mat-dialog-title>DIA-NN to CurtainPTM Converter</h2>
+
+<mat-dialog-content>
+  <form [formGroup]="form" class="converter-form">
+    <div class="form-section">
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>PR File Path (Reports.pr_matrix.tsv)</mat-label>
+        <input matInput readonly formControlName="pr_file_path">
+      </mat-form-field>
+      <div class="file-actions">
+        <button mat-raised-button color="primary" type="button" (click)="openFile('pr_file_path')">
+          Browse
+        </button>
+        <div class="file-selector">
+          <app-imported-file-selection
+            (selected)="updateFormWithSelected($event, 'pr_file_path')">
+          </app-imported-file-selection>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Report File Path (Reports.tsv)</mat-label>
+        <input matInput readonly formControlName="report_file_path">
+      </mat-form-field>
+      <div class="file-actions">
+        <button mat-raised-button color="primary" type="button" (click)="openFile('report_file_path')">
+          Browse
+        </button>
+        <div class="file-selector">
+          <app-imported-file-selection
+            (selected)="updateFormWithSelected($event, 'report_file_path')">
+          </app-imported-file-selection>
+        </div>
+      </div>
+    </div>
+
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>Modification of Interests</mat-label>
+      <input matInput formControlName="modification_of_interests">
+    </mat-form-field>
+  </form>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button (click)="close()">Close</button>
+  <button mat-raised-button color="primary" (click)="submit()" [disabled]="!form.valid">
+    Submit
+  </button>
+</mat-dialog-actions>

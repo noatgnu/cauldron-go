@@ -1,0 +1,26 @@
+<h2 mat-dialog-title>Fuzzy Clustering PCA Plot</h2>
+
+<mat-dialog-content>
+  <div class="fuzzy-viewer">
+    <div class="plot-container">
+      <app-fuzzy-clustering-pca-plot [data]="data" [revision]="revision"></app-fuzzy-clustering-pca-plot>
+    </div>
+
+    <div class="controls-panel">
+      <form [formGroup]="form" class="controls-form">
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Select File</mat-label>
+          <mat-select formControlName="selectedFile">
+            @for (file of filePathList; track file) {
+              <mat-option [value]="file">{{getFileName(file)}}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+      </form>
+    </div>
+  </div>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button (click)="close()">Close</button>
+</mat-dialog-actions>

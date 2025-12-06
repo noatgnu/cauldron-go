@@ -1,0 +1,62 @@
+@if (loading()) {
+  <div class="loading-container">
+    <mat-spinner></mat-spinner>
+    <p>Loading PCA plot...</p>
+  </div>
+} @else if (error()) {
+  <div class="error-container">
+    <mat-icon color="warn">error</mat-icon>
+    <p>{{ error() }}</p>
+  </div>
+} @else {
+  <mat-expansion-panel [expanded]="showCustomization()" (expandedChange)="showCustomization.set($event)">
+    <mat-expansion-panel-header>
+      <mat-panel-title>
+        <mat-icon>settings</mat-icon>
+        Plot Customization
+      </mat-panel-title>
+    </mat-expansion-panel-header>
+
+    <form [formGroup]="customizationForm" class="customization-form">
+      <mat-form-field appearance="outline">
+        <mat-label>Plot Title</mat-label>
+        <input matInput formControlName="title" placeholder="Enter custom title">
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Width (px)</mat-label>
+        <input matInput type="number" formControlName="width" min="400" max="2000">
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Height (px)</mat-label>
+        <input matInput type="number" formControlName="height" min="400" max="2000">
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Marker Size</mat-label>
+        <input matInput type="number" formControlName="markerSize" min="1" max="50">
+      </mat-form-field>
+
+      <mat-checkbox formControlName="showGrid">Show Grid</mat-checkbox>
+
+      <button mat-raised-button color="primary" (click)="applyCustomization()" type="button">
+        Apply Changes
+      </button>
+      <button mat-raised-button color="accent" (click)="exportToSVG()" type="button">
+        <mat-icon>save</mat-icon>
+        Export to SVG
+      </button>
+    </form>
+  </mat-expansion-panel>
+
+  <div class="plot-container">
+    <plotly-plot
+      divId="pca-plot-div"
+      [data]="plotData()"
+      [layout]="plotLayout()"
+      [config]="plotConfig()"
+      [style]="{width: '100%', height: '100%'}">
+    </plotly-plot>
+  </div>
+}

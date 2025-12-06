@@ -1,0 +1,128 @@
+.analysis-container {
+  flex: 1;
+  padding: 16px;
+  overflow-y: auto;
+}
+
+.analysis-card {
+  padding: 16px;
+
+  mat-card-header {
+    margin-bottom: 16px;
+
+    mat-card-title {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 20px;
+      font-weight: 500;
+
+      mat-icon {
+        font-size: 24px;
+        width: 24px;
+        height: 24px;
+      }
+    }
+  }
+}
+
+.analysis-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+
+  .full-width {
+    width: 100%;
+  }
+
+  .form-section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .form-field {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+
+    label {
+      font-size: 14px;
+      font-weight: 500;
+      color: rgba(0, 0, 0, 0.87);
+    }
+
+    select[multiple] {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid rgba(0, 0, 0, 0.23);
+      border-radius: 4px;
+      font-size: 14px;
+      font-family: inherit;
+
+      &:focus {
+        outline: none;
+        border-color: #1976d2;
+        box-shadow: 0 0 0 1px #1976d2;
+      }
+
+      option {
+        padding: 4px 8px;
+      }
+    }
+
+    .hint {
+      font-size: 12px;
+      color: rgba(0, 0, 0, 0.6);
+    }
+  }
+
+  .file-actions {
+    display: flex;
+    gap: 12px;
+    align-items: stretch;
+
+    button {
+      flex-shrink: 0;
+    }
+
+    .file-selector {
+      flex-grow: 1;
+    }
+  }
+
+  .checkbox-field {
+    margin: 8px 0;
+  }
+}
+
+.loading-columns {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: #f5f5f5;
+  border-radius: 4px;
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.6);
+}
+
+mat-card-actions {
+  padding: 16px;
+
+  button {
+    font-size: 13px;
+
+    mat-icon {
+      margin-right: 4px;
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+    }
+
+    mat-spinner {
+      display: inline-block;
+      margin-right: 8px;
+    }
+  }
+}

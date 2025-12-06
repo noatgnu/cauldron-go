@@ -1,0 +1,12 @@
+<nav class="breadcrumbs">
+  @for (crumb of breadcrumbs(); track crumb.url; let last = $last; let first = $first) {
+    @if (!first) {
+      <mat-icon class="separator">chevron_right</mat-icon>
+    }
+    @if (last) {
+      <span class="breadcrumb current">{{ crumb.label }}</span>
+    } @else {
+      <a class="breadcrumb link" (click)="navigate(crumb.url)">{{ crumb.label }}</a>
+    }
+  }
+</nav>

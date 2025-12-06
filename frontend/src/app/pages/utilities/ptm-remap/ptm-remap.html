@@ -1,0 +1,92 @@
+<div class="utility-container">
+  <mat-card class="utility-card">
+    <mat-card-header>
+      <mat-card-title>
+        <mat-icon>transform</mat-icon>
+        PTM Position Remapping
+      </mat-card-title>
+      <mat-card-subtitle>
+        Remap PTM positions from peptide to protein coordinates
+      </mat-card-subtitle>
+    </mat-card-header>
+    <mat-card-content>
+      <form [formGroup]="form" class="utility-form">
+        <div class="form-section">
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Input Data File</mat-label>
+            <input matInput readonly formControlName="filePath">
+          </mat-form-field>
+          <div class="file-actions">
+            <button mat-raised-button color="primary" type="button" (click)="openFile('filePath')">
+              Browse
+            </button>
+            <div class="file-selector">
+              <app-imported-file-selection
+                (columns)="updateColumns($event)"
+                (selected)="updateFormWithSelected($event, 'filePath')">
+              </app-imported-file-selection>
+            </div>
+          </div>
+        </div>
+
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Peptide Column</mat-label>
+          <mat-select formControlName="peptideColumn">
+            @for (col of columns; track col) {
+              <mat-option [value]="col">{{col}}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Position in Peptide Column</mat-label>
+          <mat-select formControlName="positionInPeptideColumn">
+            @for (col of columns; track col) {
+              <mat-option [value]="col">{{col}}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>UniProt Accession Column</mat-label>
+          <mat-select formControlName="uniprotAccColumn">
+            @for (col of columns; track col) {
+              <mat-option [value]="col">{{col}}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+
+        <div class="form-section">
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Fasta Library (Optional)</mat-label>
+            <input matInput readonly formControlName="fastaFile">
+          </mat-form-field>
+          <div class="file-actions">
+            <button mat-raised-button color="primary" type="button" (click)="openFile('fastaFile')">
+              Browse
+            </button>
+            <div class="file-selector">
+              <app-imported-file-selection
+                (selected)="updateFormWithSelected($event, 'fastaFile')">
+              </app-imported-file-selection>
+            </div>
+          </div>
+        </div>
+      </form>
+    </mat-card-content>
+    <mat-card-actions align="end">
+      <button mat-button (click)="reset()" [disabled]="running()">Reset</button>
+      <button mat-button (click)="loadExample()" [disabled]="running()">Load Example</button>
+      <button mat-raised-button color="primary" (click)="submit()"
+              [disabled]="form.invalid || running()">
+        @if (running()) {
+          <mat-spinner diameter="16"></mat-spinner>
+          Running...
+        } @else {
+          <mat-icon>play_arrow</mat-icon>
+          Remap Positions
+        }
+      </button>
+    </mat-card-actions>
+  </mat-card>
+</div>

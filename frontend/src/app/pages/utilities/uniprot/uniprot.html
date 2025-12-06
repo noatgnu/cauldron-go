@@ -1,0 +1,91 @@
+<div class="utility-container">
+  <mat-card class="utility-card">
+    <mat-card-header>
+      <mat-card-title>
+        <mat-icon>cloud_download</mat-icon>
+        UniProt Data Retrieval
+      </mat-card-title>
+      <mat-card-subtitle>
+        Fetch UniProt annotations for protein identifiers
+      </mat-card-subtitle>
+    </mat-card-header>
+    <mat-card-content>
+      <form [formGroup]="form" class="utility-form">
+        <div class="form-section">
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Input File</mat-label>
+            <input matInput readonly formControlName="inputFile">
+          </mat-form-field>
+          <div class="file-actions">
+            <button mat-raised-button color="primary" type="button" (click)="openFile()">
+              Browse
+            </button>
+            <div class="file-selector">
+              <app-imported-file-selection
+                (columns)="updateColumns($event)"
+                (selected)="updateFormWithSelected($event, 'inputFile')">
+              </app-imported-file-selection>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-row">
+          @if (uniprotFromFields.length > 0) {
+            <mat-form-field appearance="outline" class="half-width">
+              <mat-label>From Database</mat-label>
+              <mat-select formControlName="from">
+                @for (field of uniprotFromFields; track field) {
+                  <mat-optgroup [label]="field.groupName">
+                    @for (item of field.items; track item) {
+                      <mat-option [value]="item.name">{{item.displayName}}</mat-option>
+                    }
+                  </mat-optgroup>
+                }
+              </mat-select>
+            </mat-form-field>
+          }
+
+          <mat-form-field appearance="outline" class="half-width">
+            <mat-label>ID Column</mat-label>
+            <mat-select formControlName="column">
+              @for (col of columns; track col) {
+                <mat-option [value]="col">{{col}}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+        </div>
+
+        <div class="sections-container">
+          <h3>Select UniProt Fields</h3>
+          @for (section of uniprotSections; track section) {
+            @if (columnFormMap[section]) {
+              <div [formGroup]="columnFormMap[section]" class="section-group">
+                <mat-form-field appearance="outline" class="full-width">
+                  <mat-label>{{section}}</mat-label>
+                  <mat-select formControlName="columns" multiple>
+                    @for (item of uniprotSectionMap[section]; track item) {
+                      <mat-option [value]="item.fieldId">{{item.label}}</mat-option>
+                    }
+                  </mat-select>
+                </mat-form-field>
+              </div>
+            }
+          }
+        </div>
+      </form>
+    </mat-card-content>
+    <mat-card-actions align="end">
+      <button mat-button (click)="reset()" [disabled]="running()">Reset</button>
+      <button mat-raised-button color="primary" (click)="submit()"
+              [disabled]="form.invalid || running()">
+        @if (running()) {
+          <mat-spinner diameter="16"></mat-spinner>
+          Running...
+        } @else {
+          <mat-icon>play_arrow</mat-icon>
+          Retrieve Data
+        }
+      </button>
+    </mat-card-actions>
+  </mat-card>
+</div>

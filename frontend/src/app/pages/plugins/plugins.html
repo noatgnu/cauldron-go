@@ -1,0 +1,182 @@
+<div class="plugins-container">
+  <div class="header">
+    <h1>
+      <mat-icon>extension</mat-icon>
+      Custom Workflows
+    </h1>
+    <div class="header-actions">
+      <button mat-stroked-button (click)="openPluginsFolder()" [disabled]="loading()">
+        <mat-icon>folder_open</mat-icon>
+        Open Plugins Folder
+      </button>
+      <button mat-stroked-button (click)="createSamplePlugin()" [disabled]="loading()">
+        <mat-icon>add_circle_outline</mat-icon>
+        Create Sample Plugin
+      </button>
+      <button mat-raised-button color="primary" (click)="reloadPlugins()" [disabled]="loading()">
+        <mat-icon>refresh</mat-icon>
+        Reload Plugins
+      </button>
+    </div>
+  </div>
+
+  @if (loading()) {
+    <div class="loading-container">
+      <mat-spinner diameter="40"></mat-spinner>
+      <p>Loading plugins...</p>
+    </div>
+  }
+
+  @if (!loading() && plugins().length === 0) {
+    <mat-card class="empty-state">
+      <mat-card-content>
+        <mat-icon>extension</mat-icon>
+        <h2>No Plugins Found</h2>
+        <p>Create custom workflow plugins by adding YAML config files to:</p>
+        <code>{{ pluginsDirectory() }}</code>
+        <div class="empty-actions">
+          <button mat-raised-button color="primary" (click)="createSamplePlugin()">
+            <mat-icon>add_circle</mat-icon>
+            Create Sample Plugin
+          </button>
+          <button mat-stroked-button (click)="openPluginsFolder()">
+            <mat-icon>folder_open</mat-icon>
+            Open Plugins Folder
+          </button>
+        </div>
+      </mat-card-content>
+    </mat-card>
+  }
+
+  <div class="plugins-grid">
+    @for (plugin of plugins(); track plugin.id) {
+      <mat-card class="plugin-card">
+        <mat-card-header>
+          <mat-icon mat-card-avatar [class]="'runtime-icon ' + plugin.config.runtime">
+            {{ getRuntimeIcon(plugin.config.runtime) }}
+          </mat-icon>
+          <mat-card-title>{{ plugin.config.name }}</mat-card-title>
+          <mat-card-subtitle>
+            @if (plugin.config.author) {
+              by {{ plugin.config.author }} •
+            }
+            v{{ plugin.config.version }}
+          </mat-card-subtitle>
+        </mat-card-header>
+
+        <app-environment-indicator
+          [python]="plugin.config.runtime === 'python'"
+          [r]="plugin.config.runtime === 'r'"
+          [pythonWithR]="plugin.config.runtime === 'pythonWithR'">
+        </app-environment-indicator>
+
+        <mat-card-content>
+          <p class="description">{{ plugin.config.description }}</p>
+
+          @if (plugin.config.outputs && plugin.config.outputs.length > 0) {
+            <div class="outputs-info">
+              <strong>Outputs:</strong>
+              <div class="outputs-list">
+                @for (output of plugin.config.outputs; track output.name) {
+                  <mat-chip class="output-chip" matTooltip="{{ output.description }}">
+                    <mat-icon>file_present</mat-icon>
+                    {{ output.name }}
+                  </mat-chip>
+                }
+              </div>
+            </div>
+          }
+
+          @if (getForm(plugin.id); as form) {
+            <form [formGroup]="form" class="plugin-form">
+              @for (input of plugin.config.inputs; track input.name) {
+                <div class="form-field-wrapper">
+                  @if (input.type === 'file') {
+                    <mat-form-field appearance="outline" class="full-width">
+                      <mat-label>{{ input.label }}</mat-label>
+                      <input matInput readonly [formControlName]="input.name" [placeholder]="input.placeholder || ''">
+                      <mat-icon matPrefix>{{ getInputIcon(input.type) }}</mat-icon>
+                      <button mat-icon-button matSuffix type="button" (click)="openFileForInput(plugin.id, input.name)">
+                        <mat-icon>folder_open</mat-icon>
+                      </button>
+                      @if (input.description) {
+                        <mat-hint>{{ input.description }}</mat-hint>
+                      }
+                    </mat-form-field>
+                  } @else if (input.type === 'number') {
+                    <mat-form-field appearance="outline" class="full-width">
+                      <mat-label>{{ input.label }}</mat-label>
+                      <input matInput type="number" [formControlName]="input.name" [placeholder]="input.placeholder || ''">
+                      <mat-icon matPrefix>{{ getInputIcon(input.type) }}</mat-icon>
+                      @if (input.description) {
+                        <mat-hint>{{ input.description }}</mat-hint>
+                      }
+                    </mat-form-field>
+                  } @else if (input.type === 'boolean') {
+                    <mat-checkbox [formControlName]="input.name">
+                      {{ input.label }}
+                      @if (input.description) {
+                        <span class="checkbox-hint">{{ input.description }}</span>
+                      }
+                    </mat-checkbox>
+                  } @else if (input.type === 'select') {
+                    <mat-form-field appearance="outline" class="full-width">
+                      <mat-label>{{ input.label }}</mat-label>
+                      <mat-select [formControlName]="input.name">
+                        @for (option of input.options; track option) {
+                          <mat-option [value]="option">{{ option }}</mat-option>
+                        }
+                      </mat-select>
+                      <mat-icon matPrefix>{{ getInputIcon(input.type) }}</mat-icon>
+                      @if (input.description) {
+                        <mat-hint>{{ input.description }}</mat-hint>
+                      }
+                    </mat-form-field>
+                  } @else if (input.type === 'multiselect') {
+                    <mat-form-field appearance="outline" class="full-width">
+                      <mat-label>{{ input.label }}</mat-label>
+                      <mat-select [formControlName]="input.name" multiple>
+                        @for (option of input.options; track option) {
+                          <mat-option [value]="option">{{ option }}</mat-option>
+                        }
+                      </mat-select>
+                      <mat-icon matPrefix>{{ getInputIcon(input.type) }}</mat-icon>
+                      @if (input.description) {
+                        <mat-hint>{{ input.description }}</mat-hint>
+                      }
+                    </mat-form-field>
+                  } @else {
+                    <mat-form-field appearance="outline" class="full-width">
+                      <mat-label>{{ input.label }}</mat-label>
+                      <input matInput [formControlName]="input.name" [placeholder]="input.placeholder || ''">
+                      <mat-icon matPrefix>{{ getInputIcon(input.type) }}</mat-icon>
+                      @if (input.description) {
+                        <mat-hint>{{ input.description }}</mat-hint>
+                      }
+                    </mat-form-field>
+                  }
+                </div>
+              }
+            </form>
+          }
+        </mat-card-content>
+
+        <mat-card-actions>
+          <button
+            mat-raised-button
+            color="primary"
+            (click)="executePlugin(plugin)"
+            [disabled]="executing()[plugin.id] || getForm(plugin.id)?.invalid">
+            @if (executing()[plugin.id]) {
+              <mat-spinner diameter="20"></mat-spinner>
+              Executing...
+            } @else {
+              <mat-icon>play_arrow</mat-icon>
+              Run Workflow
+            }
+          </button>
+        </mat-card-actions>
+      </mat-card>
+    }
+  </div>
+</div>

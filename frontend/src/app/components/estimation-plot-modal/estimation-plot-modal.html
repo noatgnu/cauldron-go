@@ -1,0 +1,91 @@
+<h2 mat-dialog-title>Estimation Plot</h2>
+
+<mat-dialog-content>
+  <form [formGroup]="form" class="estimation-form">
+    <div class="file-section">
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Input File</mat-label>
+        <input matInput formControlName="input_file" readonly>
+      </mat-form-field>
+      <div class="file-actions">
+        <button mat-raised-button color="primary" type="button" (click)="openFile('input_file')">
+          Browse
+        </button>
+        <div class="flex-grow">
+          <app-imported-file-selection
+            (columns)="updateColumns($event)"
+            (selected)="updateFormWithSelected($event, 'input_file')">
+          </app-imported-file-selection>
+        </div>
+      </div>
+    </div>
+
+    <div class="file-section">
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Annotation File</mat-label>
+        <input matInput formControlName="annotation_file" readonly>
+      </mat-form-field>
+      <div class="file-actions">
+        <button mat-raised-button color="primary" type="button" (click)="openFile('annotation_file')">
+          Browse
+        </button>
+        <div class="flex-grow">
+          <app-imported-file-selection
+            (selected)="updateFormWithSelected($event, 'annotation_file')">
+          </app-imported-file-selection>
+        </div>
+      </div>
+    </div>
+
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>Index Column</mat-label>
+      <mat-select formControlName="index_col">
+        @for (col of columns; track col) {
+          <mat-option [value]="col">{{col}}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>Select Protein</mat-label>
+      <input matInput formControlName="selected_protein" [matAutocomplete]="auto">
+      <mat-autocomplete #auto="matAutocomplete">
+        @for (option of filteredData; track option) {
+          <mat-option [value]="option">{{option}}</mat-option>
+        }
+      </mat-autocomplete>
+    </mat-form-field>
+
+    <mat-checkbox formControlName="log2">Log2 Transform Data</mat-checkbox>
+
+    @if (conditions.length > 0) {
+      <div class="conditions-section">
+        <h3>Conditions Order</h3>
+        <mat-list>
+          @for (condition of conditions; track condition; let i = $index) {
+            <mat-list-item>
+              <span matListItemTitle>{{condition}}</span>
+              <div matListItemMeta class="condition-actions">
+                <button mat-icon-button (click)="moveConditionUp(i)" [disabled]="i === 0">
+                  <mat-icon>arrow_upward</mat-icon>
+                </button>
+                <button mat-icon-button (click)="moveConditionDown(i)" [disabled]="i === conditions.length - 1">
+                  <mat-icon>arrow_downward</mat-icon>
+                </button>
+              </div>
+            </mat-list-item>
+          }
+        </mat-list>
+      </div>
+    }
+  </form>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button (click)="loadExample()">Load Example</button>
+  <div class="flex-spacer"></div>
+  <button mat-button (click)="close()">Cancel</button>
+  <button mat-raised-button color="primary" (click)="submit()">
+    Submit
+  </button>
+</mat-dialog-actions>

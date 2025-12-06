@@ -1,0 +1,116 @@
+<div class="analysis-container">
+  <mat-card class="analysis-card">
+    <mat-card-header>
+      <mat-card-title>
+        <mat-icon>auto_fix_high</mat-icon>
+        Imputation Analysis
+      </mat-card-title>
+    </mat-card-header>
+    <app-environment-indicator [python]="true"></app-environment-indicator>
+    <mat-card-content>
+      <form [formGroup]="form" class="analysis-form">
+        <div class="form-section">
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Input Data File</mat-label>
+            <input matInput readonly formControlName="filePath">
+          </mat-form-field>
+          <div class="file-actions">
+            <button mat-raised-button color="primary" type="button" (click)="openFile()">
+              Browse
+            </button>
+            <div class="file-selector">
+              <app-imported-file-selection
+                (columns)="updateColumns($event)"
+                (selected)="updateFormWithSelected($event, 'filePath')">
+              </app-imported-file-selection>
+            </div>
+          </div>
+        </div>
+
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Runtime Environment</mat-label>
+          <mat-select formControlName="runtime">
+            <mat-option value="r">R</mat-option>
+            <mat-option value="python">Python</mat-option>
+          </mat-select>
+          <mat-hint>Select runtime environment for imputation</mat-hint>
+        </mat-form-field>
+
+        @if (columns.length > 0) {
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Sample Columns</mat-label>
+            <mat-select formControlName="columns" multiple>
+              @for (col of columns; track col) {
+                <mat-option [value]="col">{{ col }}</mat-option>
+              }
+            </mat-select>
+            <mat-hint>Select columns to impute</mat-hint>
+          </mat-form-field>
+        }
+
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Imputation Method</mat-label>
+          <mat-select formControlName="method">
+            <mat-option value="knn">KNN</mat-option>
+            <mat-option value="simple">Simple Imputation</mat-option>
+            <mat-option value="iterative">Iterative Imputation</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        @if (form.value.method === 'knn') {
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>K-neighbors</mat-label>
+            <input matInput type="number" formControlName="k" min="1">
+            <mat-hint>Number of neighbors for KNN</mat-hint>
+          </mat-form-field>
+        } @else if (form.value.method === 'simple') {
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Strategy</mat-label>
+            <mat-select formControlName="strategy">
+              <mat-option value="mean">Mean</mat-option>
+              <mat-option value="median">Median</mat-option>
+              <mat-option value="most_frequent">Most Frequent</mat-option>
+              <mat-option value="constant">Constant</mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          @if (form.value.strategy === 'constant') {
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>Constant Value</mat-label>
+              <input matInput type="number" formControlName="fillValue">
+              <mat-hint>Value to use for imputation</mat-hint>
+            </mat-form-field>
+          }
+        } @else if (form.value.method === 'iterative') {
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Iterations</mat-label>
+            <input matInput type="number" formControlName="iterations" min="1">
+            <mat-hint>Number of iterations</mat-hint>
+          </mat-form-field>
+        }
+      </form>
+    </mat-card-content>
+    <mat-card-actions align="end">
+      <button mat-button (click)="reset()" [disabled]="running()">Reset</button>
+      <button mat-button (click)="loadExample()" [disabled]="running()">
+        Load Example
+      </button>
+      <button mat-raised-button color="primary" (click)="submit()"
+              [disabled]="form.invalid || running()">
+        @if (running()) {
+          <mat-spinner diameter="16"></mat-spinner>
+          Running...
+        } @else {
+          <mat-icon>play_arrow</mat-icon>
+          Run Analysis
+        }
+      </button>
+      @if (createdJobId) {
+        <button mat-raised-button color="accent" (click)="viewJob()">
+          <mat-icon>visibility</mat-icon>
+          View Job
+        </button>
+      }
+    </mat-card-actions>
+  </mat-card>
+</div>

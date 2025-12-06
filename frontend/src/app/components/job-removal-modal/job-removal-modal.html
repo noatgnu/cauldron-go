@@ -1,0 +1,12 @@
+<h2 mat-dialog-title>Remove Job</h2>
+
+<mat-dialog-content>
+  <p>Are you sure you want to remove this job?</p>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button (click)="close()">Cancel</button>
+  <button mat-raised-button color="warn" (click)="remove()">
+    Remove
+  </button>
+</mat-dialog-actions>

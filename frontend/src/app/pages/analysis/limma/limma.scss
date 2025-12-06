@@ -1,0 +1,160 @@
+.analysis-container {
+  flex: 1;
+  padding: 16px;
+  overflow-y: auto;
+}
+
+.analysis-card {
+  padding: 16px;
+
+  mat-card-header {
+    margin-bottom: 16px;
+
+    mat-card-title {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 20px;
+      font-weight: 500;
+
+      mat-icon {
+        font-size: 24px;
+        width: 24px;
+        height: 24px;
+      }
+    }
+  }
+}
+
+.analysis-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+
+  .full-width {
+    width: 100%;
+  }
+
+  .form-section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .file-actions {
+    display: flex;
+    gap: 12px;
+    align-items: stretch;
+
+    button {
+      flex-shrink: 0;
+    }
+
+    .file-selector {
+      flex-grow: 1;
+    }
+  }
+
+  .checkbox-field {
+    margin: 8px 0;
+  }
+}
+
+.comparisons-section {
+  margin-top: 16px;
+  padding: 16px;
+  background: #f5f5f5;
+  border-radius: 8px;
+
+  .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+
+    h3 {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 500;
+    }
+
+    button {
+      font-size: 13px;
+
+      mat-icon {
+        margin-right: 4px;
+        font-size: 18px;
+        width: 18px;
+        height: 18px;
+      }
+    }
+  }
+}
+
+.comparisons-table {
+  width: 100%;
+  background: white;
+  border-radius: 4px;
+
+  th {
+    font-size: 13px;
+    font-weight: 500;
+  }
+
+  td {
+    font-size: 13px;
+  }
+
+  mat-form-field {
+    width: 100%;
+  }
+}
+
+.empty-comparisons {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  color: rgba(0, 0, 0, 0.6);
+  background: white;
+  border-radius: 4px;
+
+  mat-icon {
+    font-size: 48px;
+    width: 48px;
+    height: 48px;
+    margin-bottom: 12px;
+    opacity: 0.5;
+  }
+
+  p {
+    margin: 4px 0;
+    font-size: 13px;
+  }
+
+  .hint {
+    font-size: 12px;
+    opacity: 0.7;
+  }
+}
+
+mat-card-actions {
+  padding: 16px;
+
+  button {
+    font-size: 13px;
+
+    mat-icon {
+      margin-right: 4px;
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+    }
+
+    mat-spinner {
+      display: inline-block;
+      margin-right: 8px;
+    }
+  }
+}

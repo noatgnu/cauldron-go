@@ -1,0 +1,13 @@
+<form [formGroup]="form">
+  @for (c of conditions; track c) {
+    <div class="color-picker-row">
+      <label [for]="'color-' + c">{{c}}</label>
+      <input
+        type="color"
+        [id]="'color-' + c"
+        [formControlName]="c"
+        class="color-input"
+      />
+    </div>
+  }
+</form>

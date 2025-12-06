@@ -1,0 +1,111 @@
+<div class="jobs-container">
+  <h1>Job Queue</h1>
+
+  @if (loading()) {
+    <div class="loading-container">
+      <p>Loading jobs...</p>
+    </div>
+  } @else if (jobs().length === 0) {
+    <div class="empty-state">
+      <mat-icon>work_outline</mat-icon>
+      <p>No jobs yet</p>
+      <p class="empty-state-hint">Jobs will appear here when you run analysis tasks</p>
+    </div>
+  } @else {
+    <table mat-table [dataSource]="jobs()" class="jobs-table">
+      <ng-container matColumnDef="status">
+        <th mat-header-cell *matHeaderCellDef>Status</th>
+        <td mat-cell *matCellDef="let job">
+          <mat-icon [color]="getStatusColor(job.status)" class="status-icon">{{ getStatusIcon(job.status) }}</mat-icon>
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="name">
+        <th mat-header-cell *matHeaderCellDef>Name</th>
+        <td mat-cell *matCellDef="let job" (click)="viewJobDetail(job.id)" class="clickable">
+          <div class="job-name-cell">
+            <span class="job-name">{{ job.name }}</span>
+            @if (job.error) {
+              <mat-icon color="warn" class="error-icon" [matTooltip]="job.error">error</mat-icon>
+            }
+            @if (isEnvironmentMissing(job)) {
+              <mat-icon color="warn" class="warning-icon" matTooltip="Environment no longer exists">warning</mat-icon>
+            }
+          </div>
+          @if (job.status === 'in_progress') {
+            @if (hasProgress(job.id)) {
+              <div class="progress-info">
+                <small>{{ getJobProgress(job.id)?.message }}</small>
+                <mat-progress-bar mode="determinate" [value]="getJobProgress(job.id)?.percentage || 0"></mat-progress-bar>
+              </div>
+            } @else {
+              <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+            }
+          }
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="type">
+        <th mat-header-cell *matHeaderCellDef>Type</th>
+        <td mat-cell *matCellDef="let job">{{ job.type }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="environment">
+        <th mat-header-cell *matHeaderCellDef>Environment</th>
+        <td mat-cell *matCellDef="let job">
+          <span class="environment-label">{{ getEnvironmentLabel(job) }}</span>
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="createdAt">
+        <th mat-header-cell *matHeaderCellDef>Created</th>
+        <td mat-cell *matCellDef="let job">
+          <div class="created-cell">
+            <span>{{ job.createdAt | date:'short' }}</span>
+            @if (job.completedAt) {
+              <small class="completed-text">Completed: {{ job.completedAt | date:'short' }}</small>
+            }
+          </div>
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="actions">
+        <th mat-header-cell *matHeaderCellDef>Actions</th>
+        <td mat-cell *matCellDef="let job">
+          <div class="action-buttons">
+            @if (canRerun(job)) {
+              <button mat-icon-button [matMenuTriggerFor]="rerunMenu" (click)="$event.stopPropagation()"
+                      matTooltip="Rerun job">
+                <mat-icon>replay</mat-icon>
+              </button>
+              <mat-menu #rerunMenu="matMenu">
+                <button mat-menu-item (click)="rerunWithSameEnvironment($event, job)"
+                        [disabled]="isEnvironmentMissing(job)">
+                  <mat-icon>refresh</mat-icon>
+                  <span>Rerun with Same Environment</span>
+                </button>
+                <button mat-menu-item (click)="rerunWithDifferentEnvironment($event, job)">
+                  <mat-icon>swap_horiz</mat-icon>
+                  <span>Rerun with Current Environment</span>
+                </button>
+              </mat-menu>
+            }
+            @if (hasOutputDirectory(job)) {
+              <button mat-icon-button (click)="openOutputDirectory($event, job)"
+                      matTooltip="Open output directory">
+                <mat-icon>folder_open</mat-icon>
+              </button>
+            }
+            <button mat-icon-button (click)="deleteJob($event, job.id)"
+                    matTooltip="Delete job">
+              <mat-icon>delete</mat-icon>
+            </button>
+          </div>
+        </td>
+      </ng-container>
+
+      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+      <tr mat-row *matRowDef="let row; columns: displayedColumns;" [class.in-progress]="row.status === 'in_progress'"></tr>
+    </table>
+  }
+</div>

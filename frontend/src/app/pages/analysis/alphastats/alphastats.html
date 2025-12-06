@@ -1,0 +1,212 @@
+<div class="analysis-container">
+  <mat-card class="analysis-card">
+    <mat-card-header>
+      <mat-card-title>
+        <mat-icon>insert_chart</mat-icon>
+        AlphaStats Differential Analysis
+      </mat-card-title>
+      <mat-card-subtitle>
+        Comprehensive statistical analysis for proteomics data
+      </mat-card-subtitle>
+    </mat-card-header>
+    <app-environment-indicator [python]="true"></app-environment-indicator>
+    <mat-card-content>
+      <form [formGroup]="form" class="analysis-form">
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>File Input Type</mat-label>
+          <mat-select formControlName="engine">
+            @for (engine of engines; track engine) {
+              <mat-option [value]="engine">{{engine}}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+
+        <div class="form-section">
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Input File</mat-label>
+            <input matInput readonly formControlName="inputFile">
+          </mat-form-field>
+          <div class="file-actions">
+            <button mat-raised-button color="primary" type="button" (click)="openFile('inputFile')">
+              Browse
+            </button>
+            <div class="file-selector">
+              <app-imported-file-selection
+                (columns)="updateColumns($event)"
+                (selected)="updateFormWithSelected($event, 'inputFile')">
+              </app-imported-file-selection>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Annotation File</mat-label>
+            <input matInput readonly formControlName="annotationFile">
+          </mat-form-field>
+          <div class="file-actions">
+            <button mat-raised-button color="primary" type="button" (click)="openFile('annotationFile')">
+              Browse
+            </button>
+            <div class="file-selector">
+              <app-imported-file-selection
+                (selected)="updateFormWithSelected($event, 'annotationFile')">
+              </app-imported-file-selection>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Evidence File (Optional)</mat-label>
+            <input matInput readonly formControlName="evidenceFile">
+          </mat-form-field>
+          <div class="file-actions">
+            <button mat-raised-button color="primary" type="button" (click)="openFile('evidenceFile')">
+              Browse
+            </button>
+            <div class="file-selector">
+              <app-imported-file-selection
+                (selected)="updateFormWithSelected($event, 'evidenceFile')">
+              </app-imported-file-selection>
+            </div>
+          </div>
+        </div>
+
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Index Column</mat-label>
+          <mat-select formControlName="indexCol">
+            @for (col of columns; track col) {
+              <mat-option [value]="col">{{col}}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Data Completeness</mat-label>
+          <input matInput type="number" formControlName="dataCompleteness" step="0.1" min="0" max="1">
+          <mat-hint>Minimum fraction of non-missing values (0-1)</mat-hint>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Imputation Method</mat-label>
+          <mat-select formControlName="imputation">
+            @for (method of imputationMethods; track method) {
+              <mat-option [value]="method">{{method}}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Normalization Method</mat-label>
+          <mat-select formControlName="normalization">
+            @for (method of normalizationMethods; track method) {
+              <mat-option [value]="method">{{method}}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+
+        <div class="checkbox-field">
+          <mat-checkbox formControlName="log2">Log2 Transformation</mat-checkbox>
+        </div>
+
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Testing Method</mat-label>
+          <mat-select formControlName="method">
+            @for (method of testMethods; track method) {
+              <mat-option [value]="method">{{method}}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Columns to Merge</mat-label>
+          <mat-select formControlName="mergeColumns" multiple>
+            @for (col of columns; track col) {
+              <mat-option [value]="col">{{col}}</mat-option>
+            }
+          </mat-select>
+          <mat-hint>Select columns to merge in output</mat-hint>
+        </mat-form-field>
+
+        <div class="checkbox-field">
+          <mat-checkbox formControlName="batchCorrection">Batch Correction</mat-checkbox>
+        </div>
+
+        <div class="comparisons-section">
+          <h3>Comparisons</h3>
+
+          @if (comparisons().length > 0) {
+            <table mat-table [dataSource]="comparisons()" class="comparisons-table">
+              <ng-container matColumnDef="conditionA">
+                <th mat-header-cell *matHeaderCellDef>Condition A</th>
+                <td mat-cell *matCellDef="let comparison; let i = index">
+                  <mat-form-field appearance="outline">
+                    <mat-select [(ngModel)]="comparison.condition_A" [ngModelOptions]="{standalone: true}">
+                      @for (condition of conditions(); track condition) {
+                        <mat-option [value]="condition">{{condition}}</mat-option>
+                      }
+                    </mat-select>
+                  </mat-form-field>
+                </td>
+              </ng-container>
+
+              <ng-container matColumnDef="conditionB">
+                <th mat-header-cell *matHeaderCellDef>Condition B</th>
+                <td mat-cell *matCellDef="let comparison; let i = index">
+                  <mat-form-field appearance="outline">
+                    <mat-select [(ngModel)]="comparison.condition_B" [ngModelOptions]="{standalone: true}">
+                      @for (condition of conditions(); track condition) {
+                        <mat-option [value]="condition">{{condition}}</mat-option>
+                      }
+                    </mat-select>
+                  </mat-form-field>
+                </td>
+              </ng-container>
+
+              <ng-container matColumnDef="label">
+                <th mat-header-cell *matHeaderCellDef>Label</th>
+                <td mat-cell *matCellDef="let comparison; let i = index">
+                  <mat-form-field appearance="outline">
+                    <input matInput [(ngModel)]="comparison.comparison_label" [ngModelOptions]="{standalone: true}">
+                  </mat-form-field>
+                </td>
+              </ng-container>
+
+              <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+              <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+            </table>
+          }
+
+          <button mat-button (click)="addContrast()" type="button" [disabled]="running()">
+            <mat-icon>add</mat-icon>
+            Add Comparison
+          </button>
+        </div>
+      </form>
+    </mat-card-content>
+    <mat-card-actions align="end">
+      <button mat-button (click)="loadExample()" [disabled]="running()">
+        <mat-icon>file_download</mat-icon>
+        Load Example
+      </button>
+      <button mat-button (click)="reset()" [disabled]="running()">Reset</button>
+      <button mat-raised-button color="primary" (click)="submit()"
+              [disabled]="form.invalid || running()">
+        @if (running()) {
+          <mat-spinner diameter="16"></mat-spinner>
+          Running...
+        } @else {
+          <mat-icon>play_arrow</mat-icon>
+          Run Analysis
+        }
+      </button>
+      @if (createdJobId) {
+        <button mat-raised-button color="accent" (click)="viewJob()">
+          <mat-icon>visibility</mat-icon>
+          View Job
+        </button>
+      }
+    </mat-card-actions>
+  </mat-card>
+</div>

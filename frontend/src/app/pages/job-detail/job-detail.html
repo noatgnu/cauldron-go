@@ -1,0 +1,120 @@
+<div class="job-detail-container">
+  @if (loading()) {
+    <div class="loading-container">
+      <mat-spinner></mat-spinner>
+      <p>Loading job details...</p>
+    </div>
+  } @else if (error()) {
+    <mat-card class="error-card">
+      <mat-icon color="warn">error</mat-icon>
+      <p>{{ error() }}</p>
+      <button mat-raised-button (click)="goBack()">Go Back</button>
+    </mat-card>
+  } @else if (job()) {
+    <mat-card class="job-detail-card">
+      <mat-card-header>
+        <mat-card-title>
+          <mat-icon [color]="getStatusColor(job()!.status)">{{ getStatusIcon(job()!.status) }}</mat-icon>
+          {{ job()!.name }}
+        </mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        <div class="job-info">
+          <div class="info-row">
+            <span class="label">Job Type:</span>
+            <span class="value">{{ job()!.type }}</span>
+          </div>
+          <div class="info-row">
+            <span class="label">Status:</span>
+            <mat-chip [color]="getStatusColor(job()!.status)" highlighted>
+              {{ job()!.status }}
+            </mat-chip>
+          </div>
+          <div class="info-row">
+            <span class="label">Created:</span>
+            <span class="value">{{ job()!.createdAt | date:'medium' }}</span>
+          </div>
+          @if (job()!.startedAt) {
+            <div class="info-row">
+              <span class="label">Started:</span>
+              <span class="value">{{ job()!.startedAt | date:'medium' }}</span>
+            </div>
+          }
+          @if (job()!.completedAt) {
+            <div class="info-row">
+              <span class="label">Completed:</span>
+              <span class="value">{{ job()!.completedAt | date:'medium' }}</span>
+            </div>
+          }
+        </div>
+
+        @if (job()!.status === 'in_progress') {
+          <mat-progress-bar mode="indeterminate" [value]="job()!.progress"></mat-progress-bar>
+        }
+
+        @if (job()!.error) {
+          <div class="error-message">
+            <mat-icon color="warn">error</mat-icon>
+            <span>{{ job()!.error }}</span>
+          </div>
+        }
+
+        @if (job()!.type === 'pca' && job()!.status === 'completed') {
+          <div class="plot-section">
+            <h3>PCA Plot</h3>
+            <app-pca-plot [jobId]="jobId"></app-pca-plot>
+          </div>
+        }
+
+        @if (job()!.type === 'phate' && job()!.status === 'completed') {
+          <div class="plot-section">
+            <h3>PHATE Plot</h3>
+            <app-phate-plot [jobId]="jobId"></app-phate-plot>
+          </div>
+        }
+
+        @if (job()!.type === 'fuzzy-clustering' && job()!.status === 'completed') {
+          <div class="plot-section">
+            <h3>Fuzzy Clustering Plot</h3>
+            <app-fuzzy-clustering-plot [jobId]="jobId"></app-fuzzy-clustering-plot>
+          </div>
+        }
+
+        @if (pluginPlots().length > 0) {
+          @for (plot of pluginPlots(); track plot.fileName) {
+            <div class="plot-section">
+              <app-plugin-plot
+                [jobId]="jobId"
+                [plotFileName]="plot.fileName"
+                [plotTitle]="plot.title"
+              ></app-plugin-plot>
+            </div>
+          }
+        }
+
+        @if (job()!.terminalOutput && job()!.terminalOutput.length > 0) {
+          <div class="terminal-section">
+            <h3>Output</h3>
+            <div class="terminal-output">
+              @for (line of job()!.terminalOutput; track $index) {
+                <div class="terminal-line">{{ line }}</div>
+              }
+            </div>
+          </div>
+        }
+      </mat-card-content>
+      <mat-card-actions>
+        <button mat-raised-button (click)="goBack()">
+          <mat-icon>arrow_back</mat-icon>
+          Back to Jobs
+        </button>
+        @if (job()!.status === 'completed' && supportsAnnotations()) {
+          <button mat-raised-button color="primary" (click)="openAnnotationDialog()">
+            <mat-icon>label</mat-icon>
+            Manage Sample Annotations
+          </button>
+        }
+      </mat-card-actions>
+    </mat-card>
+  }
+</div>

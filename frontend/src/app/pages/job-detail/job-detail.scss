@@ -1,0 +1,155 @@
+.job-detail-container {
+  flex: 1;
+  padding: 16px;
+  overflow-y: auto;
+}
+
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 64px;
+  gap: 16px;
+
+  p {
+    font-size: 13px;
+    color: rgba(0, 0, 0, 0.6);
+  }
+}
+
+.error-card {
+  padding: 32px;
+  text-align: center;
+
+  mat-icon {
+    font-size: 48px;
+    width: 48px;
+    height: 48px;
+    margin-bottom: 16px;
+  }
+
+  p {
+    margin-bottom: 16px;
+    font-size: 14px;
+  }
+}
+
+.job-detail-card {
+  padding: 16px;
+
+  mat-card-header {
+    margin-bottom: 24px;
+
+    mat-card-title {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 20px;
+      font-weight: 500;
+
+      mat-icon {
+        font-size: 28px;
+        width: 28px;
+        height: 28px;
+      }
+    }
+  }
+}
+
+.job-info {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 24px;
+
+  .info-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+
+    .label {
+      font-weight: 500;
+      font-size: 13px;
+      min-width: 100px;
+      color: rgba(0, 0, 0, 0.6);
+    }
+
+    .value {
+      font-size: 13px;
+    }
+  }
+}
+
+.error-message {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background-color: rgba(244, 67, 54, 0.1);
+  border-radius: 8px;
+  margin: 16px 0;
+  font-size: 13px;
+
+  mat-icon {
+    font-size: 24px;
+    width: 24px;
+    height: 24px;
+  }
+}
+
+.plot-section {
+  margin-top: 24px;
+  padding: 16px;
+  background-color: #fafafa;
+  border-radius: 8px;
+
+  h3 {
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: 16px;
+  }
+}
+
+.terminal-section {
+  margin-top: 24px;
+
+  h3 {
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: 12px;
+  }
+}
+
+.terminal-output {
+  background: #1e1e1e;
+  color: #d4d4d4;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 12px;
+  padding: 16px;
+  border-radius: 8px;
+  max-height: 500px;
+  overflow-y: auto;
+
+  .terminal-line {
+    white-space: pre-wrap;
+    margin-bottom: 4px;
+  }
+}
+
+mat-card-actions {
+  display: flex;
+  gap: 12px;
+  padding: 16px;
+
+  button {
+    font-size: 13px;
+
+    mat-icon {
+      margin-right: 4px;
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+    }
+  }
+}

@@ -1,0 +1,67 @@
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  gap: 16px;
+
+  p {
+    margin: 0;
+    color: rgba(0, 0, 0, 0.6);
+  }
+}
+
+.error-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px;
+  background-color: #ffebee;
+  border-radius: 4px;
+  color: #c62828;
+
+  mat-icon {
+    flex-shrink: 0;
+  }
+
+  p {
+    margin: 0;
+  }
+}
+
+.container {
+  width: 100%;
+}
+
+.file-selector {
+  width: 100%;
+  max-width: 300px;
+  margin-bottom: 16px;
+}
+
+.plot-container {
+  width: 100%;
+  min-height: 400px;
+  max-height: 800px;
+}
+
+.customization-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 16px;
+
+  mat-form-field {
+    flex: 1;
+    min-width: 150px;
+  }
+
+  mat-checkbox {
+    align-self: center;
+  }
+
+  button {
+    align-self: center;
+  }
+}

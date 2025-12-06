@@ -1,0 +1,310 @@
+<div class="settings-container">
+  <h1>Settings</h1>
+
+  <mat-card style="margin-bottom: 16px; background: #fff3cd; border-left: 4px solid #ffc107;">
+    <mat-card-content style="padding: 12px;">
+      <div style="font-size: 12px; font-family: monospace;">
+        <strong>Debug Status:</strong><br>
+        Python Envs: {{ pythonEnvironments().length }} found | Detecting: {{ detectingPythonEnvs() ? 'YES' : 'NO' }} | Selected: {{ selectedPythonEnv() || 'none' }}<br>
+        R Envs: {{ rEnvironments().length }} found | Detecting: {{ detectingREnvs() ? 'YES' : 'NO' }} | Selected: {{ selectedREnv() || 'none' }}
+      </div>
+    </mat-card-content>
+  </mat-card>
+
+  @if (loading()) {
+    <div class="loading-container">
+      <mat-spinner></mat-spinner>
+    </div>
+  } @else {
+    <mat-card class="settings-card">
+      <mat-card-header>
+        <mat-card-title>General Settings</mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        <div class="form-section">
+          <h3>Output Directory</h3>
+          <p class="section-description">All job outputs and analysis results will be saved to this directory</p>
+          <mat-form-field appearance="outline" class="full-width-field">
+            <mat-label>Output Directory</mat-label>
+            <input matInput [value]="config().outputDirectory || ''" readonly>
+            <button mat-icon-button matSuffix (click)="browseOutputDirectory()" matTooltip="Select output directory">
+              <mat-icon>folder_open</mat-icon>
+            </button>
+          </mat-form-field>
+          @if (config().outputDirectory) {
+            <div class="info-box">
+              <mat-icon>info</mat-icon>
+              <div>
+                <strong>Current output directory:</strong><br>
+                <code>{{ config().outputDirectory }}</code>
+              </div>
+            </div>
+          }
+        </div>
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card class="settings-card">
+      <mat-card-header>
+        <mat-card-title>Python Configuration</mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        @if (pythonEnvironments().length > 0) {
+          <mat-form-field appearance="outline" class="full-width-field">
+            <mat-label>Select Python Environment</mat-label>
+            <mat-select [value]="selectedPythonEnv()" (selectionChange)="selectPythonEnvironment($event.value)">
+              @for (env of pythonEnvironments(); track env.path) {
+                <mat-option [value]="env.path">
+                  <div class="env-option">
+                    <div class="env-info">
+                      <span class="env-name">{{ env.name }}</span>
+                      <mat-chip [color]="getEnvironmentTypeColor(env.type)" class="env-type-chip">
+                        {{ getEnvironmentTypeLabel(env.type) }}
+                      </mat-chip>
+                    </div>
+                    <div class="env-details">
+                      <small>{{ env.version }}</small>
+                      @if (env.isVirtual) {
+                        <mat-icon class="virtual-icon" color="accent">shield</mat-icon>
+                      }
+                    </div>
+                  </div>
+                </mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+
+          @if (selectedPythonEnv()) {
+            <div class="info-box environment-status">
+              <mat-icon [color]="getEnvironmentTypeColor(getSelectedPythonEnv()?.type || '')">info</mat-icon>
+              <div>
+                <strong>Status:</strong> {{ getEnvironmentStatusMessage() }}
+              </div>
+            </div>
+
+            <div class="button-row">
+              <button mat-raised-button color="accent" (click)="viewSelectedPythonPackages()">
+                <mat-icon>inventory_2</mat-icon>
+                View Packages
+              </button>
+            </div>
+          }
+        } @else if (detectingPythonEnvs()) {
+          <div class="detecting-container">
+            <mat-spinner diameter="24"></mat-spinner>
+            <span>Detecting Python environments...</span>
+          </div>
+        } @else {
+          <div class="info-box warning-box">
+            <mat-icon color="warn">warning</mat-icon>
+            <div>
+              <strong>No Python environments found</strong>
+              <p>Click "Download Portable" to get a ready-to-use Python environment, or "Browse" to select an existing installation.</p>
+            </div>
+          </div>
+        }
+
+        <mat-form-field appearance="outline" class="full-width-field">
+          <mat-label>Python Path</mat-label>
+          <input matInput [value]="config().pythonPath || ''" readonly>
+        </mat-form-field>
+
+        <div class="action-section">
+          <h3>Environment Management</h3>
+          <div class="button-row">
+            <button mat-raised-button (click)="browsePython()" matTooltip="Select an existing Python installation">
+              <mat-icon>folder_open</mat-icon>
+              Browse
+            </button>
+            <button mat-raised-button color="primary" (click)="detectAllPythonEnvironments()"
+                    [disabled]="detectingPythonEnvs()"
+                    matTooltip="Refresh and detect all available Python environments">
+              <mat-icon>refresh</mat-icon>
+              Refresh
+            </button>
+            <button mat-raised-button color="accent" (click)="downloadPythonEnvironment()"
+                    matTooltip="Download a portable Python environment (recommended for first-time setup)">
+              <mat-icon>download</mat-icon>
+              Download Portable
+            </button>
+            @if (canCreateVirtualEnv()) {
+              <button mat-raised-button color="accent" (click)="createVirtualEnv()"
+                      matTooltip="Create an isolated virtual environment from the selected Python">
+                <mat-icon>add_circle</mat-icon>
+                Create Virtual Env
+              </button>
+            }
+          </div>
+
+          @if (!canCreateVirtualEnv() && selectedPythonEnv()) {
+            @if (isPortableEnv(selectedPythonEnv())) {
+              <p class="hint-text">
+                <mat-icon>info</mat-icon>
+                Portable environments are already isolated - no need to create virtual environments.
+              </p>
+            } @else if (isVirtualEnv(selectedPythonEnv())) {
+              <p class="hint-text">
+                <mat-icon>info</mat-icon>
+                Cannot create virtual environments from another virtual environment.
+              </p>
+            }
+          }
+        </div>
+
+        @if (pythonVersion()) {
+          <div class="version-info">
+            <mat-icon color="primary">check_circle</mat-icon>
+            <span>{{ pythonVersion() }}</span>
+          </div>
+        }
+
+        <mat-divider></mat-divider>
+
+        <div class="package-section">
+          <h3>Package Management</h3>
+          <div class="package-actions">
+            <button mat-raised-button color="accent" (click)="installPythonRequirements()" [disabled]="!config().pythonPath || installingPackages()">
+              <mat-icon>get_app</mat-icon>
+              Install Python Packages
+            </button>
+            @if (installingPackages()) {
+              <mat-spinner diameter="20"></mat-spinner>
+            }
+          </div>
+          @if (pythonInstallProgress()) {
+            <div class="install-progress">
+              <small>{{ pythonInstallProgress()?.message }}</small>
+              <mat-progress-bar mode="determinate" [value]="pythonInstallProgress()?.percentage || 0"></mat-progress-bar>
+            </div>
+          }
+          <p class="package-hint">Installs all packages from scripts/requirements.txt</p>
+        </div>
+
+        @if (!isPortableEnv(selectedPythonEnv())) {
+          <mat-divider></mat-divider>
+
+          <div class="venv-section">
+            <h3>Virtual Environments</h3>
+            @if (virtualEnvironments().length > 0) {
+              <mat-list>
+                @for (venv of virtualEnvironments(); track venv.ID) {
+                  <mat-list-item>
+                    <mat-icon matListItemIcon color="primary">folder</mat-icon>
+                    <div matListItemTitle>{{ venv.Name }}</div>
+                    <div matListItemLine class="venv-details">
+                      <small>Base: {{ getBasePythonName(venv.BasePythonPath) }}</small>
+                      <small class="venv-date">Created: {{ formatDate(venv.CreatedAt) }}</small>
+                    </div>
+                    <button mat-icon-button matListItemMeta (click)="deleteVirtualEnv(venv.ID)" color="warn">
+                      <mat-icon>delete</mat-icon>
+                    </button>
+                  </mat-list-item>
+                }
+              </mat-list>
+            } @else {
+              <p class="no-venvs">No virtual environments created yet</p>
+            }
+          </div>
+        }
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card class="settings-card">
+      <mat-card-header>
+        <mat-card-title>R Configuration</mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        @if (rEnvironments().length > 0) {
+          <mat-form-field appearance="outline" class="full-width-field">
+            <mat-label>Select R Environment</mat-label>
+            <mat-select [value]="selectedREnv()" (selectionChange)="selectREnvironment($event.value)">
+              @for (env of rEnvironments(); track env.path) {
+                <mat-option [value]="env.path">
+                  <div class="env-option">
+                    <div class="env-info">
+                      <span class="env-name">{{ env.name }}</span>
+                      @if (env.isDefault) {
+                        <mat-chip class="env-type-chip">Default</mat-chip>
+                      }
+                    </div>
+                    <div class="env-details">
+                      <small>{{ env.version }}</small>
+                    </div>
+                  </div>
+                </mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+
+          @if (selectedREnv()) {
+            <div class="button-row">
+              <button mat-raised-button color="accent" (click)="viewSelectedRPackages()">
+                <mat-icon>inventory_2</mat-icon>
+                View Packages
+              </button>
+            </div>
+          }
+        } @else if (detectingREnvs()) {
+          <div class="detecting-container">
+            <mat-spinner diameter="24"></mat-spinner>
+            <span>Detecting R environments...</span>
+          </div>
+        } @else {
+          <div class="detecting-container">
+            <mat-icon color="warn">info</mat-icon>
+            <span>No R environments found in PATH</span>
+          </div>
+        }
+
+        <mat-form-field appearance="outline" class="full-width-field">
+          <mat-label>R Path</mat-label>
+          <input matInput [value]="config().rPath || ''" readonly>
+        </mat-form-field>
+
+        <div class="button-row">
+          <button mat-raised-button (click)="browseR()">
+            <mat-icon>folder_open</mat-icon>
+            Browse
+          </button>
+          <button mat-raised-button color="primary" (click)="detectAllREnvironments()" [disabled]="detectingREnvs()">
+            <mat-icon>refresh</mat-icon>
+            Refresh
+          </button>
+          <button mat-raised-button color="accent" (click)="downloadREnvironment()">
+            <mat-icon>download</mat-icon>
+            Download Portable
+          </button>
+        </div>
+
+        @if (rVersion()) {
+          <div class="version-info">
+            <mat-icon color="primary">check_circle</mat-icon>
+            <span>{{ rVersion() }}</span>
+          </div>
+        }
+
+        <mat-divider></mat-divider>
+
+        <div class="package-section">
+          <h3>Package Management</h3>
+          <div class="package-actions">
+            <button mat-raised-button color="accent" (click)="installRPackages()" [disabled]="!config().rPath || installingPackages()">
+              <mat-icon>get_app</mat-icon>
+              Install R Packages
+            </button>
+            @if (installingPackages()) {
+              <mat-spinner diameter="20"></mat-spinner>
+            }
+          </div>
+          @if (rInstallProgress()) {
+            <div class="install-progress">
+              <small>{{ rInstallProgress()?.message }}</small>
+              <mat-progress-bar mode="determinate" [value]="rInstallProgress()?.percentage || 0"></mat-progress-bar>
+            </div>
+          }
+          <p class="package-hint">Installs all packages from scripts/r_requirements.txt via BiocManager</p>
+        </div>
+      </mat-card-content>
+    </mat-card>
+  }
+</div>

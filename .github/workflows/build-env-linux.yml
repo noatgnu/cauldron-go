@@ -1,0 +1,147 @@
+name: Build R and Python Environment for Linux x64
+
+on:
+  release:
+    types: [created]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            xorg-dev \
+            gfortran \
+            libpng-dev \
+            libjpeg-dev \
+            liblzma-dev \
+            libpcre2-dev \
+            libcurl4-openssl-dev \
+            libharfbuzz-dev \
+            libfribidi-dev \
+            libx11-dev \
+            libxext-dev \
+            libxrender-dev \
+            libxtst-dev \
+            libcairo2-dev \
+            tcl-dev \
+            tk-dev \
+            libhdf5-dev \
+            libblosc-dev \
+            libhiredis-dev \
+            libopenmpi-dev \
+            liblzo2-dev \
+            libomp-dev \
+            libreadline-dev \
+            bzip2
+
+      - name: Compile R
+        env:
+          CPPFLAGS: -I/usr/include -I/usr/include/xorg
+          LDFLAGS: -L/usr/lib -L/usr/lib/xorg
+          CFLAGS: -I/usr/include
+          TCL_LIBRARY: /usr/lib/tcltk
+          TK_LIBRARY: /usr/lib/tcltk
+          PKG_CONFIG_PATH: /usr/lib/pkgconfig
+          C_INCLUDE_PATH: /usr/include
+          LIBRARY_PATH: /usr/lib
+        run: |
+          curl -O https://cran.r-project.org/src/base/R-4/R-4.4.1.tar.gz
+          tar -xzvf R-4.4.1.tar.gz
+          cd R-4.4.1
+          ./configure --prefix=${{ github.workspace }}/bin/linux/R-Portable/ --enable-R-shlib --with-blas --with-lapack --with-tcltk --with-mpi
+          make -j$(nproc)
+          make install
+
+      - name: Set up writable permissions for R library
+        run: |
+          chmod -R 777 ${{ github.workspace }}/bin/linux/R-Portable
+
+      - name: Set up R R_LIBS_USER
+        run: |
+          echo "R_LIBS_USER=${{ github.workspace }}/bin/linux/R-Portable/lib" >> $GITHUB_ENV
+
+      - name: Install R packages
+        env:
+          CPPFLAGS: -I/usr/include -I/usr/include/xorg
+          LDFLAGS: -L/usr/lib -L/usr/lib/xorg
+          CFLAGS: -I/usr/include
+          TCL_LIBRARY: /usr/lib/tcltk
+          TK_LIBRARY: /usr/lib/tcltk
+          PKG_CONFIG_PATH: /usr/lib/pkgconfig
+          C_INCLUDE_PATH: /usr/include
+          LIBRARY_PATH: /usr/lib
+          R_HOME: ${{ github.workspace }}/bin/linux/R-Portable
+        run: ${{ github.workspace }}/bin/linux/R-Portable/bin/Rscript scripts/r/install_packages.R
+
+      - name: Download Portable Python
+        run: |
+          curl -LO https://github.com/indygreg/python-build-standalone/releases/download/20241016/cpython-3.11.10+20241016-x86_64-unknown-linux-gnu-install_only.tar.gz
+
+      - name: Extract Python
+        run: |
+          tar -xzf cpython-3.11.10+20241016-x86_64-unknown-linux-gnu-install_only.tar.gz -C bin/linux --no-same-owner --no-same-permissions
+
+      - name: Install Python Packages
+        env:
+          CPPFLAGS: -I/usr/include -I/usr/include/xorg
+          LDFLAGS: -L/usr/lib -L/usr/lib/xorg
+          CFLAGS: -I/usr/include
+          TCL_LIBRARY: /usr/lib/tcltk
+          TK_LIBRARY: /usr/lib/tcltk
+          PKG_CONFIG_PATH: /usr/lib/pkgconfig
+          C_INCLUDE_PATH: /usr/include
+          LIBRARY_PATH: /usr/lib
+          R_HOME: ${{ github.workspace }}/bin/linux/R-Portable
+        run: |
+          ${{ github.workspace }}/bin/linux/python/bin/python3 -m pip install --upgrade pip
+          ${{ github.workspace }}/bin/linux/python/bin/python3 -m pip install -r scripts/requirements.txt
+
+      - name: Compress Python directory
+        run: tar -czf python-linux-x86_64.tar.gz bin/linux/python
+
+      - name: Compress R-Portable directory
+        run: tar -czf r-portable-linux-x86_64.tar.gz bin/linux/R-Portable
+
+      - name: Upload Python Archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-linux-x86_64
+          path: python-linux-x86_64.tar.gz
+          retention-days: 30
+
+      - name: Upload R-Portable Archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: r-portable-linux-x86_64
+          path: r-portable-linux-x86_64.tar.gz
+          retention-days: 30
+
+      - name: Upload Python to Release
+        if: github.event_name == 'release'
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: python-linux-x86_64.tar.gz
+          asset_name: python-linux-x86_64.tar.gz
+          asset_content_type: application/tar+gzip
+
+      - name: Upload R to Release
+        if: github.event_name == 'release'
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: r-portable-linux-x86_64.tar.gz
+          asset_name: r-portable-linux-x86_64.tar.gz
+          asset_content_type: application/tar+gzip

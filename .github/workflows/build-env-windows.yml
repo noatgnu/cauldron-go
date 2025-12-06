@@ -1,0 +1,85 @@
+name: Build R and Python Environment for Windows x64
+
+on:
+  release:
+    types: [created]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install R
+      run: |
+        Invoke-WebRequest -Uri https://cran.r-project.org/bin/windows/base/old/4.4.1/R-4.4.1-win.exe -OutFile R-Portable.exe
+        New-Item -ItemType Directory -Force -Path bin/win/R-Portable
+        Start-Process -FilePath R-Portable.exe -ArgumentList "/VERYSILENT", "/DIR=bin/win/R-Portable" -Wait
+
+    - name: Install R packages
+      env:
+        R_LIBS_USER: ${{ github.workspace }}/bin/win/R-Portable/library
+      run: Rscript scripts/r/install_packages.R
+
+    - name: Download Portable Python 3.11
+      run: |
+        Invoke-WebRequest -Uri https://github.com/indygreg/python-build-standalone/releases/download/20241016/cpython-3.11.10+20241016-x86_64-pc-windows-msvc-shared-install_only.tar.gz -OutFile python-standalone.tar.gz
+        New-Item -ItemType Directory -Force -Path bin/win/python
+        tar -xzf python-standalone.tar.gz -C bin/win
+
+    - name: Install Python packages
+      env:
+        R_HOME: ${{ github.workspace }}/bin/win/R-Portable
+      run: |
+        cmd /c ${{ github.workspace }}/bin/win/python/python.exe -m pip install --upgrade pip
+        cmd /c ${{ github.workspace }}/bin/win/python/python.exe -m pip install -r scripts/requirements.txt
+
+    - name: Compress Python directory
+      run: tar -czf python-win-x86_64.tar.gz bin/win/python
+
+    - name: Compress R-Portable directory
+      run: tar -czf r-portable-win-x86_64.tar.gz bin/win/R-Portable
+
+    - name: Upload Python Archive
+      uses: actions/upload-artifact@v4
+      with:
+        name: python-win-x86_64
+        path: python-win-x86_64.tar.gz
+        retention-days: 30
+
+    - name: Upload R-Portable Archive
+      uses: actions/upload-artifact@v4
+      with:
+        name: r-portable-win-x86_64
+        path: r-portable-win-x86_64.tar.gz
+        retention-days: 30
+
+    - name: Upload Python to Release
+      if: github.event_name == 'release'
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ github.event.release.upload_url }}
+        asset_path: python-win-x86_64.tar.gz
+        asset_name: python-win-x86_64.tar.gz
+        asset_content_type: application/tar+gzip
+
+    - name: Upload R to Release
+      if: github.event_name == 'release'
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ github.event.release.upload_url }}
+        asset_path: r-portable-win-x86_64.tar.gz
+        asset_name: r-portable-win-x86_64.tar.gz
+        asset_content_type: application/tar+gzip

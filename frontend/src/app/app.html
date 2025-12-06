@@ -1,0 +1,18 @@
+<div class="app-container">
+  <app-toolbar (menuToggle)="toggleSidenav()"></app-toolbar>
+
+  <mat-sidenav-container class="sidenav-container">
+    <mat-sidenav
+      #sidenav
+      [opened]="sidenavOpened()"
+      [mode]="'side'"
+      class="sidenav">
+      <app-sidenav (navigationClose)="closeSidenav()"></app-sidenav>
+    </mat-sidenav>
+
+    <mat-sidenav-content class="main-content">
+      <app-breadcrumbs></app-breadcrumbs>
+      <router-outlet></router-outlet>
+    </mat-sidenav-content>
+  </mat-sidenav-container>
+</div>
