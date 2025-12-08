@@ -59,7 +59,9 @@ jobs:
           ./configure --prefix=${{ github.workspace }}/bin/linux/R-Portable/ --enable-R-shlib --with-blas --with-lapack --with-tcltk --with-mpi
           make -j$(nproc)
           make install
-          make strip
+      - name: Strip R binaries
+        run: |
+          find ${{ github.workspace }}/bin/linux/R-Portable -type f \( -name "*.so" -o -perm +111 \) -exec strip {} \;
 
       - name: Set up writable permissions for R library
         run: |
