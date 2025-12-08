@@ -61,7 +61,7 @@ jobs:
           make install
       - name: Strip R binaries
         run: |
-          find ${{ github.workspace }}/bin/linux/R-Portable -type f \( -name "*.so" -o -perm +111 \) -exec strip {} \;
+          find ${{ github.workspace }}/bin/linux/R-Portable -type f \( -name "*.so" -o -perm /111 \) -exec strip {} \;
 
       - name: Set up writable permissions for R library
         run: |

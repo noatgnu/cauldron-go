@@ -148,6 +148,9 @@ jobs:
       - name: Copy Examples (Intel)
         run: cp -r examples build/bin/
 
+      - name: Copy Scripts (Intel)
+        run: cp -r scripts build/bin/
+
       - name: Create Archive (Intel)
         run: |
           cd build/bin
@@ -167,6 +170,9 @@ jobs:
 
       - name: Copy Examples (Apple Silicon)
         run: cp -r examples build/bin/
+
+      - name: Copy Scripts (Apple Silicon)
+        run: cp -r scripts build/bin/
 
       - name: Create Archive (Apple Silicon)
         run: |
