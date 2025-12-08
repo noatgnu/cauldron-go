@@ -1,4 +1,4 @@
-import { Component, Input, OnInit, signal } from '@angular/core';
+import { Component, Input, OnInit, signal, NgZone } from '@angular/core';
 import { ReactiveFormsModule, FormBuilder, FormGroup } from '@angular/forms';
 import { PlotlyModule } from 'angular-plotly.js';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
@@ -9,7 +9,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { Wails } from '../../../core/services/wails';
-import { AnnotationService, Annotation, AnnotationColors } from '../../../core/services/annotation.service';
+import { Annotation, AnnotationService } from '../../../core/services/annotation.service';
 import { PlotlyExport } from '../../../core/services/plotly-export';
 
 interface PHATEData {
@@ -40,58 +40,180 @@ export class PhatePlot implements OnInit {
 
   protected loading = signal(true);
   protected error = signal('');
-  protected plotData = signal<any[]>([]);
-  protected plotLayout = signal<any>({});
-  protected plotConfig = signal<any>({
+  plotData: any[] = [];
+  plotLayout: any = {};
+  plotConfig: any = {
     responsive: true,
     displayModeBar: true,
-    displaylogo: false
-  });
+    displaylogo: false,
+    modeBarButtonsToRemove: ['toImage']
+  };
+  revision: number = 0;
   protected customizationForm: FormGroup;
   protected showCustomization = signal(false);
-  protected annotations: Annotation[] = [];
-  protected conditionColors: AnnotationColors = {};
+
+  private _phateData: PHATEData | null = null;
+  private _annotations: Annotation[] = [];
 
   constructor(
     private wails: Wails,
     private fb: FormBuilder,
     private annotationService: AnnotationService,
-    private plotlyExport: PlotlyExport
+    private plotlyExport: PlotlyExport,
+    private ngZone: NgZone
   ) {
     this.customizationForm = this.fb.group({
       title: [''],
       showGrid: [true],
       markerSize: [10],
       width: [800],
-      height: [600]
+      height: [600],
+      marginTop: [100],
+      marginRight: [100],
+      marginBottom: [100],
+      marginLeft: [100]
     });
   }
 
   async ngOnInit() {
-    await this.loadAndRenderPlot();
-    this.loadSavedSettings();
+    await this.loadData();
   }
 
-  async loadAndRenderPlot() {
+  private async loadData() {
     try {
       this.loading.set(true);
+      const savedSettings = await this.loadSavedSettings();
+      if (savedSettings) {
+        const completeSettings = { ...this.customizationForm.value, ...savedSettings };
+        this.customizationForm.patchValue(completeSettings, { emitEvent: false });
+      }
 
-      const data = await this.wails.readJobOutputFile(this.jobId, 'phate_output.txt');
+      const [data, annotations] = await Promise.all([
+        this.wails.readJobOutputFile(this.jobId, 'phate_output.txt'),
+        this.annotationService.loadAnnotationsForJob(this.jobId)
+      ]);
 
       if (!data) {
         throw new Error('phate_output.txt file is empty or not found');
       }
 
-      await this.tryLoadAnnotations();
+      this._phateData = this.parsePHATEData(data);
+      this._annotations = annotations;
 
-      const phateData = this.parsePHATEData(data);
-      this.createPlotData(phateData);
+      this.updatePlot();
+      await this.wails.logToFile('[PHATE Plot] Plot data loaded and rendered successfully.');
     } catch (err: any) {
       this.error.set('Failed to load PHATE plot: ' + err.message);
       await this.wails.logToFile('[PHATE Plot] Error: ' + err.message);
     } finally {
       this.loading.set(false);
     }
+  }
+
+  private updatePlot() {
+    if (!this._phateData) {
+      return;
+    }
+    this.ngZone.run(() => {
+      const settings = this.customizationForm.value;
+      const data: PHATEData = this._phateData!;
+      const is3D = data.z && data.z.length > 0;
+      const markerSize = settings.markerSize || 10;
+      const showGrid = settings.showGrid !== false;
+      const useAnnotations = this._annotations.length > 0;
+
+      if (useAnnotations) {
+        const dataWithAnnotations = data.text.map((sample, index) => {
+          const annotation = this._annotations.find(a => a.sample === sample);
+          return {
+            x: data.x[index],
+            y: data.y[index],
+            z: is3D ? data.z![index] : undefined,
+            text: sample,
+            condition: annotation ? annotation.condition : 'Unknown',
+            color: annotation ? annotation.color : '#808080'
+          };
+        });
+
+        const conditionMap = new Map<string, any[]>();
+        dataWithAnnotations.forEach(annotatedPoint => {
+          if (!conditionMap.has(annotatedPoint.condition)) {
+            conditionMap.set(annotatedPoint.condition, []);
+          }
+          conditionMap.get(annotatedPoint.condition)!.push(annotatedPoint);
+        });
+
+        this.plotData = Array.from(conditionMap.entries()).map(([condition, points]) => {
+          const trace: any = {
+            x: points.map(p => p.x),
+            y: points.map(p => p.y),
+            mode: 'markers',
+            type: is3D ? 'scatter3d' : 'scatter',
+            name: condition,
+            text: points.map(p => p.text),
+            hoverinfo: 'text+name',
+            marker: {
+              size: is3D ? markerSize / 2 : markerSize,
+              color: points.map(p => p.color), // Array of colors
+              line: { color: '#fff', width: is3D ? 0.5 : 1 }
+            }
+          };
+          if (is3D) {
+            trace.z = points.map(p => p.z);
+          }
+          return trace;
+        });
+      } else {
+          const trace: any = {
+              x: data.x,
+              y: data.y,
+              mode: 'markers',
+              type: is3D ? 'scatter3d' : 'scatter',
+              text: data.text,
+              hoverinfo: 'text',
+              marker: { size: is3D ? markerSize / 2 : markerSize, color: '#1976d2', line: { color: '#fff', width: is3D ? 0.5 : 1 } }
+          };
+          if (is3D && data.z) {
+              trace.z = data.z;
+          }
+          this.plotData = [trace];
+      }
+
+      let newLayout: any;
+      if (is3D) {
+        newLayout = {
+          title: { text: settings.title !== '' ? settings.title : 'PHATE Analysis Results (3D)' },
+          width: settings.width || 800,
+          height: settings.height || 600,
+          scene: {
+            xaxis: { title: { text: 'PHATE 1' }, gridcolor: '#e0e0e0', backgroundcolor: '#fafafa', showgrid: showGrid },
+            yaxis: { title: { text: 'PHATE 2' }, gridcolor: '#e0e0e0', backgroundcolor: '#fafafa', showgrid: showGrid },
+            zaxis: { title: { text: 'PHATE 3' }, gridcolor: '#e0e0e0', backgroundcolor: '#fafafa', showgrid: showGrid }
+          },
+          paper_bgcolor: '#ffffff',
+          hovermode: 'closest',
+          showlegend: useAnnotations,
+          legend: { x: 1.02, y: 1 },
+          margin: { t: settings.marginTop, r: settings.marginRight, b: settings.marginBottom, l: settings.marginLeft }
+        };
+      } else {
+        newLayout = {
+          title: { text: settings.title !== '' ? settings.title : 'PHATE Analysis Results' },
+          width: settings.width || 800,
+          height: settings.height || 600,
+          xaxis: { title: { text: 'PHATE 1' }, zeroline: true, gridcolor: '#e0e0e0', showgrid: showGrid, automargin: true },
+          yaxis: { title: { text: 'PHATE 2' }, zeroline: true, gridcolor: '#e0e0e0', showgrid: showGrid, automargin: true },
+          plot_bgcolor: '#fafafa',
+          paper_bgcolor: '#ffffff',
+          hovermode: 'closest',
+          showlegend: useAnnotations,
+          legend: { x: 1.02, y: 1 },
+          margin: { t: settings.marginTop, r: settings.marginRight, b: settings.marginBottom, l: settings.marginLeft }
+        };
+      }
+      this.plotLayout = newLayout;
+      this.revision++;
+    });
   }
 
   private parsePHATEData(tsvData: string): PHATEData {
@@ -131,200 +253,16 @@ export class PhatePlot implements OnInit {
     return has3D ? { x, y, z, text } : { x, y, text };
   }
 
-  private async tryLoadAnnotations() {
-    this.annotations = await this.annotationService.loadAnnotationsForJob(this.jobId);
-    if (this.annotations.length > 0) {
-      this.conditionColors = await this.annotationService.loadConditionColorsForJob(this.jobId);
-    }
-  }
-
-  private createPlotData(data: PHATEData) {
-    const is3D = data.z && data.z.length > 0;
-
-    const useConditions = this.annotations.length > 0;
-    const colors = ['#1976d2', '#388e3c', '#d32f2f', '#f57c00', '#7b1fa2', '#0097a7', '#c2185b', '#5d4037', '#fbc02d', '#00796b'];
-
-    if (useConditions) {
-      const conditionMap = new Map<string, number[]>();
-      data.text.forEach((sample, index) => {
-        const condition = this.annotationService.getCondition(sample, this.annotations);
-        if (!conditionMap.has(condition)) {
-          conditionMap.set(condition, []);
-        }
-        conditionMap.get(condition)!.push(index);
-      });
-
-      const traces = Array.from(conditionMap.entries()).map(([condition, indices], colorIndex) => {
-        const color = colors[colorIndex % colors.length];
-        const trace: any = {
-          x: indices.map(i => data.x[i]),
-          y: indices.map(i => data.y[i]),
-          mode: 'markers',
-          type: is3D ? 'scatter3d' : 'scatter',
-          name: condition,
-          text: indices.map(i => data.text[i]),
-          hoverinfo: 'text+name',
-          marker: {
-            size: is3D ? 6 : 10,
-            color: color,
-            line: {
-              color: '#fff',
-              width: is3D ? 0.5 : 1
-            }
-          }
-        };
-
-        if (is3D && data.z) {
-          trace.z = indices.map(i => data.z![i]);
-        }
-
-        return trace;
-      });
-
-      this.plotData.set(traces);
-
-      if (is3D) {
-        this.plotLayout.set({
-          title: 'PHATE Analysis Results (3D)',
-          scene: {
-            xaxis: {
-              title: 'PHATE 1',
-              gridcolor: '#e0e0e0',
-              backgroundcolor: '#fafafa'
-            },
-            yaxis: {
-              title: 'PHATE 2',
-              gridcolor: '#e0e0e0',
-              backgroundcolor: '#fafafa'
-            },
-            zaxis: {
-              title: 'PHATE 3',
-              gridcolor: '#e0e0e0',
-              backgroundcolor: '#fafafa'
-            }
-          },
-          paper_bgcolor: '#ffffff',
-          hovermode: 'closest',
-          showlegend: true,
-          legend: { x: 1.02, y: 1 },
-          margin: { t: 50, r: 150, b: 50, l: 50 }
-        });
-      } else {
-        this.plotLayout.set({
-          title: 'PHATE Analysis Results',
-          xaxis: {
-            title: 'PHATE 1',
-            zeroline: true,
-            gridcolor: '#e0e0e0'
-          },
-          yaxis: {
-            title: 'PHATE 2',
-            zeroline: true,
-            gridcolor: '#e0e0e0'
-          },
-          plot_bgcolor: '#fafafa',
-          paper_bgcolor: '#ffffff',
-          hovermode: 'closest',
-          showlegend: true,
-          legend: { x: 1.02, y: 1 },
-          margin: { t: 50, r: 150, b: 50, l: 50 }
-        });
-      }
-    } else {
-      if (is3D) {
-        this.plotData.set([{
-          x: data.x,
-          y: data.y,
-          z: data.z,
-          mode: 'markers',
-          type: 'scatter3d',
-          text: data.text,
-          hoverinfo: 'text',
-          marker: {
-            size: 6,
-            color: '#1976d2',
-            line: {
-              color: '#fff',
-              width: 0.5
-            }
-          }
-        }]);
-
-        this.plotLayout.set({
-          title: 'PHATE Analysis Results (3D)',
-          scene: {
-            xaxis: {
-              title: 'PHATE 1',
-              gridcolor: '#e0e0e0',
-              backgroundcolor: '#fafafa'
-            },
-            yaxis: {
-              title: 'PHATE 2',
-              gridcolor: '#e0e0e0',
-              backgroundcolor: '#fafafa'
-            },
-            zaxis: {
-              title: 'PHATE 3',
-              gridcolor: '#e0e0e0',
-              backgroundcolor: '#fafafa'
-            }
-          },
-          paper_bgcolor: '#ffffff',
-          hovermode: 'closest',
-          showlegend: false,
-          margin: { t: 50, r: 50, b: 50, l: 50 }
-        });
-      } else {
-        this.plotData.set([{
-          x: data.x,
-          y: data.y,
-          mode: 'markers',
-          type: 'scatter',
-          text: data.text,
-          hoverinfo: 'text',
-          marker: {
-            size: 10,
-            color: '#1976d2',
-            line: {
-              color: '#fff',
-              width: 1
-            }
-          }
-        }]);
-
-        this.plotLayout.set({
-          title: 'PHATE Analysis Results',
-          xaxis: {
-            title: 'PHATE 1',
-            zeroline: true,
-            gridcolor: '#e0e0e0'
-          },
-          yaxis: {
-            title: 'PHATE 2',
-            zeroline: true,
-            gridcolor: '#e0e0e0'
-          },
-          plot_bgcolor: '#fafafa',
-          paper_bgcolor: '#ffffff',
-          hovermode: 'closest',
-          showlegend: false,
-          margin: { t: 50, r: 50, b: 50, l: 50 }
-        });
-      }
-    }
-  }
-
-  private async loadSavedSettings() {
+  private async loadSavedSettings(): Promise<any> {
     try {
       const savedSettings = await this.wails.readJobOutputFile(this.jobId, '.plot-settings-phate.json');
       if (savedSettings) {
-        const settings = JSON.parse(savedSettings);
-        this.customizationForm.patchValue(settings);
-        this.applyCustomization();
+        return JSON.parse(savedSettings);
       }
     } catch (err: any) {
       await this.wails.logToFile(`[PHATE Plot] No saved settings found or failed to load: ${err.message}`);
     }
+    return null;
   }
 
   private async saveSettings() {
@@ -338,64 +276,8 @@ export class PhatePlot implements OnInit {
   }
 
   async applyCustomization() {
-    const values = this.customizationForm.value;
-    const is3D = this.plotData()[0]?.type === 'scatter3d';
-
-    if (is3D) {
-      this.plotLayout.update(layout => ({
-        ...layout,
-        title: values.title !== undefined && values.title !== null ? values.title : layout.title,
-        width: values.width,
-        height: values.height,
-        scene: {
-          ...layout.scene,
-          xaxis: {
-            ...layout.scene?.xaxis,
-            title: layout.scene?.xaxis?.title,
-            showgrid: values.showGrid
-          },
-          yaxis: {
-            ...layout.scene?.yaxis,
-            title: layout.scene?.yaxis?.title,
-            showgrid: values.showGrid
-          },
-          zaxis: {
-            ...layout.scene?.zaxis,
-            title: layout.scene?.zaxis?.title,
-            showgrid: values.showGrid
-          }
-        }
-      }));
-    } else {
-      this.plotLayout.update(layout => ({
-        ...layout,
-        title: values.title !== undefined && values.title !== null ? values.title : layout.title,
-        width: values.width,
-        height: values.height,
-        xaxis: {
-          ...layout.xaxis,
-          title: layout.xaxis?.title,
-          showgrid: values.showGrid
-        },
-        yaxis: {
-          ...layout.yaxis,
-          title: layout.yaxis?.title,
-          showgrid: values.showGrid
-        }
-      }));
-    }
-
-    this.plotData.update(data =>
-      data.map(trace => ({
-        ...trace,
-        marker: {
-          ...trace.marker,
-          size: values.markerSize
-        }
-      }))
-    );
-
     await this.saveSettings();
+    this.updatePlot();
   }
 
   async exportToSVG() {

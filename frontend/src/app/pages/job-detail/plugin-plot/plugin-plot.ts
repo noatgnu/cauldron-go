@@ -32,13 +32,18 @@ export class PluginPlot implements OnInit {
 
   protected loading = signal(true);
   protected error = signal('');
-  protected plotData = signal<any[]>([]);
-  protected plotLayout = signal<any>({});
-  protected plotConfig = signal<any>({
+  plotData: any[] = [];
+  plotLayout: any = {
+    paper_bgcolor: '#ffffff',
+    hovermode: 'closest'
+  };
+  plotConfig: any = {
     responsive: true,
     displayModeBar: true,
-    displaylogo: false
-  });
+    displaylogo: false,
+    modeBarButtonsToRemove: ['toImage']
+  };
+  revision: number = 0;
 
   constructor(
     private wails: Wails,
@@ -66,7 +71,7 @@ export class PluginPlot implements OnInit {
         throw new Error('Invalid plot data format: missing or invalid data array');
       }
 
-      this.plotData.set(plotlyData.data);
+      this.plotData = plotlyData.data;
 
       const layout = plotlyData.layout || {};
       if (this.plotTitle) {
@@ -80,12 +85,13 @@ export class PluginPlot implements OnInit {
         layout.hovermode = 'closest';
       }
 
-      this.plotLayout.set(layout);
+      this.plotLayout = layout;
 
       if (plotlyData.config) {
-        this.plotConfig.update(config => ({ ...config, ...plotlyData.config }));
+        this.plotConfig = { ...this.plotConfig, ...plotlyData.config };
       }
 
+      this.revision++;
       await this.wails.logToFile(`[Plugin Plot] Successfully loaded plot: ${this.plotFileName}`);
     } catch (err: any) {
       const errorMsg = 'Failed to load plugin plot: ' + (err.message || String(err));

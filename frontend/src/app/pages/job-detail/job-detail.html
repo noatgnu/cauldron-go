@@ -94,12 +94,22 @@
 
         @if (job()!.terminalOutput && job()!.terminalOutput.length > 0) {
           <div class="terminal-section">
-            <h3>Output</h3>
-            <div class="terminal-output">
-              @for (line of job()!.terminalOutput; track $index) {
-                <div class="terminal-line">{{ line }}</div>
-              }
-            </div>
+            <mat-expansion-panel [expanded]="job()!.status === 'in_progress'">
+              <mat-expansion-panel-header>
+                <mat-panel-title>
+                  <mat-icon>terminal</mat-icon>
+                  <span>Console Output</span>
+                </mat-panel-title>
+                <mat-panel-description>
+                  {{ job()!.terminalOutput.length }} lines
+                </mat-panel-description>
+              </mat-expansion-panel-header>
+              <div class="terminal-output">
+                @for (line of job()!.terminalOutput; track $index) {
+                  <div class="terminal-line">{{ line }}</div>
+                }
+              </div>
+            </mat-expansion-panel>
           </div>
         }
       </mat-card-content>
@@ -108,6 +118,12 @@
           <mat-icon>arrow_back</mat-icon>
           Back to Jobs
         </button>
+        @if (job()!.outputPath) {
+          <button mat-raised-button color="accent" (click)="openResultFolder()">
+            <mat-icon>folder_open</mat-icon>
+            Open Result Folder
+          </button>
+        }
         @if (job()!.status === 'completed' && supportsAnnotations()) {
           <button mat-raised-button color="primary" (click)="openAnnotationDialog()">
             <mat-icon>label</mat-icon>

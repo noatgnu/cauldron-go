@@ -8,7 +8,13 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
-func BuildApplicationMenu(ctx context.Context) *menu.Menu {
+type AppCallbacks interface {
+	OpenLogFile() error
+	OpenLogDirectory() error
+	HandleQuit()
+}
+
+func BuildApplicationMenu(ctx context.Context, appCallbacks AppCallbacks) *menu.Menu {
 	appMenu := menu.NewMenu()
 
 	fileMenu := appMenu.AddSubmenu("File")
@@ -21,7 +27,7 @@ func BuildApplicationMenu(ctx context.Context) *menu.Menu {
 	})
 	fileMenu.AddSeparator()
 	fileMenu.AddText("Quit", keys.CmdOrCtrl("q"), func(_ *menu.CallbackData) {
-		runtime.Quit(ctx)
+		appCallbacks.HandleQuit()
 	})
 
 	analysisMenu := appMenu.AddSubmenu("Analysis")
@@ -104,6 +110,17 @@ func BuildApplicationMenu(ctx context.Context) *menu.Menu {
 	})
 	helpMenu.AddText("Documentation", keys.Key("F1"), func(_ *menu.CallbackData) {
 		runtime.EventsEmit(ctx, "menu:docs")
+	})
+	helpMenu.AddSeparator()
+	helpMenu.AddText("Open Log File", nil, func(_ *menu.CallbackData) {
+		if err := appCallbacks.OpenLogFile(); err != nil {
+			runtime.LogErrorf(ctx, "Failed to open log file: %v", err)
+		}
+	})
+	helpMenu.AddText("Open Log Directory", nil, func(_ *menu.CallbackData) {
+		if err := appCallbacks.OpenLogDirectory(); err != nil {
+			runtime.LogErrorf(ctx, "Failed to open log directory: %v", err)
+		}
 	})
 
 	return appMenu

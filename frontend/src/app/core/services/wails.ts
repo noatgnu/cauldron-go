@@ -58,6 +58,9 @@ export class Wails {
   private progressSubject = new BehaviorSubject<ProgressNotification | null>(null);
   progress$: Observable<ProgressNotification | null> = this.progressSubject.asObservable();
 
+  private queueStatusSubject = new BehaviorSubject<any | null>(null);
+  queueStatus$: Observable<any | null> = this.queueStatusSubject.asObservable();
+
   constructor() {
     this.setupEventListeners();
   }
@@ -86,6 +89,10 @@ export class Wails {
             percentage: data.percentage
           });
         }
+      });
+
+      EventsOn('queue:status', (data: any) => {
+        this.queueStatusSubject.next(data);
       });
     } catch (error) {
       console.error('Failed to setup event listeners:', error);
@@ -412,5 +419,40 @@ export class Wails {
   async logToFile(message: string): Promise<void> {
     if (!this.isWails) throw new Error('Wails not available');
     return WailsApp.LogToFile(message);
+  }
+
+  async pauseJobQueue(): Promise<void> {
+    if (!this.isWails) throw new Error('Wails not available');
+    return WailsApp.PauseJobQueue();
+  }
+
+  async stopJobQueueImmediate(): Promise<void> {
+    if (!this.isWails) throw new Error('Wails not available');
+    return WailsApp.StopJobQueueImmediate();
+  }
+
+  async resumeJobQueue(): Promise<void> {
+    if (!this.isWails) throw new Error('Wails not available');
+    return WailsApp.ResumeJobQueue();
+  }
+
+  async getJobQueueStatus(): Promise<any> {
+    if (!this.isWails) throw new Error('Wails not available');
+    return WailsApp.GetJobQueueStatus();
+  }
+
+  async openLogFile(): Promise<void> {
+    if (!this.isWails) throw new Error('Wails not available');
+    return WailsApp.OpenLogFile();
+  }
+
+  async openLogDirectory(): Promise<void> {
+    if (!this.isWails) throw new Error('Wails not available');
+    return WailsApp.OpenLogDirectory();
+  }
+
+  async getLogFilePath(): Promise<string> {
+    if (!this.isWails) throw new Error('Wails not available');
+    return WailsApp.GetLogFilePath();
   }
 }

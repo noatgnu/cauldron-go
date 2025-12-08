@@ -1,4 +1,4 @@
-import { Component, Input, OnInit, signal } from '@angular/core';
+import { Component, Input, OnInit, signal, NgZone } from '@angular/core';
 import { ReactiveFormsModule, FormBuilder, FormGroup } from '@angular/forms';
 import { PlotlyModule } from 'angular-plotly.js';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
@@ -41,96 +41,151 @@ export class FuzzyClusteringPlot implements OnInit {
 
   protected loading = signal(true);
   protected error = signal('');
-  protected plotData = signal<any[]>([]);
-  protected plotLayout = signal<any>({});
-  protected plotConfig = signal<any>({
+  plotData: any[] = [];
+  plotLayout: any = {};
+  plotConfig: any = {
     responsive: true,
     displayModeBar: true,
-    displaylogo: false
-  });
+    displaylogo: false,
+    modeBarButtonsToRemove: ['toImage']
+  };
+  revision: number = 0;
   protected availableFiles = signal<string[]>([]);
   protected selectedFile = signal<string>('');
   protected customizationForm: FormGroup;
   protected showCustomization = signal(false);
 
+  private _clusterDataCache = new Map<string, ClusterData>();
+  private _explainedVariance: number[] | null = null;
+
   constructor(
     private wails: Wails,
     private fb: FormBuilder,
-    private plotlyExport: PlotlyExport
+    private plotlyExport: PlotlyExport,
+    private ngZone: NgZone
   ) {
     this.customizationForm = this.fb.group({
       title: [''],
       showGrid: [true],
       markerSize: [10],
       width: [800],
-      height: [600]
+      height: [600],
+      marginTop: [100],
+      marginRight: [100],
+      marginBottom: [100],
+      marginLeft: [100]
     });
   }
 
   async ngOnInit() {
-    await this.findClusterFiles();
-  }
-
-  async findClusterFiles() {
     try {
       this.loading.set(true);
-      const clusterFiles: string[] = [];
-
-      for (let i = 2; i <= 10; i++) {
-        try {
-          const filename = `fcm_${i}_clusters.txt`;
-          await this.wails.readJobOutputFile(this.jobId, filename);
-          clusterFiles.push(filename);
-        } catch (e) {
-          break;
-        }
+      const savedSettings = await this.loadSavedSettings();
+      if (savedSettings) {
+        const completeSettings = { ...this.customizationForm.value, ...savedSettings };
+        this.customizationForm.patchValue(completeSettings, { emitEvent: false });
       }
-
-      this.availableFiles.set(clusterFiles);
-
-      if (clusterFiles.length > 0) {
-        this.selectedFile.set(clusterFiles[0]);
-        await this.loadAndRenderPlot(clusterFiles[0]);
-        this.loadSavedSettings();
-      } else {
-        this.error.set('No clustering output files found');
-        this.loading.set(false);
-      }
+      await this.loadExplainedVariance();
+      await this.findAndRenderFirstPlot();
     } catch (err: any) {
-      this.error.set('Failed to find clustering files: ' + err.message);
-      await this.wails.logToFile('[Fuzzy Clustering Plot] Error finding files: ' + err.message);
+      this.error.set('Failed to initialize plot: ' + err.message);
+      await this.wails.logToFile('[Fuzzy Clustering Plot] Error on init: ' + err.message);
+    } finally {
       this.loading.set(false);
+    }
+  }
+
+  private async findAndRenderFirstPlot() {
+    const clusterFiles: string[] = [];
+    for (let i = 2; i <= 10; i++) {
+      try {
+        const filename = `fcm_${i}_clusters.txt`;
+        await this.wails.readJobOutputFile(this.jobId, filename); // Check existence
+        clusterFiles.push(filename);
+      } catch (e) {
+        break; // Stop when a file is not found
+      }
+    }
+    this.availableFiles.set(clusterFiles);
+
+    if (clusterFiles.length > 0) {
+      this.selectedFile.set(clusterFiles[0]);
+      await this.updatePlot(clusterFiles[0]);
+    } else {
+      this.error.set('No clustering output files found');
+    }
+  }
+
+  private async loadExplainedVariance() {
+    if (this._explainedVariance) return;
+    try {
+      const varianceData = await this.wails.readJobOutputFile(this.jobId, 'explained_variance_ratio.json');
+      if (!varianceData) throw new Error('explained_variance_ratio.json file is empty or not found');
+      this._explainedVariance = JSON.parse(varianceData);
+    } catch (err) {
+      throw new Error('Failed to load explained variance data');
     }
   }
 
   async onFileChange(fileName: string) {
     this.selectedFile.set(fileName);
-    await this.loadAndRenderPlot(fileName);
+    await this.updatePlot(fileName);
   }
 
-  async loadAndRenderPlot(fileName: string) {
+  private async getOrLoadClusterData(fileName: string): Promise<ClusterData> {
+    if (this._clusterDataCache.has(fileName)) {
+      return this._clusterDataCache.get(fileName)!;
+    }
+    const data = await this.wails.readJobOutputFile(this.jobId, fileName);
+    if (!data) throw new Error(`${fileName} file is empty or not found`);
+    const parsedData = this.parseClusterData(data);
+    this._clusterDataCache.set(fileName, parsedData);
+    return parsedData;
+  }
+
+  async updatePlot(fileName: string) {
+    if (!fileName) return;
+    this.loading.set(true);
     try {
-      this.loading.set(true);
+      const clusterData = await this.getOrLoadClusterData(fileName);
+      if (!this._explainedVariance) await this.loadExplainedVariance();
 
-      const [data, varianceData] = await Promise.all([
-        this.wails.readJobOutputFile(this.jobId, fileName),
-        this.wails.readJobOutputFile(this.jobId, 'explained_variance_ratio.json')
-      ]);
+      this.ngZone.run(() => {
+        const settings = this.customizationForm.value;
+        const pc1Variance = (this._explainedVariance![0] * 100).toFixed(1);
+        const pc2Variance = (this._explainedVariance![1] * 100).toFixed(1);
 
-      if (!data) {
-        throw new Error(`${fileName} file is empty or not found`);
-      }
+        const uniqueClusters = [...new Set(clusterData.cluster)];
+        const colors = ['#1976d2', '#388e3c', '#d32f2f', '#f57c00', '#7b1fa2', '#0097a7', '#c2185b', '#5d4037'];
+        const markerSize = settings.markerSize || 10;
+        const showGrid = settings.showGrid !== false;
 
-      if (!varianceData) {
-        throw new Error('explained_variance_ratio.json file is empty or not found');
-      }
+        this.plotData = uniqueClusters.map((clusterName, index) => {
+          const indices = clusterData.cluster.map((c, i) => c === clusterName ? i : -1).filter(i => i >= 0);
+          return {
+            x: indices.map(i => clusterData.x[i]),
+            y: indices.map(i => clusterData.y[i]),
+            mode: 'markers', type: 'scatter', name: `Cluster ${clusterName}`,
+            text: indices.map(i => clusterData.text[i]),
+            marker: { size: markerSize, color: colors[index % colors.length], line: { color: '#fff', width: 1 } }
+          };
+        });
 
-      const explainedVariance = JSON.parse(varianceData);
-      const clusterData = this.parseClusterData(data);
-      this.createPlotData(clusterData, explainedVariance);
+        this.plotLayout = {
+          title: { text: settings.title !== '' ? settings.title : `Fuzzy Clustering Results (${fileName})` },
+          width: settings.width || 800, height: settings.height || 600,
+          xaxis: { title: { text: `PC1 (${pc1Variance}%)` }, zeroline: true, gridcolor: '#e0e0e0', showgrid: showGrid, automargin: true },
+          yaxis: { title: { text: `PC2 (${pc2Variance}%)` }, zeroline: true, gridcolor: '#e0e0e0', showgrid: showGrid, automargin: true },
+          plot_bgcolor: '#fafafa', paper_bgcolor: '#ffffff',
+          hovermode: 'closest', showlegend: true, legend: { x: 1.02, y: 1 },
+          margin: { t: settings.marginTop, r: settings.marginRight, b: settings.marginBottom, l: settings.marginLeft }
+        };
+
+        this.revision++;
+      });
     } catch (err: any) {
-      this.error.set('Failed to load clustering plot: ' + err.message);
-      await this.wails.logToFile('[Fuzzy Clustering Plot] Error: ' + err.message);
+      this.error.set(`Failed to render plot for ${fileName}: ${err.message}`);
+      await this.wails.logToFile(`[Fuzzy Clustering Plot] Error rendering plot: ${err.message}`);
     } finally {
       this.loading.set(false);
     }
@@ -139,99 +194,35 @@ export class FuzzyClusteringPlot implements OnInit {
   private parseClusterData(tsvData: string): ClusterData {
     const lines = tsvData.trim().split('\n');
     const headers = lines[0].split('\t');
-
     const xIndex = headers.indexOf('x');
     const yIndex = headers.indexOf('y');
     const sampleIndex = headers.indexOf('Sample');
     const clusterIndex = headers.indexOf('cluster');
 
     if (xIndex === -1 || yIndex === -1 || sampleIndex === -1 || clusterIndex === -1) {
-      throw new Error(`Missing required columns. Found: ${headers.join(', ')}`);
+      throw new Error(`Missing required columns in cluster data. Found: ${headers.join(', ')}`);
     }
 
-    const x: number[] = [];
-    const y: number[] = [];
-    const text: string[] = [];
-    const cluster: string[] = [];
-
+    const x: number[] = [], y: number[] = [], text: string[] = [], cluster: string[] = [];
     for (let i = 1; i < lines.length; i++) {
       const values = lines[i].split('\t');
       if (values.length > Math.max(xIndex, yIndex, sampleIndex, clusterIndex)) {
         x.push(parseFloat(values[xIndex]));
         y.push(parseFloat(values[yIndex]));
         const samplePath = values[sampleIndex];
-        const sampleName = samplePath.split(/[/\\]/).pop() || samplePath;
-        text.push(sampleName);
+        text.push(samplePath.split(/[/\\]/).pop() || samplePath);
         cluster.push(values[clusterIndex]);
       }
     }
-
     return { x, y, text, cluster };
   }
 
-  private createPlotData(data: ClusterData, explainedVariance: number[]) {
-    const pc1Variance = (explainedVariance[0] * 100).toFixed(1);
-    const pc2Variance = (explainedVariance[1] * 100).toFixed(1);
-
-    const uniqueClusters = [...new Set(data.cluster)];
-    const colors = ['#1976d2', '#388e3c', '#d32f2f', '#f57c00', '#7b1fa2', '#0097a7', '#c2185b', '#5d4037'];
-
-    const traces = uniqueClusters.map((clusterName, index) => {
-      const indices = data.cluster.map((c, i) => c === clusterName ? i : -1).filter(i => i >= 0);
-      return {
-        x: indices.map(i => data.x[i]),
-        y: indices.map(i => data.y[i]),
-        mode: 'markers',
-        type: 'scatter',
-        name: `Cluster ${clusterName}`,
-        text: indices.map(i => data.text[i]),
-        marker: {
-          size: 10,
-          color: colors[index % colors.length],
-          line: {
-            color: '#fff',
-            width: 1
-          }
-        }
-      };
-    });
-
-    this.plotData.set(traces);
-
-    this.plotLayout.set({
-      title: 'Fuzzy Clustering Results',
-      xaxis: {
-        title: `PC1 (${pc1Variance}%)`,
-        zeroline: true,
-        gridcolor: '#e0e0e0'
-      },
-      yaxis: {
-        title: `PC2 (${pc2Variance}%)`,
-        zeroline: true,
-        gridcolor: '#e0e0e0'
-      },
-      plot_bgcolor: '#fafafa',
-      paper_bgcolor: '#ffffff',
-      hovermode: 'closest',
-      showlegend: true,
-      legend: {
-        x: 1.02,
-        y: 1
-      },
-      margin: { t: 50, r: 150, b: 50, l: 50 }
-    });
-  }
-
-  private async loadSavedSettings() {
+  private async loadSavedSettings(): Promise<any> {
     try {
       const savedSettings = await this.wails.readJobOutputFile(this.jobId, '.plot-settings-fuzzy-clustering.json');
-      if (savedSettings) {
-        const settings = JSON.parse(savedSettings);
-        this.customizationForm.patchValue(settings);
-        this.applyCustomization();
-      }
-    } catch (err: any) {
-      await this.wails.logToFile(`[Fuzzy Clustering Plot] No saved settings found or failed to load: ${err.message}`);
+      return savedSettings ? JSON.parse(savedSettings) : null;
+    } catch (err) {
+      return null;
     }
   }
 
@@ -239,47 +230,20 @@ export class FuzzyClusteringPlot implements OnInit {
     try {
       const settings = this.customizationForm.value;
       await this.wails.writeJobOutputFile(this.jobId, '.plot-settings-fuzzy-clustering.json', JSON.stringify(settings, null, 2));
-      await this.wails.logToFile(`[Fuzzy Clustering Plot] Settings saved for job: ${this.jobId}`);
     } catch (err: any) {
       await this.wails.logToFile(`[Fuzzy Clustering Plot] Failed to save settings: ${err.message}`);
     }
   }
 
   async applyCustomization() {
-    const values = this.customizationForm.value;
-
-    this.plotLayout.update(layout => ({
-      ...layout,
-      title: values.title !== undefined && values.title !== null ? values.title : layout.title,
-      width: values.width,
-      height: values.height,
-      xaxis: {
-        ...layout.xaxis,
-        showgrid: values.showGrid
-      },
-      yaxis: {
-        ...layout.yaxis,
-        showgrid: values.showGrid
-      }
-    }));
-
-    this.plotData.update(data =>
-      data.map(trace => ({
-        ...trace,
-        marker: {
-          ...trace.marker,
-          size: values.markerSize
-        }
-      }))
-    );
-
     await this.saveSettings();
+    await this.updatePlot(this.selectedFile());
   }
 
   async exportToSVG() {
     try {
       await this.plotlyExport.exportToSVG('fuzzy-clustering-plot-div', {
-        filename: 'fuzzy_clustering_plot',
+        filename: `fuzzy_clustering_${this.selectedFile()}`,
         width: this.customizationForm.value.width || 1200,
         height: this.customizationForm.value.height || 800
       });

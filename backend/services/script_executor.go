@@ -47,9 +47,7 @@ func (s *ScriptExecutor) ExecutePythonScript(ctx context.Context, jobID string, 
 	pythonPath := cfg.PythonPath
 
 	scriptPath := filepath.Join("scripts", "python", config.ScriptName)
-
-	args := []string{scriptPath}
-	args = append(args, config.Args...)
+	args := append([]string{scriptPath}, config.Args...)
 
 	cmd := exec.CommandContext(ctx, pythonPath, args...)
 

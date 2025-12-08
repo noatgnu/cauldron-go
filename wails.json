@@ -16,6 +16,7 @@
     "productName": "Cauldron",
     "productVersion": "1.0.0",
     "copyright": "Copyright 2025",
-    "comments": "Proteomics data visualization tool"
+    "comments": "Proteomics data visualization tool",
+    "icon": "resources/appicon.png"
   }
 }

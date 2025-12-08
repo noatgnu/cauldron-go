@@ -1,3 +1,4 @@
+import { DataFrame } from 'data-forge';
 import { Component, OnInit, OnDestroy, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -7,6 +8,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatChipsModule } from '@angular/material/chips';
+import { MatExpansionModule } from '@angular/material/expansion';
 import { MatDialog } from '@angular/material/dialog';
 import { Wails, Job } from '../../core/services/wails';
 import { PcaPlot } from './pca-plot/pca-plot';
@@ -14,7 +16,7 @@ import { PhatePlot } from './phate-plot/phate-plot';
 import { FuzzyClusteringPlot } from './fuzzy-clustering-plot/fuzzy-clustering-plot';
 import { PluginPlot } from './plugin-plot/plugin-plot';
 import { SampleAnnotation, SampleAnnotationData } from '../../components/sample-annotation/sample-annotation';
-import { AnnotationService } from '../../core/services/annotation.service';
+import { Annotation, AnnotationService } from '../../core/services/annotation.service';
 
 @Component({
   selector: 'app-job-detail',
@@ -26,6 +28,7 @@ import { AnnotationService } from '../../core/services/annotation.service';
     MatProgressBarModule,
     MatProgressSpinnerModule,
     MatChipsModule,
+    MatExpansionModule,
     PcaPlot,
     PhatePlot,
     FuzzyClusteringPlot,
@@ -119,19 +122,30 @@ export class JobDetail implements OnInit, OnDestroy {
     const dialogData: SampleAnnotationData = {
       mode: annotations.length > 0 ? 'edit' : 'create',
       samples: samples.length > 0 ? samples : undefined,
-      annotation: undefined
+      annotation: annotations.length > 0 ? new DataFrame(annotations.map(a => ({ Sample: a.sample, Condition: a.condition, Batch: a.batch || '', Color: a.color || '' }))) : undefined,
     };
 
     const dialogRef = this.dialog.open(SampleAnnotation, {
-      width: '800px',
+      width: '90vw',
+      maxWidth: '1200px',
       data: dialogData
     });
 
     dialogRef.afterClosed().subscribe(async (result) => {
       if (result) {
-        await this.annotationService.saveAnnotationsForJob(this.jobId, result);
+        const annotationsToSave: Annotation[] = result.map((a: any) => ({
+          sample: a.Sample,
+          condition: a.Condition,
+          batch: a.Batch,
+          color: a.Color,
+        }));
+
+        await this.annotationService.saveAnnotationsForJob(this.jobId, annotationsToSave);
+
         await this.wails.logToFile(`[Job Detail] Saved annotations for job ${this.jobId}`);
-        window.location.reload();
+        this.router.navigateByUrl('/', { skipLocationChange: true }).then(() => {
+          this.router.navigate(['/jobs', this.jobId]);
+        });
       }
     });
   }
@@ -208,6 +222,17 @@ export class JobDetail implements OnInit, OnDestroy {
       }
     } catch (err) {
       await this.wails.logToFile(`[Job Detail] Error detecting plugin plots: ${err}`);
+    }
+  }
+
+  async openResultFolder() {
+    const outputPath = this.job()?.outputPath;
+    if (outputPath) {
+      try {
+        await this.wails.openDirectoryInExplorer(outputPath);
+      } catch (error) {
+        await this.wails.logToFile(`[Job Detail] Failed to open result folder: ${error}`);
+      }
     }
   }
 }

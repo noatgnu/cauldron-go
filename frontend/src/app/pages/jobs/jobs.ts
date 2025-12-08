@@ -35,6 +35,21 @@ export class Jobs implements OnInit {
   protected rEnvironments = signal<REnvironment[]>([]);
   protected jobProgress = signal<Record<string, {message: string, percentage: number}>>({});
   protected displayedColumns: string[] = ['status', 'name', 'type', 'environment', 'createdAt', 'actions'];
+  protected queueStatus = signal<{
+    paused: boolean;
+    stopImmediate: boolean;
+    currentJobID: string;
+    pendingCount: number;
+    inProgressCount: number;
+    queueLength: number;
+  }>({
+    paused: false,
+    stopImmediate: false,
+    currentJobID: '',
+    pendingCount: 0,
+    inProgressCount: 0,
+    queueLength: 0
+  });
 
   constructor(
     private wails: Wails,
@@ -45,8 +60,10 @@ export class Jobs implements OnInit {
   async ngOnInit(): Promise<void> {
     await this.loadJobs();
     await this.loadEnvironments();
+    await this.loadQueueStatus();
     this.setupJobUpdates();
     this.setupProgressUpdates();
+    this.setupQueueStatusUpdates();
   }
 
   async loadEnvironments(): Promise<void> {
@@ -252,5 +269,48 @@ export class Jobs implements OnInit {
 
   hasOutputDirectory(job: Job): boolean {
     return !!job.outputPath && (job.status === 'completed' || job.status === 'failed');
+  }
+
+  async loadQueueStatus(): Promise<void> {
+    try {
+      const status = await this.wails.getJobQueueStatus();
+      this.queueStatus.set(status);
+    } catch (error) {
+      await this.wails.logToFile(`Failed to load queue status: ${error}`);
+    }
+  }
+
+  setupQueueStatusUpdates(): void {
+    this.wails.queueStatus$.subscribe(status => {
+      if (!status) return;
+      this.queueStatus.set(status);
+    });
+  }
+
+  async pauseQueue(): Promise<void> {
+    try {
+      await this.wails.pauseJobQueue();
+      await this.loadQueueStatus();
+    } catch (error) {
+      await this.wails.logToFile(`Failed to pause queue: ${error}`);
+    }
+  }
+
+  async stopQueueImmediate(): Promise<void> {
+    try {
+      await this.wails.stopJobQueueImmediate();
+      await this.loadQueueStatus();
+    } catch (error) {
+      await this.wails.logToFile(`Failed to stop queue: ${error}`);
+    }
+  }
+
+  async resumeQueue(): Promise<void> {
+    try {
+      await this.wails.resumeJobQueue();
+      await this.loadQueueStatus();
+    } catch (error) {
+      await this.wails.logToFile(`Failed to resume queue: ${error}`);
+    }
   }
 }

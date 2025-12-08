@@ -13,6 +13,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { ImportedFileSelection } from '../../../components/imported-file-selection/imported-file-selection';
 import { EnvironmentIndicator } from '../../../components/environment-indicator/environment-indicator';
 import { Wails } from '../../../core/services/wails';
+import { NotificationService } from '../../../core/services/notification.service';
 import { fromCSV } from 'data-forge';
 
 @Component({
@@ -43,7 +44,8 @@ export class Pca implements OnInit {
   constructor(
     private fb: FormBuilder,
     private wails: Wails,
-    private router: Router
+    private router: Router,
+    private notificationService: NotificationService
   ) {
     this.form = this.fb.group({
       inputFile: ['', Validators.required],
@@ -66,7 +68,9 @@ export class Pca implements OnInit {
         }
       }
     } catch (error) {
-      console.error('Failed to open file dialog:', error);
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      await this.wails.logToFile(`[PCA] Failed to open file dialog: ${errorMsg}`);
+      this.notificationService.showError(`Failed to open file: ${errorMsg}`);
     }
   }
 
@@ -84,6 +88,7 @@ export class Pca implements OnInit {
     this.running = true;
     this.createdJobId = null;
     try {
+      await this.wails.logToFile('[PCA] Starting job creation...');
       const jobId = await this.wails.createJob({
         type: 'pca',
         name: 'PCA Analysis',
@@ -94,12 +99,19 @@ export class Pca implements OnInit {
           log2: this.form.value.log2
         }
       });
-      console.log('PCA job created:', jobId);
+      await this.wails.logToFile(`[PCA] Job created: ${jobId}`);
       this.createdJobId = jobId;
     } catch (error) {
-      console.error('Failed to create PCA job:', error);
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      try {
+        await this.wails.logToFile(`[PCA] Failed to create job: ${errorMsg}`);
+      } catch {}
+      this.notificationService.showError(`Failed to create PCA job: ${errorMsg}`);
     } finally {
       this.running = false;
+      try {
+        await this.wails.logToFile(`[PCA] Job creation completed, running=${this.running}, jobId=${this.createdJobId}`);
+      } catch {}
     }
   }
 
@@ -143,7 +155,7 @@ export class Pca implements OnInit {
         log2: true
       });
     } catch (error) {
-      alert('Failed to load example data. Please ensure example files are available.');
+      this.notificationService.showError('Failed to load example data. Please ensure example files are available.');
     }
   }
 }

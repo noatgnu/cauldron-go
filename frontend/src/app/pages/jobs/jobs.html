@@ -1,6 +1,51 @@
 <div class="jobs-container">
   <h1>Job Queue</h1>
 
+  <mat-card class="queue-controls">
+    <mat-card-header>
+      <mat-card-title>Queue Management</mat-card-title>
+    </mat-card-header>
+    <mat-card-content>
+      <div class="queue-status">
+        <div class="status-item">
+          <mat-icon>queue</mat-icon>
+          <span>Status: <strong>{{ queueStatus().paused ? 'Paused' : 'Running' }}</strong></span>
+        </div>
+        <div class="status-item">
+          <mat-icon>pending_actions</mat-icon>
+          <span>Pending: <strong>{{ queueStatus().pendingCount }}</strong></span>
+        </div>
+        <div class="status-item">
+          <mat-icon>sync</mat-icon>
+          <span>In Progress: <strong>{{ queueStatus().inProgressCount }}</strong></span>
+        </div>
+      </div>
+      <div class="queue-actions">
+        @if (!queueStatus().paused) {
+          <button mat-raised-button color="accent" (click)="pauseQueue()">
+            <mat-icon>pause</mat-icon>
+            Pause After Current
+          </button>
+          <button mat-raised-button color="warn" (click)="stopQueueImmediate()">
+            <mat-icon>stop</mat-icon>
+            Stop Immediately
+          </button>
+        } @else {
+          <button mat-raised-button color="primary" (click)="resumeQueue()">
+            <mat-icon>play_arrow</mat-icon>
+            Resume Queue
+          </button>
+          @if (!queueStatus().stopImmediate && queueStatus().currentJobID) {
+            <button mat-raised-button (click)="resumeQueue()">
+              <mat-icon>cancel</mat-icon>
+              Cancel Pause
+            </button>
+          }
+        }
+      </div>
+    </mat-card-content>
+  </mat-card>
+
   @if (loading()) {
     <div class="loading-container">
       <p>Loading jobs...</p>

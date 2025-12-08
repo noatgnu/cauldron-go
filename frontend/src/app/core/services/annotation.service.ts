@@ -1,12 +1,14 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable } from '@angular/core';
 import { Wails } from './wails';
 
 export interface Annotation {
   sample: string;
   condition: string;
   batch?: string;
+  color?: string;
 }
 
+// Kept for legacy compatibility in other components, but will be phased out.
 export interface AnnotationColors {
   [condition: string]: string;
 }
@@ -46,13 +48,14 @@ export class AnnotationService {
   }
 
   parseAnnotations(data: string): Annotation[] {
-    const lines = data.trim().split('\n');
-    if (lines.length === 0) return [];
+    const lines = data.trim().split('\n').filter(line => !line.startsWith('#'));
+    if (lines.length < 2) return []; // Must have header and at least one data row
 
-    const headers = lines[0].split(/[\t,]/);
-    const sampleIdx = headers.findIndex(h => h.toLowerCase().includes('sample'));
-    const conditionIdx = headers.findIndex(h => h.toLowerCase().includes('condition') || h.toLowerCase().includes('group'));
-    const batchIdx = headers.findIndex(h => h.toLowerCase().includes('batch'));
+    const headers = lines[0].toLowerCase().split(/[\t,]/);
+    const sampleIdx = headers.findIndex(h => h.includes('sample'));
+    const conditionIdx = headers.findIndex(h => h.includes('condition') || h.includes('group'));
+    const batchIdx = headers.findIndex(h => h.includes('batch'));
+    const colorIdx = headers.findIndex(h => h.includes('color'));
 
     if (sampleIdx === -1 || conditionIdx === -1) {
       return [];
@@ -62,31 +65,44 @@ export class AnnotationService {
     for (let i = 1; i < lines.length; i++) {
       const values = lines[i].split(/[\t,]/);
       if (values.length > Math.max(sampleIdx, conditionIdx)) {
-        const sample = values[sampleIdx].trim();
+        const sample = values[sampleIdx]?.trim();
         const samplePath = sample.split(/[/\\]/).pop() || sample;
         const annotation: Annotation = {
           sample: samplePath,
-          condition: values[conditionIdx].trim()
+          condition: values[conditionIdx]?.trim()
         };
         if (batchIdx !== -1 && values[batchIdx]) {
           annotation.batch = values[batchIdx].trim();
         }
+        if (colorIdx !== -1 && values[colorIdx]) {
+          annotation.color = values[colorIdx].trim();
+        }
         annotations.push(annotation);
       }
     }
-
     return annotations;
   }
 
   async saveAnnotationsForJob(jobId: string, annotations: Annotation[], filename: string = 'annotation.txt'): Promise<void> {
-    const headers = annotations[0]?.batch !== undefined
-      ? ['Sample', 'Condition', 'Batch']
-      : ['Sample', 'Condition'];
+    if (!annotations || annotations.length === 0) {
+      await this.wails.logToFile(`[AnnotationService] No annotations to save for job ${jobId}`);
+      return;
+    }
+
+    const hasBatch = annotations.some(a => a.batch);
+    const hasColor = annotations.some(a => a.color);
+
+    const headers = ['Sample', 'Condition'];
+    if (hasBatch) headers.push('Batch');
+    if (hasColor) headers.push('Color');
 
     const rows = annotations.map(a => {
-      const row = [a.sample, a.condition];
-      if (a.batch !== undefined) {
-        row.push(a.batch);
+      const row = [a.sample || '', a.condition || ''];
+      if (hasBatch) {
+        row.push(a.batch || '');
+      }
+      if (hasColor) {
+        row.push(a.color || '');
       }
       return row.join('\t');
     });
@@ -94,24 +110,7 @@ export class AnnotationService {
     const content = [headers.join('\t'), ...rows].join('\n');
 
     await this.wails.writeJobOutputFile(jobId, filename, content);
-    await this.wails.logToFile(`[AnnotationService] Saved annotations to ${filename} for job ${jobId}`);
-  }
-
-  async loadConditionColorsForJob(jobId: string): Promise<AnnotationColors> {
-    try {
-      const colorData = await this.wails.readJobOutputFile(jobId, 'annotation_colors.json');
-      if (colorData) {
-        return JSON.parse(colorData);
-      }
-    } catch (err) {
-      await this.wails.logToFile(`[AnnotationService] No color mapping found for job ${jobId}`);
-    }
-    return {};
-  }
-
-  async saveConditionColorsForJob(jobId: string, colors: AnnotationColors): Promise<void> {
-    await this.wails.writeJobOutputFile(jobId, 'annotation_colors.json', JSON.stringify(colors, null, 2));
-    await this.wails.logToFile(`[AnnotationService] Saved condition colors for job ${jobId}`);
+    await this.wails.logToFile(`[AnnotationService] Saved ${annotations.length} annotations to ${filename} for job ${jobId}`);
   }
 
   getCondition(sampleName: string, annotations: Annotation[]): string {
@@ -121,23 +120,5 @@ export class AnnotationService {
 
   getDefaultColors(): string[] {
     return [...this.DEFAULT_COLORS];
-  }
-
-  assignDefaultColors(conditions: string[], existingColors: AnnotationColors = {}): AnnotationColors {
-    const colors: AnnotationColors = { ...existingColors };
-    let colorIndex = 0;
-
-    for (const condition of conditions) {
-      if (!colors[condition]) {
-        colors[condition] = this.DEFAULT_COLORS[colorIndex % this.DEFAULT_COLORS.length];
-        colorIndex++;
-      }
-    }
-
-    return colors;
-  }
-
-  extractSampleNames(samplePaths: string[]): string[] {
-    return samplePaths.map(path => path.split(/[/\\]/).pop() || path);
   }
 }

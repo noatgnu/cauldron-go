@@ -2,7 +2,7 @@
 
 set -e
 
-PROJECT_ROOT="/mnt/d/GoLandProjects/cauldronGO/cauldronGO"
+PROJECT_ROOT="/mnt/d/GoLandProjects/cauldronGO"
 FRONTEND_DIR="$PROJECT_ROOT/frontend"
 
 print_header() {
@@ -57,8 +57,8 @@ copy_resources() {
         has_error=1
     fi
 
-    if [ -d "$PROJECT_ROOT/backend/scripts" ]; then
-        if cp -r "$PROJECT_ROOT/backend/scripts" "$PROJECT_ROOT/build/bin/"; then
+    if [ -d "$PROJECT_ROOT/scripts" ]; then
+        if cp -r "$PROJECT_ROOT/scripts" "$PROJECT_ROOT/build/bin/"; then
             print_success "Scripts copied successfully"
         else
             print_error "Failed to copy scripts"
@@ -72,7 +72,29 @@ copy_resources() {
     return $has_error
 }
 
+prepare_icons() {
+    print_header "Preparing Application Icons"
+    cd "$PROJECT_ROOT"
+
+    mkdir -p "$PROJECT_ROOT/build/windows"
+
+    if [ -f "$PROJECT_ROOT/resources/appicon.png" ]; then
+        cp "$PROJECT_ROOT/resources/appicon.png" "$PROJECT_ROOT/build/appicon.png"
+        print_success "Application icon copied"
+    else
+        print_error "Warning: resources/appicon.png not found"
+    fi
+
+    if [ -f "$PROJECT_ROOT/resources/icon.ico" ]; then
+        cp "$PROJECT_ROOT/resources/icon.ico" "$PROJECT_ROOT/build/windows/icon.ico"
+        print_success "Windows icon copied"
+    else
+        print_error "Warning: resources/icon.ico not found"
+    fi
+}
+
 build_wails() {
+    prepare_icons
     print_header "Building Wails Application"
     cd "$PROJECT_ROOT"
 

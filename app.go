@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
+	goruntime "runtime"
 	"strings"
 	"time"
 
@@ -34,12 +36,23 @@ func NewApp() *App {
 
 func (a *App) startup(ctx context.Context) {
 	log.Println("[App.startup] Starting application...")
+	log.Println("[App.startup] beforeClose handler registered")
 	a.ctx = ctx
+
+	// Set up window close handler
+	if ctx.Value("wails-test") == nil {
+		log.Println("[App.startup] Setting up window close handler...")
+		runtime.EventsOn(ctx, "wails:window:close", func(data ...interface{}) {
+			log.Println("[EventsOn] Window close event detected!")
+			a.handleWindowClose(ctx)
+		})
+		log.Println("[App.startup] Window close handler registered")
+	}
 
 	// Only set menu if running in Wails runtime (not in tests)
 	if ctx.Value("wails-test") == nil {
 		log.Println("[App.startup] Setting up menu...")
-		menu := services.BuildApplicationMenu(ctx)
+		menu := services.BuildApplicationMenu(ctx, a)
 		runtime.MenuSetApplicationMenu(ctx, menu)
 	}
 
@@ -101,6 +114,9 @@ func (a *App) startup(ctx context.Context) {
 
 	log.Println("[App.startup] Initializing plugin service...")
 	a.pluginService = services.NewPluginService()
+
+	log.Println("[App.startup] Checking for unfinished jobs...")
+	go a.checkUnfinishedJobs()
 
 	log.Println("[App.startup] Application startup complete!")
 }
@@ -1031,7 +1047,7 @@ func (a *App) RunPCAAnalysis(inputFile string, outputDir string, columns []strin
 		err := a.scriptExecutor.ExecutePythonScript(a.ctx, jobID, services.ScriptConfig{
 			Type:       "pca",
 			ScriptName: "pca.py",
-			Args:       args,
+			Args:       args[1:],
 			OutputDir:  jobOutputDir,
 		})
 		if err != nil {
@@ -1097,8 +1113,8 @@ func (a *App) RunPHATEAnalysis(inputFile string, outputDir string, columns []str
 	go func() {
 		err := a.scriptExecutor.ExecutePythonScript(a.ctx, jobID, services.ScriptConfig{
 			Type:       "phate",
-			ScriptName: "phate.py",
-			Args:       args,
+			ScriptName: "phate_analysis.py",
+			Args:       args[1:],
 			OutputDir:  jobOutputDir,
 		})
 		if err != nil {
@@ -1128,6 +1144,7 @@ func (a *App) RunNormalization(inputFile string, outputDir string, columns []str
 	}
 
 	args := []string{
+		"normalization.py",
 		"-f", inputFile,
 		"-o", jobOutputDir,
 		"-c", columnsStr,
@@ -1150,7 +1167,7 @@ func (a *App) RunNormalization(inputFile string, outputDir string, columns []str
 		err := a.scriptExecutor.ExecutePythonScript(a.ctx, jobID, services.ScriptConfig{
 			Type:       "normalization",
 			ScriptName: "normalization.py",
-			Args:       args,
+			Args:       args[1:],
 			OutputDir:  jobOutputDir,
 		})
 		if err != nil {
@@ -1199,7 +1216,7 @@ func (a *App) ExecutePlugin(req models.PluginExecutionRequest) (string, error) {
 		return "", fmt.Errorf("plugin not found: %w", err)
 	}
 
-	args := []string{}
+	args := []string{plugin.ScriptPath}
 	for _, input := range plugin.Config.Inputs {
 		value, ok := req.Parameters[input.Name]
 		if !ok {
@@ -1247,7 +1264,7 @@ func (a *App) ExecutePlugin(req models.PluginExecutionRequest) (string, error) {
 			err := a.scriptExecutor.ExecutePythonScript(a.ctx, jobID, services.ScriptConfig{
 				Type:       "plugin",
 				ScriptName: plugin.ScriptPath,
-				Args:       args,
+				Args:       args[1:],
 				OutputDir:  outputDir,
 			})
 			if err != nil {
@@ -1265,7 +1282,7 @@ func (a *App) ExecutePlugin(req models.PluginExecutionRequest) (string, error) {
 			err := a.scriptExecutor.ExecuteRScript(a.ctx, jobID, services.ScriptConfig{
 				Type:       "plugin",
 				ScriptName: plugin.ScriptPath,
-				Args:       args,
+				Args:       args[1:],
 				OutputDir:  outputDir,
 			})
 			if err != nil {
@@ -1288,7 +1305,7 @@ func (a *App) ExecutePlugin(req models.PluginExecutionRequest) (string, error) {
 			err := a.scriptExecutor.ExecutePythonScript(a.ctx, jobID, services.ScriptConfig{
 				Type:       "plugin",
 				ScriptName: plugin.ScriptPath,
-				Args:       args,
+				Args:       args[1:],
 				OutputDir:  outputDir,
 			})
 			if err != nil {
@@ -1306,4 +1323,312 @@ func (a *App) ExecutePlugin(req models.PluginExecutionRequest) (string, error) {
 func (a *App) LogToFile(message string) error {
 	log.Printf("[Frontend] %s", message)
 	return nil
+}
+
+func (a *App) GetLogFilePath() (string, error) {
+	userConfigDir, err := os.UserConfigDir()
+	if err != nil {
+		return "", fmt.Errorf("failed to get user config dir: %v", err)
+	}
+
+	logDir := filepath.Join(userConfigDir, "cauldron")
+	today := time.Now().Format("2006-01-02")
+	logFileName := fmt.Sprintf("cauldron-%s.log", today)
+	logFilePath := filepath.Join(logDir, logFileName)
+
+	return logFilePath, nil
+}
+
+func (a *App) OpenLogFile() error {
+	logFilePath, err := a.GetLogFilePath()
+	if err != nil {
+		return err
+	}
+
+	if _, err := os.Stat(logFilePath); os.IsNotExist(err) {
+		return fmt.Errorf("log file does not exist: %s", logFilePath)
+	}
+
+	var cmd *exec.Cmd
+	switch goruntime.GOOS {
+	case "windows":
+		cmd = exec.Command("cmd", "/c", "start", "", logFilePath)
+	case "darwin":
+		cmd = exec.Command("open", logFilePath)
+	case "linux":
+		cmd = exec.Command("xdg-open", logFilePath)
+	default:
+		return fmt.Errorf("unsupported operating system: %s", goruntime.GOOS)
+	}
+
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("failed to open log file: %v", err)
+	}
+
+	log.Printf("[OpenLogFile] Opened log file: %s", logFilePath)
+	return nil
+}
+
+func (a *App) OpenLogDirectory() error {
+	userConfigDir, err := os.UserConfigDir()
+	if err != nil {
+		return fmt.Errorf("failed to get user config dir: %v", err)
+	}
+
+	logDir := filepath.Join(userConfigDir, "cauldron")
+
+	if _, err := os.Stat(logDir); os.IsNotExist(err) {
+		return fmt.Errorf("log directory does not exist: %s", logDir)
+	}
+
+	var cmd *exec.Cmd
+	switch goruntime.GOOS {
+	case "windows":
+		cmd = exec.Command("explorer", logDir)
+	case "darwin":
+		cmd = exec.Command("open", logDir)
+	case "linux":
+		cmd = exec.Command("xdg-open", logDir)
+	default:
+		return fmt.Errorf("unsupported operating system: %s", goruntime.GOOS)
+	}
+
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("failed to open log directory: %v", err)
+	}
+
+	log.Printf("[OpenLogDirectory] Opened log directory: %s", logDir)
+	return nil
+}
+
+func (a *App) HandleQuit() {
+	log.Println("[HandleQuit] Quit requested from menu")
+	a.handleWindowClose(a.ctx)
+}
+
+func (a *App) PauseJobQueue() error {
+	if a.jobQueue == nil {
+		return fmt.Errorf("job queue not initialized")
+	}
+	return a.jobQueue.PauseQueue()
+}
+
+func (a *App) StopJobQueueImmediate() error {
+	if a.jobQueue == nil {
+		return fmt.Errorf("job queue not initialized")
+	}
+	return a.jobQueue.StopQueueImmediate()
+}
+
+func (a *App) ResumeJobQueue() error {
+	if a.jobQueue == nil {
+		return fmt.Errorf("job queue not initialized")
+	}
+	return a.jobQueue.ResumeQueue()
+}
+
+func (a *App) GetJobQueueStatus() map[string]interface{} {
+	if a.jobQueue == nil {
+		return map[string]interface{}{
+			"error": "job queue not initialized",
+		}
+	}
+	return a.jobQueue.GetQueueStatus()
+}
+
+func (a *App) HasInProgressJobs() bool {
+	if a.jobQueue == nil {
+		log.Println("[HasInProgressJobs] jobQueue is nil")
+		return false
+	}
+	jobs := a.jobQueue.GetJobsByStatus(models.JobStatusInProgress)
+	log.Printf("[HasInProgressJobs] Found %d in-progress jobs", len(jobs))
+	if len(jobs) > 0 {
+		for _, job := range jobs {
+			log.Printf("[HasInProgressJobs] Job ID: %s, Name: %s, Status: %s", job.ID, job.Name, job.Status)
+		}
+	}
+	return len(jobs) > 0
+}
+
+func (a *App) checkUnfinishedJobs() {
+	time.Sleep(1 * time.Second)
+
+	if a.jobQueue == nil || a.db == nil {
+		return
+	}
+
+	var unfinishedJobs []*models.Job
+	a.db.GetDB().Where("status IN ?", []models.JobStatus{models.JobStatusPending, models.JobStatusInProgress}).
+		Order("created_at DESC").
+		Find(&unfinishedJobs)
+
+	if len(unfinishedJobs) == 0 {
+		log.Println("[checkUnfinishedJobs] No unfinished jobs found")
+		return
+	}
+
+	log.Printf("[checkUnfinishedJobs] Found %d unfinished job(s)", len(unfinishedJobs))
+
+	selection, err := runtime.MessageDialog(a.ctx, runtime.MessageDialogOptions{
+		Type:          runtime.QuestionDialog,
+		Title:         "Unfinished Jobs Found",
+		Message:       fmt.Sprintf("Found %d unfinished job(s) from previous session. Would you like to restart them?", len(unfinishedJobs)),
+		Buttons:       []string{"Restart Jobs", "Mark as Failed", "Leave as Is"},
+		DefaultButton: "Restart Jobs",
+	})
+
+	if err != nil {
+		log.Printf("[checkUnfinishedJobs] Error showing dialog: %v", err)
+		return
+	}
+
+	log.Printf("[checkUnfinishedJobs] User selected: %s", selection)
+
+	switch selection {
+	case "Restart Jobs":
+		for _, job := range unfinishedJobs {
+			job.Status = models.JobStatusPending
+			job.Progress = 0
+			job.Error = ""
+			job.StartedAt = nil
+			job.CompletedAt = nil
+			job.TerminalOutput = []string{}
+
+			if err := a.db.GetDB().Save(job).Error; err != nil {
+				log.Printf("[checkUnfinishedJobs] Failed to reset job %s: %v", job.ID, err)
+				continue
+			}
+
+			a.jobQueue.RequeueJob(job)
+			runtime.EventsEmit(a.ctx, "job:update", job)
+			log.Printf("[checkUnfinishedJobs] Restarted job: %s - %s", job.ID, job.Name)
+		}
+
+	case "Mark as Failed":
+		now := time.Now()
+		for _, job := range unfinishedJobs {
+			job.Status = models.JobStatusFailed
+			job.Error = "Job was interrupted by application shutdown"
+			job.CompletedAt = &now
+
+			if err := a.db.GetDB().Save(job).Error; err != nil {
+				log.Printf("[checkUnfinishedJobs] Failed to mark job %s as failed: %v", job.ID, err)
+				continue
+			}
+
+			runtime.EventsEmit(a.ctx, "job:update", job)
+			log.Printf("[checkUnfinishedJobs] Marked job as failed: %s - %s", job.ID, job.Name)
+		}
+
+	case "Leave as Is":
+		log.Println("[checkUnfinishedJobs] Leaving jobs as is")
+	}
+}
+
+func (a *App) handleWindowClose(ctx context.Context) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("[handleWindowClose] PANIC recovered: %v", r)
+		}
+		log.Println("[handleWindowClose] Function exiting")
+	}()
+
+	log.Println("[handleWindowClose] ========== CLOSE REQUESTED ==========")
+	log.Printf("[handleWindowClose] Context: %v", ctx)
+	log.Printf("[handleWindowClose] App: %v", a)
+
+	if a == nil {
+		log.Println("[handleWindowClose] ERROR: App is nil! Allowing close")
+		runtime.Quit(ctx)
+		return
+	}
+
+	if a.jobQueue == nil {
+		log.Println("[handleWindowClose] Job queue is nil, allowing close")
+		runtime.Quit(ctx)
+		return
+	}
+
+	hasInProgress := a.HasInProgressJobs()
+	log.Printf("[handleWindowClose] Has in-progress jobs: %v", hasInProgress)
+
+	if hasInProgress {
+		log.Println("[handleWindowClose] Showing jobs in progress dialog")
+		selection, err := runtime.MessageDialog(ctx, runtime.MessageDialogOptions{
+			Type:          runtime.WarningDialog,
+			Title:         "Jobs in Progress",
+			Message:       "There are jobs still running. Closing the application will terminate them. Are you sure you want to exit?",
+			Buttons:       []string{"Exit Anyway", "Cancel"},
+			DefaultButton: "Cancel",
+		})
+
+		if err != nil {
+			log.Printf("[handleWindowClose] Error showing dialog: %v", err)
+			runtime.Quit(ctx)
+			return
+		}
+
+		log.Printf("[handleWindowClose] User selected: %s", selection)
+		if selection == "Exit Anyway" {
+			log.Println("[handleWindowClose] User chose to exit anyway")
+			runtime.Quit(ctx)
+		} else {
+			log.Println("[handleWindowClose] User chose to cancel close")
+		}
+		return
+	}
+
+	log.Println("[handleWindowClose] No in-progress jobs, allowing close")
+	runtime.Quit(ctx)
+}
+
+func (a *App) beforeClose(ctx context.Context) bool {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("[beforeClose] PANIC recovered: %v", r)
+		}
+		log.Println("[beforeClose] Function exiting")
+	}()
+
+	log.Println("[beforeClose] ========== CLOSE REQUESTED ==========")
+	log.Printf("[beforeClose] Context: %v", ctx)
+	log.Printf("[beforeClose] App: %v", a)
+
+	if a == nil {
+		log.Println("[beforeClose] ERROR: App is nil!")
+		return false
+	}
+
+	if a.jobQueue == nil {
+		log.Println("[beforeClose] Job queue is nil, allowing close")
+		return false
+	}
+
+	hasInProgress := a.HasInProgressJobs()
+	log.Printf("[beforeClose] Has in-progress jobs: %v", hasInProgress)
+
+	if hasInProgress {
+		log.Println("[beforeClose] Showing jobs in progress dialog")
+		selection, err := runtime.MessageDialog(ctx, runtime.MessageDialogOptions{
+			Type:          runtime.WarningDialog,
+			Title:         "Jobs in Progress",
+			Message:       "There are jobs still running. Closing the application will terminate them. Are you sure you want to exit?",
+			Buttons:       []string{"Exit Anyway", "Cancel"},
+			DefaultButton: "Cancel",
+		})
+
+		if err != nil {
+			log.Printf("[beforeClose] Error showing dialog: %v", err)
+			return false
+		}
+
+		log.Printf("[beforeClose] User selected: %s", selection)
+		result := selection != "Exit Anyway"
+		log.Printf("[beforeClose] Returning: %v (true = prevent close, false = allow close)", result)
+		return result
+	}
+
+	log.Println("[beforeClose] No in-progress jobs, allowing close")
+	return false
 }

@@ -86,6 +86,14 @@ export function GetJob(arg1) {
   return window['go']['main']['App']['GetJob'](arg1);
 }
 
+export function GetJobQueueStatus() {
+  return window['go']['main']['App']['GetJobQueueStatus']();
+}
+
+export function GetLogFilePath() {
+  return window['go']['main']['App']['GetLogFilePath']();
+}
+
 export function GetPlugin(arg1) {
   return window['go']['main']['App']['GetPlugin'](arg1);
 }
@@ -124,6 +132,14 @@ export function GetVirtualEnvironments() {
 
 export function Greet(arg1) {
   return window['go']['main']['App']['Greet'](arg1);
+}
+
+export function HandleQuit() {
+  return window['go']['main']['App']['HandleQuit']();
+}
+
+export function HasInProgressJobs() {
+  return window['go']['main']['App']['HasInProgressJobs']();
 }
 
 export function ImportDataFile(arg1) {
@@ -178,8 +194,20 @@ export function OpenFile(arg1) {
   return window['go']['main']['App']['OpenFile'](arg1);
 }
 
+export function OpenLogDirectory() {
+  return window['go']['main']['App']['OpenLogDirectory']();
+}
+
+export function OpenLogFile() {
+  return window['go']['main']['App']['OpenLogFile']();
+}
+
 export function ParseDataFile(arg1, arg2) {
   return window['go']['main']['App']['ParseDataFile'](arg1, arg2);
+}
+
+export function PauseJobQueue() {
+  return window['go']['main']['App']['PauseJobQueue']();
 }
 
 export function ReExecuteJob(arg1) {
@@ -204,6 +232,10 @@ export function ReloadPlugins() {
 
 export function RerunJob(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['RerunJob'](arg1, arg2, arg3, arg4);
+}
+
+export function ResumeJobQueue() {
+  return window['go']['main']['App']['ResumeJobQueue']();
 }
 
 export function RunNormalization(arg1, arg2, arg3, arg4) {
@@ -232,6 +264,10 @@ export function SetActiveREnvironment(arg1) {
 
 export function SetSetting(arg1, arg2) {
   return window['go']['main']['App']['SetSetting'](arg1, arg2);
+}
+
+export function StopJobQueueImmediate() {
+  return window['go']['main']['App']['StopJobQueueImmediate']();
 }
 
 export function WriteJobOutputFile(arg1, arg2, arg3) {

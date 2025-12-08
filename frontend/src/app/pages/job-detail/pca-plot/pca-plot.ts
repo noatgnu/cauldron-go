@@ -1,4 +1,4 @@
-import { Component, Input, OnInit, signal } from '@angular/core';
+import { Component, Input, OnInit, signal, NgZone } from '@angular/core';
 import { ReactiveFormsModule, FormBuilder, FormGroup } from '@angular/forms';
 import { PlotlyModule } from 'angular-plotly.js';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
@@ -9,7 +9,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { Wails } from '../../../core/services/wails';
-import { AnnotationService, Annotation, AnnotationColors } from '../../../core/services/annotation.service';
+import { Annotation, AnnotationService } from '../../../core/services/annotation.service';
 import { PlotlyExport } from '../../../core/services/plotly-export';
 
 interface PCAData {
@@ -38,84 +38,75 @@ interface PCAData {
 export class PcaPlot implements OnInit {
   @Input() jobId!: string;
 
-  protected loading = signal(true);
-  protected error = signal('');
-  protected plotData = signal<any[]>([]);
-  protected plotLayout = signal<any>({});
-  protected plotConfig = signal<any>({
+  loading = signal(true);
+  error = signal('');
+  plotData: any[] = [];
+  plotLayout: any = {};
+  plotConfig: any = {
     responsive: true,
     displayModeBar: true,
-    displaylogo: false
-  });
-  protected customizationForm: FormGroup;
+    displaylogo: false,
+    modeBarButtonsToRemove: ['toImage']
+  };
+  revision: number = 0;
+  customizationForm: FormGroup;
   protected showCustomization = signal(false);
-  protected annotations: Annotation[] = [];
-  protected conditionColors: AnnotationColors = {};
 
+  private _pcaData: PCAData | null = null;
+  private _explainedVariance: number[] | null = null;
+  private _annotations: Annotation[] = [];
+  
   constructor(
     private wails: Wails,
     private fb: FormBuilder,
     private annotationService: AnnotationService,
-    private plotlyExport: PlotlyExport
+    private plotlyExport: PlotlyExport,
+    private ngZone: NgZone
   ) {
     this.customizationForm = this.fb.group({
       title: [''],
       showGrid: [true],
       markerSize: [10],
       width: [800],
-      height: [600]
+      height: [600],
+      marginTop: [100],
+      marginRight: [100],
+      marginBottom: [100],
+      marginLeft: [100]
     });
   }
 
   async ngOnInit() {
-    await this.loadAndRenderPlot();
-    this.loadSavedSettings();
+    await this.loadData();
   }
 
-  async loadAndRenderPlot() {
+  private async loadData() {
     try {
       this.loading.set(true);
       await this.wails.logToFile(`[PCA Plot] Starting to load plot for job: ${this.jobId}`);
 
-      let data: string;
-      let varianceData: string;
-
-      try {
-        await this.wails.logToFile('[PCA Plot] Reading pca_output.txt...');
-        data = await this.wails.readJobOutputFile(this.jobId, 'pca_output.txt');
-        await this.wails.logToFile(`[PCA Plot] pca_output.txt read successfully, length: ${data?.length || 0}, type: ${typeof data}`);
-      } catch (err: any) {
-        throw new Error(`Failed to read pca_output.txt: ${err.message || String(err)}`);
+      const savedSettings = await this.loadSavedSettings();
+      if (savedSettings) {
+        const completeSettings = { ...this.customizationForm.value, ...savedSettings };
+        this.customizationForm.patchValue(completeSettings, { emitEvent: false });
       }
 
-      try {
-        await this.wails.logToFile('[PCA Plot] Reading explained_variance_ratio.json...');
-        varianceData = await this.wails.readJobOutputFile(this.jobId, 'explained_variance_ratio.json');
-        await this.wails.logToFile(`[PCA Plot] explained_variance_ratio.json read successfully, length: ${varianceData?.length || 0}, type: ${typeof varianceData}`);
-      } catch (err: any) {
-        throw new Error(`Failed to read explained_variance_ratio.json: ${err.message || String(err)}`);
-      }
+      const [data, varianceData, annotations] = await Promise.all([
+        this.wails.readJobOutputFile(this.jobId, 'pca_output.txt').catch(err => { throw new Error(`Failed to read pca_output.txt: ${err.message || String(err)}`); }),
+        this.wails.readJobOutputFile(this.jobId, 'explained_variance_ratio.json').catch(err => { throw new Error(`Failed to read explained_variance_ratio.json: ${err.message || String(err)}`); }),
+        this.annotationService.loadAnnotationsForJob(this.jobId)
+      ]);
 
-      await this.tryLoadAnnotations();
+      if (!data) throw new Error('pca_output.txt file is empty');
+      if (!varianceData) throw new Error('explained_variance_ratio.json file is empty');
 
-      if (!data || data === '') {
-        throw new Error('pca_output.txt file is empty');
-      }
+      this._explainedVariance = JSON.parse(varianceData);
+      this._pcaData = this.parsePCAData(data);
+      this._annotations = annotations;
 
-      if (!varianceData || varianceData === '') {
-        throw new Error('explained_variance_ratio.json file is empty');
-      }
+      this.updatePlot();
+      await this.wails.logToFile('[PCA Plot] Plot data created successfully.');
 
-      await this.wails.logToFile(`[PCA Plot] About to parse variance data...`);
-      const explainedVariance = JSON.parse(varianceData);
-      await this.wails.logToFile(`[PCA Plot] Variance data parsed: ${JSON.stringify(explainedVariance)}`);
-
-      await this.wails.logToFile(`[PCA Plot] About to parse PCA data, data type: ${typeof data}, data is null: ${data === null}, data is undefined: ${data === undefined}`);
-      const pcaData = this.parsePCAData(data);
-      await this.wails.logToFile(`[PCA Plot] Parsed ${pcaData.x.length} data points`);
-
-      this.createPlotData(pcaData, explainedVariance);
-      await this.wails.logToFile('[PCA Plot] Plot data created successfully');
     } catch (err: any) {
       const errorMsg = 'Failed to load PCA plot: ' + (err.message || String(err));
       this.error.set(errorMsg);
@@ -125,11 +116,121 @@ export class PcaPlot implements OnInit {
     }
   }
 
-  private async tryLoadAnnotations() {
-    this.annotations = await this.annotationService.loadAnnotationsForJob(this.jobId);
-    if (this.annotations.length > 0) {
-      this.conditionColors = await this.annotationService.loadConditionColorsForJob(this.jobId);
+  private updatePlot() {
+    if (!this._pcaData || !this._explainedVariance) {
+      return;
     }
+
+    this.ngZone.run(() => {
+      const settings = this.customizationForm.value;
+      const data: PCAData = this._pcaData!;
+      const explainedVariance: number[] = this._explainedVariance!;
+
+      const pc1Variance = (explainedVariance[0] * 100).toFixed(1);
+      const pc2Variance = (explainedVariance[1] * 100).toFixed(1);
+      const is3D = data.z && data.z.length > 0;
+      const useConditions = this._annotations.length > 0;
+      const markerSize = settings.markerSize || 10;
+      const showGrid = settings.showGrid !== false;
+
+      if (useConditions) {
+        const dataWithAnnotations = data.text.map((sample, index) => {
+          const annotation = this._annotations.find(a => a.sample === sample);
+          return {
+            x: data.x[index],
+            y: data.y[index],
+            z: is3D ? data.z![index] : undefined,
+            text: sample,
+            condition: annotation ? annotation.condition : 'Unknown',
+            color: annotation ? annotation.color : '#808080' // Default to grey if no color
+          };
+        });
+
+        const conditionMap = new Map<string, any[]>();
+        dataWithAnnotations.forEach(annotatedPoint => {
+          if (!conditionMap.has(annotatedPoint.condition)) {
+            conditionMap.set(annotatedPoint.condition, []);
+          }
+          conditionMap.get(annotatedPoint.condition)!.push(annotatedPoint);
+        });
+
+        this.plotData = Array.from(conditionMap.entries()).map(([condition, points]) => {
+          const trace: any = {
+            x: points.map(p => p.x),
+            y: points.map(p => p.y),
+            mode: 'markers',
+            type: is3D ? 'scatter3d' : 'scatter',
+            name: condition,
+            text: points.map(p => p.text),
+            hoverinfo: 'text+name',
+            marker: {
+              size: is3D ? markerSize / 2 : markerSize,
+              color: points.map(p => p.color), // Array of colors
+              line: { color: '#fff', width: is3D ? 0.5 : 1 }
+            }
+          };
+          if (is3D) {
+            trace.z = points.map(p => p.z);
+          }
+          return trace;
+        });
+
+      } else {
+          const trace: any = {
+              x: data.x,
+              y: data.y,
+              mode: 'markers',
+              type: is3D ? 'scatter3d' : 'scatter',
+              text: data.text,
+              hoverinfo: 'text',
+              marker: {
+                  size: is3D ? markerSize / 2 : markerSize,
+                  color: '#1976d2', // Default single color
+                  line: { color: '#fff', width: is3D ? 0.5 : 1 }
+              }
+          };
+          if (is3D && data.z) {
+              trace.z = data.z;
+          }
+          this.plotData = [trace];
+      }
+
+      let newLayout: any;
+      if (is3D) {
+        const pc3Variance = (explainedVariance[2] * 100).toFixed(1);
+        newLayout = {
+          title: { text: settings.title !== '' ? settings.title : 'PCA Analysis Results (3D)' },
+          width: settings.width || 800,
+          height: settings.height || 600,
+          scene: {
+            xaxis: { title: { text: `PC1 (${pc1Variance}%)` }, gridcolor: '#e0e0e0', backgroundcolor: '#fafafa', showgrid: showGrid },
+            yaxis: { title: { text: `PC2 (${pc2Variance}%)` }, gridcolor: '#e0e0e0', backgroundcolor: '#fafafa', showgrid: showGrid },
+            zaxis: { title: { text: `PC3 (${pc3Variance}%)` }, gridcolor: '#e0e0e0', backgroundcolor: '#fafafa', showgrid: showGrid }
+          },
+          paper_bgcolor: '#ffffff',
+          hovermode: 'closest',
+          showlegend: useConditions,
+          legend: { x: 1.02, y: 1 },
+          margin: { t: settings.marginTop, r: settings.marginRight, b: settings.marginBottom, l: settings.marginLeft }
+        };
+      } else {
+        newLayout = {
+          title: { text: settings.title !== '' ? settings.title : 'PCA Analysis Results' },
+          width: settings.width || 800,
+          height: settings.height || 600,
+          xaxis: { title: { text: `PC1 (${pc1Variance}%)` }, zeroline: true, gridcolor: '#e0e0e0', showgrid: showGrid, automargin: true },
+          yaxis: { title: { text: `PC2 (${pc2Variance}%)` }, zeroline: true, gridcolor: '#e0e0e0', showgrid: showGrid, automargin: true },
+          plot_bgcolor: '#fafafa',
+          paper_bgcolor: '#ffffff',
+          hovermode: 'closest',
+          showlegend: useConditions,
+          legend: { x: 1.02, y: 1 },
+          margin: { t: settings.marginTop, r: settings.marginRight, b: settings.marginBottom, l: settings.marginLeft }
+        };
+      }
+      this.plotLayout = newLayout;
+      this.revision++;
+    });
   }
 
   private parsePCAData(tsvData: string): PCAData {
@@ -169,198 +270,16 @@ export class PcaPlot implements OnInit {
     return has3D ? { x, y, z, text } : { x, y, text };
   }
 
-  private createPlotData(data: PCAData, explainedVariance: number[]) {
-    const pc1Variance = (explainedVariance[0] * 100).toFixed(1);
-    const pc2Variance = (explainedVariance[1] * 100).toFixed(1);
-    const is3D = data.z && data.z.length > 0;
-
-    const useConditions = this.annotations.length > 0;
-    const colors = ['#1976d2', '#388e3c', '#d32f2f', '#f57c00', '#7b1fa2', '#0097a7', '#c2185b', '#5d4037', '#fbc02d', '#00796b'];
-
-    if (useConditions) {
-      const conditionMap = new Map<string, number[]>();
-      data.text.forEach((sample, index) => {
-        const condition = this.annotationService.getCondition(sample, this.annotations);
-        if (!conditionMap.has(condition)) {
-          conditionMap.set(condition, []);
-        }
-        conditionMap.get(condition)!.push(index);
-      });
-
-      const traces = Array.from(conditionMap.entries()).map(([condition, indices], colorIndex) => {
-        const color = colors[colorIndex % colors.length];
-        const trace: any = {
-          x: indices.map(i => data.x[i]),
-          y: indices.map(i => data.y[i]),
-          mode: 'markers',
-          type: is3D ? 'scatter3d' : 'scatter',
-          name: condition,
-          text: indices.map(i => data.text[i]),
-          hoverinfo: 'text+name',
-          marker: {
-            size: is3D ? 6 : 10,
-            color: color,
-            line: {
-              color: '#fff',
-              width: is3D ? 0.5 : 1
-            }
-          }
-        };
-
-        if (is3D && data.z) {
-          trace.z = indices.map(i => data.z![i]);
-        }
-
-        return trace;
-      });
-
-      this.plotData.set(traces);
-
-      if (is3D) {
-        const pc3Variance = (explainedVariance[2] * 100).toFixed(1);
-        this.plotLayout.set({
-          title: 'PCA Analysis Results (3D)',
-          scene: {
-            xaxis: {
-              title: `PC1 (${pc1Variance}%)`,
-              gridcolor: '#e0e0e0',
-              backgroundcolor: '#fafafa'
-            },
-            yaxis: {
-              title: `PC2 (${pc2Variance}%)`,
-              gridcolor: '#e0e0e0',
-              backgroundcolor: '#fafafa'
-            },
-            zaxis: {
-              title: `PC3 (${pc3Variance}%)`,
-              gridcolor: '#e0e0e0',
-              backgroundcolor: '#fafafa'
-            }
-          },
-          paper_bgcolor: '#ffffff',
-          hovermode: 'closest',
-          showlegend: true,
-          legend: { x: 1.02, y: 1 },
-          margin: { t: 50, r: 150, b: 50, l: 50 }
-        });
-      } else {
-        this.plotLayout.set({
-          title: 'PCA Analysis Results',
-          xaxis: {
-            title: `PC1 (${pc1Variance}%)`,
-            zeroline: true,
-            gridcolor: '#e0e0e0'
-          },
-          yaxis: {
-            title: `PC2 (${pc2Variance}%)`,
-            zeroline: true,
-            gridcolor: '#e0e0e0'
-          },
-          plot_bgcolor: '#fafafa',
-          paper_bgcolor: '#ffffff',
-          hovermode: 'closest',
-          showlegend: true,
-          legend: { x: 1.02, y: 1 },
-          margin: { t: 50, r: 150, b: 50, l: 50 }
-        });
-      }
-    } else {
-      if (is3D) {
-        const pc3Variance = (explainedVariance[2] * 100).toFixed(1);
-
-        this.plotData.set([{
-          x: data.x,
-          y: data.y,
-          z: data.z,
-          mode: 'markers',
-          type: 'scatter3d',
-          text: data.text,
-          hoverinfo: 'text',
-          marker: {
-            size: 6,
-            color: '#1976d2',
-            line: {
-              color: '#fff',
-              width: 0.5
-            }
-          }
-        }]);
-
-        this.plotLayout.set({
-          title: 'PCA Analysis Results (3D)',
-          scene: {
-            xaxis: {
-              title: `PC1 (${pc1Variance}%)`,
-              gridcolor: '#e0e0e0',
-              backgroundcolor: '#fafafa'
-            },
-            yaxis: {
-              title: `PC2 (${pc2Variance}%)`,
-              gridcolor: '#e0e0e0',
-              backgroundcolor: '#fafafa'
-            },
-            zaxis: {
-              title: `PC3 (${pc3Variance}%)`,
-              gridcolor: '#e0e0e0',
-              backgroundcolor: '#fafafa'
-            }
-          },
-          paper_bgcolor: '#ffffff',
-          hovermode: 'closest',
-          showlegend: false,
-          margin: { t: 50, r: 50, b: 50, l: 50 }
-        });
-      } else {
-        this.plotData.set([{
-          x: data.x,
-          y: data.y,
-          mode: 'markers',
-          type: 'scatter',
-          text: data.text,
-          hoverinfo: 'text',
-          marker: {
-            size: 10,
-            color: '#1976d2',
-            line: {
-              color: '#fff',
-              width: 1
-            }
-          }
-        }]);
-
-        this.plotLayout.set({
-          title: 'PCA Analysis Results',
-          xaxis: {
-            title: `PC1 (${pc1Variance}%)`,
-            zeroline: true,
-            gridcolor: '#e0e0e0'
-          },
-          yaxis: {
-            title: `PC2 (${pc2Variance}%)`,
-            zeroline: true,
-            gridcolor: '#e0e0e0'
-          },
-          plot_bgcolor: '#fafafa',
-          paper_bgcolor: '#ffffff',
-          hovermode: 'closest',
-          showlegend: false,
-          margin: { t: 50, r: 50, b: 50, l: 50 }
-        });
-      }
-    }
-  }
-
-  private async loadSavedSettings() {
+  private async loadSavedSettings(): Promise<any> {
     try {
       const savedSettings = await this.wails.readJobOutputFile(this.jobId, '.plot-settings-pca.json');
       if (savedSettings) {
-        const settings = JSON.parse(savedSettings);
-        this.customizationForm.patchValue(settings);
-        this.applyCustomization();
+        return JSON.parse(savedSettings);
       }
     } catch (err: any) {
       await this.wails.logToFile(`[PCA Plot] No saved settings found or failed to load: ${err.message}`);
     }
+    return null;
   }
 
   private async saveSettings() {
@@ -374,64 +293,8 @@ export class PcaPlot implements OnInit {
   }
 
   async applyCustomization() {
-    const values = this.customizationForm.value;
-    const is3D = this.plotData()[0]?.type === 'scatter3d';
-
-    if (is3D) {
-      this.plotLayout.update(layout => ({
-        ...layout,
-        title: values.title !== undefined && values.title !== null ? values.title : layout.title,
-        width: values.width,
-        height: values.height,
-        scene: {
-          ...layout.scene,
-          xaxis: {
-            ...layout.scene?.xaxis,
-            title: layout.scene?.xaxis?.title,
-            showgrid: values.showGrid
-          },
-          yaxis: {
-            ...layout.scene?.yaxis,
-            title: layout.scene?.yaxis?.title,
-            showgrid: values.showGrid
-          },
-          zaxis: {
-            ...layout.scene?.zaxis,
-            title: layout.scene?.zaxis?.title,
-            showgrid: values.showGrid
-          }
-        }
-      }));
-    } else {
-      this.plotLayout.update(layout => ({
-        ...layout,
-        title: values.title !== undefined && values.title !== null ? values.title : layout.title,
-        width: values.width,
-        height: values.height,
-        xaxis: {
-          ...layout.xaxis,
-          title: layout.xaxis?.title,
-          showgrid: values.showGrid
-        },
-        yaxis: {
-          ...layout.yaxis,
-          title: layout.yaxis?.title,
-          showgrid: values.showGrid
-        }
-      }));
-    }
-
-    this.plotData.update(data =>
-      data.map(trace => ({
-        ...trace,
-        marker: {
-          ...trace.marker,
-          size: values.markerSize
-        }
-      }))
-    );
-
     await this.saveSettings();
+    this.updatePlot();
   }
 
   async exportToSVG() {

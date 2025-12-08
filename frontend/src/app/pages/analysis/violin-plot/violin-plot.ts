@@ -240,14 +240,7 @@ export class ViolinPlot implements OnInit {
         responsive: true,
         displayModeBar: true,
         displaylogo: false,
-        modeBarButtonsToRemove: ['lasso2d', 'select2d'] as any,
-        toImageButtonOptions: {
-          format: 'png' as const,
-          filename: 'violin_plot',
-          height: 800,
-          width: 1200,
-          scale: 2
-        }
+        modeBarButtonsToRemove: ['lasso2d', 'select2d', 'toImage'] as any
       };
 
       const plotDiv = document.getElementById('violin-plot-div');

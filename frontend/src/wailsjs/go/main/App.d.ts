@@ -45,6 +45,10 @@ export function GetImportedFiles():Promise<Array<services.ImportedFile>>;
 
 export function GetJob(arg1:string):Promise<models.Job>;
 
+export function GetJobQueueStatus():Promise<Record<string, any>>;
+
+export function GetLogFilePath():Promise<string>;
+
 export function GetPlugin(arg1:string):Promise<models.Plugin>;
 
 export function GetPlugins():Promise<Array<models.Plugin>>;
@@ -64,6 +68,10 @@ export function GetSettings():Promise<models.Config>;
 export function GetVirtualEnvironments():Promise<Array<services.VirtualEnvironment>>;
 
 export function Greet(arg1:string):Promise<string>;
+
+export function HandleQuit():Promise<void>;
+
+export function HasInProgressJobs():Promise<boolean>;
 
 export function ImportDataFile(arg1:string):Promise<number>;
 
@@ -91,7 +99,13 @@ export function OpenDirectoryInExplorer(arg1:string):Promise<void>;
 
 export function OpenFile(arg1:string):Promise<string>;
 
+export function OpenLogDirectory():Promise<void>;
+
+export function OpenLogFile():Promise<void>;
+
 export function ParseDataFile(arg1:string,arg2:number):Promise<services.DataFilePreview>;
+
+export function PauseJobQueue():Promise<void>;
 
 export function ReExecuteJob(arg1:string):Promise<string>;
 
@@ -104,6 +118,8 @@ export function ReadJobOutputFile(arg1:string,arg2:string):Promise<string>;
 export function ReloadPlugins():Promise<void>;
 
 export function RerunJob(arg1:string,arg2:boolean,arg3:string,arg4:string):Promise<string>;
+
+export function ResumeJobQueue():Promise<void>;
 
 export function RunNormalization(arg1:string,arg2:string,arg3:Array<string>,arg4:string):Promise<string>;
 
@@ -118,5 +134,7 @@ export function SetActivePythonEnvironment(arg1:string):Promise<void>;
 export function SetActiveREnvironment(arg1:string):Promise<void>;
 
 export function SetSetting(arg1:string,arg2:any):Promise<void>;
+
+export function StopJobQueueImmediate():Promise<void>;
 
 export function WriteJobOutputFile(arg1:string,arg2:string,arg3:string):Promise<void>;

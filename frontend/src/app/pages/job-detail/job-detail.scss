@@ -114,10 +114,28 @@
 .terminal-section {
   margin-top: 24px;
 
-  h3 {
+  mat-expansion-panel {
+    box-shadow: none;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+  }
+
+  mat-panel-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     font-size: 14px;
     font-weight: 500;
-    margin-bottom: 12px;
+
+    mat-icon {
+      font-size: 20px;
+      width: 20px;
+      height: 20px;
+    }
+  }
+
+  mat-panel-description {
+    font-size: 12px;
+    color: rgba(0, 0, 0, 0.6);
   }
 }
 

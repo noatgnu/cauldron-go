@@ -15,16 +15,20 @@ import (
 )
 
 type JobQueueService struct {
-	ctx          context.Context
-	db           *DatabaseService
-	jobs         map[string]*models.Job
-	queue        chan *models.Job
-	workers      int
-	mu           sync.RWMutex
-	wg           sync.WaitGroup
-	pythonRunner *PythonRunner
-	rRunner      *RRunner
-	settingsServ *SettingsService
+	ctx           context.Context
+	db            *DatabaseService
+	jobs          map[string]*models.Job
+	queue         chan *models.Job
+	workers       int
+	mu            sync.RWMutex
+	wg            sync.WaitGroup
+	pythonRunner  *PythonRunner
+	rRunner       *RRunner
+	settingsServ  *SettingsService
+	paused        bool
+	stopImmediate bool
+	currentJobID  string
+	cancelFunc    context.CancelFunc
 }
 
 func NewJobQueueService(ctx context.Context, db *DatabaseService) *JobQueueService {
@@ -56,6 +60,19 @@ func (j *JobQueueService) worker() {
 	defer j.wg.Done()
 
 	for job := range j.queue {
+		j.mu.RLock()
+		isPaused := j.paused
+		j.mu.RUnlock()
+
+		if isPaused {
+			log.Printf("[worker] Queue is paused, requeueing job: %s", job.ID)
+			j.mu.Lock()
+			j.queue <- job
+			j.mu.Unlock()
+			time.Sleep(1 * time.Second)
+			continue
+		}
+
 		j.processJob(job)
 	}
 }
@@ -234,12 +251,37 @@ func (j *JobQueueService) ValidateJobEnvironment(job *models.Job) error {
 }
 
 func (j *JobQueueService) processJob(job *models.Job) {
+	j.mu.Lock()
+	j.currentJobID = job.ID
+	j.mu.Unlock()
+
+	defer func() {
+		j.mu.Lock()
+		j.currentJobID = ""
+		j.mu.Unlock()
+	}()
+
 	now := time.Now()
 	job.StartedAt = &now
 	job.Status = models.JobStatusInProgress
 
 	j.db.GetDB().Save(job)
 	j.emitJobUpdate(job)
+
+	j.mu.RLock()
+	shouldStopImmediate := j.stopImmediate
+	j.mu.RUnlock()
+
+	if shouldStopImmediate {
+		log.Printf("[processJob] Immediate stop requested, canceling job: %s", job.ID)
+		completedTime := time.Now()
+		job.CompletedAt = &completedTime
+		job.Status = models.JobStatusFailed
+		job.Error = "Job stopped by user request"
+		j.db.GetDB().Save(job)
+		j.emitJobUpdate(job)
+		return
+	}
 
 	if err := j.ValidateJobEnvironment(job); err != nil {
 		completedTime := time.Now()
@@ -508,4 +550,109 @@ func (j *JobQueueService) SearchJobs(query string) []*models.Job {
 		Find(&jobs)
 
 	return jobs
+}
+
+func (j *JobQueueService) RequeueJob(job *models.Job) {
+	j.mu.Lock()
+	j.jobs[job.ID] = job
+	j.mu.Unlock()
+
+	j.queue <- job
+	j.emitJobUpdate(job)
+}
+
+func (j *JobQueueService) PauseQueue() error {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+
+	if j.paused {
+		return fmt.Errorf("queue is already paused")
+	}
+
+	j.paused = true
+	log.Println("[PauseQueue] Queue paused - will finish current job then stop processing")
+
+	if j.ctx.Value("wails-test") == nil {
+		runtime.EventsEmit(j.ctx, "queue:status", map[string]interface{}{
+			"paused":        true,
+			"stopImmediate": false,
+		})
+	}
+
+	return nil
+}
+
+func (j *JobQueueService) StopQueueImmediate() error {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+
+	j.paused = true
+	j.stopImmediate = true
+	log.Println("[StopQueueImmediate] Queue stopped immediately - canceling current job and pausing queue")
+
+	if j.currentJobID != "" {
+		log.Printf("[StopQueueImmediate] Marking current job %s for cancellation", j.currentJobID)
+	}
+
+	if j.ctx.Value("wails-test") == nil {
+		runtime.EventsEmit(j.ctx, "queue:status", map[string]interface{}{
+			"paused":        true,
+			"stopImmediate": true,
+		})
+	}
+
+	return nil
+}
+
+func (j *JobQueueService) ResumeQueue() error {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+
+	if !j.paused {
+		return fmt.Errorf("queue is not paused")
+	}
+
+	j.paused = false
+	j.stopImmediate = false
+	log.Println("[ResumeQueue] Queue resumed - processing will continue")
+
+	if j.ctx.Value("wails-test") == nil {
+		runtime.EventsEmit(j.ctx, "queue:status", map[string]interface{}{
+			"paused":        false,
+			"stopImmediate": false,
+		})
+	}
+
+	var pendingJobs []*models.Job
+	j.db.GetDB().Where("status = ?", models.JobStatusPending).Order("created_at ASC").Find(&pendingJobs)
+
+	for _, job := range pendingJobs {
+		if _, exists := j.jobs[job.ID]; !exists {
+			j.jobs[job.ID] = job
+			j.queue <- job
+			log.Printf("[ResumeQueue] Requeued pending job: %s - %s", job.ID, job.Name)
+		}
+	}
+
+	return nil
+}
+
+func (j *JobQueueService) GetQueueStatus() map[string]interface{} {
+	j.mu.RLock()
+	defer j.mu.RUnlock()
+
+	var pendingCount int64
+	var inProgressCount int64
+
+	j.db.GetDB().Model(&models.Job{}).Where("status = ?", models.JobStatusPending).Count(&pendingCount)
+	j.db.GetDB().Model(&models.Job{}).Where("status = ?", models.JobStatusInProgress).Count(&inProgressCount)
+
+	return map[string]interface{}{
+		"paused":          j.paused,
+		"stopImmediate":   j.stopImmediate,
+		"currentJobID":    j.currentJobID,
+		"pendingCount":    pendingCount,
+		"inProgressCount": inProgressCount,
+		"queueLength":     len(j.queue),
+	}
 }

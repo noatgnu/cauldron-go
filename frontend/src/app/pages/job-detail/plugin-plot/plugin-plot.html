@@ -28,9 +28,11 @@
       <div class="plot-container">
         <plotly-plot
           [divId]="getPlotId()"
-          [data]="plotData()"
-          [layout]="plotLayout()"
-          [config]="plotConfig()"
+          [data]="plotData"
+          [layout]="plotLayout"
+          [config]="plotConfig"
+          [updateOnLayoutChange]="true"
+          [revision]="revision"
         ></plotly-plot>
       </div>
     }
