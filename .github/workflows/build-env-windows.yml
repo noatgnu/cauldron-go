@@ -24,6 +24,22 @@ jobs:
         New-Item -ItemType Directory -Force -Path bin/win/R-Portable
         Start-Process -FilePath R-Portable.exe -ArgumentList "/VERYSILENT", "/DIR=bin/win/R-Portable" -Wait
 
+    - name: Clean up R installation
+      shell: pwsh
+      run: |
+        $R_PORTABLE_PATH = "${{ github.workspace }}/bin/win/R-Portable"
+        Remove-Item -Path "$R_PORTABLE_PATH/share/doc" -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item -Path "$R_PORTABLE_PATH/share/info" -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item -Path "$R_PORTABLE_PATH/share/man" -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item -Path "$R_PORTABLE_PATH/src" -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item -Path "$R_PORTABLE_PATH/tests" -Recurse -Force -ErrorAction SilentlyContinue
+        Get-ChildItem -Path "$R_PORTABLE_PATH/library" -Directory | ForEach-Object {
+            Remove-Item -Path "$($_.FullName)/doc" -Recurse -Force -ErrorAction SilentlyContinue
+            Remove-Item -Path "$($_.FullName)/html" -Recurse -Force -ErrorAction SilentlyContinue
+            Remove-Item -Path "$($_.FullName)/help" -Recurse -Force -ErrorAction SilentlyContinue
+            Remove-Item -Path "$($_.FullName)/examples" -Recurse -Force -ErrorAction SilentlyContinue
+        }
+
     - name: Install R packages
       env:
         R_LIBS_USER: ${{ github.workspace }}/bin/win/R-Portable/library
