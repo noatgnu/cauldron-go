@@ -12,6 +12,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatDialog } from '@angular/material/dialog';
 import { Wails, Job, ImportedFile } from '../core/services/wails';
 import { ImportDialog } from '../pages/import-dialog/import-dialog';
+import { NotificationService } from '../core/services/notification.service';
 
 @Component({
   selector: 'app-home',
@@ -56,7 +57,8 @@ export class Home implements OnInit {
   constructor(
     protected wails: Wails,
     private dialog: MatDialog,
-    private router: Router
+    private router: Router,
+    private notificationService: NotificationService
   ) {}
 
   async ngOnInit() {
@@ -275,12 +277,14 @@ export class Home implements OnInit {
     }
   }
 
-  async reExecuteJob(id: string): Promise<void> {
+  async rerunJob(id: string): Promise<void> {
     try {
-      const newJobId = await this.wails.reExecuteJob(id);
-      console.log('Re-executed job, new job ID:', newJobId);
+      const newJobId = await this.wails.rerunJob(id, true, '', '');
+      this.notificationService.showSuccess(`Job ${id} was successfully rerun as new job ${newJobId}`);
+      await this.loadJobs(); // Refresh the job list
     } catch (error) {
-      console.error('Failed to re-execute job:', error);
+      console.error('Failed to rerun job:', error);
+      this.notificationService.showError('Failed to rerun job.');
     }
   }
 

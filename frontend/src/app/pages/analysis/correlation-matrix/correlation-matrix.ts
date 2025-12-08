@@ -14,6 +14,7 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { ImportedFileSelection } from '../../../components/imported-file-selection/imported-file-selection';
 import { EnvironmentIndicator } from '../../../components/environment-indicator/environment-indicator';
 import { Wails } from '../../../core/services/wails';
+import { fromCSV } from 'data-forge';
 
 @Component({
   selector: 'app-correlation-matrix',
@@ -177,15 +178,31 @@ export class CorrelationMatrix implements OnInit {
 
   async loadExample() {
     try {
-      const filePath = await this.wails.getExampleFilePath('diann', 'imputed.data.txt');
-      this.form.patchValue({ inputFile: filePath });
-      const preview = await this.wails.parseDataFile(filePath, 1);
-      if (preview && preview.headers) {
-        this.columns = preview.headers;
-        const sampleColumns = this.columns.slice(0, 10);
-        this.form.patchValue({ sampleCols: sampleColumns });
+      const inputFilePath = await this.wails.getExampleFilePath('diann', 'imputed.data.txt');
+      const sampleListFilePath = await this.wails.getExampleFilePath('phate', 'phate_output.txt');
+
+      this.form.patchValue({ inputFile: inputFilePath });
+      const preview = await this.wails.parseDataFile(inputFilePath, 1);
+      if (!preview || !preview.headers) {
+        throw new Error('Failed to parse headers from input file.');
       }
+      this.columns = preview.headers;
+
+      const sampleListContent = await this.wails.readFile(sampleListFilePath);
+      // @ts-ignore
+      const sampleListDf = fromCSV(sampleListContent, { delimiter: '\t' });
+      const sampleCols = sampleListDf.getSeries('sample').toArray();
+
+      this.form.patchValue({
+        indexCol: this.columns[9],
+        sampleCols: sampleCols,
+        method: 'pearson',
+        order: 'hclust',
+        presentingMethod: 'circle',
+        corShape: 'upper',
+      });
     } catch (error) {
+      await this.wails.logToFile(`[CorrelationMatrix] Failed to load example: ${error}`);
       alert('Failed to load example data. Please ensure example files are available.');
     }
   }

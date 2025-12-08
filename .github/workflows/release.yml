@@ -72,7 +72,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
 
       - name: Install Wails
         run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.11.0
@@ -118,13 +118,15 @@ jobs:
       - name: Install Wails
         run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.11.0
 
-      - name: Build Application (Intel)
+      - name: Build Frontend
         run: |
           cd frontend
           npm install
           npm run build
           cd ..
-          wails build -platform darwin/amd64
+
+      - name: Build Application (Intel)
+        run: wails build -platform darwin/amd64 -skipfrontend
 
       - name: Copy Examples (Intel)
         run: cp -r examples build/bin/
@@ -132,10 +134,16 @@ jobs:
       - name: Create Archive (Intel)
         run: |
           cd build/bin
-          tar -czf ../../cauldron-darwin-amd64.tar.gz cauldron examples/
+          tar -czf ../../cauldron-darwin-amd64.tar.gz cauldron.app examples/
+
+      - name: Upload Artifact (Intel)
+        uses: actions/upload-artifact@v4
+        with:
+          name: cauldron-darwin-amd64
+          path: cauldron-darwin-amd64.tar.gz
 
       - name: Build Application (Apple Silicon)
-        run: wails build -platform darwin/arm64
+        run: wails build -platform darwin/arm64 -skipfrontend -clean
 
       - name: Copy Examples (Apple Silicon)
         run: cp -r examples build/bin/
@@ -143,13 +151,7 @@ jobs:
       - name: Create Archive (Apple Silicon)
         run: |
           cd build/bin
-          tar -czf ../../cauldron-darwin-arm64.tar.gz cauldron examples/
-
-      - name: Upload Artifact (Intel)
-        uses: actions/upload-artifact@v4
-        with:
-          name: cauldron-darwin-amd64
-          path: cauldron-darwin-amd64.tar.gz
+          tar -czf ../../cauldron-darwin-arm64.tar.gz cauldron.app examples/
 
       - name: Upload Artifact (Apple Silicon)
         uses: actions/upload-artifact@v4

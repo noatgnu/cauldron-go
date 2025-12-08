@@ -54,6 +54,7 @@ jobs:
           ./configure --prefix=${{ github.workspace }}/bin/darwin/R-Portable/ --enable-R-shlib --with-blas --with-lapack --with-tcltk --with-mpi
           make -j$(nproc)
           make install
+          make strip
 
       - name: Set up writable permissions for R library
         run: |

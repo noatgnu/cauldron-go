@@ -293,7 +293,7 @@ func (a *App) CreateJob(req models.JobRequest) (string, error) {
 			return a.RunPHATEAnalysis(inputFile, "", columns, nComponents, useLog2)
 		}
 
-	case "fuzzy_clustering":
+	case "fuzzy-clustering":
 		if len(req.InputFiles) < 2 {
 			return "", fmt.Errorf("fuzzy clustering requires input file and annotation file")
 		}
@@ -483,7 +483,7 @@ func (a *App) CreateJob(req models.JobRequest) (string, error) {
 
 		return a.jobQueue.CreateJobWithParameters(req.Type, req.Name, runtime, args, parameters)
 
-	case "correlation_matrix":
+	case "correlation-matrix":
 		if len(req.InputFiles) == 0 {
 			return "", fmt.Errorf("no input file provided for correlation matrix")
 		}
@@ -562,7 +562,8 @@ func (a *App) CreateJob(req models.JobRequest) (string, error) {
 		}
 
 		parameters := map[string]interface{}{
-			"outputDir": jobOutputDir,
+			"outputDir":  jobOutputDir,
+			"inputFiles": req.InputFiles,
 		}
 
 		return a.jobQueue.CreateJobWithParameters(req.Type, req.Name, "r", args, parameters)
@@ -689,7 +690,7 @@ func (a *App) CreateJob(req models.JobRequest) (string, error) {
 
 		return a.jobQueue.CreateJobWithParameters(req.Type, req.Name, "r", args, parameters)
 
-	case "estimation_plot":
+	case "estimation-plot":
 		if len(req.InputFiles) < 2 {
 			return "", fmt.Errorf("estimation plot requires input file and annotation file")
 		}
@@ -715,7 +716,7 @@ func (a *App) CreateJob(req models.JobRequest) (string, error) {
 
 		return a.jobQueue.CreateJob(req.Type, req.Name, "python", args)
 
-	case "cv_plot":
+	case "cv-plot":
 		args := []string{"cv.py"}
 
 		if logFile := getStringParam(req.Parameters, "log_file_path", ""); logFile != "" {
@@ -739,7 +740,7 @@ func (a *App) CreateJob(req models.JobRequest) (string, error) {
 
 		return a.jobQueue.CreateJob(req.Type, req.Name, "python", args)
 
-	case "fold_change_violin":
+	case "fold-change-violin":
 		if len(req.InputFiles) == 0 {
 			return "", fmt.Errorf("no input file provided for fold change violin")
 		}
@@ -830,6 +831,91 @@ func (a *App) ReExecuteJob(id string) (string, error) {
 		}
 
 		return a.RunNormalization(inputFile, outputDir, columns, scalerType)
+
+	case "correlation-matrix":
+		inputFiles, _ := job.Parameters["inputFiles"].([]interface{})
+		inputFile := inputFiles[0].(string)
+
+		cfg := a.settings.GetConfig()
+		baseOutputDir := cfg.OutputDirectory
+		if baseOutputDir == "" {
+			baseOutputDir = "outputs"
+		}
+
+		jobOutputDir := filepath.Join(baseOutputDir, fmt.Sprintf("correlation_matrix_%s", time.Now().Format("20060102_150405")))
+		os.MkdirAll(jobOutputDir, 0755)
+
+		args := []string{"correlation_matrix.R", "--file_path", inputFile, "--output_folder", jobOutputDir}
+
+		if idx := getStringParam(job.Parameters, "index_col", ""); idx != "" {
+			args = append(args, "--index_col", idx)
+		}
+		if cols, ok := job.Parameters["sample_cols"].([]interface{}); ok && len(cols) > 0 {
+			args = append(args, "--sample_cols", arrayToCommaString(cols))
+		}
+		if method := getStringParam(job.Parameters, "method", "pearson"); method != "" {
+			args = append(args, "--method", method)
+		}
+		if minVal, ok := job.Parameters["min_value"].(float64); ok && minVal != 0 {
+			args = append(args, "--min_value", fmt.Sprintf("%.2f", minVal))
+		}
+		if order := getStringParam(job.Parameters, "order", ""); order != "" {
+			args = append(args, "--order", order)
+		}
+		if hclust := getStringParam(job.Parameters, "hclust_method", "ward.D"); hclust != "" {
+			args = append(args, "--hclust_method", hclust)
+		}
+		if pm := getStringParam(job.Parameters, "presenting_method", "ellipse"); pm != "" {
+			args = append(args, "--presenting_method", pm)
+		}
+		if shape := getStringParam(job.Parameters, "cor_shape", "upper"); shape != "" {
+			args = append(args, "--cor_shape", shape)
+		}
+		if palette := getStringParam(job.Parameters, "color_ramp_palette", ""); palette != "" {
+			args = append(args, "--color_ramp_palette", palette)
+		}
+		if plotWidth := getIntParam(job.Parameters, "plot_width", 10); plotWidth > 0 {
+			args = append(args, "--plot_width", fmt.Sprintf("%d", plotWidth))
+		}
+		if plotHeight := getIntParam(job.Parameters, "plot_height", 10); plotHeight > 0 {
+			args = append(args, "--plot_height", fmt.Sprintf("%d", plotHeight))
+		}
+		if textSize := getFloatParam(job.Parameters, "text_label_size", 1.0); textSize > 0 {
+			args = append(args, "--text_label_size", fmt.Sprintf("%.2f", textSize))
+		}
+		if numSize := getFloatParam(job.Parameters, "number_label_size", 1.0); numSize > 0 {
+			args = append(args, "--number_label_size", fmt.Sprintf("%.2f", numSize))
+		}
+		if rotation := getIntParam(job.Parameters, "label_rotation", 45); rotation >= 0 {
+			args = append(args, "--label_rotation", fmt.Sprintf("%d", rotation))
+		}
+		if getBoolParam(job.Parameters, "show_diagonal") {
+			args = append(args, "--show_diagonal", "true")
+		} else {
+			args = append(args, "--show_diagonal", "false")
+		}
+		if getBoolParam(job.Parameters, "add_grid") {
+			args = append(args, "--add_grid", "true")
+			if gridColor := getStringParam(job.Parameters, "grid_color", "white"); gridColor != "" {
+				args = append(args, "--grid_color", gridColor)
+			}
+		} else {
+			args = append(args, "--add_grid", "false")
+		}
+		if numDigits := getIntParam(job.Parameters, "number_digits", 2); numDigits >= 0 {
+			args = append(args, "--number_digits", fmt.Sprintf("%d", numDigits))
+		}
+		if plotTitle := getStringParam(job.Parameters, "plot_title", ""); plotTitle != "" {
+			args = append(args, "--plot_title", plotTitle)
+		}
+
+		rerunParameters := make(map[string]interface{})
+		for k, v := range job.Parameters {
+			rerunParameters[k] = v
+		}
+		rerunParameters["outputDir"] = jobOutputDir
+
+		return a.jobQueue.CreateJobWithParameters(job.Type, job.Name, "r", args, rerunParameters)
 
 	default:
 		return "", fmt.Errorf("unsupported job type for re-execution: %s", job.Type)

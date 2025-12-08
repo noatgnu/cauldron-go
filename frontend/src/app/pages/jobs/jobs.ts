@@ -200,7 +200,7 @@ export class Jobs implements OnInit {
   }
 
   canRerun(job: Job): boolean {
-    return job.status === 'completed' || job.status === 'failed';
+    return true;
   }
 
   async rerunWithSameEnvironment(event: Event, job: Job): Promise<void> {
