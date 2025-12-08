@@ -74,6 +74,16 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
 
+      - name: Create WebKitGTK 4.0 symlink for pkg-config
+        run: |
+          # Find the directory containing webkit2gtk-4.1.pc
+          WEBKIT_PC_PATH=$(pkg-config --variable pc_path webkit2gtk-4.1)
+          WEBKIT_PC_DIR=$(dirname "$WEBKIT_PC_PATH")
+          
+          # Create a symlink from 4.1.pc to 4.0.pc
+          sudo ln -s "${WEBKIT_PC_DIR}/webkit2gtk-4.1.pc" "${WEBKIT_PC_DIR}/webkit2gtk-4.0.pc"
+
+
       - name: Install Wails
         run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.11.0
 
@@ -118,15 +128,8 @@ jobs:
       - name: Install Wails
         run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.11.0
 
-      - name: Build Frontend
-        run: |
-          cd frontend
-          npm install
-          npm run build
-          cd ..
-
       - name: Build Application (Intel)
-        run: wails build -platform darwin/amd64 -skipfrontend
+        run: wails build -platform darwin/amd64
 
       - name: Copy Examples (Intel)
         run: cp -r examples build/bin/
@@ -143,7 +146,7 @@ jobs:
           path: cauldron-darwin-amd64.tar.gz
 
       - name: Build Application (Apple Silicon)
-        run: wails build -platform darwin/arm64 -skipfrontend -clean
+        run: wails build -platform darwin/arm64 -clean
 
       - name: Copy Examples (Apple Silicon)
         run: cp -r examples build/bin/
