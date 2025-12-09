@@ -13,41 +13,45 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Set up Python 3.11
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.11'
-
-    - name: Install Rtools
-      run: choco install rtools --no-progress
-
-    - name: Add Rtools to PATH
+    - name: Install R
       run: |
-        echo "C:\rtools44\usr\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-        echo "C:\rtools44\mingw64\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+        Invoke-WebRequest -Uri https://cran.r-project.org/bin/windows/base/old/4.5.2/R-4.5.2-win.exe -OutFile R-Installer.exe
+        New-Item -ItemType Directory -Force -Path bin/win/R-Portable
+        Start-Process -FilePath R-Installer.exe -ArgumentList "/VERYSILENT", "/DIR=${{ github.workspace }}/bin/win/R-Portable" -Wait
 
-    - name: Compile R
-      shell: bash
+    - name: Clean up R installation
+      shell: pwsh
       run: |
-        curl -O https://cran.r-project.org/src/base/R-4/R-4.4.1.tar.gz
-        7z x R-4.4.1.tar.gz
-        7z x R-4.4.1.tar
-        cd R-4.4.1
-        INSTALL_DIR=$(echo "${{ github.workspace }}/bin/win/R-Portable" | sed -e 's|\\|/|' -e 's|^\([A-Z]\):|/\L\1|')
-        ./configure --prefix="$INSTALL_DIR" --enable-R-shlib --with-blas --with-lapack --without-readline --without-tcltk
-        make -j$(nproc)
-        make install
+        $R_PORTABLE_PATH = "${{ github.workspace }}/bin/win/R-Portable"
+        
+        # Aggressive cleanup for common large and unnecessary files
+        Remove-Item -Path "$R_PORTABLE_PATH/doc" -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item -Path "$R_PORTABLE_PATH/share/doc" -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item -Path "$R_PORTABLE_PATH/share/info" -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item -Path "$R_PORTABLE_PATH/share/man" -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item -Path "$R_PORTABLE_PATH/src" -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item -Path "$R_PORTABLE_PATH/tests" -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item -Path "$R_PORTABLE_PATH/library/translations" -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item -Path "$R_PORTABLE_PATH/library/*/po" -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item -Path "$R_PORTABLE_PATH/library/*/help" -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item -Path "$R_PORTABLE_PATH/library/*/doc" -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item -Path "$R_PORTABLE_PATH/library/*/html" -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item -Path "$R_PORTABLE_PATH/library/*/CITATION" -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item -Path "$R_PORTABLE_PATH/library/*/NEWS" -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item -Path "$R_PORTABLE_PATH/library/*/CHANGE*" -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item -Path "$R_PORTABLE_PATH/share/texmf" -Recurse -Force -ErrorAction SilentlyContinue
 
-    - name: Strip R binaries
-      shell: msys2 {0}
-      run: |
-        find /c/Users/runneradmin/work/cauldron-go/cauldron-go/bin/win/R-Portable -type f \( -name "*.exe" -o -name "*.dll" \) -exec strip {} \;
-    
+        # Clean up package examples and demos
+        Get-ChildItem -Path "$R_PORTABLE_PATH/library" -Directory | ForEach-Object {
+            Remove-Item -Path "$($_.FullName)/examples" -Recurse -Force -ErrorAction SilentlyContinue
+            Remove-Item -Path "$($_.FullName)/tests" -Recurse -Force -ErrorAction SilentlyContinue
+            Remove-Item -Path "$($_.FullName)/demo" -Recurse -Force -ErrorAction SilentlyContinue
+        }
+
     - name: Install R packages
-      shell: msys2 {0}
       env:
-        R_LIBS_USER: /c/Users/runneradmin/work/cauldron-go/cauldron-go/bin/win/R-Portable/library
-      run: /c/Users/runneradmin/work/cauldron-go/cauldron-go/bin/win/R-Portable/bin/Rscript /c/Users/runneradmin/work/cauldron-go/cauldron-go/scripts/r/install_packages.R
+        R_LIBS_USER: ${{ github.workspace }}/bin/win/R-Portable/library
+      run: ${{ github.workspace }}/bin/win/R-Portable/bin/Rscript.exe scripts/r/install_packages.R
 
     - name: Download Portable Python 3.11
       run: |
