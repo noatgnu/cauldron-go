@@ -62,6 +62,20 @@ jobs:
       - name: Strip R binaries
         run: |
           find ${{ github.workspace }}/bin/linux/R-Portable -type f \( -name "*.so" -o -perm /111 \) -exec strip {} \;
+      - name: Clean up R installation
+        run: |
+          rm -rf ${{ github.workspace }}/bin/linux/R-Portable/doc
+          rm -rf ${{ github.workspace }}/bin/linux/R-Portable/tests
+          rm -rf ${{ github.workspace }}/bin/linux/R-Portable/share/doc
+          rm -rf ${{ github.workspace }}/bin/linux/R-Portable/share/info
+          rm -rf ${{ github.workspace }}/bin/linux/R-Portable/share/man
+          rm -rf ${{ github.workspace }}/bin/linux/R-Portable/library/*/doc
+          rm -rf ${{ github.workspace }}/bin/linux/R-Portable/library/*/html
+          rm -rf ${{ github.workspace }}/bin/linux/R-Portable/library/*/help
+          rm -rf ${{ github.workspace }}/bin/linux/R-Portable/library/*/examples
+          rm -rf ${{ github.workspace }}/bin/linux/R-Portable/library/*/demo
+          rm -rf ${{ github.workspace }}/bin/linux/R-Portable/library/*/tests
+
 
       - name: Set up writable permissions for R library
         run: |
