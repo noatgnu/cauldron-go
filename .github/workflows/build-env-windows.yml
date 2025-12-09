@@ -26,8 +26,8 @@ jobs:
         echo "C:\rtools44\usr\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
         echo "C:\rtools44\mingw64\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
-    - name: Install bsdtar
-      run: choco install bsdtar --no-progress
+    - name: Install libarchive (for bsdtar)
+      run: choco install libarchive --no-progress
 
     - name: Compile R
       shell: bash
