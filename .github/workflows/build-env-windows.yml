@@ -33,7 +33,8 @@ jobs:
         7z x R-4.4.1.tar.gz
         7z x R-4.4.1.tar
         cd R-4.4.1
-        ./configure --prefix=${{ github.workspace }}/bin/win/R-Portable --enable-R-shlib --with-blas --with-lapack
+        INSTALL_DIR=$(echo "${{ github.workspace }}/bin/win/R-Portable" | sed -e 's|\\|/|' -e 's|^\([A-Z]\):|/\L\1|')
+        ./configure --prefix="$INSTALL_DIR" --enable-R-shlib --with-blas --with-lapack
         make -j$(nproc)
         make install
 
