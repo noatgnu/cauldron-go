@@ -28,13 +28,16 @@ jobs:
 
     - name: Compile R
       shell: bash
+      env:
+        LDFLAGS: -LC:/rtools44/mingw64/lib
+        CPPFLAGS: -IC:/rtools44/mingw64/include
       run: |
         curl -O https://cran.r-project.org/src/base/R-4/R-4.4.1.tar.gz
         7z x R-4.4.1.tar.gz
         7z x R-4.4.1.tar
         cd R-4.4.1
         INSTALL_DIR=$(echo "${{ github.workspace }}/bin/win/R-Portable" | sed -e 's|\\|/|' -e 's|^\([A-Z]\):|/\L\1|')
-        ./configure --prefix="$INSTALL_DIR" --enable-R-shlib --with-blas --with-lapack
+        ./configure --prefix="$INSTALL_DIR" --enable-R-shlib --with-blas --with-lapack --without-readline --without-tcltk
         make -j$(nproc)
         make install
 
