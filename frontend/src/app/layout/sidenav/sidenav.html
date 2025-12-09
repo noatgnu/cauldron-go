@@ -1,17 +1,33 @@
-<div class="search-container">
-  <mat-form-field appearance="outline" class="search-field">
-    <mat-label>Search tools & analysis</mat-label>
-    <input matInput
-           [value]="searchQuery()"
-           (input)="updateSearch($any($event.target).value)"
-           placeholder="Type to search...">
-    <mat-icon matPrefix>search</mat-icon>
-    @if (searchQuery()) {
-      <button matSuffix mat-icon-button (click)="clearSearch()" type="button">
-        <mat-icon>clear</mat-icon>
-      </button>
-    }
-  </mat-form-field>
+<div class="sidebar-header">
+  <div class="view-toggle">
+    <mat-checkbox
+      [checked]="showPlugins()"
+      (change)="togglePluginView()"
+      color="primary">
+      <span class="toggle-label">
+        <mat-icon>{{ showPlugins() ? 'extension' : 'apps' }}</mat-icon>
+        {{ showPlugins() ? 'Plugin View' : 'Classic View' }}
+      </span>
+    </mat-checkbox>
+  </div>
+
+  <mat-divider></mat-divider>
+
+  <div class="search-container">
+    <mat-form-field appearance="outline" class="search-field">
+      <mat-label>Search tools & analysis</mat-label>
+      <input matInput
+             [value]="searchQuery()"
+             (input)="updateSearch($any($event.target).value)"
+             placeholder="Type to search...">
+      <mat-icon matPrefix>search</mat-icon>
+      @if (searchQuery()) {
+        <button matSuffix mat-icon-button (click)="clearSearch()" type="button">
+          <mat-icon>clear</mat-icon>
+        </button>
+      }
+    </mat-form-field>
+  </div>
 </div>
 
 <mat-nav-list class="sidenav-list">

@@ -27,6 +27,8 @@ export function DownloadPortableEnvironment(arg1:string,arg2:string):Promise<voi
 
 export function ExecutePlugin(arg1:models.PluginExecutionRequest):Promise<string>;
 
+export function ExecutePluginV2(arg1:models.PluginExecutionRequestV2):Promise<string>;
+
 export function ExecutePythonScript(arg1:string,arg2:Array<string>):Promise<string>;
 
 export function ExecuteRScript(arg1:string,arg2:Array<string>):Promise<string>;
@@ -51,9 +53,13 @@ export function GetLogFilePath():Promise<string>;
 
 export function GetPlugin(arg1:string):Promise<models.Plugin>;
 
+export function GetPluginV2(arg1:string):Promise<models.PluginV2>;
+
 export function GetPlugins():Promise<Array<models.Plugin>>;
 
 export function GetPluginsDirectory():Promise<string>;
+
+export function GetPluginsV2():Promise<Array<models.PluginV2>>;
 
 export function GetPortableEnvironmentPath(arg1:string):Promise<string>;
 
@@ -116,6 +122,8 @@ export function ReadFilePreview(arg1:string,arg2:number):Promise<Array<string>>;
 export function ReadJobOutputFile(arg1:string,arg2:string):Promise<string>;
 
 export function ReloadPlugins():Promise<void>;
+
+export function ReloadPluginsV2():Promise<void>;
 
 export function RerunJob(arg1:string,arg2:boolean,arg3:string,arg4:string):Promise<string>;
 

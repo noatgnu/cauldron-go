@@ -1,0 +1,95 @@
+plugin:
+  id: "cv-plot"
+  name: "Coefficient of Variation Plot"
+  description: "Generate coefficient of variation (CV) plots for DIA-NN data quality assessment"
+  version: "1.0.0"
+  author: "CauldronGO Team"
+  category: "visualization"
+  icon: "analytics"
+
+runtime:
+  type: "python"
+  script: "cv.py"
+
+inputs:
+  - name: "annotation_file"
+    label: "Annotation File"
+    type: "file"
+    required: true
+    accept: ".csv,.tsv,.txt"
+    description: "Sample annotation file with conditions"
+
+  - name: "log_file_path"
+    label: "Log File"
+    type: "file"
+    required: false
+    accept: ".txt,.log"
+    description: "DIA-NN log file to extract sample names (optional if sample_names provided)"
+
+  - name: "report_pr_file_path"
+    label: "Protein Report File"
+    type: "file"
+    required: false
+    accept: ".csv,.tsv,.txt"
+    description: "DIA-NN protein-level report file"
+
+  - name: "report_pg_file_path"
+    label: "Protein Group Report File"
+    type: "file"
+    required: false
+    accept: ".csv,.tsv,.txt"
+    description: "DIA-NN protein group-level report file"
+
+  - name: "intensity_col"
+    label: "Intensity Column"
+    type: "text"
+    default: "Intensity"
+    description: "Name of the intensity column in the report files"
+
+  - name: "sample_names"
+    label: "Sample Names"
+    type: "text"
+    required: false
+    placeholder: "Sample1,Sample2,Sample3"
+    description: "Comma-separated sample names (required if log file not provided)"
+
+outputs:
+  - name: "pr_cv_plot"
+    path: "pr_cv.svg"
+    type: "image"
+    description: "CV plot for protein-level data"
+    format: "svg"
+
+  - name: "pg_cv_plot"
+    path: "pg_cv.svg"
+    type: "image"
+    description: "CV plot for protein group-level data"
+    format: "svg"
+
+execution:
+  argsMapping:
+    log_file_path: "--log_file_path"
+    report_pr_file_path: "--report_pr_file_path"
+    report_pg_file_path: "--report_pg_file_path"
+    intensity_col: "--intensity_col"
+    annotation_file: "--annotation_file"
+    sample_names: "--sample_names"
+
+  outputDir: "--output_file"
+
+  requirements:
+    python: ">=3.11"
+    packages:
+      - "pandas>=2.0.0"
+      - "numpy>=1.24.0"
+      - "scipy>=1.10.0"
+      - "seaborn>=0.12.0"
+      - "matplotlib>=3.7.0"
+
+example:
+  enabled: true
+  values:
+    annotation_file: "diann/annotation.txt"
+    log_file_path: "diann/Reports.log.txt"
+    report_pr_file_path: "diann/Reports.pr_matrix.tsv"
+    report_pg_file_path: "diann/Reports.pg_matrix.tsv"

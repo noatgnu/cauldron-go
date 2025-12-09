@@ -28,6 +28,8 @@ type App struct {
 	scriptExecutor     *services.ScriptExecutor
 	portableEnvService *services.PortableEnvService
 	pluginService      *services.PluginService
+	pluginLoaderV2     *services.PluginLoaderV2
+	pluginExecutor     *services.PluginExecutor
 }
 
 func NewApp() *App {
@@ -114,6 +116,14 @@ func (a *App) startup(ctx context.Context) {
 
 	log.Println("[App.startup] Initializing plugin service...")
 	a.pluginService = services.NewPluginService()
+
+	log.Println("[App.startup] Initializing plugin system V2...")
+	a.pluginLoaderV2 = services.NewPluginLoaderV2("")
+	if err := a.pluginLoaderV2.LoadPlugins(); err != nil {
+		log.Printf("[App.startup] Failed to load plugins: %v", err)
+	}
+	a.pluginExecutor = services.NewPluginExecutor()
+	log.Println("[App.startup] Plugin system V2 initialized")
 
 	log.Println("[App.startup] Checking for unfinished jobs...")
 	go a.checkUnfinishedJobs()
@@ -1404,6 +1414,93 @@ func (a *App) ExecutePlugin(req models.PluginExecutionRequest) (string, error) {
 	}
 
 	return jobID, nil
+}
+
+func (a *App) GetPluginsV2() []*models.PluginV2 {
+	return a.pluginLoaderV2.GetAllPlugins()
+}
+
+func (a *App) GetPluginV2(id string) (*models.PluginV2, error) {
+	return a.pluginLoaderV2.GetPlugin(id)
+}
+
+func (a *App) ExecutePluginV2(req models.PluginExecutionRequestV2) (string, error) {
+	plugin, err := a.pluginLoaderV2.GetPlugin(req.PluginID)
+	if err != nil {
+		return "", err
+	}
+
+	if err := a.pluginExecutor.ValidateParameters(plugin, req.Parameters); err != nil {
+		return "", fmt.Errorf("parameter validation failed: %w", err)
+	}
+
+	args, err := a.pluginExecutor.BuildArguments(plugin, req.Parameters)
+	if err != nil {
+		return "", fmt.Errorf("failed to build arguments: %w", err)
+	}
+
+	cfg := a.settings.GetConfig()
+	baseOutputDir := cfg.OutputDirectory
+	if baseOutputDir == "" {
+		baseOutputDir = "outputs"
+	}
+
+	outputDir := filepath.Join(baseOutputDir, fmt.Sprintf("%s_%s",
+		plugin.Definition.Plugin.ID,
+		time.Now().Format("20060102_150405")))
+	os.MkdirAll(outputDir, 0755)
+
+	if plugin.Definition.Execution.OutputDir != "" {
+		args = append(args, plugin.Definition.Execution.OutputDir, outputDir)
+	}
+
+	parameters := make(map[string]interface{})
+	for k, v := range req.Parameters {
+		parameters[k] = v
+	}
+	parameters["outputDir"] = outputDir
+	parameters["pluginId"] = plugin.Definition.Plugin.ID
+
+	jobID, err := a.jobQueue.CreateJobWithParameters(
+		plugin.Definition.Plugin.ID,
+		plugin.Definition.Plugin.Name,
+		plugin.Definition.Runtime.Type,
+		args,
+		parameters,
+	)
+	if err != nil {
+		return "", err
+	}
+
+	go func() {
+		var execErr error
+		switch plugin.Definition.Runtime.Type {
+		case "python", "pythonWithR":
+			execErr = a.scriptExecutor.ExecutePythonScript(a.ctx, jobID, services.ScriptConfig{
+				Type:       plugin.Definition.Plugin.ID,
+				ScriptName: filepath.Base(plugin.ScriptPath),
+				Args:       args[1:],
+				OutputDir:  outputDir,
+			})
+		case "r":
+			execErr = a.scriptExecutor.ExecuteRScript(a.ctx, jobID, services.ScriptConfig{
+				Type:       plugin.Definition.Plugin.ID,
+				ScriptName: filepath.Base(plugin.ScriptPath),
+				Args:       args[1:],
+				OutputDir:  outputDir,
+			})
+		}
+
+		if execErr != nil {
+			log.Printf("[ExecutePluginV2] Error: %v", execErr)
+		}
+	}()
+
+	return jobID, nil
+}
+
+func (a *App) ReloadPluginsV2() error {
+	return a.pluginLoaderV2.ReloadPlugins()
 }
 
 func (a *App) LogToFile(message string) error {

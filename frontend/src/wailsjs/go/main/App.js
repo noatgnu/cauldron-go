@@ -50,6 +50,10 @@ export function ExecutePlugin(arg1) {
   return window['go']['main']['App']['ExecutePlugin'](arg1);
 }
 
+export function ExecutePluginV2(arg1) {
+  return window['go']['main']['App']['ExecutePluginV2'](arg1);
+}
+
 export function ExecutePythonScript(arg1, arg2) {
   return window['go']['main']['App']['ExecutePythonScript'](arg1, arg2);
 }
@@ -98,12 +102,20 @@ export function GetPlugin(arg1) {
   return window['go']['main']['App']['GetPlugin'](arg1);
 }
 
+export function GetPluginV2(arg1) {
+  return window['go']['main']['App']['GetPluginV2'](arg1);
+}
+
 export function GetPlugins() {
   return window['go']['main']['App']['GetPlugins']();
 }
 
 export function GetPluginsDirectory() {
   return window['go']['main']['App']['GetPluginsDirectory']();
+}
+
+export function GetPluginsV2() {
+  return window['go']['main']['App']['GetPluginsV2']();
 }
 
 export function GetPortableEnvironmentPath(arg1) {
@@ -228,6 +240,10 @@ export function ReadJobOutputFile(arg1, arg2) {
 
 export function ReloadPlugins() {
   return window['go']['main']['App']['ReloadPlugins']();
+}
+
+export function ReloadPluginsV2() {
+  return window['go']['main']['App']['ReloadPluginsV2']();
 }
 
 export function RerunJob(arg1, arg2, arg3, arg4) {

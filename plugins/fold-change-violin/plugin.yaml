@@ -1,0 +1,108 @@
+plugin:
+  id: "fold-change-violin"
+  name: "Fold Change Violin Plot"
+  description: "Generate violin plots for fold enrichment analysis across organelles"
+  version: "1.0.0"
+  author: "CauldronGO Team"
+  category: "visualization"
+  icon: "bar_chart"
+
+runtime:
+  type: "python"
+  script: "fold_change_violin_plot.py"
+
+inputs:
+  - name: "input_file"
+    label: "Input Data File"
+    type: "file"
+    required: true
+    accept: ".csv,.tsv,.txt"
+    description: "Data file containing fold enrichment values"
+
+  - name: "columns_prefix"
+    label: "Columns Prefix"
+    type: "text"
+    default: "Difference"
+    description: "Prefix of columns to include in analysis"
+
+  - name: "categories"
+    label: "Categories"
+    type: "text"
+    default: "C..Lysosome,C..Mitochondira,Endosome,Golgi,ER,Ribosome,Nuclear"
+    description: "Comma-separated list of organelle/category names"
+
+  - name: "match_value"
+    label: "Match Value"
+    type: "text"
+    default: "+"
+    description: "Symbol or string to match in the data for filtering"
+
+  - name: "fold_enrichment_col"
+    label: "Fold Enrichment Column"
+    type: "text"
+    default: "Fold enrichment"
+    description: "Name of the column containing fold enrichment values"
+
+  - name: "organelle_col"
+    label: "Organelle Column"
+    type: "text"
+    default: "Organelle"
+    description: "Name of the column containing organelle labels"
+
+  - name: "comparison_col"
+    label: "Comparison Column"
+    type: "text"
+    required: false
+    default: "Comparison"
+    description: "Name of the column for comparison groups (optional)"
+
+  - name: "colors"
+    label: "Category Colors"
+    type: "text"
+    default: "C..Lysosome:#ffb3ba,C..Mitochondira:#ffdfba,Endosome:#ffffba,Golgi:#baffc9,ER:#bae1ff,Ribosome:#d7baff,Nuclear:#ffbaff"
+    description: "Comma-separated category:color pairs (e.g., Lysosome:#ffb3ba)"
+
+  - name: "figsize"
+    label: "Figure Size"
+    type: "text"
+    default: "6,10"
+    description: "Figure size in inches (width,height)"
+
+outputs:
+  - name: "violin_plots"
+    path: "*.pdf"
+    type: "image"
+    description: "Violin plots for each comparison group (or single plot.pdf)"
+    format: "pdf"
+
+execution:
+  argsMapping:
+    input_file: "--file_path"
+    columns_prefix: "--columns_prefix"
+    categories: "--categories"
+    match_value: "--match_value"
+    fold_enrichment_col: "--fold_enrichment_col"
+    organelle_col: "--organelle_col"
+    comparison_col: "--comparison_col"
+    colors: "--colors"
+    figsize: "--figsize"
+
+  outputDir: "--output_folder"
+
+  requirements:
+    python: ">=3.11"
+    packages:
+      - "pandas>=2.0.0"
+      - "seaborn>=0.12.0"
+      - "matplotlib>=3.7.0"
+
+example:
+  enabled: true
+  values:
+    input_file: "fold_change/enrichment.txt"
+    columns_prefix: "Difference"
+    categories: "C..Lysosome,C..Mitochondira,Endosome,Golgi,ER,Ribosome,Nuclear"
+    match_value: "+"
+    fold_enrichment_col: "Fold enrichment"
+    organelle_col: "Organelle"
+    comparison_col: "Comparison"

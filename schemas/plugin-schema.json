@@ -1,0 +1,432 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://cauldron.go/schemas/plugin-v2.json",
+  "title": "CauldronGO Plugin Configuration",
+  "description": "Schema for CauldronGO plugin.yaml files",
+  "type": "object",
+  "required": ["plugin", "runtime", "inputs", "execution"],
+  "properties": {
+    "plugin": {
+      "type": "object",
+      "description": "Plugin metadata",
+      "required": ["id", "name", "description", "version", "category"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique plugin identifier (kebab-case)",
+          "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$",
+          "examples": ["pca-analysis", "dose-response"]
+        },
+        "name": {
+          "type": "string",
+          "description": "Human-readable plugin name",
+          "minLength": 1,
+          "examples": ["PCA Analysis", "Dose-Response Analysis"]
+        },
+        "description": {
+          "type": "string",
+          "description": "Brief description of what the plugin does",
+          "minLength": 10,
+          "examples": ["Principal Component Analysis for dimensionality reduction"]
+        },
+        "version": {
+          "type": "string",
+          "description": "Plugin version (semantic versioning)",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$",
+          "default": "1.0.0"
+        },
+        "author": {
+          "type": "string",
+          "description": "Plugin author",
+          "examples": ["CauldronGO Team", "John Doe"]
+        },
+        "category": {
+          "type": "string",
+          "description": "Plugin category for organization",
+          "enum": ["analysis", "preprocessing", "visualization", "utilities"],
+          "examples": ["analysis"]
+        },
+        "icon": {
+          "type": "string",
+          "description": "Material icon name",
+          "examples": ["analytics", "scatter_plot", "timeline"]
+        }
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "description": "Runtime configuration",
+      "required": ["type", "script"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "description": "Runtime environment",
+          "enum": ["python", "r", "pythonWithR"]
+        },
+        "script": {
+          "type": "string",
+          "description": "Script filename to execute",
+          "pattern": "^[a-zA-Z0-9_-]+\\.(py|R)$",
+          "examples": ["analysis.py", "process.R"]
+        }
+      }
+    },
+    "inputs": {
+      "type": "array",
+      "description": "Input parameters for the plugin",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/definitions/input"
+      }
+    },
+    "outputs": {
+      "type": "array",
+      "description": "Output files produced by the plugin",
+      "items": {
+        "$ref": "#/definitions/output"
+      }
+    },
+    "plots": {
+      "type": "array",
+      "description": "Visualization configurations",
+      "items": {
+        "$ref": "#/definitions/plot"
+      }
+    },
+    "execution": {
+      "type": "object",
+      "description": "Execution configuration",
+      "required": ["argsMapping", "outputDir"],
+      "properties": {
+        "argsMapping": {
+          "type": "object",
+          "description": "Mapping from input names to command-line arguments",
+          "additionalProperties": {
+            "oneOf": [
+              { "type": "string" },
+              { "$ref": "#/definitions/argMapping" }
+            ]
+          }
+        },
+        "outputDir": {
+          "type": "string",
+          "description": "Command-line flag for output directory",
+          "pattern": "^--[a-z][a-z0-9_-]*$",
+          "examples": ["--output_folder", "--output"]
+        },
+        "requirements": {
+          "$ref": "#/definitions/requirements"
+        }
+      }
+    },
+    "example": {
+      "$ref": "#/definitions/example"
+    }
+  },
+  "definitions": {
+    "input": {
+      "type": "object",
+      "required": ["name", "label", "type"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Input parameter name (snake_case or camelCase)",
+          "pattern": "^[a-z][a-zA-Z0-9_]*$",
+          "examples": ["input_file", "n_components", "fillValue"]
+        },
+        "label": {
+          "type": "string",
+          "description": "Human-readable label",
+          "minLength": 1
+        },
+        "type": {
+          "type": "string",
+          "description": "Input type",
+          "enum": ["file", "text", "number", "boolean", "select", "column-selector"]
+        },
+        "required": {
+          "type": "boolean",
+          "description": "Whether this input is required",
+          "default": false
+        },
+        "default": {
+          "description": "Default value for this input"
+        },
+        "description": {
+          "type": "string",
+          "description": "Help text for this input"
+        },
+        "placeholder": {
+          "type": "string",
+          "description": "Placeholder text for text inputs"
+        },
+        "accept": {
+          "type": "string",
+          "description": "Accepted file extensions (for file inputs)",
+          "pattern": "^\\.[a-z]+([,\\.]\\.[a-z]+)*$",
+          "examples": [".csv,.tsv,.txt"]
+        },
+        "options": {
+          "type": "array",
+          "description": "Available options (for select inputs)",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 2
+        },
+        "multiple": {
+          "type": "boolean",
+          "description": "Allow multiple selections (for column-selector)",
+          "default": false
+        },
+        "sourceFile": {
+          "type": "string",
+          "description": "Source file input name (for column-selector)",
+          "examples": ["input_file"]
+        },
+        "min": {
+          "type": "number",
+          "description": "Minimum value (for number inputs)"
+        },
+        "max": {
+          "type": "number",
+          "description": "Maximum value (for number inputs)"
+        },
+        "step": {
+          "type": "number",
+          "description": "Step size (for number inputs)",
+          "exclusiveMinimum": 0
+        },
+        "visibleWhen": {
+          "$ref": "#/definitions/visibilityCondition"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "type": { "const": "file" } }
+          },
+          "then": {
+            "properties": {
+              "accept": { "type": "string" }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "type": { "const": "select" } }
+          },
+          "then": {
+            "required": ["options"],
+            "properties": {
+              "options": {
+                "type": "array",
+                "minItems": 2
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "type": { "const": "column-selector" } }
+          },
+          "then": {
+            "required": ["sourceFile"],
+            "properties": {
+              "sourceFile": { "type": "string" }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "type": { "const": "number" } }
+          },
+          "then": {
+            "properties": {
+              "min": { "type": "number" },
+              "max": { "type": "number" },
+              "step": { "type": "number" }
+            }
+          }
+        }
+      ]
+    },
+    "output": {
+      "type": "object",
+      "required": ["name", "path", "type"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Output name (snake_case or camelCase)",
+          "pattern": "^[a-z][a-zA-Z0-9_]*$"
+        },
+        "path": {
+          "type": "string",
+          "description": "Output file path (supports wildcards)",
+          "examples": ["output.txt", "results_*.csv"]
+        },
+        "type": {
+          "type": "string",
+          "description": "Output type",
+          "enum": ["data", "image", "plot", "log"]
+        },
+        "description": {
+          "type": "string",
+          "description": "Description of this output"
+        },
+        "format": {
+          "type": "string",
+          "description": "File format",
+          "enum": ["tsv", "csv", "json", "txt", "svg", "png", "pdf"]
+        }
+      }
+    },
+    "plot": {
+      "type": "object",
+      "required": ["id", "name", "type", "component", "dataSource"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique plot identifier",
+          "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)*$"
+        },
+        "name": {
+          "type": "string",
+          "description": "Human-readable plot name"
+        },
+        "type": {
+          "type": "string",
+          "description": "Plot type",
+          "enum": ["scatter", "line", "bar", "heatmap", "volcano"]
+        },
+        "component": {
+          "type": "string",
+          "description": "Angular component name"
+        },
+        "dataSource": {
+          "type": "string",
+          "description": "Output name to use as data source"
+        },
+        "config": {
+          "type": "object",
+          "properties": {
+            "axes": {
+              "type": "object",
+              "properties": {
+                "x": { "type": "string" },
+                "y": { "type": "string" },
+                "colorBy": { "type": "string" },
+                "sizeBy": { "type": "string" },
+                "labels": { "type": "string" }
+              }
+            }
+          }
+        },
+        "customization": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "label", "type"],
+            "properties": {
+              "name": { "type": "string" },
+              "label": { "type": "string" },
+              "type": {
+                "type": "string",
+                "enum": ["text", "number", "boolean"]
+              },
+              "default": {},
+              "min": { "type": "number" },
+              "max": { "type": "number" }
+            }
+          }
+        }
+      }
+    },
+    "argMapping": {
+      "type": "object",
+      "properties": {
+        "flag": {
+          "type": "string",
+          "description": "Command-line flag",
+          "pattern": "^--[a-z][a-z0-9_-]*$"
+        },
+        "transform": {
+          "type": "string",
+          "description": "Value transformation",
+          "enum": ["comma-join", "space-join", "json-encode"]
+        },
+        "when": {
+          "type": "string",
+          "description": "Only include when value matches this"
+        },
+        "value": {
+          "type": "string",
+          "description": "Value to pass instead of actual value"
+        }
+      }
+    },
+    "requirements": {
+      "type": "object",
+      "properties": {
+        "python": {
+          "type": "string",
+          "description": "Python version requirement",
+          "pattern": "^>=?\\d+\\.\\d+(\\.\\d+)?$",
+          "examples": [">=3.11"]
+        },
+        "r": {
+          "type": "string",
+          "description": "R version requirement",
+          "pattern": "^>=?\\d+\\.\\d+(\\.\\d+)?$",
+          "examples": [">=4.0"]
+        },
+        "packages": {
+          "type": "array",
+          "description": "Required packages",
+          "items": {
+            "type": "string"
+          },
+          "examples": [["pandas>=2.0.0", "numpy>=1.24.0"]]
+        }
+      }
+    },
+    "visibilityCondition": {
+      "type": "object",
+      "required": ["field"],
+      "properties": {
+        "field": {
+          "type": "string",
+          "description": "Field name to check"
+        },
+        "equals": {
+          "description": "Show when field equals this value"
+        },
+        "equalsAny": {
+          "type": "array",
+          "description": "Show when field equals any of these values",
+          "items": {},
+          "minItems": 2
+        }
+      },
+      "oneOf": [
+        { "required": ["equals"] },
+        { "required": ["equalsAny"] }
+      ]
+    },
+    "example": {
+      "type": "object",
+      "required": ["enabled"],
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Whether example data is available"
+        },
+        "values": {
+          "type": "object",
+          "description": "Example values for inputs",
+          "additionalProperties": true
+        }
+      }
+    }
+  }
+}

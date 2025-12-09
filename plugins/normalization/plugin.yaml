@@ -1,0 +1,159 @@
+plugin:
+  id: "normalization"
+  name: "Data Normalization"
+  description: "Normalize data using various scaling methods"
+  version: "1.0.0"
+  author: "CauldronGO Team"
+  category: "preprocessing"
+  icon: "tune"
+
+runtime:
+  type: "python"
+  script: "normalization.py"
+
+inputs:
+  - name: "input_file"
+    label: "Input File"
+    type: "file"
+    required: true
+    accept: ".csv,.tsv,.txt"
+    description: "Data file to normalize"
+
+  - name: "columns_name"
+    label: "Sample Columns"
+    type: "column-selector"
+    required: true
+    multiple: true
+    sourceFile: "input_file"
+    description: "Select columns to normalize"
+
+  - name: "scaler_type"
+    label: "Scaler Type"
+    type: "select"
+    required: true
+    default: "minmax"
+    options:
+      - "minmax"
+      - "standard"
+      - "robust"
+      - "quantile"
+      - "normalizer"
+      - "power"
+    description: "Normalization method to use"
+
+  - name: "with_centering"
+    label: "With Centering"
+    type: "boolean"
+    default: false
+    description: "Center the data before scaling"
+    visibleWhen:
+      field: "scaler_type"
+      equals: "standard"
+
+  - name: "with_scaling"
+    label: "With Scaling"
+    type: "boolean"
+    default: true
+    description: "Scale the data to unit variance"
+    visibleWhen:
+      field: "scaler_type"
+      equals: "standard"
+
+  - name: "n_quantiles"
+    label: "Number of Quantiles"
+    type: "number"
+    default: 1000
+    min: 100
+    max: 10000
+    step: 100
+    description: "Number of quantiles for quantile transformation"
+    visibleWhen:
+      field: "scaler_type"
+      equals: "quantile"
+
+  - name: "output_distribution"
+    label: "Output Distribution"
+    type: "select"
+    default: "uniform"
+    options:
+      - "uniform"
+      - "normal"
+    description: "Distribution for quantile transformation output"
+    visibleWhen:
+      field: "scaler_type"
+      equals: "quantile"
+
+  - name: "norm"
+    label: "Normalization Method"
+    type: "select"
+    default: "l2"
+    options:
+      - "l1"
+      - "l2"
+      - "max"
+    description: "Norm to use for normalizer scaler"
+    visibleWhen:
+      field: "scaler_type"
+      equals: "normalizer"
+
+  - name: "power_method"
+    label: "Power Transform Method"
+    type: "select"
+    default: "yeo-johnson"
+    options:
+      - "yeo-johnson"
+      - "box-cox"
+    description: "Method for power transformation"
+    visibleWhen:
+      field: "scaler_type"
+      equals: "power"
+
+outputs:
+  - name: "normalized_data"
+    path: "normalized.data.txt"
+    type: "data"
+    description: "Normalized data matrix"
+    format: "tsv"
+
+execution:
+  argsMapping:
+    input_file: "--file_path"
+    columns_name:
+      flag: "--columns_name"
+      transform: "comma-join"
+    scaler_type: "--scaler_type"
+    with_centering:
+      flag: "--with_centering"
+      value: "True"
+      when: "true"
+    with_scaling:
+      flag: "--with_scaling"
+      value: "True"
+      when: "true"
+    n_quantiles: "--n_quantiles"
+    output_distribution: "--output_distribution"
+    norm: "--norm"
+    power_method: "--power_method"
+
+  outputDir: "--output_folder"
+
+  requirements:
+    python: ">=3.11"
+    packages:
+      - "numpy>=1.24.0"
+      - "pandas>=2.0.0"
+      - "scikit-learn>=1.3.0"
+
+example:
+  enabled: true
+  values:
+    input_file: "diann/imputed.data.txt"
+    columns_name_source: "diann/imputed.data.txt"
+    columns_name:
+      - 'C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_BCA_LT-IP_01.raw'
+      - 'C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_BCA_LT-IP_02.raw'
+      - 'C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_BCA_LT-IP_03.raw'
+      - 'C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_BCA_LT-MockIP_01.raw'
+      - 'C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_BCA_LT-MockIP_02.raw'
+      - 'C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_BCA_LT-MockIP_03.raw'
+    scaler_type: "minmax"

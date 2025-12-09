@@ -1,0 +1,252 @@
+plugin:
+  id: "correlation-matrix"
+  name: "Correlation Matrix"
+  description: "Generate correlation matrices with customizable visualization options"
+  version: "1.0.0"
+  author: "CauldronGO Team"
+  category: "visualization"
+  icon: "grid_on"
+
+runtime:
+  type: "r"
+  script: "correlation_matrix.R"
+
+inputs:
+  - name: "input_file"
+    label: "Input File"
+    type: "file"
+    required: true
+    accept: ".csv,.tsv,.txt"
+    description: "Data file for correlation analysis"
+
+  - name: "index_col"
+    label: "Index Column"
+    type: "text"
+    required: false
+    description: "Column name to use as row identifier"
+
+  - name: "sample_cols"
+    label: "Sample Columns"
+    type: "column-selector"
+    required: true
+    multiple: true
+    sourceFile: "input_file"
+    description: "Columns to include in correlation analysis"
+
+  - name: "method"
+    label: "Correlation Method"
+    type: "select"
+    required: false
+    default: "pearson"
+    options:
+      - "pearson"
+      - "spearman"
+      - "kendall"
+    description: "Method for calculating correlations"
+
+  - name: "min_value"
+    label: "Minimum Value"
+    type: "number"
+    default: 0
+    description: "Minimum value for filtering"
+
+  - name: "order"
+    label: "Order"
+    type: "select"
+    required: false
+    options:
+      - "original"
+      - "AOE"
+      - "FPC"
+      - "hclust"
+      - "alphabet"
+    description: "Ordering method for variables"
+
+  - name: "hclust_method"
+    label: "Hierarchical Clustering Method"
+    type: "select"
+    default: "ward.D"
+    options:
+      - "ward.D"
+      - "ward.D2"
+      - "single"
+      - "complete"
+      - "average"
+      - "mcquitty"
+      - "median"
+      - "centroid"
+    description: "Method for hierarchical clustering"
+
+  - name: "presenting_method"
+    label: "Presentation Method"
+    type: "select"
+    default: "ellipse"
+    options:
+      - "circle"
+      - "square"
+      - "ellipse"
+      - "number"
+      - "shade"
+      - "color"
+      - "pie"
+    description: "Visual representation of correlations"
+
+  - name: "cor_shape"
+    label: "Correlation Shape"
+    type: "select"
+    default: "upper"
+    options:
+      - "full"
+      - "upper"
+      - "lower"
+    description: "Which part of the matrix to display"
+
+  - name: "color_ramp_palette"
+    label: "Color Palette"
+    type: "text"
+    required: false
+    placeholder: "RdYlBu,Blues,Greens"
+    description: "Color palette for the plot"
+
+  - name: "plot_width"
+    label: "Plot Width"
+    type: "number"
+    default: 10
+    min: 5
+    max: 30
+    description: "Width of the plot in inches"
+
+  - name: "plot_height"
+    label: "Plot Height"
+    type: "number"
+    default: 10
+    min: 5
+    max: 30
+    description: "Height of the plot in inches"
+
+  - name: "text_label_size"
+    label: "Text Label Size"
+    type: "number"
+    default: 1.0
+    min: 0.1
+    max: 5.0
+    step: 0.1
+    description: "Size of text labels"
+
+  - name: "number_label_size"
+    label: "Number Label Size"
+    type: "number"
+    default: 1.0
+    min: 0.1
+    max: 5.0
+    step: 0.1
+    description: "Size of correlation coefficient numbers"
+
+  - name: "label_rotation"
+    label: "Label Rotation"
+    type: "number"
+    default: 45
+    min: 0
+    max: 90
+    step: 5
+    description: "Rotation angle for labels in degrees"
+
+  - name: "show_diagonal"
+    label: "Show Diagonal"
+    type: "boolean"
+    default: true
+    description: "Show the diagonal of the correlation matrix"
+
+  - name: "add_grid"
+    label: "Add Grid"
+    type: "boolean"
+    default: false
+    description: "Add grid lines to the plot"
+
+  - name: "grid_color"
+    label: "Grid Color"
+    type: "text"
+    default: "white"
+    description: "Color of grid lines (if enabled)"
+
+  - name: "number_digits"
+    label: "Number of Digits"
+    type: "number"
+    default: 2
+    min: 0
+    max: 5
+    step: 1
+    description: "Decimal places for correlation coefficients"
+
+  - name: "plot_title"
+    label: "Plot Title"
+    type: "text"
+    required: false
+    description: "Title for the correlation plot"
+
+outputs:
+  - name: "correlation_matrix"
+    path: "correlation_matrix.txt"
+    type: "data"
+    description: "Correlation matrix values"
+    format: "tsv"
+
+  - name: "correlation_plot"
+    path: "correlation_matrix.pdf"
+    type: "image"
+    description: "Correlation matrix visualization"
+    format: "pdf"
+
+execution:
+  argsMapping:
+    input_file: "--file_path"
+    index_col: "--index_col"
+    sample_cols:
+      flag: "--sample_cols"
+      transform: "comma-join"
+    method: "--method"
+    min_value: "--min_value"
+    order: "--order"
+    hclust_method: "--hclust_method"
+    presenting_method: "--presenting_method"
+    cor_shape: "--cor_shape"
+    color_ramp_palette: "--color_ramp_palette"
+    plot_width: "--plot_width"
+    plot_height: "--plot_height"
+    text_label_size: "--text_label_size"
+    number_label_size: "--number_label_size"
+    label_rotation: "--label_rotation"
+    show_diagonal:
+      flag: "--show_diagonal"
+      value: "true"
+      when: "true"
+    add_grid:
+      flag: "--add_grid"
+      value: "true"
+      when: "true"
+    grid_color: "--grid_color"
+    number_digits: "--number_digits"
+    plot_title: "--plot_title"
+
+  outputDir: "--output_folder"
+
+  requirements:
+    r: ">=4.0"
+    packages:
+      - "corrplot"
+      - "RColorBrewer"
+
+example:
+  enabled: true
+  values:
+    input_file: "diann/imputed.data.txt"
+    sample_cols_source: "diann/imputed.data.txt"
+    sample_cols:
+      - 'C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_BCA_LT-IP_01.raw'
+      - 'C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_BCA_LT-IP_02.raw'
+      - 'C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_BCA_LT-IP_03.raw'
+      - 'C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_BCA_LT-MockIP_01.raw'
+      - 'C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_BCA_LT-MockIP_02.raw'
+      - 'C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_BCA_LT-MockIP_03.raw'
+    index_col: "Precursor.Id"
+    order: "hclust"

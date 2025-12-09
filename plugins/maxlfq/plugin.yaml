@@ -1,0 +1,115 @@
+plugin:
+  id: "maxlfq"
+  name: "MaxLFQ Normalization"
+  description: "Label-free quantification using MaxLFQ algorithm"
+  version: "1.0.0"
+  author: "CauldronGO Team"
+  category: "preprocessing"
+  icon: "insights"
+
+runtime:
+  type: "r"
+  script: "maxlfq.R"
+
+inputs:
+  - name: "input_file"
+    label: "Input File"
+    type: "file"
+    required: true
+    accept: ".csv,.tsv,.txt"
+    description: "Peptide intensity data file"
+
+  - name: "protein_col"
+    label: "Protein Column"
+    type: "text"
+    required: true
+    default: "Protein.Group"
+    description: "Column name containing protein identifiers"
+
+  - name: "peptide_col"
+    label: "Peptide Column"
+    type: "text"
+    required: true
+    default: "Precursor.Id"
+    description: "Column name containing peptide identifiers"
+
+  - name: "sample_cols"
+    label: "Sample Columns"
+    type: "column-selector"
+    required: true
+    multiple: true
+    sourceFile: "input_file"
+    description: "Columns containing sample intensities"
+
+  - name: "min_samples"
+    label: "Minimum Samples"
+    type: "number"
+    default: 1
+    min: 1
+    max: 100
+    step: 1
+    description: "Minimum number of samples required for quantification"
+
+  - name: "use_log2"
+    label: "Use Log2 Transform"
+    type: "boolean"
+    default: false
+    description: "Apply log2 transformation to intensities"
+
+  - name: "normalize"
+    label: "Normalize"
+    type: "boolean"
+    default: true
+    description: "Perform median normalization"
+
+outputs:
+  - name: "maxlfq_results"
+    path: "maxlfq.data.txt"
+    type: "data"
+    description: "MaxLFQ normalized protein intensities"
+    format: "tsv"
+
+execution:
+  argsMapping:
+    input_file: "--file_path"
+    protein_col: "--protein_col"
+    peptide_col: "--peptide_col"
+    sample_cols:
+      flag: "--sample_cols"
+      transform: "comma-join"
+    min_samples: "--min_samples"
+    use_log2:
+      flag: "--use_log2"
+      when: "true"
+      value: "true"
+    normalize:
+      flag: "--normalize"
+      when: "true"
+      value: "true"
+
+  outputDir: "--output_folder"
+
+  requirements:
+    r: ">=4.0"
+    packages:
+      - "iq"
+      - "tidyverse"
+      - "data.table"
+
+example:
+  enabled: true
+  values:
+    input_file: "diann/Reports.pg_matrix.tsv"
+    protein_col: "Protein.Group"
+    peptide_col: "Precursor.Id"
+    sample_cols_source: "diann/Reports.pg_matrix.tsv"
+    sample_cols:
+      - 'C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_BCA_LT-IP_01.raw'
+      - 'C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_BCA_LT-IP_02.raw'
+      - 'C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_BCA_LT-IP_03.raw'
+      - 'C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_BCA_LT-MockIP_01.raw'
+      - 'C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_BCA_LT-MockIP_02.raw'
+      - 'C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_BCA_LT-MockIP_03.raw'
+    min_samples: 1
+    use_log2: false
+    normalize: true

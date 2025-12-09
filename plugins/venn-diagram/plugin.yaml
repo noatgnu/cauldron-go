@@ -1,0 +1,118 @@
+plugin:
+  id: "venn-diagram"
+  name: "Venn Diagram"
+  description: "Generate Venn diagrams for set comparison"
+  version: "1.0.0"
+  author: "CauldronGO Team"
+  category: "visualization"
+  icon: "schema"
+
+runtime:
+  type: "r"
+  script: "venn_diagram.R"
+
+inputs:
+  - name: "input_file"
+    label: "Input File"
+    type: "file"
+    required: true
+    accept: ".csv,.tsv,.txt"
+    description: "Data file containing sets to compare"
+
+  - name: "sample_cols"
+    label: "Sample Columns"
+    type: "column-selector"
+    required: true
+    multiple: true
+    sourceFile: "input_file"
+    description: "Columns representing different sets (max 5)"
+
+  - name: "set_names"
+    label: "Set Names"
+    type: "text"
+    required: false
+    description: "Comma-separated names for the sets (optional)"
+
+  - name: "threshold"
+    label: "Threshold"
+    type: "number"
+    default: 0.0
+    min: 0
+    max: 100
+    description: "Minimum value threshold for presence"
+
+  - name: "use_presence"
+    label: "Use Presence/Absence"
+    type: "boolean"
+    default: true
+    description: "Use binary presence/absence instead of values"
+
+  - name: "fill_colors"
+    label: "Fill Colors"
+    type: "text"
+    required: false
+    placeholder: "#FF0000,#00FF00,#0000FF"
+    description: "Comma-separated hex colors for each set"
+
+  - name: "alpha"
+    label: "Transparency (Alpha)"
+    type: "number"
+    default: 0.5
+    min: 0
+    max: 1
+    step: 0.1
+    description: "Transparency of overlapping regions (0=transparent, 1=opaque)"
+
+outputs:
+  - name: "venn_diagram"
+    path: "venn_diagram.png"
+    type: "image"
+    description: "Venn diagram visualization"
+    format: "png"
+
+  - name: "venn_summary"
+    path: "venn_summary.txt"
+    type: "data"
+    description: "Summary of overlaps between sets"
+    format: "tsv"
+
+  - name: "venn_presence"
+    path: "venn_presence.txt"
+    type: "data"
+    description: "Presence/absence matrix for each set"
+    format: "tsv"
+
+execution:
+  argsMapping:
+    input_file: "--file_path"
+    sample_cols:
+      flag: "--sample_cols"
+      transform: "comma-join"
+    set_names: "--set_names"
+    threshold: "--threshold"
+    use_presence:
+      flag: "--use_presence"
+      value: "true"
+      when: "true"
+    fill_colors: "--fill_colors"
+    alpha: "--alpha"
+
+  outputDir: "--output_folder"
+
+  requirements:
+    r: ">=4.0"
+    packages:
+      - "VennDiagram"
+      - "grid"
+
+example:
+  enabled: true
+  values:
+    input_file: "diann/imputed.data.txt"
+    sample_cols_source: "diann/imputed.data.txt"
+    sample_cols:
+      - 'C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_BCA_LT-IP_01.raw'
+      - 'C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_BCA_LT-MockIP_01.raw'
+      - 'C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_BCA_LT-WCL_01.raw'
+    threshold: 0
+    use_presence: true

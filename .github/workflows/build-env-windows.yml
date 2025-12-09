@@ -18,28 +18,33 @@ jobs:
       with:
         python-version: '3.11'
 
-    - name: Install R
-      run: |
-        Invoke-WebRequest -Uri https://cran.r-project.org/bin/windows/base/old/4.4.1/R-4.4.1-win.exe -OutFile R-Portable.exe
-        New-Item -ItemType Directory -Force -Path bin/win/R-Portable
-        Start-Process -FilePath R-Portable.exe -ArgumentList "/VERYSILENT", "/DIR=bin/win/R-Portable" -Wait
+    - name: Install Rtools
+      run: choco install rtools --no-progress
 
-    - name: Clean up R installation
+    - name: Add Rtools to PATH
+      run: |
+        echo "C:\rtools44\usr\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+        echo "C:\rtools44\mingw64\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+    - name: Compile R
+      shell: bash
+      run: |
+        curl -O https://cran.r-project.org/src/base/R-4/R-4.4.1.tar.gz
+        tar -xzvf R-4.4.1.tar.gz
+        cd R-4.4.1
+        ./configure --prefix=${{ github.workspace }}/bin/win/R-Portable --enable-R-shlib --with-blas --with-lapack
+        make -j$(nproc)
+        make install
+
+    - name: Strip R binaries
       shell: pwsh
       run: |
         $R_PORTABLE_PATH = "${{ github.workspace }}/bin/win/R-Portable"
-        Remove-Item -Path "$R_PORTABLE_PATH/share/doc" -Recurse -Force -ErrorAction SilentlyContinue
-        Remove-Item -Path "$R_PORTABLE_PATH/share/info" -Recurse -Force -ErrorAction SilentlyContinue
-        Remove-Item -Path "$R_PORTABLE_PATH/share/man" -Recurse -Force -ErrorAction SilentlyContinue
-        Remove-Item -Path "$R_PORTABLE_PATH/src" -Recurse -Force -ErrorAction SilentlyContinue
-        Remove-Item -Path "$R_PORTABLE_PATH/tests" -Recurse -Force -ErrorAction SilentlyContinue
-        Get-ChildItem -Path "$R_PORTABLE_PATH/library" -Directory | ForEach-Object {
-            Remove-Item -Path "$($_.FullName)/doc" -Recurse -Force -ErrorAction SilentlyContinue
-            Remove-Item -Path "$($_.FullName)/html" -Recurse -Force -ErrorAction SilentlyContinue
-            Remove-Item -Path "$($_.FullName)/help" -Recurse -Force -ErrorAction SilentlyContinue
-            Remove-Item -Path "$($_.FullName)/examples" -Recurse -Force -ErrorAction SilentlyContinue
+        Get-ChildItem -Path $R_PORTABLE_PATH -Recurse -Include *.exe, *.dll | ForEach-Object {
+          echo "Stripping $_.FullName"
+          strip $_.FullName
         }
-
+    
     - name: Install R packages
       env:
         R_LIBS_USER: ${{ github.workspace }}/bin/win/R-Portable/library

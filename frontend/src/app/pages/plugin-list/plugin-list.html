@@ -1,0 +1,93 @@
+<div class="plugin-list-container">
+  <div class="header">
+    <h1>
+      <mat-icon>extension</mat-icon>
+      Available Plugins
+    </h1>
+
+    <mat-form-field appearance="outline" class="search-field">
+      <mat-label>Search plugins</mat-label>
+      <input matInput [(ngModel)]="searchQuery" (input)="onSearch()" placeholder="Search by name, description, or ID">
+      <mat-icon matPrefix>search</mat-icon>
+    </mat-form-field>
+  </div>
+
+  @if (loading()) {
+    <div class="loading">
+      <mat-spinner diameter="40"></mat-spinner>
+      <p>Loading plugins...</p>
+    </div>
+  } @else if (error()) {
+    <div class="error">
+      <mat-icon>error</mat-icon>
+      <p>{{ error() }}</p>
+      <button mat-raised-button color="primary" (click)="loadPlugins()">
+        <mat-icon>refresh</mat-icon>
+        Retry
+      </button>
+    </div>
+  } @else {
+    <div class="plugin-grid">
+      @for (category of getPluginsByCategory() | keyvalue; track category.key) {
+        <div class="category-section">
+          <h2 class="category-title">
+            <mat-icon>{{ getCategoryIcon(category.key) }}</mat-icon>
+            {{ category.key | titlecase }}
+          </h2>
+
+          <div class="plugin-cards">
+            @for (plugin of category.value; track plugin.definition.plugin.id) {
+              <mat-card class="plugin-card" (click)="navigateToPlugin(plugin.definition.plugin.id)">
+                <mat-card-header>
+                  <mat-icon mat-card-avatar>{{ plugin.definition.plugin.icon || 'extension' }}</mat-icon>
+                  <mat-card-title>{{ plugin.definition.plugin.name }}</mat-card-title>
+                  <mat-card-subtitle>v{{ plugin.definition.plugin.version }}</mat-card-subtitle>
+                </mat-card-header>
+
+                <mat-card-content>
+                  <p class="description">{{ plugin.definition.plugin.description }}</p>
+
+                  <div class="metadata">
+                    <mat-chip class="runtime-chip">
+                      <mat-icon>{{ getRuntimeIcon(plugin.definition.runtime.type) }}</mat-icon>
+                      {{ getRuntimeLabel(plugin.definition.runtime.type) }}
+                    </mat-chip>
+
+                    <div class="counts">
+                      <span class="count-item">
+                        <mat-icon>input</mat-icon>
+                        {{ plugin.definition.inputs.length }} inputs
+                      </span>
+                      <span class="count-item">
+                        <mat-icon>output</mat-icon>
+                        {{ plugin.definition.outputs?.length || 0 }} outputs
+                      </span>
+                    </div>
+                  </div>
+
+                  @if (plugin.definition.plugin.author) {
+                    <p class="author">by {{ plugin.definition.plugin.author }}</p>
+                  }
+                </mat-card-content>
+
+                <mat-card-actions align="end">
+                  <button mat-button color="primary">
+                    <mat-icon>play_arrow</mat-icon>
+                    Run
+                  </button>
+                </mat-card-actions>
+              </mat-card>
+            }
+          </div>
+        </div>
+      }
+    </div>
+
+    @if (filteredPlugins().length === 0) {
+      <div class="no-results">
+        <mat-icon>search_off</mat-icon>
+        <p>No plugins found matching "{{ searchQuery }}"</p>
+      </div>
+    }
+  }
+</div>

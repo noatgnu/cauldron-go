@@ -98,6 +98,7 @@ bin/linux/python/
 bin/linux/R-Portable/
 bin/darwin/python/
 bin/darwin/R-Portable/
+bin/plugin**
 
 # Keep scripts directory structure
 !scripts/

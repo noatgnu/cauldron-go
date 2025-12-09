@@ -1,0 +1,148 @@
+name: Build and Test
+
+on:
+  push:
+    branches:
+      - master
+      - main
+      - develop
+  pull_request:
+    branches:
+      - master
+      - main
+      - develop
+
+jobs:
+  build-dev-tools:
+    name: Build Developer Tools
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Build plugin-validator
+        run: go build -o bin/plugin-validator ./cmd/plugin-validator
+
+      - name: Build plugin-doc-generator
+        run: go build -o bin/plugin-doc-generator ./cmd/plugin-doc-generator
+
+      - name: Build plugin-doc-generator-all
+        run: go build -o bin/plugin-doc-generator-all ./cmd/plugin-doc-generator-all
+
+      - name: Build plugin-scaffolder
+        run: go build -o bin/plugin-scaffolder ./cmd/plugin-scaffolder
+
+      - name: Test plugin-validator
+        run: ./bin/plugin-validator plugins/pca-analysis
+
+      - name: Test doc generator
+        run: ./bin/plugin-doc-generator plugins/pca-analysis
+
+      - name: Validate all plugins
+        run: ./bin/plugin-validator plugins/
+
+      - name: Upload tools as artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dev-tools-linux
+          path: bin/
+
+  build-backend:
+    name: Build Backend
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Build backend
+        run: go build -v ./...
+
+      - name: Run tests
+        run: go test -v ./...
+
+  build-frontend:
+    name: Build Frontend
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm install
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+      - name: Upload frontend build
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist/
+
+  integration-test:
+    name: Integration Test
+    needs: [build-dev-tools, build-backend, build-frontend]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Download dev tools
+        uses: actions/download-artifact@v4
+        with:
+          name: dev-tools-linux
+          path: bin/
+
+      - name: Make tools executable
+        run: chmod +x bin/*
+
+      - name: Download frontend
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist/
+
+      - name: Validate all plugins
+        run: ./bin/plugin-validator plugins/
+
+      - name: Generate all documentation
+        run: ./bin/plugin-doc-generator-all
+
+      - name: Check directory structure
+        run: |
+          echo "Checking required directories..."
+          test -d plugins && echo "[SUCCESS] plugins/ exists" || echo "[ERROR] plugins/ missing"
+          test -d examples && echo "[SUCCESS] examples/ exists" || echo "[ERROR] examples/ missing"
+          test -d scripts && echo "[SUCCESS] scripts/ exists" || echo "[ERROR] scripts/ missing"
+          test -d bin && echo "[SUCCESS] bin/ exists" || echo "[ERROR] bin/ missing"
+          test -d frontend/dist && echo "[SUCCESS] frontend/dist/ exists" || echo "[ERROR] frontend/dist/ missing"
+
+          echo ""
+          echo "Plugin count:"
+          find plugins -name "plugin.yaml" | wc -l
+
+          echo ""
+          echo "Dev tools built:"
+          ls -lh bin/

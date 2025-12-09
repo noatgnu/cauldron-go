@@ -1,12 +1,16 @@
-import { Component, output, signal, computed } from '@angular/core';
+import { Component, output, signal, computed, OnInit } from '@angular/core';
 import { MatListModule } from '@angular/material/list';
 import { MatIconModule } from '@angular/material/icon';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
+import { MatCheckboxModule } from '@angular/material/checkbox';
+import { MatDividerModule } from '@angular/material/divider';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
+import { PluginV2Service } from '../../core/services/plugin-v2';
+import { models } from '../../../wailsjs/go/models';
 
 interface NavItem {
   label: string;
@@ -17,15 +21,27 @@ interface NavItem {
 
 @Component({
   selector: 'app-sidenav',
-  imports: [MatListModule, MatIconModule, MatExpansionModule, MatFormFieldModule, MatInputModule, MatButtonModule, FormsModule],
+  imports: [
+    MatListModule,
+    MatIconModule,
+    MatExpansionModule,
+    MatFormFieldModule,
+    MatInputModule,
+    MatButtonModule,
+    MatCheckboxModule,
+    MatDividerModule,
+    FormsModule
+  ],
   templateUrl: './sidenav.html',
   styleUrl: './sidenav.scss',
 })
-export class Sidenav {
+export class Sidenav implements OnInit {
   navigationClose = output<void>();
   searchQuery = signal<string>('');
+  showPlugins = signal<boolean>(false);
+  plugins = signal<models.PluginV2[]>([]);
 
-  navItems: NavItem[] = [
+  hardcodedNavItems: NavItem[] = [
     { label: 'Home', icon: 'home', route: '/' },
     {
       label: 'Data Transformation',
@@ -77,14 +93,51 @@ export class Sidenav {
     }
   ];
 
-  filteredNavItems = computed(() => {
-    const query = this.searchQuery().toLowerCase().trim();
+  categoryIcons: Record<string, string> = {
+    'analysis': 'analytics',
+    'visualization': 'insert_chart_outlined',
+    'preprocessing': 'transform',
+    'utilities': 'build'
+  };
 
-    if (!query) {
-      return this.navItems;
+  pluginNavItems = computed(() => {
+    const navItems: NavItem[] = [{ label: 'Home', icon: 'home', route: '/' }];
+    const categoryMap = new Map<string, models.PluginV2[]>();
+
+    for (const plugin of this.plugins()) {
+      const category = plugin.definition.plugin.category || 'uncategorized';
+      if (!categoryMap.has(category)) {
+        categoryMap.set(category, []);
+      }
+      categoryMap.get(category)!.push(plugin);
     }
 
-    return this.navItems.map(item => {
+    for (const [category, pluginList] of categoryMap) {
+      const children: NavItem[] = pluginList.map(plugin => ({
+        label: plugin.definition.plugin.name,
+        icon: plugin.definition.plugin.icon || 'extension',
+        route: `/plugin/${plugin.definition.plugin.id}`
+      }));
+
+      navItems.push({
+        label: this.formatCategoryLabel(category),
+        icon: this.categoryIcons[category] || 'folder',
+        children
+      });
+    }
+
+    return navItems;
+  });
+
+  filteredNavItems = computed(() => {
+    const query = this.searchQuery().toLowerCase().trim();
+    const sourceItems = this.showPlugins() ? this.pluginNavItems() : this.hardcodedNavItems;
+
+    if (!query) {
+      return sourceItems;
+    }
+
+    return sourceItems.map(item => {
       if (item.children) {
         const filteredChildren = item.children.filter(child =>
           child.label.toLowerCase().includes(query) ||
@@ -105,7 +158,34 @@ export class Sidenav {
     }).filter(item => item !== null) as NavItem[];
   });
 
-  constructor(private router: Router) {}
+  constructor(
+    private router: Router,
+    private pluginService: PluginV2Service
+  ) {}
+
+  async ngOnInit() {
+    await this.loadPlugins();
+  }
+
+  async loadPlugins() {
+    try {
+      const plugins = await this.pluginService.getAllPlugins();
+      this.plugins.set(plugins);
+    } catch (error) {
+      console.error('Failed to load plugins:', error);
+    }
+  }
+
+  togglePluginView() {
+    this.showPlugins.update(v => !v);
+    this.clearSearch();
+  }
+
+  formatCategoryLabel(category: string): string {
+    return category.split('-').map(word =>
+      word.charAt(0).toUpperCase() + word.slice(1)
+    ).join(' ');
+  }
 
   navigate(route: string): void {
     this.router.navigate([route]);

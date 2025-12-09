@@ -1,20 +1,17 @@
 <div class="environment-indicator">
   <span class="label">Requires:</span>
   @if (pythonWithR) {
-    <mat-chip class="env-chip python-chip" matTooltip="Uses Python with R integration via rpy2">
-      <mat-icon>code</mat-icon>
+    <mat-chip class="env-chip python-r-chip" matTooltip="Uses Python with R integration via rpy2">
       Python + R
     </mat-chip>
   } @else {
     @if (python) {
       <mat-chip class="env-chip python-chip" matTooltip="Uses Python runtime environment">
-        <mat-icon>code</mat-icon>
         Python
       </mat-chip>
     }
     @if (r) {
       <mat-chip class="env-chip r-chip" matTooltip="Uses R runtime environment">
-        <mat-icon>analytics</mat-icon>
         R
       </mat-chip>
     }

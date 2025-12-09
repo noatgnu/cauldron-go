@@ -1,0 +1,181 @@
+plugin:
+  id: "dose-response"
+  name: "Dose-Response Analysis"
+  description: "Fit dose-response curves and calculate IC50 values for compound screening data"
+  version: "1.0.0"
+  author: "CauldronGO Team"
+  category: "analysis"
+  icon: "timeline"
+
+runtime:
+  type: "python"
+  script: "dose_response_analyzer.py"
+
+inputs:
+  - name: "input_file"
+    label: "Input Data File"
+    type: "file"
+    required: true
+    accept: ".csv,.tsv,.txt"
+    description: "Data file containing compound, concentration, and response values"
+
+  - name: "compound_col"
+    label: "Compound Column"
+    type: "text"
+    default: "Compound"
+    description: "Column name for compound identifiers"
+
+  - name: "concentration_col"
+    label: "Concentration Column"
+    type: "text"
+    default: "Conc"
+    description: "Column name for concentration values"
+
+  - name: "response_col"
+    label: "Response Column"
+    type: "text"
+    default: "Rab10"
+    description: "Column name for response values"
+
+  - name: "enable_custom_models"
+    label: "Enable Custom Models"
+    type: "boolean"
+    default: true
+    description: "Include extended set of dose-response models"
+
+  - name: "selection_metric"
+    label: "Model Selection Metric"
+    type: "select"
+    default: "rmse"
+    options:
+      - "rmse"
+      - "aic"
+      - "bic"
+      - "r2"
+    description: "Metric used to select the best fitting model"
+
+  - name: "show_ic50_lines"
+    label: "Show IC50 Lines"
+    type: "boolean"
+    default: true
+    description: "Display IC50 reference lines on plots"
+
+  - name: "show_dmax_lines"
+    label: "Show Dmax Lines"
+    type: "boolean"
+    default: true
+    description: "Display Dmax reference lines on plots"
+
+  - name: "file_format"
+    label: "Output Format"
+    type: "select"
+    default: "svg"
+    options:
+      - "svg"
+      - "png"
+      - "pdf"
+    description: "File format for output plots"
+
+  - name: "add_timestamp"
+    label: "Add Timestamp"
+    type: "boolean"
+    default: true
+    description: "Add timestamp to output filenames"
+
+  - name: "create_overlay"
+    label: "Create Overlay Plot"
+    type: "boolean"
+    default: false
+    description: "Create a plot with multiple compounds overlaid"
+
+  - name: "overlay_compounds"
+    label: "Overlay Compounds"
+    type: "text"
+    required: false
+    placeholder: "CompoundA,CompoundB,CompoundC"
+    description: "Comma-separated list of compounds to overlay on one plot"
+    visibleWhen:
+      field: "create_overlay"
+      equals: true
+
+  - name: "compound_colors"
+    label: "Compound Colors"
+    type: "text"
+    required: false
+    placeholder: "CompoundA:#ff0000;CompoundB:#00ff00"
+    description: "Semicolon-separated compound:color pairs for overlay plot"
+    visibleWhen:
+      field: "create_overlay"
+      equals: true
+
+outputs:
+  - name: "summary_table"
+    path: "summary_table.txt"
+    type: "data"
+    description: "Summary statistics for all fitted models"
+    format: "tsv"
+
+  - name: "best_models"
+    path: "best_models.txt"
+    type: "data"
+    description: "Best fitting model parameters and IC50 values for each compound"
+    format: "tsv"
+
+  - name: "dose_response_plots"
+    path: "dose_response*.svg"
+    type: "image"
+    description: "Individual dose-response curve plots for each compound"
+    format: "svg"
+
+  - name: "overlay_plot"
+    path: "overlay*.svg"
+    type: "image"
+    description: "Overlay plot with multiple compounds (if overlay_compounds specified)"
+    format: "svg"
+
+execution:
+  argsMapping:
+    input_file: "--input_file"
+    compound_col: "--compound_col"
+    concentration_col: "--concentration_col"
+    response_col: "--response_col"
+    enable_custom_models:
+      flag: "--enable_custom_models"
+      when: "true"
+    selection_metric: "--selection_metric"
+    show_ic50_lines:
+      flag: "--show_ic50_lines"
+      when: "true"
+    show_dmax_lines:
+      flag: "--show_dmax_lines"
+      when: "true"
+    file_format: "--file_format"
+    add_timestamp:
+      flag: "--add_timestamp"
+      when: "true"
+    overlay_compounds: "--overlay_compounds"
+    compound_colors: "--compound_colors"
+
+  outputDir: "--output_folder"
+
+  requirements:
+    python: ">=3.11"
+    packages:
+      - "pandas>=2.0.0"
+      - "numpy>=1.24.0"
+      - "matplotlib>=3.7.0"
+      - "dra>=0.1.0"
+
+example:
+  enabled: true
+  values:
+    input_file: "dose_response/example_data.csv"
+    compound_col: "Compound"
+    concentration_col: "Conc"
+    response_col: "Rab10"
+    enable_custom_models: true
+    selection_metric: "rmse"
+    show_ic50_lines: true
+    show_dmax_lines: true
+    file_format: "svg"
+    create_overlay: false

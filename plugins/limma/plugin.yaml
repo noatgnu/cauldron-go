@@ -1,0 +1,81 @@
+plugin:
+  id: "limma"
+  name: "Limma Differential Expression"
+  description: "Linear models for differential expression analysis using limma"
+  version: "1.0.0"
+  author: "CauldronGO Team"
+  category: "analysis"
+  icon: "difference"
+
+runtime:
+  type: "pythonWithR"
+  script: "differential_analysis.py"
+
+inputs:
+  - name: "input_file"
+    label: "Input Data File"
+    type: "file"
+    required: true
+    accept: ".csv,.tsv,.txt"
+    description: "Proteomics or expression data file"
+
+  - name: "annotation_file"
+    label: "Annotation File"
+    type: "file"
+    required: true
+    accept: ".csv,.tsv,.txt"
+    description: "Sample annotation file with conditions"
+
+  - name: "index_col"
+    label: "Index Column"
+    type: "text"
+    required: false
+    description: "Column name to use as feature identifier"
+
+  - name: "log2"
+    label: "Apply Log2 Transformation"
+    type: "boolean"
+    default: false
+    description: "Apply log2 transformation before analysis"
+
+  - name: "comparisons"
+    label: "Comparisons"
+    type: "text"
+    required: false
+    description: "Comparison groups for differential analysis"
+
+outputs:
+  - name: "differential_results"
+    path: "differential_analysis.txt"
+    type: "data"
+    description: "Differential expression analysis results"
+    format: "tsv"
+
+execution:
+  argsMapping:
+    input_file: "--input_file"
+    annotation_file: "--annotation_file"
+    index_col: "--index_col"
+    log2:
+      flag: "--log2"
+      when: "true"
+    comparisons: "--comparison_file"
+
+  outputDir: "--output_folder"
+
+  requirements:
+    python: ">=3.11"
+    r: ">=4.0"
+    packages:
+      - "pandas>=2.0.0"
+      - "numpy>=1.24.0"
+      - "rpy2>=3.5.0"
+
+example:
+  enabled: true
+  values:
+    input_file: "diann/imputed.data.txt"
+    annotation_file: "differential_analysis/annotation.txt"
+    comparisons: "differential_analysis/comparison.bca.txt"
+    index_col: "Protein.Ids"
+    log2: true

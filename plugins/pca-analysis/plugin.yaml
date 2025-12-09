@@ -1,0 +1,173 @@
+plugin:
+  id: "pca-analysis"
+  name: "PCA Analysis"
+  description: "Principal Component Analysis for dimensionality reduction and visualization"
+  version: "1.0.0"
+  author: "CauldronGO Team"
+  category: "analysis"
+  icon: "scatter_plot"
+
+runtime:
+  type: "python"
+  script: "pca.py"
+
+inputs:
+  - name: "input_file"
+    label: "Input File"
+    type: "file"
+    required: true
+    accept: ".csv,.tsv,.txt"
+    description: "Data matrix file containing samples and measurements"
+
+  - name: "annotation_file"
+    label: "Sample Annotation File"
+    type: "file"
+    required: false
+    accept: ".csv,.tsv,.txt"
+    description: "Optional annotation file for sample grouping and coloring (Sample, Condition, Batch, Color)"
+
+  - name: "columns_name"
+    label: "Sample Columns"
+    type: "column-selector"
+    required: true
+    multiple: true
+    sourceFile: "input_file"
+    description: "Select columns containing sample data for PCA analysis"
+
+  - name: "n_components"
+    label: "Number of Components"
+    type: "number"
+    required: true
+    default: 2
+    min: 2
+    max: 10
+    step: 1
+    description: "Number of principal components to compute"
+
+  - name: "log2"
+    label: "Apply Log2 Transform"
+    type: "boolean"
+    default: false
+    description: "Apply log2 transformation to the data before PCA"
+
+outputs:
+  - name: "pca_output"
+    path: "pca_output.txt"
+    type: "data"
+    description: "PCA coordinates for each sample"
+    format: "tsv"
+
+  - name: "explained_variance"
+    path: "explained_variance_ratio.json"
+    type: "data"
+    description: "Variance explained by each principal component"
+    format: "json"
+
+plots:
+  - id: "pca-scatter"
+    name: "PCA Scatter Plot"
+    type: "scatter"
+    component: "PcaPlot"
+    dataSource: "pca_output"
+    config:
+      axes:
+        x: "x_pca"
+        y: "y_pca"
+        colorBy: "condition"
+        labels: "sample"
+
+    customization:
+      - name: "title"
+        label: "Plot Title"
+        type: "text"
+        default: ""
+
+      - name: "showGrid"
+        label: "Show Grid"
+        type: "boolean"
+        default: true
+
+      - name: "markerSize"
+        label: "Marker Size"
+        type: "number"
+        default: 10
+        min: 1
+        max: 50
+
+      - name: "width"
+        label: "Width (px)"
+        type: "number"
+        default: 800
+        min: 400
+        max: 2000
+
+      - name: "height"
+        label: "Height (px)"
+        type: "number"
+        default: 600
+        min: 400
+        max: 2000
+
+      - name: "marginTop"
+        label: "Margin Top (px)"
+        type: "number"
+        default: 100
+        min: 0
+        max: 200
+
+      - name: "marginRight"
+        label: "Margin Right (px)"
+        type: "number"
+        default: 100
+        min: 0
+        max: 300
+
+      - name: "marginBottom"
+        label: "Margin Bottom (px)"
+        type: "number"
+        default: 100
+        min: 0
+        max: 200
+
+      - name: "marginLeft"
+        label: "Margin Left (px)"
+        type: "number"
+        default: 100
+        min: 0
+        max: 200
+
+execution:
+  argsMapping:
+    input_file: "--input_file"
+    columns_name:
+      flag: "--columns_name"
+      transform: "comma-join"
+    n_components: "--n_components"
+    log2:
+      flag: "--log2"
+      when: "true"
+      value: "true"
+
+  outputDir: "--output_folder"
+
+  requirements:
+    python: ">=3.11"
+    packages:
+      - "numpy>=1.24.0"
+      - "pandas>=2.0.0"
+      - "scikit-learn>=1.3.0"
+
+example:
+  enabled: true
+  values:
+    input_file: "diann/imputed.data.txt"
+    columns_name_source: "diann/imputed.data.txt"
+    columns_name:
+      - 'C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_BCA_LT-IP_01.raw'
+      - 'C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_BCA_LT-IP_02.raw'
+      - 'C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_BCA_LT-IP_03.raw'
+      - 'C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_BCA_LT-MockIP_01.raw'
+      - 'C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_BCA_LT-MockIP_02.raw'
+      - 'C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_BCA_LT-MockIP_03.raw'
+    n_components: 2
+    log2: true

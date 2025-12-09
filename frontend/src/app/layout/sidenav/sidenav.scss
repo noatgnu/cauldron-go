@@ -1,7 +1,37 @@
+.sidebar-header {
+  position: sticky;
+  top: 0;
+  background-color: #fafafa;
+  z-index: 10;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+.view-toggle {
+  padding: 12px 16px;
+  background-color: white;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+
+  mat-checkbox {
+    width: 100%;
+  }
+
+  .toggle-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 500;
+    font-size: 13px;
+
+    mat-icon {
+      font-size: 20px;
+      width: 20px;
+      height: 20px;
+    }
+  }
+}
+
 .search-container {
   padding: 16px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.12);
-  background-color: #fafafa;
 
   .search-field {
     width: 100%;

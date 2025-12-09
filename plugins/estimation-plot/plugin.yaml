@@ -1,0 +1,97 @@
+plugin:
+  id: "estimation-plot"
+  name: "Estimation Plot"
+  description: "Generate estimation plots with effect sizes using DABEST"
+  version: "1.0.0"
+  author: "CauldronGO Team"
+  category: "visualization"
+  icon: "show_chart"
+
+runtime:
+  type: "python"
+  script: "estimation_plot.py"
+
+inputs:
+  - name: "input_file"
+    label: "Input Data File"
+    type: "file"
+    required: true
+    accept: ".csv,.tsv,.txt"
+    description: "Data file containing protein/feature intensities"
+
+  - name: "annotation_file"
+    label: "Sample Annotation File"
+    type: "file"
+    required: true
+    accept: ".csv,.tsv,.txt"
+    description: "Sample annotation file with conditions"
+
+  - name: "index_col"
+    label: "Index Column"
+    type: "text"
+    required: true
+    description: "Column name to use as feature identifier (e.g., Protein.IDs)"
+
+  - name: "selected_proteins"
+    label: "Selected Proteins/Features"
+    type: "text"
+    required: true
+    multiple: true
+    description: "List of proteins/features to plot (one per line or comma-separated)"
+
+  - name: "log2"
+    label: "Apply Log2 Transformation"
+    type: "boolean"
+    default: true
+    description: "Apply log2 transformation to values before plotting"
+
+  - name: "condition_order"
+    label: "Condition Order"
+    type: "text"
+    required: false
+    placeholder: "Control,Treatment1,Treatment2"
+    description: "Comma-separated list of conditions in desired order"
+
+outputs:
+  - name: "estimation_plots"
+    path: "*.svg"
+    type: "image"
+    description: "Estimation plots for each selected protein (one SVG per protein)"
+    format: "svg"
+
+  - name: "statistics"
+    path: "*_stats.tsv"
+    type: "data"
+    description: "Statistical test results for each protein"
+    format: "tsv"
+
+execution:
+  argsMapping:
+    input_file: "--file_path"
+    annotation_file: "--sample_annotation"
+    index_col: "--index_col"
+    selected_proteins:
+      flag: "--selected_protein"
+      transform: "space-join"
+    log2:
+      flag: "--log2"
+      when: "true"
+    condition_order: "--condition_order"
+
+  outputDir: "--out_folder"
+
+  requirements:
+    python: ">=3.11"
+    packages:
+      - "pandas>=2.0.0"
+      - "numpy>=1.24.0"
+      - "dabest>=2023.2.14"
+      - "matplotlib>=3.7.0"
+
+example:
+  enabled: true
+  values:
+    input_file: "diann/imputed.data.txt"
+    annotation_file: "differential_analysis/annotation.txt"
+    index_col: "Precursor.Id"
+    log2: true

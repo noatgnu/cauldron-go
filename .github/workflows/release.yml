@@ -27,6 +27,15 @@ jobs:
         run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.11.0
         shell: bash
 
+      - name: Build Developer Tools
+        run: |
+          mkdir -p bin
+          go build -o bin/plugin-validator.exe ./cmd/plugin-validator
+          go build -o bin/plugin-doc-generator.exe ./cmd/plugin-doc-generator
+          go build -o bin/plugin-doc-generator-all.exe ./cmd/plugin-doc-generator-all
+          go build -o bin/plugin-scaffolder.exe ./cmd/plugin-scaffolder
+        shell: bash
+
       - name: Build Application
         run: |
           cd frontend
@@ -36,20 +45,19 @@ jobs:
           wails build -platform windows/amd64
         shell: bash
 
-      - name: Copy Examples
+      - name: Copy Resources
         run: |
           cp -r examples build/bin/
-        shell: bash
-
-      - name: Copy Scripts
-        run: |
           cp -r scripts build/bin/
+          cp -r plugins build/bin/
+          mkdir -p build/bin/tools
+          cp -r bin/* build/bin/tools/
         shell: bash
 
       - name: Create Archive
         run: |
           cd build/bin
-          7z a ../../cauldron-windows-amd64.zip cauldron.exe examples/ scripts/
+          7z a ../../cauldron-windows-amd64.zip cauldron.exe examples/ scripts/ plugins/ tools/
         shell: bash
 
       - name: Upload Artifact
@@ -95,6 +103,14 @@ jobs:
       - name: Install Wails
         run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.11.0
 
+      - name: Build Developer Tools
+        run: |
+          mkdir -p bin
+          go build -o bin/plugin-validator ./cmd/plugin-validator
+          go build -o bin/plugin-doc-generator ./cmd/plugin-doc-generator
+          go build -o bin/plugin-doc-generator-all ./cmd/plugin-doc-generator-all
+          go build -o bin/plugin-scaffolder ./cmd/plugin-scaffolder
+
       - name: Build Application
         run: |
           cd frontend
@@ -103,16 +119,18 @@ jobs:
           cd ..
           wails build -platform linux/amd64
 
-      - name: Copy Examples
-        run: cp -r examples build/bin/
-
-      - name: Copy Scripts
-        run: cp -r scripts build/bin/
+      - name: Copy Resources
+        run: |
+          cp -r examples build/bin/
+          cp -r scripts build/bin/
+          cp -r plugins build/bin/
+          mkdir -p build/bin/tools
+          cp -r bin/* build/bin/tools/
 
       - name: Create Archive
         run: |
           cd build/bin
-          tar -czf ../../cauldron-linux-amd64.tar.gz cauldron examples/ scripts/
+          tar -czf ../../cauldron-linux-amd64.tar.gz cauldron examples/ scripts/ plugins/ tools/
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
@@ -139,22 +157,32 @@ jobs:
       - name: Install Wails
         run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.11.0
 
+      - name: Build Developer Tools
+        run: |
+          mkdir -p bin
+          go build -o bin/plugin-validator ./cmd/plugin-validator
+          go build -o bin/plugin-doc-generator ./cmd/plugin-doc-generator
+          go build -o bin/plugin-doc-generator-all ./cmd/plugin-doc-generator-all
+          go build -o bin/plugin-scaffolder ./cmd/plugin-scaffolder
+
       - name: Build Application (Intel)
         run: wails build -platform darwin/amd64
 
       - name: Verify Intel Build
         run: ls -l build/bin/
 
-      - name: Copy Examples (Intel)
-        run: cp -r examples build/bin/
-
-      - name: Copy Scripts (Intel)
-        run: cp -r scripts build/bin/
+      - name: Copy Resources (Intel)
+        run: |
+          cp -r examples build/bin/
+          cp -r scripts build/bin/
+          cp -r plugins build/bin/
+          mkdir -p build/bin/tools
+          cp -r bin/* build/bin/tools/
 
       - name: Create Archive (Intel)
         run: |
           cd build/bin
-          tar -czf ../../cauldron-darwin-amd64.tar.gz cauldron-go.app examples/ scripts/
+          tar -czf ../../cauldron-darwin-amd64.tar.gz cauldron-go.app examples/ scripts/ plugins/ tools/
 
       - name: Upload Artifact (Intel)
         uses: actions/upload-artifact@v4
@@ -168,16 +196,18 @@ jobs:
       - name: Verify Apple Silicon Build
         run: ls -l build/bin/
 
-      - name: Copy Examples (Apple Silicon)
-        run: cp -r examples build/bin/
-
-      - name: Copy Scripts (Apple Silicon)
-        run: cp -r scripts build/bin/
+      - name: Copy Resources (Apple Silicon)
+        run: |
+          cp -r examples build/bin/
+          cp -r scripts build/bin/
+          cp -r plugins build/bin/
+          mkdir -p build/bin/tools
+          cp -r bin/* build/bin/tools/
 
       - name: Create Archive (Apple Silicon)
         run: |
           cd build/bin
-          tar -czf ../../cauldron-darwin-arm64.tar.gz cauldron-go.app examples/ scripts/
+          tar -czf ../../cauldron-darwin-arm64.tar.gz cauldron-go.app examples/ scripts/ plugins/ tools/
 
       - name: Upload Artifact (Apple Silicon)
         uses: actions/upload-artifact@v4

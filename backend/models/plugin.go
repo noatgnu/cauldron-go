@@ -11,12 +11,13 @@ const (
 type PluginInputType string
 
 const (
-	PluginInputTypeFile        PluginInputType = "file"
-	PluginInputTypeText        PluginInputType = "text"
-	PluginInputTypeNumber      PluginInputType = "number"
-	PluginInputTypeBoolean     PluginInputType = "boolean"
-	PluginInputTypeSelect      PluginInputType = "select"
-	PluginInputTypeMultiSelect PluginInputType = "multiselect"
+	PluginInputTypeFile           PluginInputType = "file"
+	PluginInputTypeText           PluginInputType = "text"
+	PluginInputTypeNumber         PluginInputType = "number"
+	PluginInputTypeBoolean        PluginInputType = "boolean"
+	PluginInputTypeSelect         PluginInputType = "select"
+	PluginInputTypeMultiSelect    PluginInputType = "multiselect"
+	PluginInputTypeColumnSelector PluginInputType = "column-selector"
 )
 
 type PluginInput struct {

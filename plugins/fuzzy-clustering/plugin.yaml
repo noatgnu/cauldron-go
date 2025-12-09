@@ -1,0 +1,99 @@
+plugin:
+  id: "fuzzy-clustering"
+  name: "Fuzzy C-Means Clustering"
+  description: "Fuzzy clustering algorithm for pattern recognition"
+  version: "1.0.0"
+  author: "CauldronGO Team"
+  category: "analysis"
+  icon: "bubble_chart"
+
+runtime:
+  type: "python"
+  script: "fuzz_clustering.py"
+
+inputs:
+  - name: "input_file"
+    label: "Input File"
+    type: "file"
+    required: true
+    accept: ".csv,.tsv,.txt"
+    description: "Data matrix file for clustering"
+
+  - name: "annotation_file"
+    label: "Annotation File"
+    type: "file"
+    required: true
+    accept: ".csv,.tsv,.txt"
+    description: "Sample annotation file"
+
+  - name: "center_count"
+    label: "Number of Clusters"
+    type: "number"
+    required: false
+    default: 3
+    min: 2
+    max: 20
+    step: 1
+    description: "Number of cluster centers"
+
+outputs:
+  - name: "cluster_results"
+    path: "fcm_*_clusters.txt"
+    type: "data"
+    description: "Cluster assignments for each center count (creates multiple files)"
+    format: "tsv"
+
+  - name: "explained_variance"
+    path: "explained_variance_ratio.json"
+    type: "data"
+    description: "PCA explained variance ratio"
+    format: "json"
+
+plots:
+  - id: "fuzzy-cluster-plot"
+    name: "Fuzzy Clustering Plot"
+    type: "scatter"
+    component: "FuzzyClusteringPlot"
+    dataSource: "cluster_assignments"
+    config:
+      axes:
+        x: "PC1"
+        y: "PC2"
+        colorBy: "cluster"
+        labels: "sample"
+
+    customization:
+      - name: "title"
+        label: "Plot Title"
+        type: "text"
+        default: "Fuzzy Clustering Results"
+
+      - name: "markerSize"
+        label: "Marker Size"
+        type: "number"
+        default: 10
+        min: 1
+        max: 50
+
+execution:
+  argsMapping:
+    input_file: "--file_path"
+    annotation_file: "--annotation_path"
+    center_count: "--center_count"
+
+  outputDir: "--output_folder"
+
+  requirements:
+    python: ">=3.11"
+    packages:
+      - "numpy>=1.24.0"
+      - "pandas>=2.0.0"
+      - "scikit-fuzzy>=0.4.0"
+      - "matplotlib>=3.7.0"
+
+example:
+  enabled: true
+  values:
+    input_file: "diann/imputed.data.txt"
+    annotation_file: "phate/phate_output.txt"
+    center_count: 3

@@ -1,0 +1,126 @@
+<form [formGroup]="form" class="dynamic-form" [class.loading-overlay]="loading()" [class.is-loading]="loading()" (ngSubmit)="submit()">
+  @if (loading()) {
+    <div class="loading-indicator">
+      <mat-spinner diameter="20"></mat-spinner>
+      <span>Loading...</span>
+    </div>
+  }
+
+  @if (validationErrors().length > 0) {
+    <div class="validation-summary has-errors">
+      <strong>Please fix the following errors:</strong>
+      <ul>
+        @for (error of validationErrors(); track error) {
+          <li>{{ error }}</li>
+        }
+      </ul>
+    </div>
+  }
+
+  @for (input of plugin.definition.inputs; track input.name) {
+    @if (isInputVisible(input)) {
+      <div class="form-field">
+        @switch (input.type) {
+        @case ('file') {
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>{{ input.label }}</mat-label>
+            <input matInput readonly [formControlName]="input.name">
+            @if (input.description) {
+              <mat-hint>{{ input.description }}</mat-hint>
+            }
+          </mat-form-field>
+          <button mat-raised-button color="primary" type="button" (click)="openFile(input.name)" [disabled]="disabled">
+            Browse
+          </button>
+        }
+        @case ('text') {
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>{{ input.label }}</mat-label>
+            <input matInput [formControlName]="input.name" [placeholder]="input.placeholder || ''">
+            @if (input.description) {
+              <mat-hint>{{ input.description }}</mat-hint>
+            }
+            @if (form.get(input.name)?.hasError('required')) {
+              <mat-error>{{ input.label }} is required</mat-error>
+            }
+          </mat-form-field>
+        }
+        @case ('number') {
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>{{ input.label }}</mat-label>
+            <input matInput type="number"
+                   [formControlName]="input.name"
+                   [min]="input.min ?? null"
+                   [max]="input.max ?? null"
+                   [step]="input.step || 1">
+            @if (input.description) {
+              <mat-hint>{{ input.description }}</mat-hint>
+            }
+            @if (form.get(input.name)?.hasError('required')) {
+              <mat-error>{{ input.label }} is required</mat-error>
+            }
+            @if (form.get(input.name)?.hasError('min')) {
+              <mat-error>Minimum value is {{ input.min }}</mat-error>
+            }
+            @if (form.get(input.name)?.hasError('max')) {
+              <mat-error>Maximum value is {{ input.max }}</mat-error>
+            }
+          </mat-form-field>
+        }
+        @case ('boolean') {
+          <div class="checkbox-field">
+            <mat-checkbox [formControlName]="input.name" [disabled]="disabled">
+              {{ input.label }}
+            </mat-checkbox>
+            @if (input.description) {
+              <p class="hint">{{ input.description }}</p>
+            }
+          </div>
+        }
+        @case ('select') {
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>{{ input.label }}</mat-label>
+            <mat-select [formControlName]="input.name">
+              @for (option of input.options; track option) {
+                <mat-option [value]="option">{{ option }}</mat-option>
+              }
+            </mat-select>
+            @if (input.description) {
+              <mat-hint>{{ input.description }}</mat-hint>
+            }
+            @if (form.get(input.name)?.hasError('required')) {
+              <mat-error>{{ input.label }} is required</mat-error>
+            }
+          </mat-form-field>
+        }
+        @case ('column-selector') {
+          @if (getColumns(input.name).length > 0) {
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>{{ input.label }}</mat-label>
+              <mat-select [formControlName]="input.name" [multiple]="input.multiple">
+                @for (col of getColumns(input.name); track col; let idx = $index) {
+                  <mat-option
+                    [value]="col"
+                    (click)="input.multiple ? handleOptionClick($event, input.name, col, getColumns(input.name)) : null">
+                    {{ col }}
+                  </mat-option>
+                }
+              </mat-select>
+              @if (input.description) {
+                <mat-hint>{{ input.description }}</mat-hint>
+              }
+              @if (form.get(input.name)?.hasError('required')) {
+                <mat-error>{{ input.label }} is required</mat-error>
+              }
+            </mat-form-field>
+          } @else {
+            <p class="info-text">
+              Select {{ input.sourceFile }} file first to load columns
+            </p>
+          }
+        }
+        }
+      </div>
+    }
+  }
+</form>

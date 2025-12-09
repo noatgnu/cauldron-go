@@ -1,0 +1,186 @@
+plugin:
+  id: "alphastats"
+  name: "AlphaStats Analysis"
+  description: "Comprehensive proteomics analysis with preprocessing and differential expression"
+  version: "1.0.0"
+  author: "CauldronGO Team"
+  category: "analysis"
+  icon: "analytics"
+
+runtime:
+  type: "pythonWithR"
+  script: "alphapept_process.py"
+
+inputs:
+  - name: "input_file"
+    label: "Input Data File"
+    type: "file"
+    required: true
+    accept: ".csv,.tsv,.txt"
+    description: "Proteomics data file"
+
+  - name: "metadata_file"
+    label: "Metadata File"
+    type: "file"
+    required: true
+    accept: ".csv,.tsv,.txt"
+    description: "Sample metadata/annotation file"
+
+  - name: "engine"
+    label: "Data Engine"
+    type: "select"
+    required: true
+    default: "generic"
+    options:
+      - "generic"
+      - "spectronaut"
+      - "maxquant"
+      - "fragpipe"
+      - "diann"
+    description: "The data processing engine used to generate the input file"
+
+  - name: "index_col"
+    label: "Index Column"
+    type: "text"
+    required: false
+    description: "Column name to use as index (e.g., Protein ID, Precursor ID)"
+
+  - name: "merge_columns_list"
+    label: "Merge Columns"
+    type: "column-selector"
+    required: false
+    multiple: true
+    sourceFile: "input_file"
+    description: "Additional columns to merge from the original file"
+
+  - name: "method"
+    label: "Differential Analysis Method"
+    type: "select"
+    required: false
+    default: "ttest"
+    options:
+      - "ttest"
+      - "welch-ttest"
+      - "paired-ttest"
+      - "wald"
+      - "sam"
+    description: "Statistical method for differential analysis"
+
+  - name: "imputation"
+    label: "Imputation Method"
+    type: "select"
+    required: false
+    options:
+      - "mean"
+      - "median"
+      - "knn"
+      - "randomforest"
+    description: "Method to impute missing values"
+
+  - name: "normalization"
+    label: "Normalization Method"
+    type: "select"
+    required: false
+    options:
+      - "zscore"
+      - "quantile"
+      - "linear"
+      - "vst"
+    description: "Method to normalize the data"
+
+  - name: "data_completeness"
+    label: "Data Completeness Threshold"
+    type: "number"
+    default: 0.3
+    min: 0
+    max: 1
+    step: 0.1
+    description: "Minimum fraction of non-missing values required"
+
+  - name: "log2"
+    label: "Apply Log2 Transformation"
+    type: "boolean"
+    default: false
+    description: "Apply log2 transformation to intensities"
+
+  - name: "batch_correction"
+    label: "Batch Correction"
+    type: "boolean"
+    default: false
+    description: "Perform batch effect correction"
+
+  - name: "evidence_file"
+    label: "Evidence File (MaxQuant)"
+    type: "file"
+    required: false
+    accept: ".csv,.tsv,.txt"
+    description: "MaxQuant evidence file (optional)"
+
+  - name: "comparisons"
+    label: "Comparison Matrix"
+    type: "text"
+    required: false
+    description: "Comma-separated comparisons for differential analysis"
+
+outputs:
+  - name: "preprocessed"
+    path: "preprocessed.txt"
+    type: "data"
+    description: "Preprocessed data matrix"
+    format: "tsv"
+
+  - name: "result"
+    path: "result.txt"
+    type: "data"
+    description: "Differential expression analysis results"
+    format: "tsv"
+
+execution:
+  argsMapping:
+    input_file: "--file_path"
+    metadata_file: "--metadata_path"
+    engine: "--engine"
+    index_col: "--index"
+    merge_columns_list:
+      flag: "--merge_columns"
+      transform: "comma-join"
+    method: "--method"
+    imputation: "--impute"
+    normalization: "--normalize"
+    data_completeness: "--data_completeness"
+    log2:
+      flag: "--log2"
+      when: "true"
+    batch_correction:
+      flag: "--batch_correction"
+      when: "true"
+    evidence_file: "--evidence_file"
+    comparisons: "--comparison_matrix"
+
+  outputDir: "--output_folder"
+
+  requirements:
+    python: ">=3.11"
+    r: ">=4.0"
+    packages:
+      - "pandas>=2.0.0"
+      - "numpy>=1.24.0"
+      - "alphatims>=1.0.0"
+      - "alphastats>=0.6.0"
+
+example:
+  enabled: true
+  values:
+    input_file: "diann/imputed.data.txt"
+    metadata_file: "differential_analysis/annotation.txt"
+    engine: "generic"
+    index_col: "Precursor.Id"
+    merge_columns_list_source: "diann/imputed.data.txt"
+    merge_columns_list: ["Protein.Ids", "Genes"]
+    method: "welch-ttest"
+    imputation: "knn"
+    normalization: "quantile"
+    data_completeness: 0.3
+    log2: true
+    batch_correction: false
+    comparisons: "differential_analysis/comparison.bca.txt"

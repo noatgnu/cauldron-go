@@ -1,0 +1,110 @@
+plugin:
+  id: "batch-correction"
+  name: "Batch Effect Correction"
+  description: "Correct for batch effects in proteomics data"
+  version: "1.0.0"
+  author: "CauldronGO Team"
+  category: "preprocessing"
+  icon: "sync_alt"
+
+runtime:
+  type: "r"
+  script: "batch_correction.R"
+
+inputs:
+  - name: "input_file"
+    label: "Input File"
+    type: "file"
+    required: true
+    accept: ".csv,.tsv,.txt"
+    description: "Data file with batch effects"
+
+  - name: "sample_cols"
+    label: "Sample Columns"
+    type: "column-selector"
+    required: true
+    multiple: true
+    sourceFile: "input_file"
+    description: "Columns containing sample data"
+
+  - name: "batch_info"
+    label: "Batch Information File"
+    type: "file"
+    required: true
+    accept: ".csv,.tsv,.txt"
+    description: "File containing batch assignments for each sample"
+
+  - name: "method"
+    label: "Correction Method"
+    type: "select"
+    required: true
+    default: "combat"
+    options:
+      - "combat"
+      - "limma"
+      - "ruvseq"
+    description: "Method to use for batch correction"
+
+  - name: "preserve_group"
+    label: "Preserve Group"
+    type: "text"
+    required: false
+    description: "Biological group information to preserve during correction"
+
+  - name: "use_log2"
+    label: "Use Log2"
+    type: "boolean"
+    default: false
+    description: "Apply log2 transformation before correction"
+
+outputs:
+  - name: "corrected_data"
+    path: "batch_corrected.data.txt"
+    type: "data"
+    description: "Batch-corrected data matrix"
+    format: "tsv"
+
+  - name: "batch_info"
+    path: "batch_info.txt"
+    type: "data"
+    description: "Batch correction summary information"
+    format: "tsv"
+
+execution:
+  argsMapping:
+    input_file: "--file_path"
+    sample_cols:
+      flag: "--sample_cols"
+      transform: "comma-join"
+    batch_info: "--batch_info"
+    method: "--method"
+    preserve_group: "--preserve_group"
+    use_log2:
+      flag: "--use_log2"
+      when: "true"
+      value: "true"
+
+  outputDir: "--output_folder"
+
+  requirements:
+    r: ">=4.0"
+    packages:
+      - "sva"
+      - "limma"
+      - "RUVSeq"
+
+example:
+  enabled: true
+  values:
+    input_file: "diann/imputed.data.txt"
+    sample_cols_source: "diann/imputed.data.txt"
+    sample_cols:
+      - 'C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_BCA_LT-IP_01.raw'
+      - 'C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_BCA_LT-IP_02.raw'
+      - 'C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_BCA_LT-IP_03.raw'
+      - 'C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_BCA_LT-MockIP_01.raw'
+      - 'C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_BCA_LT-MockIP_02.raw'
+      - 'C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_BCA_LT-MockIP_03.raw'
+    batch_info: "differential_analysis/batch_info.txt"
+    method: "combat"
+    use_log2: false

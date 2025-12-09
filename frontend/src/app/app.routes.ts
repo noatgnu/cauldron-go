@@ -25,13 +25,18 @@ import { PtmRemap } from './pages/utilities/ptm-remap/ptm-remap';
 import { PeptideCheck } from './pages/utilities/peptide-check/peptide-check';
 import { FormatConversion } from './pages/utilities/format-conversion/format-conversion';
 import { Plugins } from './pages/plugins/plugins';
+import { PluginList } from './pages/plugin-list/plugin-list';
+import { PluginExecute } from './pages/plugin-execute/plugin-execute';
 
 export const routes: Routes = [
   { path: '', component: Home },
   { path: 'settings', component: Settings },
   { path: 'jobs', component: Jobs },
   { path: 'jobs/:id', component: JobDetail },
+  { path: 'job/:id', component: JobDetail },
   { path: 'plugins', component: Plugins },
+  { path: 'plugin-list', component: PluginList },
+  { path: 'plugin/:id', component: PluginExecute },
   { path: 'analysis/pca', component: Pca },
   { path: 'analysis/imputation', component: Imputation },
   { path: 'analysis/normalization', component: Normalization },
