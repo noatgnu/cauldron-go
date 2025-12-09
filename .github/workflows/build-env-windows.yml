@@ -21,13 +21,18 @@ jobs:
     - name: Install Rtools
       run: choco install rtools --no-progress
 
+    - name: Add Rtools to PATH
+      run: |
+        echo "C:\rtools44\usr\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+        echo "C:\rtools44\mingw64\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
     - name: Compile R
-      shell: msys2 {0}
+      shell: bash
       run: |
         curl -O https://cran.r-project.org/src/base/R-4/R-4.4.1.tar.gz
         tar -xzvf R-4.4.1.tar.gz
         cd R-4.4.1
-        ./configure --prefix="/c/Users/runneradmin/work/cauldron-go/cauldron-go/bin/win/R-Portable" --enable-R-shlib --with-blas --with-lapack --without-readline --without-tcltk
+        ./configure --prefix=${{ github.workspace }}/bin/win/R-Portable --enable-R-shlib --with-blas --with-lapack --without-readline --without-tcltk
         make -j$(nproc)
         make install
 
