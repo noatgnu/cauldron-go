@@ -30,7 +30,9 @@ jobs:
       shell: bash
       run: |
         curl -O https://cran.r-project.org/src/base/R-4/R-4.4.1.tar.gz
-        tar -xzvf R-4.4.1.tar.gz
+        
+        7z x R-4.4.1.tar.gz -o.
+        7z x R-4.4.1.tar -o.
         cd R-4.4.1
         ./configure --prefix=${{ github.workspace }}/bin/win/R-Portable --enable-R-shlib --with-blas --with-lapack --without-readline --without-tcltk
         make -j$(nproc)
