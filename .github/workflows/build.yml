@@ -69,22 +69,22 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Make build.sh executable
+        run: chmod +x build.sh
+
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
           go-version: '1.21'
 
-      - name: Build backend
-        run: go build -v ./...
+      - name: Build developer tools
+        run: ./build.sh tools
 
-      - name: Run tests
-        run: go test -v ./...
+      - name: Build external utilities
+        run: ./build.sh external linux/amd64
 
-      - name: Run utility program tests
-        run: |
-          echo "Testing uniprot-fetcher..."
-          go test -v ./cmd/uniprot-fetcher
-          echo "::notice::All utility program tests passed"
+      - name: Run backend tests
+        run: go test -v ./backend/... ./cmd/...
 
   build-frontend:
     name: Build Frontend
