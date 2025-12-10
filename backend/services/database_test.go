@@ -157,7 +157,7 @@ func TestJobQueueService(t *testing.T) {
 	db := createTestDB(t)
 	defer db.Close()
 
-	ctx := context.Background()
+	ctx := context.WithValue(context.Background(), "wails-test", true)
 
 	jobQueue := NewJobQueueService(ctx, db)
 	defer jobQueue.Shutdown()
