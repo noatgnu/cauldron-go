@@ -61,13 +61,13 @@
         "type": {
           "type": "string",
           "description": "Runtime environment",
-          "enum": ["python", "r", "pythonWithR"]
+          "enum": ["python", "r", "pythonWithR", "direct"]
         },
         "script": {
           "type": "string",
-          "description": "Script filename to execute",
-          "pattern": "^[a-zA-Z0-9_-]+\\.(py|R)$",
-          "examples": ["analysis.py", "process.R"]
+          "description": "Script filename or executable to run",
+          "pattern": "^[a-zA-Z0-9_-]+(\\.(py|R|exe))?$",
+          "examples": ["analysis.py", "process.R", "uniprot-fetcher", "uniprot-fetcher.exe"]
         }
       }
     },
@@ -142,7 +142,7 @@
         "type": {
           "type": "string",
           "description": "Input type",
-          "enum": ["file", "text", "number", "boolean", "select", "column-selector"]
+          "enum": ["file", "text", "number", "boolean", "select", "multiselect-grouped", "column-selector"]
         },
         "required": {
           "type": "boolean",
@@ -173,6 +173,26 @@
             "type": "string"
           },
           "minItems": 2
+        },
+        "optionsFromFile": {
+          "type": "string",
+          "description": "Load options from a text file (one per line)",
+          "pattern": "^[a-zA-Z0-9_.-]+\\.txt$",
+          "examples": ["from_databases.txt", "options.txt"]
+        },
+        "groups": {
+          "type": "array",
+          "description": "Grouped options (for multiselect-grouped)",
+          "items": {
+            "$ref": "#/definitions/fieldGroup"
+          },
+          "minItems": 1
+        },
+        "groupsFromFile": {
+          "type": "string",
+          "description": "Load grouped options from a JSON file",
+          "pattern": "^[a-zA-Z0-9_.-]+\\.json$",
+          "examples": ["fields.json", "grouped_options.json"]
         },
         "multiple": {
           "type": "boolean",
@@ -217,13 +237,21 @@
             "properties": { "type": { "const": "select" } }
           },
           "then": {
-            "required": ["options"],
-            "properties": {
-              "options": {
-                "type": "array",
-                "minItems": 2
-              }
-            }
+            "oneOf": [
+              { "required": ["options"] },
+              { "required": ["optionsFromFile"] }
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": { "type": { "const": "multiselect-grouped" } }
+          },
+          "then": {
+            "oneOf": [
+              { "required": ["groups"] },
+              { "required": ["groupsFromFile"] }
+            ]
           }
         },
         {
@@ -412,6 +440,38 @@
         { "required": ["equals"] },
         { "required": ["equalsAny"] }
       ]
+    },
+    "fieldOption": {
+      "type": "object",
+      "required": ["value", "label"],
+      "properties": {
+        "value": {
+          "type": "string",
+          "description": "Option value to be passed to the plugin"
+        },
+        "label": {
+          "type": "string",
+          "description": "Human-readable label shown in UI"
+        }
+      }
+    },
+    "fieldGroup": {
+      "type": "object",
+      "required": ["name", "options"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Group name/category"
+        },
+        "options": {
+          "type": "array",
+          "description": "Options in this group",
+          "items": {
+            "$ref": "#/definitions/fieldOption"
+          },
+          "minItems": 1
+        }
+      }
     },
     "example": {
       "type": "object",
