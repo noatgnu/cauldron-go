@@ -13,6 +13,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Make build.sh executable
+        run: chmod +x build.sh
+        shell: bash
+
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
@@ -82,6 +86,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Make build.sh executable
+        run: chmod +x build.sh
+
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
@@ -148,19 +155,22 @@ jobs:
       - name: Create Archive
         run: |
           cd build/bin
-          GZIP=-9 tar -czf ../../cauldron-linux-amd64.tar.gz cauldron examples/ scripts/ plugins/ tools/
+          XZ_OPT=-9 tar -cJf ../../cauldron-linux-amd64.tar.xz cauldron examples/ scripts/ plugins/ tools/
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: cauldron-linux-amd64
-          path: cauldron-linux-amd64.tar.gz
+          path: cauldron-linux-amd64.tar.xz
 
   build-macos-intel:
     runs-on: macos-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Make build.sh executable
+        run: chmod +x build.sh
 
       - name: Setup Go
         uses: actions/setup-go@v5
@@ -208,19 +218,22 @@ jobs:
       - name: Create Archive
         run: |
           cd build/bin
-          GZIP=-9 tar -czf ../../cauldron-darwin-amd64.tar.gz cauldron-go.app examples/ scripts/ plugins/ tools/
+          XZ_OPT=-9 tar -cJf ../../cauldron-darwin-amd64.tar.xz cauldron-go.app examples/ scripts/ plugins/ tools/
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: cauldron-darwin-amd64
-          path: cauldron-darwin-amd64.tar.gz
+          path: cauldron-darwin-amd64.tar.xz
 
   build-macos-arm64:
     runs-on: macos-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Make build.sh executable
+        run: chmod +x build.sh
 
       - name: Setup Go
         uses: actions/setup-go@v5
@@ -268,13 +281,13 @@ jobs:
       - name: Create Archive
         run: |
           cd build/bin
-          GZIP=-9 tar -czf ../../cauldron-darwin-arm64.tar.gz cauldron-go.app examples/ scripts/ plugins/ tools/
+          XZ_OPT=-9 tar -cJf ../../cauldron-darwin-arm64.tar.xz cauldron-go.app examples/ scripts/ plugins/ tools/
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: cauldron-darwin-arm64
-          path: cauldron-darwin-arm64.tar.gz
+          path: cauldron-darwin-arm64.tar.xz
 
   create-release:
     needs: [build-windows, build-linux, build-macos-intel, build-macos-arm64]
@@ -289,9 +302,9 @@ jobs:
         with:
           files: |
             cauldron-windows-amd64/cauldron-windows-amd64.zip
-            cauldron-linux-amd64/cauldron-linux-amd64.tar.gz
-            cauldron-darwin-amd64/cauldron-darwin-amd64.tar.gz
-            cauldron-darwin-arm64/cauldron-darwin-arm64.tar.gz
+            cauldron-linux-amd64/cauldron-linux-amd64.tar.xz
+            cauldron-darwin-amd64/cauldron-darwin-amd64.tar.xz
+            cauldron-darwin-arm64/cauldron-darwin-arm64.tar.xz
           draft: false
           prerelease: false
         env:

@@ -67,27 +67,27 @@ jobs:
         cmd /c ${{ github.workspace }}/bin/win/python/python.exe -m pip install -r scripts/requirements.txt
 
     - name: Compress Python directory
-      run: tar -czf python-win-x86_64.tar.gz bin/win/python
+      run: tar -cJf python-win-x86_64.tar.xz bin/win/python
       env:
-        GZIP: -9
+        XZ_OPT: -9
 
     - name: Compress R-Portable directory
-      run: tar -czf r-portable-win-x86_64.tar.gz bin/win/R-Portable
+      run: tar -cJf r-portable-win-x86_64.tar.xz bin/win/R-Portable
       env:
-        GZIP: -9
+        XZ_OPT: -9
 
     - name: Upload Python Archive
       uses: actions/upload-artifact@v4
       with:
         name: python-win-x86_64
-        path: python-win-x86_64.tar.gz
+        path: python-win-x86_64.tar.xz
         retention-days: 30
 
     - name: Upload R-Portable Archive
       uses: actions/upload-artifact@v4
       with:
         name: r-portable-win-x86_64
-        path: r-portable-win-x86_64.tar.gz
+        path: r-portable-win-x86_64.tar.xz
         retention-days: 30
 
     - name: Upload Python to Release
@@ -97,9 +97,9 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ github.event.release.upload_url }}
-        asset_path: python-win-x86_64.tar.gz
-        asset_name: python-win-x86_64.tar.gz
-        asset_content_type: application/tar+gzip
+        asset_path: python-win-x86_64.tar.xz
+        asset_name: python-win-x86_64.tar.xz
+        asset_content_type: application/x-xz
 
     - name: Upload R to Release
       if: github.event_name == 'release'
@@ -108,6 +108,6 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ github.event.release.upload_url }}
-        asset_path: r-portable-win-x86_64.tar.gz
-        asset_name: r-portable-win-x86_64.tar.gz
-        asset_content_type: application/tar+gzip
+        asset_path: r-portable-win-x86_64.tar.xz
+        asset_name: r-portable-win-x86_64.tar.xz
+        asset_content_type: application/x-xz

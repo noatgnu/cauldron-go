@@ -14,22 +14,35 @@ type VisibilityCondition struct {
 	EqualsAny []interface{} `yaml:"equalsAny,omitempty"`
 }
 
+type FieldOption struct {
+	Value string `yaml:"value"`
+	Label string `yaml:"label"`
+}
+
+type FieldGroup struct {
+	Name    string        `yaml:"name"`
+	Options []FieldOption `yaml:"options"`
+}
+
 type PluginInput struct {
-	Name        string               `yaml:"name"`
-	Label       string               `yaml:"label"`
-	Type        string               `yaml:"type"`
-	Required    bool                 `yaml:"required"`
-	Default     interface{}          `yaml:"default,omitempty"`
-	Options     []string             `yaml:"options,omitempty"`
-	Description string               `yaml:"description,omitempty"`
-	Placeholder string               `yaml:"placeholder,omitempty"`
-	Accept      string               `yaml:"accept,omitempty"`
-	Multiple    bool                 `yaml:"multiple,omitempty"`
-	SourceFile  string               `yaml:"sourceFile,omitempty"`
-	Min         *float64             `yaml:"min,omitempty"`
-	Max         *float64             `yaml:"max,omitempty"`
-	Step        *float64             `yaml:"step,omitempty"`
-	VisibleWhen *VisibilityCondition `yaml:"visibleWhen,omitempty"`
+	Name            string               `yaml:"name"`
+	Label           string               `yaml:"label"`
+	Type            string               `yaml:"type"`
+	Required        bool                 `yaml:"required"`
+	Default         interface{}          `yaml:"default,omitempty"`
+	Options         []string             `yaml:"options,omitempty"`
+	OptionsFromFile string               `yaml:"optionsFromFile,omitempty"`
+	Groups          []FieldGroup         `yaml:"groups,omitempty"`
+	GroupsFromFile  string               `yaml:"groupsFromFile,omitempty"`
+	Description     string               `yaml:"description,omitempty"`
+	Placeholder     string               `yaml:"placeholder,omitempty"`
+	Accept          string               `yaml:"accept,omitempty"`
+	Multiple        bool                 `yaml:"multiple,omitempty"`
+	SourceFile      string               `yaml:"sourceFile,omitempty"`
+	Min             *float64             `yaml:"min,omitempty"`
+	Max             *float64             `yaml:"max,omitempty"`
+	Step            *float64             `yaml:"step,omitempty"`
+	VisibleWhen     *VisibilityCondition `yaml:"visibleWhen,omitempty"`
 }
 
 type PluginOutput struct {
@@ -131,7 +144,7 @@ func validatePlugin(pluginPath string) (bool, []string) {
 	if plugin.Runtime.Type == "" {
 		errors = append(errors, "runtime.type is required")
 	} else {
-		validRuntimes := map[string]bool{"python": true, "r": true, "pythonWithR": true}
+		validRuntimes := map[string]bool{"python": true, "r": true, "pythonWithR": true, "direct": true}
 		if !validRuntimes[plugin.Runtime.Type] {
 			errors = append(errors, fmt.Sprintf("Invalid runtime.type: %s", plugin.Runtime.Type))
 		}
@@ -140,11 +153,13 @@ func validatePlugin(pluginPath string) (bool, []string) {
 	if plugin.Runtime.Script == "" {
 		errors = append(errors, "runtime.script is required")
 	} else {
-		// Check if script exists
-		pluginDir := filepath.Dir(pluginPath)
-		scriptPath := filepath.Join(pluginDir, plugin.Runtime.Script)
-		if _, err := os.Stat(scriptPath); os.IsNotExist(err) {
-			errors = append(errors, fmt.Sprintf("Script not found: %s", plugin.Runtime.Script))
+		// Check if script exists (for direct runtime, script is the executable name)
+		if plugin.Runtime.Type != "direct" {
+			pluginDir := filepath.Dir(pluginPath)
+			scriptPath := filepath.Join(pluginDir, plugin.Runtime.Script)
+			if _, err := os.Stat(scriptPath); os.IsNotExist(err) {
+				errors = append(errors, fmt.Sprintf("Script not found: %s", plugin.Runtime.Script))
+			}
 		}
 	}
 
@@ -171,14 +186,23 @@ func validatePlugin(pluginPath string) (bool, []string) {
 			validTypes := map[string]bool{
 				"file": true, "text": true, "number": true,
 				"boolean": true, "select": true, "column-selector": true,
+				"multiselect-grouped": true,
 			}
 			if !validTypes[input.Type] {
 				errors = append(errors, fmt.Sprintf("inputs[%d].type is invalid: %s", i, input.Type))
 			}
 
 			// Type-specific validation
-			if input.Type == "select" && len(input.Options) == 0 {
-				errors = append(errors, fmt.Sprintf("inputs[%d]: select type requires options", i))
+			if input.Type == "select" {
+				if len(input.Options) == 0 && input.OptionsFromFile == "" {
+					errors = append(errors, fmt.Sprintf("inputs[%d]: select type requires either options or optionsFromFile", i))
+				}
+			}
+
+			if input.Type == "multiselect-grouped" {
+				if len(input.Groups) == 0 && input.GroupsFromFile == "" {
+					errors = append(errors, fmt.Sprintf("inputs[%d]: multiselect-grouped type requires either groups or groupsFromFile", i))
+				}
 			}
 
 			if input.Type == "column-selector" && input.SourceFile == "" {

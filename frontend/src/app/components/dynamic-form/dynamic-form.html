@@ -81,8 +81,38 @@
           <mat-form-field appearance="outline" class="full-width">
             <mat-label>{{ input.label }}</mat-label>
             <mat-select [formControlName]="input.name">
-              @for (option of input.options; track option) {
+              @for (option of getSelectOptions(input); track option) {
                 <mat-option [value]="option">{{ option }}</mat-option>
+              }
+            </mat-select>
+            @if (input.description) {
+              <mat-hint>{{ input.description }}</mat-hint>
+            }
+            @if (form.get(input.name)?.hasError('required')) {
+              <mat-error>{{ input.label }} is required</mat-error>
+            }
+          </mat-form-field>
+        }
+        @case ('multiselect-grouped') {
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>{{ input.label }}</mat-label>
+            <mat-select [formControlName]="input.name" multiple>
+              @if (input.groups) {
+                @for (group of input.groups; track group.name) {
+                  <mat-optgroup [label]="group.name">
+                    @for (option of group.options; track option.value) {
+                      <mat-option [value]="option.value">{{ option.label }}</mat-option>
+                    }
+                  </mat-optgroup>
+                }
+              } @else if (input.groupsFromFile) {
+                @for (group of getGroupedOptions(input.name); track group.name) {
+                  <mat-optgroup [label]="group.name">
+                    @for (option of group.options; track option.value) {
+                      <mat-option [value]="option.value">{{ option.label }}</mat-option>
+                    }
+                  </mat-optgroup>
+                }
               }
             </mat-select>
             @if (input.description) {

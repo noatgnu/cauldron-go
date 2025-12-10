@@ -36,6 +36,8 @@ export class DynamicFormComponent implements OnInit {
 
   form!: FormGroup;
   columnOptions = new Map<string, string[]>();
+  selectOptions = new Map<string, string[]>();
+  groupedOptions = new Map<string, models.FieldGroup[]>();
   loading = signal(false);
   formValues = signal<Record<string, any>>({});
   validationErrors = signal<string[]>([]);
@@ -47,8 +49,9 @@ export class DynamicFormComponent implements OnInit {
     private notificationService: NotificationService
   ) {}
 
-  ngOnInit() {
+  async ngOnInit() {
     this.buildForm();
+    await this.loadExternalOptions();
     this.form.valueChanges.subscribe((values) => {
       this.formValues.set(values);
       this.formChange.emit(this.getFormValue());
@@ -96,6 +99,8 @@ export class DynamicFormComponent implements OnInit {
         return input.min || 0;
       case 'column-selector':
         return input.multiple ? [] : '';
+      case 'multiselect-grouped':
+        return [];
       default:
         return '';
     }
@@ -145,6 +150,65 @@ export class DynamicFormComponent implements OnInit {
 
   getColumns(inputName: string): string[] {
     return this.columnOptions.get(inputName) || [];
+  }
+
+  private async loadExternalOptions() {
+    for (const input of this.plugin.definition.inputs) {
+      if (input.type === 'select' && input.optionsFromFile) {
+        await this.loadOptionsFromFile(input.name, input.optionsFromFile);
+      } else if (input.type === 'multiselect-grouped' && input.groupsFromFile) {
+        await this.loadGroupsFromFile(input.name, input.groupsFromFile);
+      }
+    }
+  }
+
+  private async loadOptionsFromFile(inputName: string, filePath: string) {
+    try {
+      this.loading.set(true);
+      const content = await this.wails.readFile(filePath);
+      if (!content) return;
+
+      const options = content
+        .split('\n')
+        .map(line => line.trim())
+        .filter(line => line.length > 0);
+
+      this.selectOptions.set(inputName, options);
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      await this.wails.logToFile(`Error loading options from file: ${errorMsg}`);
+      this.notificationService.showError(`Failed to load options: ${errorMsg}`);
+    } finally {
+      this.loading.set(false);
+    }
+  }
+
+  private async loadGroupsFromFile(inputName: string, filePath: string) {
+    try {
+      this.loading.set(true);
+      const content = await this.wails.readFile(filePath);
+      if (!content) return;
+
+      const groups: models.FieldGroup[] = JSON.parse(content);
+      this.groupedOptions.set(inputName, groups);
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      await this.wails.logToFile(`Error loading groups from file: ${errorMsg}`);
+      this.notificationService.showError(`Failed to load grouped options: ${errorMsg}`);
+    } finally {
+      this.loading.set(false);
+    }
+  }
+
+  getSelectOptions(input: models.PluginInputV2): string[] {
+    if (input.optionsFromFile) {
+      return this.selectOptions.get(input.name) || [];
+    }
+    return input.options || [];
+  }
+
+  getGroupedOptions(inputName: string): models.FieldGroup[] {
+    return this.groupedOptions.get(inputName) || [];
   }
 
   getInputsByType(type: string): models.PluginInputV2[] {
@@ -201,6 +265,8 @@ export class DynamicFormComponent implements OnInit {
   reset() {
     this.form.reset();
     this.columnOptions.clear();
+    this.selectOptions.clear();
+    this.groupedOptions.clear();
     this.validationErrors.set([]);
   }
 

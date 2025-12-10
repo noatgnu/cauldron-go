@@ -16,6 +16,7 @@ import (
 	"strings"
 
 	"github.com/noatgnu/cauldron-go/backend/models"
+	"github.com/ulikunitz/xz"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -143,6 +144,81 @@ func (f *FileService) ExtractTarGz(archivePath string, destPath string) error {
 	defer gzReader.Close()
 
 	tarReader := tar.NewReader(gzReader)
+
+	var processedSize int64
+	lastEmitSize := int64(0)
+	emitThreshold := totalSize / 20
+
+	fileName := filepath.Base(archivePath)
+
+	for {
+		header, err := tarReader.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return err
+		}
+
+		target := filepath.Join(destPath, header.Name)
+
+		switch header.Typeflag {
+		case tar.TypeDir:
+			if err := os.MkdirAll(target, 0755); err != nil {
+				return err
+			}
+		case tar.TypeReg:
+			outFile, err := os.Create(target)
+			if err != nil {
+				return err
+			}
+			if _, err := io.Copy(outFile, tarReader); err != nil {
+				outFile.Close()
+				return err
+			}
+			outFile.Close()
+
+			processedSize += header.Size
+
+			if processedSize-lastEmitSize >= emitThreshold || processedSize >= totalSize {
+				percentage := float64(processedSize) / float64(totalSize) * 100
+				if percentage > 100 {
+					percentage = 100
+				}
+
+				f.progressNotifier.EmitProgress(ProgressTypeExtract, fileName,
+					fmt.Sprintf("Extracting %s", fileName), percentage)
+
+				lastEmitSize = processedSize
+			}
+		}
+	}
+
+	f.progressNotifier.EmitComplete(ProgressTypeExtract, fileName,
+		fmt.Sprintf("Extracted %s", fileName))
+
+	return nil
+}
+
+func (f *FileService) ExtractTarXz(archivePath string, destPath string) error {
+	file, err := os.Open(archivePath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	fileInfo, err := file.Stat()
+	if err != nil {
+		return err
+	}
+	totalSize := fileInfo.Size()
+
+	xzReader, err := xz.NewReader(file)
+	if err != nil {
+		return err
+	}
+
+	tarReader := tar.NewReader(xzReader)
 
 	var processedSize int64
 	lastEmitSize := int64(0)

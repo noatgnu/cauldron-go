@@ -123,23 +123,23 @@ jobs:
           ${{ github.workspace }}/bin/darwin/python/bin/python3 -m pip install -r scripts/requirements.txt
 
       - name: Compress Python directory
-        run: GZIP=-9 tar -czf python-darwin-arm64.tar.gz bin/darwin/python
+        run: XZ_OPT=-9 tar -cJf python-darwin-arm64.tar.xz bin/darwin/python
 
       - name: Compress R-Portable directory
-        run: GZIP=-9 tar -czf r-portable-darwin-arm64.tar.gz bin/darwin/R-Portable
+        run: XZ_OPT=-9 tar -cJf r-portable-darwin-arm64.tar.xz bin/darwin/R-Portable
 
       - name: Upload Python Archive
         uses: actions/upload-artifact@v4
         with:
           name: python-darwin-arm64
-          path: python-darwin-arm64.tar.gz
+          path: python-darwin-arm64.tar.xz
           retention-days: 30
 
       - name: Upload R-Portable Archive
         uses: actions/upload-artifact@v4
         with:
           name: r-portable-darwin-arm64
-          path: r-portable-darwin-arm64.tar.gz
+          path: r-portable-darwin-arm64.tar.xz
           retention-days: 30
 
       - name: Upload Python to Release
@@ -149,9 +149,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ github.event.release.upload_url }}
-          asset_path: python-darwin-arm64.tar.gz
-          asset_name: python-darwin-arm64.tar.gz
-          asset_content_type: application/tar+gzip
+          asset_path: python-darwin-arm64.tar.xz
+          asset_name: python-darwin-arm64.tar.xz
+          asset_content_type: application/x-xz
 
       - name: Upload R to Release
         if: github.event_name == 'release'
@@ -160,6 +160,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ github.event.release.upload_url }}
-          asset_path: r-portable-darwin-arm64.tar.gz
-          asset_name: r-portable-darwin-arm64.tar.gz
-          asset_content_type: application/tar+gzip
+          asset_path: r-portable-darwin-arm64.tar.xz
+          asset_name: r-portable-darwin-arm64.tar.xz
+          asset_content_type: application/x-xz

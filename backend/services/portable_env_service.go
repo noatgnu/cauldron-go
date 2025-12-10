@@ -132,9 +132,9 @@ func (p *PortableEnvService) DownloadPortableEnvironment(url, environment string
 
 	var fileName string
 	if environment == "python" {
-		fileName = "python.tar.gz"
+		fileName = "python.tar.xz"
 	} else {
-		fileName = "r-portable.tar.gz"
+		fileName = "r-portable.tar.xz"
 	}
 
 	tempFilePath := filepath.Join(tempFolder, fileName)
@@ -223,7 +223,7 @@ func (p *PortableEnvService) DownloadPortableEnvironment(url, environment string
 
 	platformName := translatePlatform(goruntime.GOOS)
 
-	if err := p.fileService.ExtractTarGz(tempFilePath, tempFolder); err != nil {
+	if err := p.fileService.ExtractTarXz(tempFilePath, tempFolder); err != nil {
 		return err
 	}
 

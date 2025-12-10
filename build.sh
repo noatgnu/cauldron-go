@@ -2,7 +2,7 @@
 
 set -e
 
-PROJECT_ROOT="/mnt/d/GoLandProjects/cauldronGO"
+PROJECT_ROOT=$(cd "$(dirname "$0")" && pwd)
 FRONTEND_DIR="$PROJECT_ROOT/frontend"
 
 print_header() {
