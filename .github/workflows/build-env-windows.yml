@@ -68,9 +68,13 @@ jobs:
 
     - name: Compress Python directory
       run: tar -czf python-win-x86_64.tar.gz bin/win/python
+      env:
+        GZIP: -9
 
     - name: Compress R-Portable directory
       run: tar -czf r-portable-win-x86_64.tar.gz bin/win/R-Portable
+      env:
+        GZIP: -9
 
     - name: Upload Python Archive
       uses: actions/upload-artifact@v4

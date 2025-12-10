@@ -1,0 +1,122 @@
+plugin:
+  id: "clustal-omega"
+  name: "Clustal Omega Alignment"
+  description: "Multiple sequence alignment using Clustal Omega"
+  version: "1.0.0"
+  author: "CauldronGO Team"
+  category: "analysis"
+  icon: "view_timeline"
+
+runtime:
+  type: "direct"
+  script: "clustalo"
+
+inputs:
+  - name: "input_file"
+    label: "Input Sequences File"
+    type: "file"
+    required: true
+    accept: ".fasta,.fa,.fna,.ffn,.faa,.frn,.aln"
+    description: "Input file containing sequences to align in FASTA format"
+
+  - name: "output_format"
+    label: "Output Format"
+    type: "select"
+    required: true
+    default: "fasta"
+    options:
+      - "fasta"
+      - "clustal"
+      - "msf"
+      - "phylip"
+      - "selex"
+      - "stockholm"
+      - "vienna"
+    description: "Output alignment format"
+
+  - name: "seqtype"
+    label: "Sequence Type"
+    type: "select"
+    required: true
+    default: "protein"
+    options:
+      - "protein"
+      - "dna"
+      - "rna"
+    description: "Type of sequences being aligned"
+
+  - name: "num_threads"
+    label: "Number of Threads"
+    type: "number"
+    required: true
+    default: 4
+    min: 1
+    max: 64
+    step: 1
+    description: "Number of CPU threads to use"
+
+  - name: "dealign"
+    label: "Dealign Input Sequences"
+    type: "boolean"
+    default: false
+    description: "Remove any existing alignment from input sequences"
+
+  - name: "full"
+    label: "Use Full Distance Matrix"
+    type: "boolean"
+    default: false
+    description: "Use full distance matrix for guide-tree calculation (more accurate but slower)"
+
+  - name: "full_iter"
+    label: "Use Full Iterative Alignment"
+    type: "boolean"
+    default: false
+    description: "Use full distance matrix for guide-tree calculation during iteration (very slow)"
+
+outputs:
+  - name: "alignment"
+    path: "alignment.aln"
+    type: "data"
+    description: "Multiple sequence alignment output"
+    format: "txt"
+
+  - name: "guide_tree"
+    path: "guide_tree.nwk"
+    type: "data"
+    description: "Guide tree in Newick format"
+    format: "nwk"
+
+execution:
+  argsMapping:
+    input_file: "-i"
+    output_format: "--outfmt"
+    seqtype: "--seqtype"
+    num_threads: "--threads"
+    dealign:
+      flag: "--dealign"
+      when: "true"
+      value: ""
+    full:
+      flag: "--full"
+      when: "true"
+      value: ""
+    full_iter:
+      flag: "--full-iter"
+      when: "true"
+      value: ""
+
+  outputDir: "-o"
+
+  requirements:
+    note: "Requires Clustal Omega to be installed and available in system PATH or placed in bin/external directory"
+
+example:
+  enabled: false
+  values:
+    input_file: "sequences/unaligned.fasta"
+    output_format: "fasta"
+    seqtype: "protein"
+    num_threads: 4
+    dealign: false
+    full: false
+    full_iter: false

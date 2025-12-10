@@ -1,0 +1,150 @@
+plugin:
+  id: "uniprot-fetcher"
+  name: "UniProt Data Retrieval"
+  description: "Fetch protein annotations from UniProt database using REST API"
+  version: "1.0.0"
+  author: "CauldronGO Team"
+  category: "utilities"
+  icon: "cloud_download"
+
+runtime:
+  type: "direct"
+  script: "uniprot-fetcher.exe"
+
+inputs:
+  - name: "input_mode"
+    label: "Input Mode"
+    type: "select"
+    required: true
+    default: "file"
+    options:
+      - "file"
+      - "text"
+    description: "Choose input method: file with column selection or direct text list"
+
+  - name: "input_file"
+    label: "Input File"
+    type: "file"
+    required: false
+    accept: ".csv,.tsv,.txt"
+    description: "File containing protein identifiers"
+    visibleWhen:
+      field: "input_mode"
+      equals: "file"
+
+  - name: "column"
+    label: "ID Column"
+    type: "column-selector"
+    required: false
+    multiple: false
+    sourceFile: "input_file"
+    description: "Column containing protein IDs (e.g., UniProt accessions)"
+    visibleWhen:
+      field: "input_mode"
+      equals: "file"
+
+  - name: "delimiter"
+    label: "Input File Delimiter"
+    type: "select"
+    required: false
+    default: "tab"
+    options:
+      - "tab"
+      - "comma"
+      - "semicolon"
+    description: "Delimiter used in input file"
+    visibleWhen:
+      field: "input_mode"
+      equals: "file"
+
+  - name: "id_list"
+    label: "Protein ID List"
+    type: "text"
+    required: false
+    placeholder: "Enter protein IDs separated by commas, spaces, or newlines (e.g., P12345, Q9Y6K9, O15111)"
+    description: "List of protein IDs (comma, space, semicolon, or newline separated)"
+    visibleWhen:
+      field: "input_mode"
+      equals: "text"
+
+  - name: "from_database"
+    label: "From Database"
+    type: "select"
+    required: true
+    default: "UniProtKB_AC-ID"
+    optionsFromFile: "from_databases.txt"
+    description: "Source database of the input IDs"
+
+  - name: "fields"
+    label: "UniProt Fields"
+    type: "multiselect-grouped"
+    required: true
+    default:
+      - "accession"
+      - "id"
+      - "gene_names"
+      - "organism_name"
+      - "protein_name"
+    groupsFromFile: "fields.json"
+    description: "UniProt fields to retrieve (organized by categories)"
+
+  - name: "output_format"
+    label: "Output Format"
+    type: "select"
+    required: true
+    default: "tsv"
+    options:
+      - "tsv"
+      - "json"
+    description: "Output file format"
+
+outputs:
+  - name: "uniprot_results"
+    path: "uniprot_results.tsv"
+    type: "data"
+    description: "UniProt annotation data"
+    format: "tsv"
+
+execution:
+  argsMapping:
+    input_file: "--input"
+    id_list: "--ids"
+    column: "--column"
+    from_database: "--from"
+    fields:
+      flag: "--fields"
+      transform: "comma-join"
+    output_format: "--format"
+    delimiter:
+      flag: "--delimiter"
+      transform: "map"
+      values:
+        tab: "\t"
+        comma: ","
+        semicolon: ";"
+
+  outputDir: "--output"
+
+  requirements:
+    note: |
+      Requires internet connection to access UniProt REST API.
+      Rate limits: 500 IDs per batch, polling every 1 second.
+      The program will automatically handle batching for large ID lists.
+
+example:
+  enabled: false
+  values:
+    input_file: "proteomics/protein_list.txt"
+    column: "Protein.Ids"
+    from_database: "UniProtKB_AC-ID"
+    fields:
+      - "accession"
+      - "id"
+      - "gene_names"
+      - "organism_name"
+      - "protein_name"
+      - "cc_function"
+      - "go"
+      - "keyword"
+    output_format: "tsv"
+    delimiter: "tab"

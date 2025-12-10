@@ -23,22 +23,35 @@ type VisibilityCondition struct {
 	EqualsAny []interface{} `yaml:"equalsAny,omitempty" json:"equalsAny,omitempty"`
 }
 
+type FieldOption struct {
+	Value string `yaml:"value" json:"value"`
+	Label string `yaml:"label" json:"label"`
+}
+
+type FieldGroup struct {
+	Name    string        `yaml:"name" json:"name"`
+	Options []FieldOption `yaml:"options" json:"options"`
+}
+
 type PluginInputV2 struct {
-	Name        string               `yaml:"name" json:"name"`
-	Label       string               `yaml:"label" json:"label"`
-	Type        PluginInputType      `yaml:"type" json:"type"`
-	Required    bool                 `yaml:"required" json:"required"`
-	Default     interface{}          `yaml:"default,omitempty" json:"default,omitempty"`
-	Options     []string             `yaml:"options,omitempty" json:"options,omitempty"`
-	Description string               `yaml:"description,omitempty" json:"description,omitempty"`
-	Placeholder string               `yaml:"placeholder,omitempty" json:"placeholder,omitempty"`
-	Accept      string               `yaml:"accept,omitempty" json:"accept,omitempty"`
-	Multiple    bool                 `yaml:"multiple,omitempty" json:"multiple,omitempty"`
-	SourceFile  string               `yaml:"sourceFile,omitempty" json:"sourceFile,omitempty"`
-	Min         *float64             `yaml:"min,omitempty" json:"min,omitempty"`
-	Max         *float64             `yaml:"max,omitempty" json:"max,omitempty"`
-	Step        *float64             `yaml:"step,omitempty" json:"step,omitempty"`
-	VisibleWhen *VisibilityCondition `yaml:"visibleWhen,omitempty" json:"visibleWhen,omitempty"`
+	Name            string               `yaml:"name" json:"name"`
+	Label           string               `yaml:"label" json:"label"`
+	Type            PluginInputType      `yaml:"type" json:"type"`
+	Required        bool                 `yaml:"required" json:"required"`
+	Default         interface{}          `yaml:"default,omitempty" json:"default,omitempty"`
+	Options         []string             `yaml:"options,omitempty" json:"options,omitempty"`
+	OptionsFromFile string               `yaml:"optionsFromFile,omitempty" json:"optionsFromFile,omitempty"`
+	Groups          []FieldGroup         `yaml:"groups,omitempty" json:"groups,omitempty"`
+	GroupsFromFile  string               `yaml:"groupsFromFile,omitempty" json:"groupsFromFile,omitempty"`
+	Description     string               `yaml:"description,omitempty" json:"description,omitempty"`
+	Placeholder     string               `yaml:"placeholder,omitempty" json:"placeholder,omitempty"`
+	Accept          string               `yaml:"accept,omitempty" json:"accept,omitempty"`
+	Multiple        bool                 `yaml:"multiple,omitempty" json:"multiple,omitempty"`
+	SourceFile      string               `yaml:"sourceFile,omitempty" json:"sourceFile,omitempty"`
+	Min             *float64             `yaml:"min,omitempty" json:"min,omitempty"`
+	Max             *float64             `yaml:"max,omitempty" json:"max,omitempty"`
+	Step            *float64             `yaml:"step,omitempty" json:"step,omitempty"`
+	VisibleWhen     *VisibilityCondition `yaml:"visibleWhen,omitempty" json:"visibleWhen,omitempty"`
 }
 
 type PluginOutputV2 struct {

@@ -123,10 +123,10 @@ jobs:
           ${{ github.workspace }}/bin/darwin/python/bin/python3 -m pip install -r scripts/requirements.txt
 
       - name: Compress Python directory
-        run: tar -czf python-darwin-arm64.tar.gz bin/darwin/python
+        run: GZIP=-9 tar -czf python-darwin-arm64.tar.gz bin/darwin/python
 
       - name: Compress R-Portable directory
-        run: tar -czf r-portable-darwin-arm64.tar.gz bin/darwin/R-Portable
+        run: GZIP=-9 tar -czf r-portable-darwin-arm64.tar.gz bin/darwin/R-Portable
 
       - name: Upload Python Archive
         uses: actions/upload-artifact@v4

@@ -1,0 +1,1238 @@
+{
+  "Names & Taxonomy": [
+    {
+      "value": "accession",
+      "label": "Entry"
+    },
+    {
+      "value": "id",
+      "label": "Entry Name"
+    },
+    {
+      "value": "gene_names",
+      "label": "Gene Names"
+    },
+    {
+      "value": "gene_oln",
+      "label": "Gene Names (ordered locus)"
+    },
+    {
+      "value": "gene_orf",
+      "label": "Gene Names (ORF)"
+    },
+    {
+      "value": "gene_primary",
+      "label": "Gene Names (primary)"
+    },
+    {
+      "value": "gene_synonym",
+      "label": "Gene Names (synonym)"
+    },
+    {
+      "value": "organism_name",
+      "label": "Organism"
+    },
+    {
+      "value": "organism_id",
+      "label": "Organism (ID)"
+    },
+    {
+      "value": "protein_name",
+      "label": "Protein names"
+    },
+    {
+      "value": "xref_proteomes",
+      "label": "Proteomes"
+    },
+    {
+      "value": "lineage",
+      "label": "Taxonomic lineage"
+    },
+    {
+      "value": "lineage_ids",
+      "label": "Taxonomic lineage (Ids)"
+    },
+    {
+      "value": "virus_hosts",
+      "label": "Virus hosts"
+    }
+  ],
+  "Sequences": [
+    {
+      "value": "cc_alternative_products",
+      "label": "Alternative products (isoforms)"
+    },
+    {
+      "value": "ft_var_seq",
+      "label": "Alternative sequence"
+    },
+    {
+      "value": "cc_sc_epred",
+      "label": "Erroneous gene model prediction"
+    },
+    {
+      "value": "fragment",
+      "label": "Fragment"
+    },
+    {
+      "value": "encoded_in",
+      "label": "Encoded in"
+    },
+    {
+      "value": "length",
+      "label": "Length"
+    },
+    {
+      "value": "mass",
+      "label": "Mass"
+    },
+    {
+      "value": "cc_mass_spectrometry",
+      "label": "Mass spectrometry"
+    },
+    {
+      "value": "ft_variant",
+      "label": "Natural variant"
+    },
+    {
+      "value": "ft_non_cons",
+      "label": "Non-adjacent residues"
+    },
+    {
+      "value": "ft_non_std",
+      "label": "Non-standard residue"
+    },
+    {
+      "value": "ft_non_ter",
+      "label": "Non-terminal residue"
+    },
+    {
+      "value": "cc_polymorphism",
+      "label": "Polymorphism"
+    },
+    {
+      "value": "cc_rna_editing",
+      "label": "RNA Editing"
+    },
+    {
+      "value": "sequence",
+      "label": "Sequence"
+    },
+    {
+      "value": "cc_sequence_caution",
+      "label": "Sequence caution"
+    },
+    {
+      "value": "ft_conflict",
+      "label": "Sequence conflict"
+    },
+    {
+      "value": "ft_unsure",
+      "label": "Sequence uncertainty"
+    },
+    {
+      "value": "sequence_version",
+      "label": "Sequence version"
+    }
+  ],
+  "Function": [
+    {
+      "value": "absorption",
+      "label": "Absorption"
+    },
+    {
+      "value": "ft_act_site",
+      "label": "Active site"
+    },
+    {
+      "value": "ft_binding",
+      "label": "Binding site"
+    },
+    {
+      "value": "cc_catalytic_activity",
+      "label": "Catalytic activity"
+    },
+    {
+      "value": "cc_cofactor",
+      "label": "Cofactor"
+    },
+    {
+      "value": "ft_dna_bind",
+      "label": "DNA binding"
+    },
+    {
+      "value": "ec",
+      "label": "EC number"
+    },
+    {
+      "value": "cc_activity_regulation",
+      "label": "Activity regulation"
+    },
+    {
+      "value": "cc_function",
+      "label": "Function [CC]"
+    },
+    {
+      "value": "kinetics",
+      "label": "Kinetics"
+    },
+    {
+      "value": "cc_pathway",
+      "label": "Pathway"
+    },
+    {
+      "value": "ph_dependence",
+      "label": "pH dependence"
+    },
+    {
+      "value": "redox_potential",
+      "label": "Redox potential"
+    },
+    {
+      "value": "rhea",
+      "label": "Rhea ID"
+    },
+    {
+      "value": "ft_site",
+      "label": "Site"
+    },
+    {
+      "value": "temp_dependence",
+      "label": "Temperature dependence"
+    }
+  ],
+  "Miscellaneous": [
+    {
+      "value": "annotation_score",
+      "label": "Annotation"
+    },
+    {
+      "value": "cc_caution",
+      "label": "Caution"
+    },
+    {
+      "value": "keyword",
+      "label": "Keywords"
+    },
+    {
+      "value": "keywordid",
+      "label": "Keyword ID"
+    },
+    {
+      "value": "cc_miscellaneous",
+      "label": "Miscellaneous [CC]"
+    },
+    {
+      "value": "protein_existence",
+      "label": "Protein existence"
+    },
+    {
+      "value": "reviewed",
+      "label": "Reviewed"
+    },
+    {
+      "value": "tools",
+      "label": "Tools"
+    },
+    {
+      "value": "uniparc_id",
+      "label": "UniParc"
+    },
+    {
+      "value": "comment_count",
+      "label": "Comments"
+    },
+    {
+      "value": "feature_count",
+      "label": "Features"
+    },
+    {
+      "value": "xref_agora",
+      "label": "Agora"
+    },
+    {
+      "value": "xref_biogrid-orcs",
+      "label": "BioGRID-ORCS"
+    },
+    {
+      "value": "xref_cd-code",
+      "label": "CD-CODE"
+    },
+    {
+      "value": "xref_chitars",
+      "label": "ChiTaRS"
+    },
+    {
+      "value": "xref_evolutionarytrace",
+      "label": "EvolutionaryTrace"
+    },
+    {
+      "value": "xref_genewiki",
+      "label": "GeneWiki"
+    },
+    {
+      "value": "xref_genomernai",
+      "label": "GenomeRNAi"
+    },
+    {
+      "value": "xref_mesh",
+      "label": "MeSH"
+    },
+    {
+      "value": "xref_medgen",
+      "label": "MedGen"
+    },
+    {
+      "value": "xref_orcid",
+      "label": "ORCID"
+    },
+    {
+      "value": "xref_pgenn",
+      "label": "PGenN"
+    },
+    {
+      "value": "xref_phi-base",
+      "label": "PHI-base"
+    },
+    {
+      "value": "xref_pro",
+      "label": "PRO"
+    },
+    {
+      "value": "xref_pharos",
+      "label": "Pharos"
+    },
+    {
+      "value": "xref_pubtator",
+      "label": "PubTator"
+    },
+    {
+      "value": "xref_rnact",
+      "label": "RNAct"
+    },
+    {
+      "value": "xref_emind",
+      "label": "eMIND"
+    }
+  ],
+  "Interaction": [
+    {
+      "value": "cc_interaction",
+      "label": "Interacts with"
+    },
+    {
+      "value": "cc_subunit",
+      "label": "Subunit structure"
+    }
+  ],
+  "Expression": [
+    {
+      "value": "cc_developmental_stage",
+      "label": "Developmental stage"
+    },
+    {
+      "value": "cc_induction",
+      "label": "Induction"
+    },
+    {
+      "value": "cc_tissue_specificity",
+      "label": "Tissue specificity"
+    }
+  ],
+  "Gene Ontology (GO)": [
+    {
+      "value": "go_p",
+      "label": "Gene Ontology (biological process)"
+    },
+    {
+      "value": "go_c",
+      "label": "Gene Ontology (cellular component)"
+    },
+    {
+      "value": "go",
+      "label": "Gene Ontology (GO)"
+    },
+    {
+      "value": "go_f",
+      "label": "Gene Ontology (molecular function)"
+    },
+    {
+      "value": "go_id",
+      "label": "Gene Ontology IDs"
+    }
+  ],
+  "Pathology & Biotech": [
+    {
+      "value": "cc_allergen",
+      "label": "Allergenic Properties"
+    },
+    {
+      "value": "cc_biotechnology",
+      "label": "Biotechnological use"
+    },
+    {
+      "value": "cc_disruption_phenotype",
+      "label": "Disruption phenotype"
+    },
+    {
+      "value": "cc_disease",
+      "label": "Involvement in disease"
+    },
+    {
+      "value": "ft_mutagen",
+      "label": "Mutagenesis"
+    },
+    {
+      "value": "cc_pharmaceutical",
+      "label": "Pharmaceutical use"
+    },
+    {
+      "value": "cc_toxic_dose",
+      "label": "Toxic dose"
+    }
+  ],
+  "Subcellular location": [
+    {
+      "value": "ft_intramem",
+      "label": "Intramembrane"
+    },
+    {
+      "value": "cc_subcellular_location",
+      "label": "Subcellular location [CC]"
+    },
+    {
+      "value": "ft_topo_dom",
+      "label": "Topological domain"
+    },
+    {
+      "value": "ft_transmem",
+      "label": "Transmembrane"
+    }
+  ],
+  "PTM / Processing": [
+    {
+      "value": "ft_chain",
+      "label": "Chain"
+    },
+    {
+      "value": "ft_crosslnk",
+      "label": "Cross-link"
+    },
+    {
+      "value": "ft_disulfid",
+      "label": "Disulfide bond"
+    },
+    {
+      "value": "ft_carbohyd",
+      "label": "Glycosylation"
+    },
+    {
+      "value": "ft_init_met",
+      "label": "Initiator methionine"
+    },
+    {
+      "value": "ft_lipid",
+      "label": "Lipidation"
+    },
+    {
+      "value": "ft_mod_res",
+      "label": "Modified residue"
+    },
+    {
+      "value": "ft_peptide",
+      "label": "Peptide"
+    },
+    {
+      "value": "cc_ptm",
+      "label": "Post-translational modification"
+    },
+    {
+      "value": "ft_propep",
+      "label": "Propeptide"
+    },
+    {
+      "value": "ft_signal",
+      "label": "Signal peptide"
+    },
+    {
+      "value": "ft_transit",
+      "label": "Transit peptide"
+    }
+  ],
+  "Structure": [
+    {
+      "value": "structure_3d",
+      "label": "3D"
+    },
+    {
+      "value": "ft_strand",
+      "label": "Beta strand"
+    },
+    {
+      "value": "ft_helix",
+      "label": "Helix"
+    },
+    {
+      "value": "ft_turn",
+      "label": "Turn"
+    }
+  ],
+  "Publications": [
+    {
+      "value": "lit_pubmed_id",
+      "label": "PubMed ID"
+    },
+    {
+      "value": "lit_doi_id",
+      "label": "DOI ID"
+    }
+  ],
+  "Date of": [
+    {
+      "value": "date_created",
+      "label": "Date of creation"
+    },
+    {
+      "value": "date_modified",
+      "label": "Date of last modification"
+    },
+    {
+      "value": "date_sequence_modified",
+      "label": "Date of last sequence modification"
+    },
+    {
+      "value": "version",
+      "label": "Entry version"
+    }
+  ],
+  "Family & Domains": [
+    {
+      "value": "ft_coiled",
+      "label": "Coiled coil"
+    },
+    {
+      "value": "ft_compbias",
+      "label": "Compositional bias"
+    },
+    {
+      "value": "cc_domain",
+      "label": "Domain [CC]"
+    },
+    {
+      "value": "ft_domain",
+      "label": "Domain [FT]"
+    },
+    {
+      "value": "ft_motif",
+      "label": "Motif"
+    },
+    {
+      "value": "protein_families",
+      "label": "Protein families"
+    },
+    {
+      "value": "ft_region",
+      "label": "Region"
+    },
+    {
+      "value": "ft_repeat",
+      "label": "Repeat"
+    },
+    {
+      "value": "cc_similarity",
+      "label": "Sequence similarities"
+    },
+    {
+      "value": "ft_zn_fing",
+      "label": "Zinc finger"
+    }
+  ],
+  "Sequence": [
+    {
+      "value": "xref_ccds",
+      "label": "CCDS"
+    },
+    {
+      "value": "xref_embl",
+      "label": "EMBL"
+    },
+    {
+      "value": "xref_generif",
+      "label": "GeneRIF"
+    },
+    {
+      "value": "xref_pir",
+      "label": "PIR"
+    },
+    {
+      "value": "xref_refseq",
+      "label": "RefSeq"
+    }
+  ],
+  "3D structure": [
+    {
+      "value": "xref_alphafolddb",
+      "label": "AlphaFoldDB"
+    },
+    {
+      "value": "xref_bmrb",
+      "label": "BMRB"
+    },
+    {
+      "value": "xref_emdb",
+      "label": "EMDB"
+    },
+    {
+      "value": "xref_pcddb",
+      "label": "PCDDB"
+    },
+    {
+      "value": "xref_pdb",
+      "label": "PDB"
+    },
+    {
+      "value": "xref_pdbsum",
+      "label": "PDBsum"
+    },
+    {
+      "value": "xref_sasbdb",
+      "label": "SASBDB"
+    },
+    {
+      "value": "xref_smr",
+      "label": "SMR"
+    }
+  ],
+  "Protein-protein interaction": [
+    {
+      "value": "xref_biogrid",
+      "label": "BioGRID"
+    },
+    {
+      "value": "xref_corum",
+      "label": "CORUM"
+    },
+    {
+      "value": "xref_complexportal",
+      "label": "ComplexPortal"
+    },
+    {
+      "value": "xref_dip",
+      "label": "DIP"
+    },
+    {
+      "value": "xref_elm",
+      "label": "ELM"
+    },
+    {
+      "value": "xref_funcoup",
+      "label": "FunCoup"
+    },
+    {
+      "value": "xref_intact",
+      "label": "IntAct"
+    },
+    {
+      "value": "xref_mint",
+      "label": "MINT"
+    },
+    {
+      "value": "xref_string",
+      "label": "STRING"
+    }
+  ],
+  "Chemistry": [
+    {
+      "value": "xref_bindingdb",
+      "label": "BindingDB"
+    },
+    {
+      "value": "xref_chembl",
+      "label": "ChEMBL"
+    },
+    {
+      "value": "xref_drugbank",
+      "label": "DrugBank"
+    },
+    {
+      "value": "xref_drugcentral",
+      "label": "DrugCentral"
+    },
+    {
+      "value": "xref_guidetopharmacology",
+      "label": "GuidetoPHARMACOLOGY"
+    },
+    {
+      "value": "xref_swisslipids",
+      "label": "SwissLipids"
+    }
+  ],
+  "Protein family/group": [
+    {
+      "value": "xref_allergome",
+      "label": "Allergome"
+    },
+    {
+      "value": "xref_card",
+      "label": "CARD"
+    },
+    {
+      "value": "xref_cazy",
+      "label": "CAZy"
+    },
+    {
+      "value": "xref_esther",
+      "label": "ESTHER"
+    },
+    {
+      "value": "xref_imgt_gene-db",
+      "label": "IMGT_GENE-DB"
+    },
+    {
+      "value": "xref_merops",
+      "label": "MEROPS"
+    },
+    {
+      "value": "xref_moondb",
+      "label": "MoonDB"
+    },
+    {
+      "value": "xref_moonprot",
+      "label": "MoonProt"
+    },
+    {
+      "value": "xref_peroxibase",
+      "label": "PeroxiBase"
+    },
+    {
+      "value": "xref_rebase",
+      "label": "REBASE"
+    },
+    {
+      "value": "xref_tcdb",
+      "label": "TCDB"
+    },
+    {
+      "value": "xref_unilectin",
+      "label": "UniLectin"
+    }
+  ],
+  "PTM": [
+    {
+      "value": "xref_carbonyldb",
+      "label": "CarbonylDB"
+    },
+    {
+      "value": "xref_depod",
+      "label": "DEPOD"
+    },
+    {
+      "value": "xref_glyconnect",
+      "label": "GlyConnect"
+    },
+    {
+      "value": "xref_glycosmos",
+      "label": "GlyCosmos"
+    },
+    {
+      "value": "xref_glygen",
+      "label": "GlyGen"
+    },
+    {
+      "value": "xref_metosite",
+      "label": "MetOSite"
+    },
+    {
+      "value": "xref_phosphositeplus",
+      "label": "PhosphoSitePlus"
+    },
+    {
+      "value": "xref_swisspalm",
+      "label": "SwissPalm"
+    },
+    {
+      "value": "xref_unicarbkb",
+      "label": "UniCarbKB"
+    },
+    {
+      "value": "xref_iptmnet",
+      "label": "iPTMnet"
+    }
+  ],
+  "Genetic variation": [
+    {
+      "value": "xref_alzforum",
+      "label": "Alzforum"
+    },
+    {
+      "value": "xref_biomuta",
+      "label": "BioMuta"
+    },
+    {
+      "value": "xref_dmdm",
+      "label": "DMDM"
+    },
+    {
+      "value": "xref_dbsnp",
+      "label": "dbSNP"
+    }
+  ],
+  "2D gel": [
+    {
+      "value": "xref_ogp",
+      "label": "OGP"
+    },
+    {
+      "value": "xref_reproduction-2dpage",
+      "label": "REPRODUCTION-2DPAGE"
+    }
+  ],
+  "Proteomic": [
+    {
+      "value": "xref_cptac",
+      "label": "CPTAC"
+    },
+    {
+      "value": "xref_massive",
+      "label": "MassIVE"
+    },
+    {
+      "value": "xref_pride",
+      "label": "PRIDE"
+    },
+    {
+      "value": "xref_paxdb",
+      "label": "PaxDb"
+    },
+    {
+      "value": "xref_peptideatlas",
+      "label": "PeptideAtlas"
+    },
+    {
+      "value": "xref_promex",
+      "label": "ProMEX"
+    },
+    {
+      "value": "xref_proteomicsdb",
+      "label": "ProteomicsDB"
+    },
+    {
+      "value": "xref_pumba",
+      "label": "Pumba"
+    },
+    {
+      "value": "xref_topdownproteomics",
+      "label": "TopDownProteomics"
+    },
+    {
+      "value": "xref_jpost",
+      "label": "jPOST"
+    }
+  ],
+  "Protocols and materials": [
+    {
+      "value": "xref_abcd",
+      "label": "ABCD"
+    },
+    {
+      "value": "xref_antibodypedia",
+      "label": "Antibodypedia"
+    },
+    {
+      "value": "xref_cptc",
+      "label": "CPTC"
+    },
+    {
+      "value": "xref_dnasu",
+      "label": "DNASU"
+    },
+    {
+      "value": "xref_ycharos",
+      "label": "YCharOS"
+    }
+  ],
+  "Genome annotation": [
+    {
+      "value": "xref_ensembl",
+      "label": "Ensembl"
+    },
+    {
+      "value": "xref_ensemblbacteria",
+      "label": "EnsemblBacteria"
+    },
+    {
+      "value": "xref_ensemblfungi",
+      "label": "EnsemblFungi"
+    },
+    {
+      "value": "xref_ensemblmetazoa",
+      "label": "EnsemblMetazoa"
+    },
+    {
+      "value": "xref_ensemblplants",
+      "label": "EnsemblPlants"
+    },
+    {
+      "value": "xref_ensemblprotists",
+      "label": "EnsemblProtists"
+    },
+    {
+      "value": "xref_geneid",
+      "label": "GeneID"
+    },
+    {
+      "value": "xref_gramene",
+      "label": "Gramene"
+    },
+    {
+      "value": "xref_kegg",
+      "label": "KEGG"
+    },
+    {
+      "value": "xref_mane-select",
+      "label": "MANE-Select"
+    },
+    {
+      "value": "xref_patric",
+      "label": "PATRIC"
+    },
+    {
+      "value": "xref_ucsc",
+      "label": "UCSC"
+    },
+    {
+      "value": "xref_vectorbase",
+      "label": "VectorBase"
+    },
+    {
+      "value": "xref_wbparasite",
+      "label": "WBParaSite"
+    }
+  ],
+  "Organism-specific": [
+    {
+      "value": "xref_agr",
+      "label": "AGR"
+    },
+    {
+      "value": "xref_arachnoserver",
+      "label": "ArachnoServer"
+    },
+    {
+      "value": "xref_araport",
+      "label": "Araport"
+    },
+    {
+      "value": "xref_cgd",
+      "label": "CGD"
+    },
+    {
+      "value": "xref_ctd",
+      "label": "CTD"
+    },
+    {
+      "value": "xref_conoserver",
+      "label": "ConoServer"
+    },
+    {
+      "value": "xref_disgenet",
+      "label": "DisGeNET"
+    },
+    {
+      "value": "xref_echobase",
+      "label": "EchoBASE"
+    },
+    {
+      "value": "xref_flybase",
+      "label": "FlyBase"
+    },
+    {
+      "value": "xref_genecards",
+      "label": "GeneCards"
+    },
+    {
+      "value": "xref_genereviews",
+      "label": "GeneReviews"
+    },
+    {
+      "value": "xref_hgnc",
+      "label": "HGNC"
+    },
+    {
+      "value": "xref_hpa",
+      "label": "HPA"
+    },
+    {
+      "value": "xref_ic4r",
+      "label": "IC4R"
+    },
+    {
+      "value": "xref_japonicusdb",
+      "label": "JaponicusDB"
+    },
+    {
+      "value": "xref_legiolist",
+      "label": "LegioList"
+    },
+    {
+      "value": "xref_leproma",
+      "label": "Leproma"
+    },
+    {
+      "value": "xref_mgi",
+      "label": "MGI"
+    },
+    {
+      "value": "xref_mim",
+      "label": "MIM"
+    },
+    {
+      "value": "xref_maizegdb",
+      "label": "MaizeGDB"
+    },
+    {
+      "value": "xref_malacards",
+      "label": "MalaCards"
+    },
+    {
+      "value": "xref_niagads",
+      "label": "NIAGADS"
+    },
+    {
+      "value": "xref_opentargets",
+      "label": "OpenTargets"
+    },
+    {
+      "value": "xref_orphanet",
+      "label": "Orphanet"
+    },
+    {
+      "value": "xref_pharmgkb",
+      "label": "PharmGKB"
+    },
+    {
+      "value": "xref_pombase",
+      "label": "PomBase"
+    },
+    {
+      "value": "xref_pseudocap",
+      "label": "PseudoCAP"
+    },
+    {
+      "value": "xref_rgd",
+      "label": "RGD"
+    },
+    {
+      "value": "xref_sgd",
+      "label": "SGD"
+    },
+    {
+      "value": "xref_tair",
+      "label": "TAIR"
+    },
+    {
+      "value": "xref_tuberculist",
+      "label": "TubercuList"
+    },
+    {
+      "value": "xref_veupathdb",
+      "label": "VEuPathDB"
+    },
+    {
+      "value": "xref_vgnc",
+      "label": "VGNC"
+    },
+    {
+      "value": "xref_wormbase",
+      "label": "WormBase"
+    },
+    {
+      "value": "xref_xenbase",
+      "label": "Xenbase"
+    },
+    {
+      "value": "xref_zfin",
+      "label": "ZFIN"
+    },
+    {
+      "value": "xref_dictybase",
+      "label": "dictyBase"
+    },
+    {
+      "value": "xref_euhcvdb",
+      "label": "euHCVdb"
+    },
+    {
+      "value": "xref_nextprot",
+      "label": "neXtProt"
+    }
+  ],
+  "Phylogenomic": [
+    {
+      "value": "xref_genetree",
+      "label": "GeneTree"
+    },
+    {
+      "value": "xref_hogenom",
+      "label": "HOGENOM"
+    },
+    {
+      "value": "xref_inparanoid",
+      "label": "InParanoid"
+    },
+    {
+      "value": "xref_oma",
+      "label": "OMA"
+    },
+    {
+      "value": "xref_orthodb",
+      "label": "OrthoDB"
+    },
+    {
+      "value": "xref_pan-go",
+      "label": "PAN-GO"
+    },
+    {
+      "value": "xref_phylomedb",
+      "label": "PhylomeDB"
+    },
+    {
+      "value": "xref_treefam",
+      "label": "TreeFam"
+    },
+    {
+      "value": "xref_eggnog",
+      "label": "eggNOG"
+    }
+  ],
+  "Enzyme and pathway": [
+    {
+      "value": "xref_brenda",
+      "label": "BRENDA"
+    },
+    {
+      "value": "xref_biocyc",
+      "label": "BioCyc"
+    },
+    {
+      "value": "xref_pathwaycommons",
+      "label": "PathwayCommons"
+    },
+    {
+      "value": "xref_plantreactome",
+      "label": "PlantReactome"
+    },
+    {
+      "value": "xref_reactome",
+      "label": "Reactome"
+    },
+    {
+      "value": "xref_sabio-rk",
+      "label": "SABIO-RK"
+    },
+    {
+      "value": "xref_signor",
+      "label": "SIGNOR"
+    },
+    {
+      "value": "xref_strenda-db",
+      "label": "STRENDA-DB"
+    },
+    {
+      "value": "xref_signalink",
+      "label": "SignaLink"
+    },
+    {
+      "value": "xref_unipathway",
+      "label": "UniPathway"
+    }
+  ],
+  "Gene expression": [
+    {
+      "value": "xref_bgee",
+      "label": "Bgee"
+    },
+    {
+      "value": "xref_cleanex",
+      "label": "CleanEx"
+    },
+    {
+      "value": "xref_collectf",
+      "label": "CollecTF"
+    },
+    {
+      "value": "xref_expressionatlas",
+      "label": "ExpressionAtlas"
+    }
+  ],
+  "Family and domain": [
+    {
+      "value": "xref_antifam",
+      "label": "AntiFam"
+    },
+    {
+      "value": "xref_cdd",
+      "label": "CDD"
+    },
+    {
+      "value": "xref_disprot",
+      "label": "DisProt"
+    },
+    {
+      "value": "xref_funfam",
+      "label": "FunFam"
+    },
+    {
+      "value": "xref_gene3d",
+      "label": "Gene3D"
+    },
+    {
+      "value": "xref_hamap",
+      "label": "HAMAP"
+    },
+    {
+      "value": "xref_ideal",
+      "label": "IDEAL"
+    },
+    {
+      "value": "xref_interpro",
+      "label": "InterPro"
+    },
+    {
+      "value": "xref_ncbifam",
+      "label": "NCBIfam"
+    },
+    {
+      "value": "xref_panther",
+      "label": "PANTHER"
+    },
+    {
+      "value": "xref_pirsf",
+      "label": "PIRSF"
+    },
+    {
+      "value": "xref_prints",
+      "label": "PRINTS"
+    },
+    {
+      "value": "xref_prosite",
+      "label": "PROSITE"
+    },
+    {
+      "value": "xref_pfam",
+      "label": "Pfam"
+    },
+    {
+      "value": "xref_sfld",
+      "label": "SFLD"
+    },
+    {
+      "value": "xref_smart",
+      "label": "SMART"
+    },
+    {
+      "value": "xref_supfam",
+      "label": "SUPFAM"
+    }
+  ]
+}

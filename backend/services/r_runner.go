@@ -30,7 +30,12 @@ func NewRRunner(settings *SettingsService) *RRunner {
 }
 
 func (r *RRunner) ExecuteScript(scriptName string, args []string, outputCallback func(line string)) error {
-	scriptPath := filepath.Join(r.scriptDir, scriptName)
+	var scriptPath string
+	if filepath.IsAbs(scriptName) {
+		scriptPath = scriptName
+	} else {
+		scriptPath = filepath.Join(r.scriptDir, scriptName)
+	}
 
 	if _, err := os.Stat(scriptPath); os.IsNotExist(err) {
 		return fmt.Errorf("script not found: %s", scriptPath)

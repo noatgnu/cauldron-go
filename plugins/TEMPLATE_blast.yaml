@@ -1,0 +1,101 @@
+plugin:
+  id: "blast-search"
+  name: "BLAST Sequence Search"
+  description: "Perform sequence similarity search using BLAST (Basic Local Alignment Search Tool)"
+  version: "1.0.0"
+  author: "CauldronGO Team"
+  category: "analysis"
+  icon: "biotech"
+
+runtime:
+  type: "direct"
+  script: "blastp"
+
+inputs:
+  - name: "query_file"
+    label: "Query Sequence File"
+    type: "file"
+    required: true
+    accept: ".fasta,.fa,.fna,.ffn,.faa,.frn"
+    description: "Input file containing query sequence(s) in FASTA format"
+
+  - name: "database"
+    label: "BLAST Database"
+    type: "text"
+    required: true
+    placeholder: "nr"
+    description: "Name of the BLAST database to search against"
+
+  - name: "output_format"
+    label: "Output Format"
+    type: "select"
+    required: true
+    default: "6"
+    options:
+      - "0"
+      - "6"
+      - "7"
+      - "10"
+      - "11"
+    description: "Output format (0=pairwise, 6=tabular, 7=XML, 10=CSV, 11=ASN.1)"
+
+  - name: "evalue"
+    label: "E-value Threshold"
+    type: "number"
+    required: true
+    default: 0.001
+    min: 0
+    max: 1000
+    step: 0.001
+    description: "Expectation value threshold for saving hits"
+
+  - name: "max_target_seqs"
+    label: "Maximum Target Sequences"
+    type: "number"
+    required: true
+    default: 500
+    min: 1
+    max: 10000
+    step: 1
+    description: "Maximum number of aligned sequences to keep"
+
+  - name: "num_threads"
+    label: "Number of Threads"
+    type: "number"
+    required: true
+    default: 4
+    min: 1
+    max: 64
+    step: 1
+    description: "Number of CPU threads to use"
+
+outputs:
+  - name: "blast_results"
+    path: "blast_output.txt"
+    type: "data"
+    description: "BLAST search results"
+    format: "txt"
+
+execution:
+  argsMapping:
+    query_file: "-query"
+    database: "-db"
+    output_format: "-outfmt"
+    evalue: "-evalue"
+    max_target_seqs: "-max_target_seqs"
+    num_threads: "-num_threads"
+
+  outputDir: "-out"
+
+  requirements:
+    note: "Requires BLAST+ to be installed and available in system PATH or placed in bin/external directory"
+
+example:
+  enabled: false
+  values:
+    query_file: "sequences/query.fasta"
+    database: "nr"
+    output_format: "6"
+    evalue: 0.001
+    max_target_seqs: 500
+    num_threads: 4

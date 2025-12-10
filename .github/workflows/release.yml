@@ -28,12 +28,22 @@ jobs:
         shell: bash
 
       - name: Build Developer Tools
+        run: ./build.sh tools
+        shell: bash
+
+      - name: Build External Tools
+        run: ./build.sh external windows/amd64
+        shell: bash
+
+      - name: Validate Plugins
         run: |
-          mkdir -p bin
-          go build -o bin/plugin-validator.exe ./cmd/plugin-validator
-          go build -o bin/plugin-doc-generator.exe ./cmd/plugin-doc-generator
-          go build -o bin/plugin-doc-generator-all.exe ./cmd/plugin-doc-generator-all
-          go build -o bin/plugin-scaffolder.exe ./cmd/plugin-scaffolder
+          echo "Validating all plugins before release..."
+          ./bin/plugin-validator.exe plugins/
+          if [ $? -ne 0 ]; then
+            echo "::error::Plugin validation failed - cannot create release"
+            exit 1
+          fi
+          echo "::notice::All plugins validated successfully"
         shell: bash
 
       - name: Build Application
@@ -104,12 +114,20 @@ jobs:
         run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.11.0
 
       - name: Build Developer Tools
+        run: ./build.sh tools
+
+      - name: Build External Tools
+        run: ./build.sh external linux/amd64
+
+      - name: Validate Plugins
         run: |
-          mkdir -p bin
-          go build -o bin/plugin-validator ./cmd/plugin-validator
-          go build -o bin/plugin-doc-generator ./cmd/plugin-doc-generator
-          go build -o bin/plugin-doc-generator-all ./cmd/plugin-doc-generator-all
-          go build -o bin/plugin-scaffolder ./cmd/plugin-scaffolder
+          echo "Validating all plugins before release..."
+          ./bin/plugin-validator plugins/
+          if [ $? -ne 0 ]; then
+            echo "::error::Plugin validation failed - cannot create release"
+            exit 1
+          fi
+          echo "::notice::All plugins validated successfully"
 
       - name: Build Application
         run: |
@@ -130,7 +148,7 @@ jobs:
       - name: Create Archive
         run: |
           cd build/bin
-          tar -czf ../../cauldron-linux-amd64.tar.gz cauldron examples/ scripts/ plugins/ tools/
+          GZIP=-9 tar -czf ../../cauldron-linux-amd64.tar.gz cauldron examples/ scripts/ plugins/ tools/
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
@@ -138,7 +156,7 @@ jobs:
           name: cauldron-linux-amd64
           path: cauldron-linux-amd64.tar.gz
 
-  build-macos:
+  build-macos-intel:
     runs-on: macos-latest
     steps:
       - name: Checkout code
@@ -158,20 +176,28 @@ jobs:
         run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.11.0
 
       - name: Build Developer Tools
-        run: |
-          mkdir -p bin
-          go build -o bin/plugin-validator ./cmd/plugin-validator
-          go build -o bin/plugin-doc-generator ./cmd/plugin-doc-generator
-          go build -o bin/plugin-doc-generator-all ./cmd/plugin-doc-generator-all
-          go build -o bin/plugin-scaffolder ./cmd/plugin-scaffolder
+        run: ./build.sh tools
 
-      - name: Build Application (Intel)
+      - name: Build External Tools
+        run: ./build.sh external darwin/amd64
+
+      - name: Validate Plugins
+        run: |
+          echo "Validating all plugins before release..."
+          ./bin/plugin-validator plugins/
+          if [ $? -ne 0 ]; then
+            echo "::error::Plugin validation failed - cannot create release"
+            exit 1
+          fi
+          echo "::notice::All plugins validated successfully"
+
+      - name: Build Application
         run: wails build -platform darwin/amd64
 
-      - name: Verify Intel Build
+      - name: Verify Build
         run: ls -l build/bin/
 
-      - name: Copy Resources (Intel)
+      - name: Copy Resources
         run: |
           cp -r examples build/bin/
           cp -r scripts build/bin/
@@ -179,24 +205,59 @@ jobs:
           mkdir -p build/bin/tools
           cp -r bin/* build/bin/tools/
 
-      - name: Create Archive (Intel)
+      - name: Create Archive
         run: |
           cd build/bin
-          tar -czf ../../cauldron-darwin-amd64.tar.gz cauldron-go.app examples/ scripts/ plugins/ tools/
+          GZIP=-9 tar -czf ../../cauldron-darwin-amd64.tar.gz cauldron-go.app examples/ scripts/ plugins/ tools/
 
-      - name: Upload Artifact (Intel)
+      - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: cauldron-darwin-amd64
           path: cauldron-darwin-amd64.tar.gz
 
-      - name: Build Application (Apple Silicon)
-        run: wails build -platform darwin/arm64 -clean
+  build-macos-arm64:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Verify Apple Silicon Build
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Wails
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.11.0
+
+      - name: Build Developer Tools
+        run: ./build.sh tools
+
+      - name: Build External Tools
+        run: ./build.sh external darwin/arm64
+
+      - name: Validate Plugins
+        run: |
+          echo "Validating all plugins before release..."
+          ./bin/plugin-validator plugins/
+          if [ $? -ne 0 ]; then
+            echo "::error::Plugin validation failed - cannot create release"
+            exit 1
+          fi
+          echo "::notice::All plugins validated successfully"
+
+      - name: Build Application
+        run: wails build -platform darwin/arm64
+
+      - name: Verify Build
         run: ls -l build/bin/
 
-      - name: Copy Resources (Apple Silicon)
+      - name: Copy Resources
         run: |
           cp -r examples build/bin/
           cp -r scripts build/bin/
@@ -204,19 +265,19 @@ jobs:
           mkdir -p build/bin/tools
           cp -r bin/* build/bin/tools/
 
-      - name: Create Archive (Apple Silicon)
+      - name: Create Archive
         run: |
           cd build/bin
-          tar -czf ../../cauldron-darwin-arm64.tar.gz cauldron-go.app examples/ scripts/ plugins/ tools/
+          GZIP=-9 tar -czf ../../cauldron-darwin-arm64.tar.gz cauldron-go.app examples/ scripts/ plugins/ tools/
 
-      - name: Upload Artifact (Apple Silicon)
+      - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: cauldron-darwin-arm64
           path: cauldron-darwin-arm64.tar.gz
 
   create-release:
-    needs: [build-windows, build-linux, build-macos]
+    needs: [build-windows, build-linux, build-macos-intel, build-macos-arm64]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
     steps:

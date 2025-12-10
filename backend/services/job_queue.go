@@ -24,6 +24,7 @@ type JobQueueService struct {
 	wg            sync.WaitGroup
 	pythonRunner  *PythonRunner
 	rRunner       *RRunner
+	directRunner  *DirectRunner
 	settingsServ  *SettingsService
 	paused        bool
 	stopImmediate bool
@@ -50,9 +51,10 @@ func NewJobQueueService(ctx context.Context, db *DatabaseService) *JobQueueServi
 	return service
 }
 
-func (j *JobQueueService) SetRunners(pythonRunner *PythonRunner, rRunner *RRunner, settings *SettingsService) {
+func (j *JobQueueService) SetRunners(pythonRunner *PythonRunner, rRunner *RRunner, directRunner *DirectRunner, settings *SettingsService) {
 	j.pythonRunner = pythonRunner
 	j.rRunner = rRunner
+	j.directRunner = directRunner
 	j.settingsServ = settings
 }
 
@@ -326,6 +328,21 @@ func (j *JobQueueService) processJob(job *models.Job) {
 			return
 		}
 		err = j.rRunner.ExecuteScript(job.Args[0], job.Args[1:], outputCallback)
+	} else if job.Command == "direct" {
+		if j.directRunner == nil {
+			completedTime := time.Now()
+			job.CompletedAt = &completedTime
+			job.Status = models.JobStatusFailed
+			job.Error = "Direct runner not initialized"
+			j.db.GetDB().Save(job)
+			j.emitJobUpdate(job)
+			return
+		}
+		var workingDir string
+		if outputDir, ok := job.Parameters["outputDir"].(string); ok {
+			workingDir = outputDir
+		}
+		err = j.directRunner.ExecuteProgram(job.Args[0], job.Args[1:], workingDir, outputCallback)
 	} else {
 		if j.pythonRunner == nil {
 			completedTime := time.Now()

@@ -73,13 +73,14 @@ func (a *App) startup(ctx context.Context) {
 	a.fileService = services.NewFileService(ctx)
 	a.pythonRunner = services.NewPythonRunner(a.settings)
 	a.rRunner = services.NewRRunner(a.settings)
+	directRunner := services.NewDirectRunner()
 	a.envService = services.NewEnvironmentService(ctx, db, services.NewProgressNotifier(ctx))
 	a.portableEnvService = services.NewPortableEnvService(ctx, a.fileService)
 
 	log.Println("[App.startup] Initializing job queue...")
 	a.jobQueue = services.NewJobQueueService(ctx, db)
 	log.Println("[App.startup] Setting job queue runners...")
-	a.jobQueue.SetRunners(a.pythonRunner, a.rRunner, a.settings)
+	a.jobQueue.SetRunners(a.pythonRunner, a.rRunner, directRunner, a.settings)
 
 	log.Println("[App.startup] Initializing script executor...")
 	a.scriptExecutor = services.NewScriptExecutor(a.settings)

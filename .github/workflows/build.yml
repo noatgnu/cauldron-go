@@ -25,17 +25,11 @@ jobs:
         with:
           go-version: '1.21'
 
-      - name: Build plugin-validator
-        run: go build -o bin/plugin-validator ./cmd/plugin-validator
+      - name: Build developer tools
+        run: ./build.sh tools
 
-      - name: Build plugin-doc-generator
-        run: go build -o bin/plugin-doc-generator ./cmd/plugin-doc-generator
-
-      - name: Build plugin-doc-generator-all
-        run: go build -o bin/plugin-doc-generator-all ./cmd/plugin-doc-generator-all
-
-      - name: Build plugin-scaffolder
-        run: go build -o bin/plugin-scaffolder ./cmd/plugin-scaffolder
+      - name: Build external utilities
+        run: ./build.sh external linux/amd64
 
       - name: Test plugin-validator
         run: ./bin/plugin-validator plugins/pca-analysis
@@ -45,6 +39,19 @@ jobs:
 
       - name: Validate all plugins
         run: ./bin/plugin-validator plugins/
+
+      - name: Test uniprot-fetcher help
+        run: ./bin/external/uniprot-fetcher --help
+
+      - name: Test utility programs
+        run: |
+          echo "Testing uniprot-fetcher text mode..."
+          ./bin/external/uniprot-fetcher --ids "P12345" --from "UniProtKB_AC-ID" --fields "accession,id" --output /tmp/uniprot-test
+          if [ ! -f /tmp/uniprot-test/uniprot_results.tsv ]; then
+            echo "::error::uniprot-fetcher failed to create output file"
+            exit 1
+          fi
+          echo "::notice::uniprot-fetcher test passed"
 
       - name: Upload tools as artifacts
         uses: actions/upload-artifact@v4
@@ -69,6 +76,12 @@ jobs:
 
       - name: Run tests
         run: go test -v ./...
+
+      - name: Run utility program tests
+        run: |
+          echo "Testing uniprot-fetcher..."
+          go test -v ./cmd/uniprot-fetcher
+          echo "::notice::All utility program tests passed"
 
   build-frontend:
     name: Build Frontend

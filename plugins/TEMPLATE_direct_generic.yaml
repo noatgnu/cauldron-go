@@ -1,0 +1,86 @@
+plugin:
+  id: "template-direct-executable"
+  name: "Direct Executable Template"
+  description: "Template for creating plugins that run direct executable programs like BLAST, Clustal, etc."
+  version: "1.0.0"
+  author: "Your Name"
+  category: "analysis"
+  icon: "terminal"
+
+runtime:
+  type: "direct"
+  script: "program_name"
+
+inputs:
+  - name: "input_file"
+    label: "Input File"
+    type: "file"
+    required: true
+    accept: ".txt,.csv,.tsv,.fasta"
+    description: "Input file for the program"
+
+  - name: "parameter1"
+    label: "Parameter 1"
+    type: "text"
+    required: false
+    placeholder: "Enter value"
+    description: "Description of parameter 1"
+
+  - name: "parameter2"
+    label: "Parameter 2"
+    type: "number"
+    required: true
+    default: 10
+    min: 1
+    max: 100
+    step: 1
+    description: "Description of parameter 2"
+
+  - name: "option"
+    label: "Option"
+    type: "select"
+    required: true
+    default: "option1"
+    options:
+      - "option1"
+      - "option2"
+      - "option3"
+    description: "Select an option"
+
+  - name: "enable_feature"
+    label: "Enable Feature"
+    type: "boolean"
+    default: false
+    description: "Enable or disable this feature"
+
+outputs:
+  - name: "output_data"
+    path: "output.txt"
+    type: "data"
+    description: "Program output data"
+    format: "txt"
+
+execution:
+  argsMapping:
+    input_file: "--input"
+    parameter1: "--param1"
+    parameter2: "--param2"
+    option: "--option"
+    enable_feature:
+      flag: "--enable-feature"
+      when: "true"
+      value: ""
+
+  outputDir: "--output"
+
+  requirements:
+    note: "Requires the executable to be installed and available in system PATH or placed in bin/external directory"
+
+example:
+  enabled: false
+  values:
+    input_file: "data/sample.txt"
+    parameter1: "value1"
+    parameter2: 10
+    option: "option1"
+    enable_feature: false

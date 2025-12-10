@@ -133,6 +133,31 @@ build_dev_tools() {
     print_success "All developer tools built successfully"
 }
 
+build_external_tools() {
+    print_header "Building External Utility Programs"
+    cd "$PROJECT_ROOT"
+
+    mkdir -p "$PROJECT_ROOT/bin/external"
+
+    local platform="${1:-linux/amd64}"
+    local os_part="${platform%/*}"
+    local arch_part="${platform#*/}"
+
+    local output_name="uniprot-fetcher"
+    if [ "$os_part" = "windows" ]; then
+        output_name="uniprot-fetcher.exe"
+    fi
+
+    if GOOS="$os_part" GOARCH="$arch_part" go build -o "bin/external/$output_name" ./cmd/uniprot-fetcher; then
+        print_success "Built uniprot-fetcher for $platform"
+    else
+        print_error "Failed to build uniprot-fetcher"
+        return 1
+    fi
+
+    print_success "All external utility programs built successfully for $platform"
+}
+
 prepare_icons() {
     print_header "Preparing Application Icons"
     cd "$PROJECT_ROOT"
@@ -155,11 +180,12 @@ prepare_icons() {
 }
 
 build_wails() {
+    PLATFORM="${1:-windows/amd64}"
+
+    build_external_tools "$PLATFORM"
     prepare_icons
     print_header "Building Wails Application"
     cd "$PROJECT_ROOT"
-
-    PLATFORM="${1:-windows/amd64}"
 
     if ~/go/bin/wails build -platform "$PLATFORM" 2>&1 | tee /tmp/wails-build.log; then
         copy_resources || print_error "Warning: Failed to copy some resources, but build succeeded"
@@ -191,13 +217,14 @@ Cauldron Build Script
 Usage: ./build.sh [COMMAND] [OPTIONS]
 
 Commands:
-  frontend         Build only the frontend
-  wails [PLATFORM] Build the Wails application (default: windows/amd64)
-  tools            Build developer tools (plugin-validator, etc.)
-  all [PLATFORM]   Build frontend, tools, and Wails app (default)
-  clean            Clean all build artifacts
-  rebuild [PLATFORM] Clean and rebuild everything
-  help             Show this help message
+  frontend              Build only the frontend
+  wails [PLATFORM]      Build the Wails application (default: windows/amd64)
+  tools                 Build developer tools (plugin-validator, etc.)
+  external [PLATFORM]   Build external utility programs (uniprot-fetcher, etc.)
+  all [PLATFORM]        Build frontend, tools, and Wails app (default)
+  clean                 Clean all build artifacts
+  rebuild [PLATFORM]    Clean and rebuild everything
+  help                  Show this help message
 
 Platforms:
   windows/amd64    Windows 64-bit (default)
@@ -206,12 +233,13 @@ Platforms:
   darwin/arm64     macOS 64-bit (Apple Silicon)
 
 Examples:
-  ./build.sh                    # Build everything for Windows
-  ./build.sh frontend           # Build only frontend
-  ./build.sh tools              # Build developer tools
-  ./build.sh wails linux/amd64  # Build Wails app for Linux
-  ./build.sh rebuild            # Clean and rebuild everything
-  ./build.sh clean              # Clean build artifacts
+  ./build.sh                       # Build everything for Windows
+  ./build.sh frontend              # Build only frontend
+  ./build.sh tools                 # Build developer tools
+  ./build.sh external linux/amd64  # Build external utilities for Linux
+  ./build.sh wails linux/amd64     # Build Wails app for Linux
+  ./build.sh rebuild               # Clean and rebuild everything
+  ./build.sh clean                 # Clean build artifacts
 
 EOF
 }
@@ -222,6 +250,9 @@ case "${1:-all}" in
         ;;
     tools)
         build_dev_tools
+        ;;
+    external)
+        build_external_tools "${2:-linux/amd64}"
         ;;
     wails)
         build_wails "${2:-windows/amd64}"

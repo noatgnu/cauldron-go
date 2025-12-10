@@ -1,10 +1,14 @@
 package services
 
 import (
+	"bufio"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
 	"path/filepath"
+	goruntime "runtime"
+	"strings"
 
 	"github.com/noatgnu/cauldron-go/backend/models"
 	"gopkg.in/yaml.v3"
@@ -68,13 +72,7 @@ func (l *PluginLoaderV2) LoadPlugins() error {
 }
 
 func (l *PluginLoaderV2) loadPlugin(pluginDir string) (*models.PluginV2, error) {
-	configPath := filepath.Join(pluginDir, "plugin.yaml")
-	if _, err := os.Stat(configPath); os.IsNotExist(err) {
-		configPath = filepath.Join(pluginDir, "plugin.yml")
-		if _, err := os.Stat(configPath); os.IsNotExist(err) {
-			return nil, fmt.Errorf("plugin.yaml not found in %s", pluginDir)
-		}
-	}
+	configPath := l.getPlatformSpecificConfig(pluginDir)
 
 	data, err := os.ReadFile(configPath)
 	if err != nil {
@@ -90,6 +88,10 @@ func (l *PluginLoaderV2) loadPlugin(pluginDir string) (*models.PluginV2, error) 
 		return nil, fmt.Errorf("invalid plugin definition: %w", err)
 	}
 
+	if err := l.loadOptionsFromFiles(pluginDir, &definition); err != nil {
+		return nil, fmt.Errorf("failed to load options from files: %w", err)
+	}
+
 	scriptPath := filepath.Join(pluginDir, definition.Runtime.Script)
 	if _, err := os.Stat(scriptPath); os.IsNotExist(err) {
 		return nil, fmt.Errorf("script file not found: %s", scriptPath)
@@ -102,6 +104,24 @@ func (l *PluginLoaderV2) loadPlugin(pluginDir string) (*models.PluginV2, error) 
 	}
 
 	return plugin, nil
+}
+
+func (l *PluginLoaderV2) getPlatformSpecificConfig(pluginDir string) string {
+	platformConfigs := []string{
+		fmt.Sprintf("plugin.%s.yaml", goruntime.GOOS),
+		fmt.Sprintf("plugin.%s.yml", goruntime.GOOS),
+		"plugin.yaml",
+		"plugin.yml",
+	}
+
+	for _, configName := range platformConfigs {
+		configPath := filepath.Join(pluginDir, configName)
+		if _, err := os.Stat(configPath); err == nil {
+			return configPath
+		}
+	}
+
+	return filepath.Join(pluginDir, "plugin.yaml")
 }
 
 func (l *PluginLoaderV2) validateDefinition(def *models.PluginDefinition) error {
@@ -125,6 +145,7 @@ func (l *PluginLoaderV2) validateDefinition(def *models.PluginDefinition) error 
 		"python":      true,
 		"r":           true,
 		"pythonWithR": true,
+		"direct":      true,
 	}
 	if !validRuntimes[def.Runtime.Type] {
 		return fmt.Errorf("invalid runtime type: %s", def.Runtime.Type)
@@ -208,4 +229,75 @@ func (l *PluginLoaderV2) ReloadPlugins() error {
 
 func (l *PluginLoaderV2) GetPluginsDirectory() string {
 	return l.pluginsDir
+}
+
+func (l *PluginLoaderV2) loadOptionsFromFiles(pluginDir string, def *models.PluginDefinition) error {
+	for i := range def.Inputs {
+		input := &def.Inputs[i]
+
+		if input.OptionsFromFile != "" {
+			optionsPath := filepath.Join(pluginDir, input.OptionsFromFile)
+			options, err := l.loadOptionsFromTextFile(optionsPath)
+			if err != nil {
+				return fmt.Errorf("failed to load options from %s: %w", input.OptionsFromFile, err)
+			}
+			input.Options = options
+		}
+
+		if input.GroupsFromFile != "" {
+			groupsPath := filepath.Join(pluginDir, input.GroupsFromFile)
+			groups, err := l.loadGroupsFromJSONFile(groupsPath)
+			if err != nil {
+				return fmt.Errorf("failed to load groups from %s: %w", input.GroupsFromFile, err)
+			}
+			input.Groups = groups
+		}
+	}
+
+	return nil
+}
+
+func (l *PluginLoaderV2) loadOptionsFromTextFile(filePath string) ([]string, error) {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	var options []string
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line != "" {
+			options = append(options, line)
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+
+	return options, nil
+}
+
+func (l *PluginLoaderV2) loadGroupsFromJSONFile(filePath string) ([]models.FieldGroup, error) {
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, err
+	}
+
+	var groupsMap map[string][]models.FieldOption
+	if err := json.Unmarshal(data, &groupsMap); err != nil {
+		return nil, err
+	}
+
+	groups := make([]models.FieldGroup, 0, len(groupsMap))
+	for name, options := range groupsMap {
+		groups = append(groups, models.FieldGroup{
+			Name:    name,
+			Options: options,
+		})
+	}
+
+	return groups, nil
 }

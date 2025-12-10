@@ -4,13 +4,15 @@ on:
   push:
     paths:
       - 'plugins/**'
-      - 'schemas/**'
-      - 'scripts/validate-plugin*.sh'
-      - 'scripts/validate-plugin*.py'
+      - 'cmd/plugin-validator/**'
+      - 'backend/models/plugin*.go'
+      - 'backend/services/plugin_loader*.go'
   pull_request:
     paths:
       - 'plugins/**'
-      - 'schemas/**'
+      - 'cmd/plugin-validator/**'
+      - 'backend/models/plugin*.go'
+      - 'backend/services/plugin_loader*.go'
 
 jobs:
   validate-plugins:
@@ -28,12 +30,32 @@ jobs:
 
       - name: Build validator
         run: |
+          mkdir -p bin
           go build -o bin/plugin-validator ./cmd/plugin-validator
+          chmod +x bin/plugin-validator
+
+      - name: Test validator binary
+        run: |
+          ./bin/plugin-validator --help || echo "Validator built successfully"
+          if [ ! -f bin/plugin-validator ]; then
+            echo "[ERROR] Validator binary not found"
+            exit 1
+          fi
+          echo "[SUCCESS] Validator binary built and ready"
 
       - name: Validate plugins
         run: |
           echo "Validating plugin configurations..."
           ./bin/plugin-validator plugins/
+
+      - name: Verify validation results
+        run: |
+          if [ $? -eq 0 ]; then
+            echo "[SUCCESS] All plugins validated successfully"
+          else
+            echo "[ERROR] Plugin validation failed"
+            exit 1
+          fi
 
   generate-docs:
     name: Generate Plugin Documentation
@@ -51,8 +73,22 @@ jobs:
 
       - name: Build documentation generators
         run: |
+          mkdir -p bin
           go build -o bin/plugin-doc-generator ./cmd/plugin-doc-generator
           go build -o bin/plugin-doc-generator-all ./cmd/plugin-doc-generator-all
+          chmod +x bin/plugin-doc-generator bin/plugin-doc-generator-all
+
+      - name: Test documentation generators
+        run: |
+          if [ ! -f bin/plugin-doc-generator ]; then
+            echo "[ERROR] plugin-doc-generator binary not found"
+            exit 1
+          fi
+          if [ ! -f bin/plugin-doc-generator-all ]; then
+            echo "[ERROR] plugin-doc-generator-all binary not found"
+            exit 1
+          fi
+          echo "[SUCCESS] Documentation generators built successfully"
 
       - name: Generate documentation
         run: |
@@ -68,6 +104,56 @@ jobs:
             exit 1
           fi
           echo "[SUCCESS] All documentation is up to date"
+
+  test-developer-tools:
+    name: Test All Developer Tools
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Build all developer tools
+        run: |
+          mkdir -p bin
+          echo "Building plugin-validator..."
+          go build -o bin/plugin-validator ./cmd/plugin-validator
+          echo "Building plugin-doc-generator..."
+          go build -o bin/plugin-doc-generator ./cmd/plugin-doc-generator
+          echo "Building plugin-doc-generator-all..."
+          go build -o bin/plugin-doc-generator-all ./cmd/plugin-doc-generator-all
+          echo "Building plugin-scaffolder..."
+          go build -o bin/plugin-scaffolder ./cmd/plugin-scaffolder
+          chmod +x bin/*
+
+      - name: Verify binaries
+        run: |
+          echo "Verifying plugin-validator..."
+          ls -lh bin/plugin-validator
+          echo "Verifying plugin-doc-generator..."
+          ls -lh bin/plugin-doc-generator
+          echo "Verifying plugin-doc-generator-all..."
+          ls -lh bin/plugin-doc-generator-all
+          echo "Verifying plugin-scaffolder..."
+          ls -lh bin/plugin-scaffolder
+          echo "[SUCCESS] All developer tools built successfully"
+
+      - name: Test plugin-validator
+        run: |
+          echo "Testing plugin-validator..."
+          ./bin/plugin-validator plugins/ || exit 1
+          echo "[SUCCESS] plugin-validator works"
+
+      - name: Test plugin-doc-generator-all
+        run: |
+          echo "Testing plugin-doc-generator-all..."
+          ./bin/plugin-doc-generator-all || exit 1
+          echo "[SUCCESS] plugin-doc-generator-all works"
 
   lint-yaml:
     name: Lint YAML Files

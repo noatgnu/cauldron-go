@@ -15,4 +15,5 @@ export class EnvironmentIndicator {
   @Input() python: boolean = false;
   @Input() r: boolean = false;
   @Input() pythonWithR: boolean = false;
+  @Input() direct: boolean = false;
 }

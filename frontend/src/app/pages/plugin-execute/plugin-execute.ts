@@ -111,11 +111,12 @@ export class PluginExecute implements OnInit {
     }
   }
 
-  getRuntimeIcon(runtime: string): { python: boolean; r: boolean; pythonWithR: boolean } {
+  getRuntimeIcon(runtime: string): { python: boolean; r: boolean; pythonWithR: boolean; direct: boolean } {
     return {
       python: runtime === 'python',
       r: runtime === 'r',
-      pythonWithR: runtime === 'pythonWithR'
+      pythonWithR: runtime === 'pythonWithR',
+      direct: runtime === 'direct'
     };
   }
 }

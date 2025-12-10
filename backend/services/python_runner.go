@@ -28,7 +28,12 @@ func NewPythonRunner(settings *SettingsService) *PythonRunner {
 }
 
 func (p *PythonRunner) ExecuteScript(scriptName string, args []string, outputCallback func(line string)) error {
-	scriptPath := filepath.Join(p.scriptDir, scriptName)
+	var scriptPath string
+	if filepath.IsAbs(scriptName) {
+		scriptPath = scriptName
+	} else {
+		scriptPath = filepath.Join(p.scriptDir, scriptName)
+	}
 
 	if _, err := os.Stat(scriptPath); os.IsNotExist(err) {
 		return fmt.Errorf("script not found: %s", scriptPath)
