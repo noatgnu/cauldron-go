@@ -44,9 +44,16 @@ export class PluginExecute implements OnInit {
 
   async ngOnInit() {
     this.route.paramMap.subscribe(async params => {
-      const pluginId = params.get('id');
-      if (!pluginId) {
+      const pluginIdStr = params.get('id');
+      if (!pluginIdStr) {
         this.error.set('Plugin ID not provided');
+        this.loading.set(false);
+        return;
+      }
+
+      const pluginId = parseInt(pluginIdStr, 10);
+      if (isNaN(pluginId)) {
+        this.error.set('Invalid plugin ID');
         this.loading.set(false);
         return;
       }
@@ -56,7 +63,7 @@ export class PluginExecute implements OnInit {
     });
   }
 
-  async loadPlugin(id: string) {
+  async loadPlugin(id: number) {
     try {
       this.loading.set(true);
       this.error.set('');
@@ -75,7 +82,7 @@ export class PluginExecute implements OnInit {
 
     try {
       this.executing.set(true);
-      const jobId = await this.pluginService.executePlugin(plugin.definition.plugin.id, parameters);
+      const jobId = await this.pluginService.executePlugin(plugin.id, parameters);
       this.createdJobId.set(jobId);
 
       this.snackBar.open('Job created successfully!', 'Close', {

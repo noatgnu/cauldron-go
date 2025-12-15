@@ -1,6 +1,6 @@
 import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { ReactiveFormsModule, FormBuilder, FormGroup, FormArray, Validators } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
@@ -12,9 +12,11 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { Wails } from '../../core/services/wails';
 import { Plugin, PluginInput, PluginExecutionRequest } from '../../core/models/plugin';
 import { EnvironmentIndicator } from '../../components/environment-indicator/environment-indicator';
+import { InstallPluginDialog } from '../../components/install-plugin-dialog/install-plugin-dialog';
 
 @Component({
   selector: 'app-plugins',
@@ -32,41 +34,70 @@ import { EnvironmentIndicator } from '../../components/environment-indicator/env
     MatChipsModule,
     MatTooltipModule,
     MatProgressSpinnerModule,
+    MatDialogModule,
     EnvironmentIndicator
   ],
   templateUrl: './plugins.html',
-  styleUrl: './plugins.scss',
+  styleUrl: './plugins.scss'
 })
 export class Plugins implements OnInit {
   protected plugins = signal<Plugin[]>([]);
   protected loading = signal(false);
   protected executing = signal<Record<string, boolean>>({});
-  protected pluginForms = signal<Record<string, FormGroup>>({});
   protected pluginsDirectory = signal('');
+
+  mainFormGroup!: FormGroup;
 
   constructor(
     private wails: Wails,
-    private fb: FormBuilder
+    private fb: FormBuilder,
+    private dialog: MatDialog
   ) {}
 
+  get pluginsFormArray(): FormArray {
+    return this.mainFormGroup.get('plugins') as FormArray;
+  }
+
   async ngOnInit() {
+    this.mainFormGroup = this.fb.group({
+      plugins: this.fb.array([])
+    });
+
     await this.loadPlugins();
     await this.loadPluginsDirectory();
   }
 
   async loadPlugins() {
     this.loading.set(true);
+
     try {
       const plugins = await this.wails.getPlugins();
-      this.plugins.set(plugins);
 
-      const forms: Record<string, FormGroup> = {};
-      for (const plugin of plugins) {
-        forms[plugin.id] = this.createFormForPlugin(plugin);
+      await this.wails.logToFile(`[Plugins] Before sort: ${plugins.map(p => p.config.name).join(', ')}`);
+
+      const sortedPlugins = [...plugins].sort((a, b) => {
+        const catA = a.config.category || '';
+        const catB = b.config.category || '';
+
+        if (catA !== catB) {
+          return catA.localeCompare(catB);
+        }
+
+        return a.config.name.localeCompare(b.config.name);
+      });
+
+      await this.wails.logToFile(`[Plugins] After sort: ${sortedPlugins.map(p => p.config.name).join(', ')}`);
+
+      this.plugins.set(sortedPlugins);
+
+      const pluginsArray = this.mainFormGroup.get('plugins') as FormArray;
+      pluginsArray.clear();
+
+      for (const plugin of sortedPlugins) {
+        pluginsArray.push(this.createFormForPlugin(plugin));
       }
-      this.pluginForms.set(forms);
     } catch (error) {
-      console.error('Failed to load plugins:', error);
+      await this.wails.logToFile(`[Plugins] Failed to load plugins: ${error}`);
     } finally {
       this.loading.set(false);
     }
@@ -77,7 +108,7 @@ export class Plugins implements OnInit {
       const dir = await this.wails.getPluginsDirectory();
       this.pluginsDirectory.set(dir);
     } catch (error) {
-      console.error('Failed to get plugins directory:', error);
+      await this.wails.logToFile(`[Plugins] Failed to get plugins directory: ${error}`);
     }
   }
 
@@ -107,26 +138,22 @@ export class Plugins implements OnInit {
     return this.fb.group(group);
   }
 
-  getForm(pluginId: string): FormGroup | undefined {
-    return this.pluginForms()[pluginId];
-  }
-
-  async openFileForInput(pluginId: string, inputName: string) {
+  async openFileForInput(index: number, inputName: string) {
     try {
       const path = await this.wails.openDataFileDialog();
       if (path) {
-        const form = this.getForm(pluginId);
-        if (form) {
-          form.patchValue({ [inputName]: path });
-        }
+        const formGroup = this.pluginsFormArray.at(index) as FormGroup;
+        formGroup.patchValue({ [inputName]: path });
       }
     } catch (error) {
-      console.error('Failed to open file dialog:', error);
+      await this.wails.logToFile(`[Plugins] Failed to open file dialog: ${error}`);
     }
   }
 
-  async executePlugin(plugin: Plugin) {
-    const form = this.getForm(plugin.id);
+  async executePlugin(index: number) {
+    const plugin = this.plugins()[index];
+    const form = this.pluginsFormArray.at(index) as FormGroup;
+
     if (!form || form.invalid) {
       return;
     }
@@ -140,9 +167,9 @@ export class Plugins implements OnInit {
       };
 
       const jobId = await this.wails.executePlugin(request);
-      console.log('Plugin execution started:', jobId);
+      await this.wails.logToFile(`[Plugins] Plugin execution started: ${jobId}`);
     } catch (error) {
-      console.error('Failed to execute plugin:', error);
+      await this.wails.logToFile(`[Plugins] Failed to execute plugin: ${error}`);
     } finally {
       this.executing.update(state => ({ ...state, [plugin.id]: false }));
     }
@@ -154,7 +181,7 @@ export class Plugins implements OnInit {
       await this.wails.reloadPlugins();
       await this.loadPlugins();
     } catch (error) {
-      console.error('Failed to reload plugins:', error);
+      await this.wails.logToFile(`[Plugins] Failed to reload plugins: ${error}`);
     } finally {
       this.loading.set(false);
     }
@@ -166,7 +193,7 @@ export class Plugins implements OnInit {
       await this.wails.createSamplePlugin();
       await this.loadPlugins();
     } catch (error) {
-      console.error('Failed to create sample plugin:', error);
+      await this.wails.logToFile(`[Plugins] Failed to create sample plugin: ${error}`);
     } finally {
       this.loading.set(false);
     }
@@ -178,7 +205,7 @@ export class Plugins implements OnInit {
         window.runtime.BrowserOpenURL(`file://${this.pluginsDirectory()}`);
       }
     } catch (error) {
-      console.error('Failed to open plugins folder:', error);
+      await this.wails.logToFile(`[Plugins] Failed to open plugins folder: ${error}`);
     }
   }
 
@@ -201,5 +228,27 @@ export class Plugins implements OnInit {
       case 'multiselect': return 'checklist';
       default: return 'input';
     }
+  }
+
+  async openInstallDialog() {
+    const dialogRef = this.dialog.open(InstallPluginDialog, {
+      width: '600px',
+      disableClose: false
+    });
+
+    dialogRef.afterClosed().subscribe(async (repoURL: string) => {
+      if (repoURL) {
+        this.loading.set(true);
+        try {
+          await this.wails.installPluginFromRepo(repoURL);
+          await this.wails.logToFile(`[Plugins] Successfully installed plugin from: ${repoURL}`);
+          await this.loadPlugins();
+        } catch (error) {
+          await this.wails.logToFile(`[Plugins] Failed to install plugin: ${error}`);
+        } finally {
+          this.loading.set(false);
+        }
+      }
+    });
   }
 }

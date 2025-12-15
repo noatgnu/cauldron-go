@@ -64,11 +64,17 @@ inputs:
     description: "Transparency of overlapping regions (0=transparent, 1=opaque)"
 
 outputs:
-  - name: "venn_diagram"
-    path: "venn_diagram.png"
+  - name: "venn_diagram_svg"
+    path: "venn_diagram.svg"
     type: "image"
-    description: "Venn diagram visualization"
-    format: "png"
+    description: "Venn diagram visualization (SVG)"
+    format: "svg"
+
+  - name: "venn_diagram_pdf"
+    path: "venn_diagram.pdf"
+    type: "image"
+    description: "Venn diagram visualization (PDF)"
+    format: "pdf"
 
   - name: "venn_summary"
     path: "venn_summary.txt"
@@ -81,6 +87,15 @@ outputs:
     type: "data"
     description: "Presence/absence matrix for each set"
     format: "tsv"
+
+plots:
+  - id: "venn_diagram"
+    name: "Venn Diagram"
+    type: "image-grid"
+    dataSource: "venn_diagram_svg"
+    config:
+      imagePattern: "*.svg"
+      columns: 1
 
 execution:
   argsMapping:
@@ -108,11 +123,13 @@ execution:
 example:
   enabled: true
   values:
-    input_file: "diann/imputed.data.txt"
-    sample_cols_source: "diann/imputed.data.txt"
+    input_file: "venn_diagram/venn_example.txt"
+    sample_cols_source: "venn_diagram/venn_example.txt"
     sample_cols:
-      - 'C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_BCA_LT-IP_01.raw'
-      - 'C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_BCA_LT-MockIP_01.raw'
-      - 'C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_BCA_LT-WCL_01.raw'
+      - "Control"
+      - "Treatment_A"
+      - "Treatment_B"
+    set_names: "Control,Treatment A,Treatment B"
     threshold: 0
     use_presence: true
+    alpha: 0.5

@@ -16,13 +16,14 @@ import {NotificationService} from "../../core/services/notification.service";
 
 export interface SampleAnnotationData {
   samples?: string[];
-  annotation?: IDataFrame<number, {Sample: string, Condition: string, Batch: string, Color: string}>;
+  annotation?: IDataFrame<number, {Sample: string, Condition: string, BioReplicate: string, Batch: string, Color: string}>;
   mode: 'edit' | 'create';
 }
 
 interface RegexRule {
   pattern: string;
   condition: string;
+  bioreplicate: string;
   batch: string;
 }
 
@@ -48,9 +49,9 @@ interface RegexRule {
   styleUrl: './sample-annotation.scss'
 })
 export class SampleAnnotation {
-  _annotation: {Sample: string, Condition: string, Batch: string, Color: string, selected?: boolean}[] = [];
+  _annotation: {Sample: string, Condition: string, BioReplicate: string, Batch: string, Color: string, selected?: boolean}[] = [];
   mode: 'edit' | 'create' = 'edit';
-  displayedColumns: string[] = ['Sample', 'Condition', 'Color', 'Batch'];
+  displayedColumns: string[] = ['Sample', 'Condition', 'BioReplicate', 'Color', 'Batch'];
   private readonly defaultColorList: string[] = [
     '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
     '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'
@@ -58,6 +59,7 @@ export class SampleAnnotation {
 
   regexRules: RegexRule[] = [];
   batchCondition: string = '';
+  batchBioReplicate: string = '';
   batchBatch: string = '';
   selectAllCheckbox: boolean = false;
 
@@ -66,15 +68,44 @@ export class SampleAnnotation {
     @Inject(MAT_DIALOG_DATA) public data: SampleAnnotationData,
     private notificationService: NotificationService
   ) {
-    this.mode = data.mode;
-    if (data.samples) {
-      this._annotation = data.samples.map(s => ({Sample: s, Condition: '', Batch: '', Color: this.defaultColorList[0], selected: false}));
-    } else if (data.annotation) {
-      this._annotation = data.annotation.toArray().map(a => ({...a, selected: false, Color: a.Color || ''}));
+    try {
+      this.mode = data.mode;
+      if (data.samples) {
+        this._annotation = data.samples.map(s => ({Sample: s, Condition: '', BioReplicate: '', Batch: '', Color: this.defaultColorList[0], selected: false}));
+        console.log('[SampleAnnotation] Initialized with samples:', this._annotation.length);
+      } else if (data.annotation) {
+        let annotationArray: any[];
+        if (Array.isArray(data.annotation)) {
+          console.log('[SampleAnnotation] Received plain array');
+          annotationArray = data.annotation;
+        } else if (typeof data.annotation.toArray === 'function') {
+          console.log('[SampleAnnotation] Received DataFrame');
+          annotationArray = data.annotation.toArray();
+        } else {
+          console.error('[SampleAnnotation] Unknown annotation type:', typeof data.annotation);
+          annotationArray = [];
+        }
+        console.log('[SampleAnnotation] Annotation array:', annotationArray);
+        this._annotation = annotationArray.map(a => ({
+          Sample: a.Sample || '',
+          Condition: a.Condition || '',
+          BioReplicate: a.BioReplicate || '',
+          Batch: a.Batch || '',
+          Color: a.Color || '',
+          selected: false
+        }));
+        console.log('[SampleAnnotation] Initialized with annotations:', this._annotation.length);
+      } else {
+        console.warn('[SampleAnnotation] No samples or annotations provided');
+        this._annotation = [];
+      }
+    } catch (error) {
+      console.error('[SampleAnnotation] Error initializing:', error);
+      this._annotation = [];
     }
   }
 
-  onConditionChange(changedRow: {Sample: string, Condition: string, Batch: string, Color: string, selected?: boolean}) {
+  onConditionChange(changedRow: {Sample: string, Condition: string, BioReplicate: string, Batch: string, Color: string, selected?: boolean}) {
     if (!changedRow.Condition) {
       changedRow.Color = '';
       return;
@@ -96,7 +127,7 @@ export class SampleAnnotation {
     }
   }
 
-  get annotation(): {Sample: string, Condition: string, Batch: string, Color: string, selected?: boolean}[] {
+  get annotation(): {Sample: string, Condition: string, BioReplicate: string, Batch: string, Color: string, selected?: boolean}[] {
     return this._annotation;
   }
 
@@ -110,10 +141,10 @@ export class SampleAnnotation {
   }
 
   addSample() {
-    this._annotation.push({Sample: '', Condition: '', Batch: '', Color: '', selected: false});
+    this._annotation.push({Sample: '', Condition: '', BioReplicate: '', Batch: '', Color: '', selected: false});
   }
 
-  parseFromClipboard(column: 'Sample'|'Condition'|'Batch'|'Color') {
+  parseFromClipboard(column: 'Sample'|'Condition'|'BioReplicate'|'Batch'|'Color') {
     navigator.clipboard.readText().then(text => {
       text = text.trim();
       let lines = text.split(/\r?\n/).filter(l => l.length > 0);
@@ -133,7 +164,7 @@ export class SampleAnnotation {
           if (this._annotation[i]) {
             this._annotation[i][column] = lines[i];
           } else {
-            this._annotation.push({Sample: lines[i], Condition: '', Batch: '', Color: '', selected: false});
+            this._annotation.push({Sample: lines[i], Condition: '', BioReplicate: '', Batch: '', Color: '', selected: false});
           }
            if (column === 'Condition') {
             this.onConditionChange(this._annotation[i]);
@@ -145,7 +176,7 @@ export class SampleAnnotation {
   }
 
   addRegexRule() {
-    this.regexRules.push({pattern: '', condition: '', batch: ''});
+    this.regexRules.push({pattern: '', condition: '', bioreplicate: '', batch: ''});
   }
 
   removeRegexRule(index: number) {
@@ -162,6 +193,9 @@ export class SampleAnnotation {
           if (regex.test(annotation.Sample)) {
             annotation.Condition = rule.condition;
             this.onConditionChange(annotation);
+            if (rule.bioreplicate) {
+              annotation.BioReplicate = rule.bioreplicate;
+            }
             if (rule.batch) {
               annotation.Batch = rule.batch;
             }
@@ -211,6 +245,9 @@ export class SampleAnnotation {
       if (annotation.selected) {
         annotation.Condition = this.batchCondition;
         this.onConditionChange(annotation);
+        if (this.batchBioReplicate) {
+          annotation.BioReplicate = this.batchBioReplicate;
+        }
         if (this.batchBatch) {
           annotation.Batch = this.batchBatch;
         }
@@ -219,6 +256,7 @@ export class SampleAnnotation {
     this.notificationService.showSuccess(`Applied condition "${this.batchCondition}" to ${selectedCount} sample(s)`);
     this.deselectAll();
     this.batchCondition = '';
+    this.batchBioReplicate = '';
     this.batchBatch = '';
   }
 

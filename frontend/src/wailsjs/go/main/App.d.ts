@@ -3,15 +3,21 @@
 import {models} from '../models';
 import {services} from '../models';
 
+export function ConvertPluginToYAML(arg1:models.PluginDefinition):Promise<string>;
+
 export function CreateJob(arg1:models.JobRequest):Promise<string>;
 
 export function CreatePythonVirtualEnv(arg1:string,arg2:string):Promise<void>;
 
 export function CreateSamplePlugin():Promise<void>;
 
+export function DecodePluginRepoURL(arg1:string):Promise<string>;
+
 export function DeleteImportedFile(arg1:number):Promise<void>;
 
 export function DeleteJob(arg1:string):Promise<void>;
+
+export function DeletePlugin(arg1:string):Promise<void>;
 
 export function DeleteVirtualEnvironment(arg1:number):Promise<void>;
 
@@ -53,7 +59,11 @@ export function GetLogFilePath():Promise<string>;
 
 export function GetPlugin(arg1:string):Promise<models.Plugin>;
 
-export function GetPluginV2(arg1:string):Promise<models.PluginV2>;
+export function GetPluginTemplates():Promise<Array<models.PluginV2>>;
+
+export function GetPluginV2(arg1:number):Promise<models.PluginV2>;
+
+export function GetPluginVersion(arg1:string):Promise<string>;
 
 export function GetPlugins():Promise<Array<models.Plugin>>;
 
@@ -75,17 +85,25 @@ export function GetVirtualEnvironments():Promise<Array<services.VirtualEnvironme
 
 export function Greet(arg1:string):Promise<string>;
 
+export function HandleProtocolURL(arg1:string):Promise<void>;
+
 export function HandleQuit():Promise<void>;
 
 export function HasInProgressJobs():Promise<boolean>;
 
 export function ImportDataFile(arg1:string):Promise<number>;
 
+export function InstallPluginFromRepo(arg1:string):Promise<void>;
+
 export function InstallPythonPackages(arg1:string,arg2:Array<string>):Promise<void>;
 
 export function InstallPythonRequirements(arg1:string,arg2:string):Promise<void>;
 
 export function InstallRPackages(arg1:string,arg2:Array<string>):Promise<void>;
+
+export function IsPluginInstalled(arg1:string):Promise<boolean>;
+
+export function ListJobOutputFiles(arg1:string):Promise<Array<string>>;
 
 export function ListPythonPackages(arg1:string):Promise<Array<string>>;
 
@@ -110,6 +128,8 @@ export function OpenLogDirectory():Promise<void>;
 export function OpenLogFile():Promise<void>;
 
 export function ParseDataFile(arg1:string,arg2:number):Promise<services.DataFilePreview>;
+
+export function ParsePluginYAML(arg1:string):Promise<models.PluginDefinition>;
 
 export function PauseJobQueue():Promise<void>;
 
@@ -137,6 +157,10 @@ export function RunPHATEAnalysis(arg1:string,arg2:string,arg3:Array<string>,arg4
 
 export function SaveFile(arg1:string,arg2:string):Promise<string>;
 
+export function SavePluginYAML(arg1:string,arg2:string):Promise<void>;
+
+export function SaveTempFile(arg1:string,arg2:string):Promise<string>;
+
 export function SetActivePythonEnvironment(arg1:string):Promise<void>;
 
 export function SetActiveREnvironment(arg1:string):Promise<void>;
@@ -144,5 +168,11 @@ export function SetActiveREnvironment(arg1:string):Promise<void>;
 export function SetSetting(arg1:string,arg2:any):Promise<void>;
 
 export function StopJobQueueImmediate():Promise<void>;
+
+export function UninstallPluginFromRepo(arg1:string):Promise<void>;
+
+export function UpdatePluginFromRepo(arg1:string):Promise<void>;
+
+export function ValidatePluginYAML(arg1:string):Promise<boolean>;
 
 export function WriteJobOutputFile(arg1:string,arg2:string,arg3:string):Promise<void>;

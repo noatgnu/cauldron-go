@@ -81,6 +81,15 @@ copy_resources() {
         has_error=1
     fi
 
+    if [ -f "$PROJECT_ROOT/bin/external/uniprot-fetcher.exe" ]; then
+        if cp "$PROJECT_ROOT/bin/external/uniprot-fetcher.exe" "$PROJECT_ROOT/build/bin/plugins/uniprot-fetcher/"; then
+            print_success "Uniprot-fetcher executable copied to plugin directory"
+        else
+            print_error "Failed to copy uniprot-fetcher executable"
+            has_error=1
+        fi
+    fi
+
     if [ -d "$PROJECT_ROOT/bin" ]; then
         mkdir -p "$PROJECT_ROOT/build/bin/tools"
         if cp -r "$PROJECT_ROOT/bin/"* "$PROJECT_ROOT/build/bin/tools/"; then

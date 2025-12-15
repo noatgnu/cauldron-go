@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	goruntime "runtime"
 	"strings"
+	"time"
 
 	"github.com/noatgnu/cauldron-go/backend/models"
 	"gopkg.in/yaml.v3"
@@ -16,10 +17,11 @@ import (
 
 type PluginLoaderV2 struct {
 	pluginsDir string
-	plugins    map[string]*models.PluginV2
+	plugins    map[uint]*models.PluginV2
+	db         *DatabaseService
 }
 
-func NewPluginLoaderV2(pluginsDir string) *PluginLoaderV2 {
+func NewPluginLoaderV2(pluginsDir string, db *DatabaseService) *PluginLoaderV2 {
 	if pluginsDir == "" {
 		execPath, _ := os.Executable()
 		pluginsDir = filepath.Join(filepath.Dir(execPath), "plugins")
@@ -27,7 +29,8 @@ func NewPluginLoaderV2(pluginsDir string) *PluginLoaderV2 {
 
 	return &PluginLoaderV2{
 		pluginsDir: pluginsDir,
-		plugins:    make(map[string]*models.PluginV2),
+		plugins:    make(map[uint]*models.PluginV2),
+		db:         db,
 	}
 }
 
@@ -59,10 +62,18 @@ func (l *PluginLoaderV2) LoadPlugins() error {
 			continue
 		}
 
-		l.plugins[plugin.Definition.Plugin.ID] = plugin
+		registry, err := l.getOrCreateRegistry(plugin, pluginPath)
+		if err != nil {
+			log.Printf("[PluginLoader] Failed to register plugin from %s: %v", pluginPath, err)
+			continue
+		}
+
+		plugin.ID = registry.ID
+		l.plugins[registry.ID] = plugin
 		loadedCount++
-		log.Printf("[PluginLoader] Loaded plugin: %s (%s) from %s",
+		log.Printf("[PluginLoader] Loaded plugin: %s [ID:%d] (%s) from %s",
 			plugin.Definition.Plugin.Name,
+			registry.ID,
 			plugin.Definition.Plugin.ID,
 			pluginPath)
 	}
@@ -196,10 +207,42 @@ func (l *PluginLoaderV2) validateDefinition(def *models.PluginDefinition) error 
 	return nil
 }
 
-func (l *PluginLoaderV2) GetPlugin(id string) (*models.PluginV2, error) {
+func (l *PluginLoaderV2) getOrCreateRegistry(plugin *models.PluginV2, folderPath string) (*models.PluginRegistry, error) {
+	var registry models.PluginRegistry
+
+	result := l.db.GetDB().Where("folder_path = ?", folderPath).First(&registry)
+	if result.Error == nil {
+		return &registry, nil
+	}
+
+	installSource := "builtin"
+	if plugin.Definition.Plugin.Repository != "" {
+		installSource = "remote"
+	}
+
+	registry = models.PluginRegistry{
+		PluginID:      plugin.Definition.Plugin.ID,
+		Name:          plugin.Definition.Plugin.Name,
+		Version:       plugin.Definition.Plugin.Version,
+		Repository:    plugin.Definition.Plugin.Repository,
+		FolderPath:    folderPath,
+		InstallSource: installSource,
+		InstalledAt:   time.Now(),
+		UpdatedAt:     time.Now(),
+	}
+
+	if err := l.db.GetDB().Create(&registry).Error; err != nil {
+		return nil, err
+	}
+
+	log.Printf("[PluginLoader] Created registry entry [ID:%d] for %s", registry.ID, plugin.Definition.Plugin.Name)
+	return &registry, nil
+}
+
+func (l *PluginLoaderV2) GetPlugin(id uint) (*models.PluginV2, error) {
 	plugin, exists := l.plugins[id]
 	if !exists {
-		return nil, fmt.Errorf("plugin not found: %s", id)
+		return nil, fmt.Errorf("plugin not found with ID: %d", id)
 	}
 	return plugin, nil
 }
@@ -223,7 +266,7 @@ func (l *PluginLoaderV2) GetPluginsByCategory(category models.PluginCategory) []
 }
 
 func (l *PluginLoaderV2) ReloadPlugins() error {
-	l.plugins = make(map[string]*models.PluginV2)
+	l.plugins = make(map[uint]*models.PluginV2)
 	return l.LoadPlugins()
 }
 

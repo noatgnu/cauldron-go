@@ -46,3 +46,16 @@ mat-card-header {
   min-height: 400px;
   max-height: 800px;
 }
+
+.image-container {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 16px;
+
+  img {
+    max-width: 100%;
+    height: auto;
+  }
+}

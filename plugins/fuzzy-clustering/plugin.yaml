@@ -54,13 +54,13 @@ plots:
     name: "Fuzzy Clustering Plot"
     type: "scatter"
     component: "FuzzyClusteringPlot"
-    dataSource: "cluster_assignments"
+    dataSource: "cluster_results"
     config:
       axes:
         x: "PC1"
         y: "PC2"
         colorBy: "cluster"
-        labels: "sample"
+        labels: "Sample"
 
     customization:
       - name: "title"
@@ -95,5 +95,5 @@ example:
   enabled: true
   values:
     input_file: "diann/imputed.data.txt"
-    annotation_file: "phate/phate_output.txt"
+    annotation_file: "diann/annotation.txt"
     center_count: 3

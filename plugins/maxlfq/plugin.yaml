@@ -1,7 +1,7 @@
 plugin:
   id: "maxlfq"
   name: "MaxLFQ Normalization"
-  description: "Label-free quantification using MaxLFQ algorithm"
+  description: "Label-free quantification using MaxLFQ algorithm for protein-level quantification from peptide intensities"
   version: "1.0.0"
   author: "CauldronGO Team"
   category: "preprocessing"
@@ -41,14 +41,21 @@ inputs:
     sourceFile: "input_file"
     description: "Columns containing sample intensities"
 
-  - name: "min_samples"
-    label: "Minimum Samples"
+  - name: "annotation_file"
+    label: "Sample Annotation File"
+    type: "file"
+    required: false
+    accept: ".csv,.tsv,.txt"
+    description: "Optional annotation file with Sample and Condition columns for grouping in plots"
+
+  - name: "data_completeness"
+    label: "Data Completeness"
     type: "number"
-    default: 1
-    min: 1
-    max: 100
-    step: 1
-    description: "Minimum number of samples required for quantification"
+    default: 0.7
+    min: 0
+    max: 1
+    step: 0.1
+    description: "Minimum fraction of samples with valid values (0-1). Higher values = less memory usage. Use 0.7-0.9 for large datasets."
 
   - name: "use_log2"
     label: "Use Log2 Transform"
@@ -62,12 +69,34 @@ inputs:
     default: true
     description: "Perform median normalization"
 
+  - name: "max_cores"
+    label: "Maximum Cores"
+    type: "number"
+    default: -1
+    min: -1
+    max: 128
+    step: 1
+    description: "Maximum number of CPU cores to use (-1 = use all available cores minus 1, 0 = use all cores)"
+
 outputs:
   - name: "maxlfq_results"
     path: "maxlfq.data.txt"
     type: "data"
     description: "MaxLFQ normalized protein intensities"
     format: "tsv"
+
+annotation:
+  samplesFrom: "sample_cols"
+  annotationFile: "annotation_file"
+
+plots:
+  - id: "normalization_comparison"
+    type: "image-grid"
+    title: "Normalization Quality Control"
+    description: "Boxplots showing protein intensities before and after normalization"
+    dataSource: "maxlfq_results"
+    config:
+      imagePattern: "*.svg"
 
 execution:
   argsMapping:
@@ -77,7 +106,8 @@ execution:
     sample_cols:
       flag: "--sample_cols"
       transform: "comma-join"
-    min_samples: "--min_samples"
+    annotation_file: "--annotation_file"
+    data_completeness: "--data_completeness"
     use_log2:
       flag: "--use_log2"
       when: "true"
@@ -86,6 +116,7 @@ execution:
       flag: "--normalize"
       when: "true"
       value: "true"
+    max_cores: "--max_cores"
 
   outputDir: "--output_folder"
 
@@ -95,14 +126,15 @@ execution:
       - "iq"
       - "tidyverse"
       - "data.table"
+      - "reshape2"
 
 example:
   enabled: true
   values:
-    input_file: "diann/Reports.pg_matrix.tsv"
+    input_file: "diann/Reports.pr_matrix.tsv"
     protein_col: "Protein.Group"
     peptide_col: "Precursor.Id"
-    sample_cols_source: "diann/Reports.pg_matrix.tsv"
+    sample_cols_source: "diann/Reports.pr_matrix.tsv"
     sample_cols:
       - 'C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_BCA_LT-IP_01.raw'
       - 'C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_BCA_LT-IP_02.raw'
@@ -110,6 +142,6 @@ example:
       - 'C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_BCA_LT-MockIP_01.raw'
       - 'C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_BCA_LT-MockIP_02.raw'
       - 'C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_BCA_LT-MockIP_03.raw'
-    min_samples: 1
+    data_completeness: 0.7
     use_log2: false
     normalize: true

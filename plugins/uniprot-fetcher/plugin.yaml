@@ -132,10 +132,12 @@ execution:
       The program will automatically handle batching for large ID lists.
 
 example:
-  enabled: false
+  enabled: true
   values:
-    input_file: "proteomics/protein_list.txt"
+    input_mode: "file"
+    input_file: "diann/imputed.data.txt"
     column: "Protein.Ids"
+    delimiter: "tab"
     from_database: "UniProtKB_AC-ID"
     fields:
       - "accession"
@@ -147,4 +149,3 @@ example:
       - "go"
       - "keyword"
     output_format: "tsv"
-    delimiter: "tab"

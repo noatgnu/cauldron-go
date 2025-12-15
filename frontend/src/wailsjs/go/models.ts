@@ -1,5 +1,19 @@
 export namespace models {
 	
+	export class AnnotationConfig {
+	    samplesFrom?: string;
+	    annotationFile?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new AnnotationConfig(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.samplesFrom = source["samplesFrom"];
+	        this.annotationFile = source["annotationFile"];
+	    }
+	}
 	export class Config {
 	    resultStoragePath: string;
 	    outputDirectory: string;
@@ -587,6 +601,7 @@ export namespace models {
 	    author?: string;
 	    category: string;
 	    icon?: string;
+	    repository?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new PluginMetadata(source);
@@ -601,6 +616,7 @@ export namespace models {
 	        this.author = source["author"];
 	        this.category = source["category"];
 	        this.icon = source["icon"];
+	        this.repository = source["repository"];
 	    }
 	}
 	export class PluginDefinition {
@@ -609,6 +625,7 @@ export namespace models {
 	    inputs: PluginInputV2[];
 	    outputs?: PluginOutputV2[];
 	    plots?: PluginPlot[];
+	    annotation?: AnnotationConfig;
 	    execution: PluginExecution;
 	    example?: ExampleData;
 	
@@ -623,6 +640,7 @@ export namespace models {
 	        this.inputs = this.convertValues(source["inputs"], PluginInputV2);
 	        this.outputs = this.convertValues(source["outputs"], PluginOutputV2);
 	        this.plots = this.convertValues(source["plots"], PluginPlot);
+	        this.annotation = this.convertValues(source["annotation"], AnnotationConfig);
 	        this.execution = this.convertValues(source["execution"], PluginExecution);
 	        this.example = this.convertValues(source["example"], ExampleData);
 	    }
@@ -661,7 +679,7 @@ export namespace models {
 	    }
 	}
 	export class PluginExecutionRequestV2 {
-	    pluginId: string;
+	    pluginId: number;
 	    parameters: Record<string, any>;
 	
 	    static createFrom(source: any = {}) {
@@ -683,6 +701,7 @@ export namespace models {
 	
 	
 	export class PluginV2 {
+	    id: number;
 	    definition: PluginDefinition;
 	    folderPath: string;
 	    scriptPath: string;
@@ -693,6 +712,7 @@ export namespace models {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
 	        this.definition = this.convertValues(source["definition"], PluginDefinition);
 	        this.folderPath = source["folderPath"];
 	        this.scriptPath = source["scriptPath"];

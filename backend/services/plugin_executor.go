@@ -3,6 +3,9 @@ package services
 import (
 	"encoding/json"
 	"fmt"
+	"log"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/noatgnu/cauldron-go/backend/models"
@@ -17,7 +20,21 @@ func NewPluginExecutor() *PluginExecutor {
 func (e *PluginExecutor) BuildArguments(plugin *models.PluginV2, parameters map[string]interface{}) ([]string, error) {
 	args := []string{plugin.ScriptPath}
 
-	for inputName, mappingInterface := range plugin.Definition.Execution.ArgsMapping {
+	log.Printf("[BuildArguments] Plugin: %s\n", plugin.Definition.Plugin.ID)
+	inputOrder := ""
+	for _, inp := range plugin.Definition.Inputs {
+		inputOrder += inp.Name + ", "
+	}
+	log.Printf("[BuildArguments] Input order: %s\n", inputOrder)
+
+	for _, input := range plugin.Definition.Inputs {
+		inputName := input.Name
+
+		mappingInterface, hasMapping := plugin.Definition.Execution.ArgsMapping[inputName]
+		if !hasMapping {
+			continue
+		}
+
 		paramValue, hasValue := parameters[inputName]
 
 		mapping, err := e.parseArgMapping(mappingInterface)
@@ -41,6 +58,13 @@ func (e *PluginExecutor) BuildArguments(plugin *models.PluginV2, parameters map[
 			if !shouldInclude {
 				continue
 			}
+			flag := *mapping.Flag
+			args = append(args, flag)
+			continue
+		}
+
+		if input.Type == models.PluginInputTypeFile && paramValue != nil {
+			paramValue = e.resolveFilePath(paramValue)
 		}
 
 		flag := *mapping.Flag
@@ -55,13 +79,12 @@ func (e *PluginExecutor) BuildArguments(plugin *models.PluginV2, parameters map[
 			value = &valueStr
 		}
 
-		if *value == "true" && mapping.When != nil {
-			args = append(args, flag)
-		} else if *value != "" {
+		if *value != "" {
 			args = append(args, flag, *value)
 		}
 	}
 
+	log.Printf("[BuildArguments] Final args: %v\n", args)
 	return args, nil
 }
 
@@ -234,4 +257,41 @@ func (e *PluginExecutor) validateInputRange(input models.PluginInputV2, value in
 	}
 
 	return nil
+}
+
+func (e *PluginExecutor) resolveFilePath(value interface{}) interface{} {
+	pathStr, ok := value.(string)
+	if !ok {
+		return value
+	}
+
+	if filepath.IsAbs(pathStr) {
+		return value
+	}
+
+	execPath, err := os.Executable()
+	if err != nil {
+		log.Printf("[resolveFilePath] Failed to get executable path: %v", err)
+		return value
+	}
+
+	execDir := filepath.Dir(execPath)
+
+	examplesPath := filepath.Join(execDir, pathStr)
+	if _, err := os.Stat(examplesPath); err == nil {
+		log.Printf("[resolveFilePath] Resolved %s to %s", pathStr, examplesPath)
+		return examplesPath
+	}
+
+	cwd, err := os.Getwd()
+	if err == nil {
+		cwdPath := filepath.Join(cwd, pathStr)
+		if _, err := os.Stat(cwdPath); err == nil {
+			log.Printf("[resolveFilePath] Resolved %s to %s", pathStr, cwdPath)
+			return cwdPath
+		}
+	}
+
+	log.Printf("[resolveFilePath] Could not resolve path %s, using as-is", pathStr)
+	return value
 }

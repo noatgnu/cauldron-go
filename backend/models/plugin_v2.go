@@ -125,6 +125,7 @@ type PluginMetadata struct {
 	Author      string         `yaml:"author,omitempty" json:"author,omitempty"`
 	Category    PluginCategory `yaml:"category" json:"category"`
 	Icon        string         `yaml:"icon,omitempty" json:"icon,omitempty"`
+	Repository  string         `yaml:"repository,omitempty" json:"repository,omitempty"`
 }
 
 type ExampleData struct {
@@ -132,23 +133,30 @@ type ExampleData struct {
 	Values  map[string]interface{} `yaml:"values" json:"values"`
 }
 
+type AnnotationConfig struct {
+	SamplesFrom    string `yaml:"samplesFrom,omitempty" json:"samplesFrom,omitempty"`
+	AnnotationFile string `yaml:"annotationFile,omitempty" json:"annotationFile,omitempty"`
+}
+
 type PluginDefinition struct {
-	Plugin    PluginMetadata   `yaml:"plugin" json:"plugin"`
-	Runtime   PluginRuntimeV2  `yaml:"runtime" json:"runtime"`
-	Inputs    []PluginInputV2  `yaml:"inputs" json:"inputs"`
-	Outputs   []PluginOutputV2 `yaml:"outputs,omitempty" json:"outputs,omitempty"`
-	Plots     []PluginPlot     `yaml:"plots,omitempty" json:"plots,omitempty"`
-	Execution PluginExecution  `yaml:"execution" json:"execution"`
-	Example   *ExampleData     `yaml:"example,omitempty" json:"example,omitempty"`
+	Plugin     PluginMetadata    `yaml:"plugin" json:"plugin"`
+	Runtime    PluginRuntimeV2   `yaml:"runtime" json:"runtime"`
+	Inputs     []PluginInputV2   `yaml:"inputs" json:"inputs"`
+	Outputs    []PluginOutputV2  `yaml:"outputs,omitempty" json:"outputs,omitempty"`
+	Plots      []PluginPlot      `yaml:"plots,omitempty" json:"plots,omitempty"`
+	Annotation *AnnotationConfig `yaml:"annotation,omitempty" json:"annotation,omitempty"`
+	Execution  PluginExecution   `yaml:"execution" json:"execution"`
+	Example    *ExampleData      `yaml:"example,omitempty" json:"example,omitempty"`
 }
 
 type PluginV2 struct {
+	ID         uint             `json:"id"`
 	Definition PluginDefinition `json:"definition"`
 	FolderPath string           `json:"folderPath"`
 	ScriptPath string           `json:"scriptPath"`
 }
 
 type PluginExecutionRequestV2 struct {
-	PluginID   string                 `json:"pluginId"`
+	PluginID   uint                   `json:"pluginId"`
 	Parameters map[string]interface{} `json:"parameters"`
 }

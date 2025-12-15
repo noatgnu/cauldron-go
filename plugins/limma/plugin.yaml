@@ -40,8 +40,9 @@ inputs:
 
   - name: "comparisons"
     label: "Comparisons"
-    type: "text"
+    type: "file"
     required: false
+    accept: ".csv,.tsv,.txt"
     description: "Comparison groups for differential analysis"
 
 outputs:

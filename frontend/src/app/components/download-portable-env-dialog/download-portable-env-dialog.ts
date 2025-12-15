@@ -1,7 +1,7 @@
-import { Component, Input, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
+import { Component, Input, OnInit, OnDestroy, ChangeDetectorRef, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, ReactiveFormsModule } from '@angular/forms';
-import { MatDialogModule, MatDialogRef } from '@angular/material/dialog';
+import { MatDialogModule, MatDialogRef, MatDialog } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
 import { MatInputModule } from '@angular/material/input';
@@ -9,6 +9,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { Wails } from '../../core/services/wails';
 import { Subscription } from 'rxjs';
+import { ConfirmDialogComponent } from '../confirm-dialog/confirm-dialog';
 
 @Component({
   selector: 'app-download-portable-env-dialog',
@@ -38,11 +39,14 @@ export class DownloadPortableEnvDialogComponent implements OnInit, OnDestroy {
     percentage: number;
     downloaded?: number;
     total?: number;
+    files?: number;
   }> = {};
   currentPhase = '';
   overallProgress = 0;
 
   private progressSubscription?: Subscription;
+
+  private dialog = inject(MatDialog);
 
   constructor(
     private fb: FormBuilder,
@@ -170,11 +174,13 @@ export class DownloadPortableEnvDialogComponent implements OnInit, OnDestroy {
 
         const downloaded = data?.['downloaded'] || 0;
         const total = data?.['total'] || 0;
+        const files = data?.['files'] || 0;
 
         this.progressItems[message] = {
           percentage,
           downloaded: type === 'download' ? downloaded : undefined,
-          total: type === 'download' ? total : undefined
+          total: type === 'download' ? total : undefined,
+          files: (type === 'extract' || type === 'install') && files > 0 ? files : undefined
         };
         this.cdr.detectChanges();
       }
@@ -186,8 +192,35 @@ export class DownloadPortableEnvDialogComponent implements OnInit, OnDestroy {
 
     const url = this.form.get('url')?.value;
     if (!url || url.startsWith('Error:')) {
-      alert('Invalid download URL');
+      await this.wails.logToFile('[DownloadPortableEnv] Invalid download URL');
       return;
+    }
+
+    try {
+      const existingPath = await this.wails.getPortableEnvironmentPath(this.environment);
+
+      if (existingPath && existingPath !== '') {
+        const envName = this.environment === 'python' ? 'Python' : 'R';
+        const dialogRef = this.dialog.open(ConfirmDialogComponent, {
+          width: '400px',
+          data: {
+            title: `Replace Existing ${envName} Environment?`,
+            message: `A portable ${envName} environment is already installed at:\n\n${existingPath}\n\nDownloading a new environment will remove the existing one. Do you want to continue?`,
+            confirmText: 'Yes, Replace',
+            cancelText: 'Cancel'
+          }
+        });
+
+        const confirmed = await dialogRef.afterClosed().toPromise();
+        if (!confirmed) {
+          await this.wails.logToFile('[DownloadPortableEnv] User cancelled download - existing environment found');
+          return;
+        }
+
+        await this.wails.logToFile('[DownloadPortableEnv] User confirmed replacement of existing environment');
+      }
+    } catch (error) {
+      await this.wails.logToFile(`[DownloadPortableEnv] Could not check existing environment: ${error}`);
     }
 
     this.progressItems = {};
@@ -202,6 +235,7 @@ export class DownloadPortableEnvDialogComponent implements OnInit, OnDestroy {
       this.downloading = false;
       this.form.enable();
       this.cdr.detectChanges();
+      await this.wails.logToFile(`[DownloadPortableEnv] Download error: ${errorMessage}`);
     }
   }
 

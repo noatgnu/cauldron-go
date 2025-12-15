@@ -124,11 +124,9 @@ execution:
     scaler_type: "--scaler_type"
     with_centering:
       flag: "--with_centering"
-      value: "True"
       when: "true"
     with_scaling:
       flag: "--with_scaling"
-      value: "True"
       when: "true"
     n_quantiles: "--n_quantiles"
     output_distribution: "--output_distribution"

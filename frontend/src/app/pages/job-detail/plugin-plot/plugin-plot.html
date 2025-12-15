@@ -19,22 +19,28 @@
     }
 
     @if (!loading() && !error()) {
-      <div class="export-actions">
-        <button mat-raised-button color="accent" (click)="exportToSVG()">
-          <mat-icon>save</mat-icon>
-          Export to SVG
-        </button>
-      </div>
-      <div class="plot-container">
-        <plotly-plot
-          [divId]="getPlotId()"
-          [data]="plotData"
-          [layout]="plotLayout"
-          [config]="plotConfig"
-          [updateOnLayoutChange]="true"
-          [revision]="revision"
-        ></plotly-plot>
-      </div>
+      @if (plotType === 'json') {
+        <div class="export-actions">
+          <button mat-raised-button color="accent" (click)="exportToSVG()">
+            <mat-icon>save</mat-icon>
+            Export to SVG
+          </button>
+        </div>
+        <div class="plot-container">
+          <plotly-plot
+            [divId]="getPlotId()"
+            [data]="plotData"
+            [layout]="plotLayout"
+            [config]="plotConfig"
+            [updateOnLayoutChange]="true"
+            [revision]="revision"
+          ></plotly-plot>
+        </div>
+      } @else if (plotType === 'svg' || plotType === 'png') {
+        <div class="image-container">
+          <img [src]="imageData()" [alt]="plotTitle || 'Plugin Plot'" />
+        </div>
+      }
     }
   </mat-card-content>
 </mat-card>

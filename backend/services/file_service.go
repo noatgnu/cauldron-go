@@ -207,12 +207,6 @@ func (f *FileService) ExtractTarXz(archivePath string, destPath string) error {
 	}
 	defer file.Close()
 
-	fileInfo, err := file.Stat()
-	if err != nil {
-		return err
-	}
-	totalSize := fileInfo.Size()
-
 	xzReader, err := xz.NewReader(file)
 	if err != nil {
 		return err
@@ -220,11 +214,13 @@ func (f *FileService) ExtractTarXz(archivePath string, destPath string) error {
 
 	tarReader := tar.NewReader(xzReader)
 
-	var processedSize int64
-	lastEmitSize := int64(0)
-	emitThreshold := totalSize / 20
-
 	fileName := filepath.Base(archivePath)
+	messageKey := fmt.Sprintf("Extracting %s", fileName)
+	f.progressNotifier.EmitStart(ProgressTypeExtract, messageKey, messageKey)
+
+	filesExtracted := 0
+	lastEmitCount := 0
+	emitInterval := 50
 
 	for {
 		header, err := tarReader.Next()
@@ -253,24 +249,21 @@ func (f *FileService) ExtractTarXz(archivePath string, destPath string) error {
 			}
 			outFile.Close()
 
-			processedSize += header.Size
+			filesExtracted++
 
-			if processedSize-lastEmitSize >= emitThreshold || processedSize >= totalSize {
-				percentage := float64(processedSize) / float64(totalSize) * 100
-				if percentage > 100 {
-					percentage = 100
-				}
+			if filesExtracted-lastEmitCount >= emitInterval {
+				f.progressNotifier.EmitWithData(ProgressTypeExtract, messageKey,
+					messageKey, 50, map[string]interface{}{
+						"files": filesExtracted,
+					})
 
-				f.progressNotifier.EmitProgress(ProgressTypeExtract, fileName,
-					fmt.Sprintf("Extracting %s", fileName), percentage)
-
-				lastEmitSize = processedSize
+				lastEmitCount = filesExtracted
 			}
 		}
 	}
 
-	f.progressNotifier.EmitComplete(ProgressTypeExtract, fileName,
-		fmt.Sprintf("Extracted %s", fileName))
+	f.progressNotifier.EmitComplete(ProgressTypeExtract, messageKey,
+		fmt.Sprintf("Extracted %s (%d files)", fileName, filesExtracted))
 
 	return nil
 }

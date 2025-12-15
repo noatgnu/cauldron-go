@@ -14,6 +14,7 @@ import (
 	"github.com/noatgnu/cauldron-go/backend/models"
 	"github.com/noatgnu/cauldron-go/backend/services"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
+	"gopkg.in/yaml.v3"
 )
 
 type App struct {
@@ -30,6 +31,8 @@ type App struct {
 	pluginService      *services.PluginService
 	pluginLoaderV2     *services.PluginLoaderV2
 	pluginExecutor     *services.PluginExecutor
+	pluginInstaller    *services.PluginInstaller
+	protocolHandler    *services.ProtocolHandler
 }
 
 func NewApp() *App {
@@ -38,18 +41,8 @@ func NewApp() *App {
 
 func (a *App) startup(ctx context.Context) {
 	log.Println("[App.startup] Starting application...")
-	log.Println("[App.startup] beforeClose handler registered")
+	log.Println("[App.startup] OnBeforeClose handler will handle window close events")
 	a.ctx = ctx
-
-	// Set up window close handler
-	if ctx.Value("wails-test") == nil {
-		log.Println("[App.startup] Setting up window close handler...")
-		runtime.EventsOn(ctx, "wails:window:close", func(data ...interface{}) {
-			log.Println("[EventsOn] Window close event detected!")
-			a.handleWindowClose(ctx)
-		})
-		log.Println("[App.startup] Window close handler registered")
-	}
 
 	// Only set menu if running in Wails runtime (not in tests)
 	if ctx.Value("wails-test") == nil {
@@ -115,15 +108,48 @@ func (a *App) startup(ctx context.Context) {
 		runtime.EventsEmit(a.ctx, "job:update", job)
 	})
 
+	a.scriptExecutor.SetOutputCallback(func(jobID string, line string) {
+		job, err := a.jobQueue.GetJob(jobID)
+		if err != nil {
+			return
+		}
+
+		job.TerminalOutput = append(job.TerminalOutput, line)
+		if err := a.db.GetDB().Save(job).Error; err != nil {
+			log.Printf("[App] Failed to save job output %s: %v", jobID, err)
+		}
+
+		runtime.EventsEmit(a.ctx, "job:output", map[string]interface{}{
+			"jobId":  jobID,
+			"output": line,
+		})
+	})
+
 	log.Println("[App.startup] Initializing plugin service...")
 	a.pluginService = services.NewPluginService()
 
 	log.Println("[App.startup] Initializing plugin system V2...")
-	a.pluginLoaderV2 = services.NewPluginLoaderV2("")
+	a.pluginLoaderV2 = services.NewPluginLoaderV2("", a.db)
 	if err := a.pluginLoaderV2.LoadPlugins(); err != nil {
 		log.Printf("[App.startup] Failed to load plugins: %v", err)
 	}
 	a.pluginExecutor = services.NewPluginExecutor()
+
+	exePath, _ := os.Executable()
+	pluginsDir := filepath.Join(filepath.Dir(exePath), "plugins")
+	a.pluginInstaller = services.NewPluginInstaller(pluginsDir, a.db, a.pluginLoaderV2)
+	log.Println("[App.startup] Plugin installer initialized")
+
+	log.Println("[App.startup] Initializing protocol handler...")
+	a.protocolHandler = services.NewProtocolHandler(a.pluginInstaller)
+	if err := a.protocolHandler.RegisterProtocol(); err != nil {
+		log.Printf("[App.startup] Warning: Failed to register protocol handler: %v", err)
+	}
+	log.Println("[App.startup] Protocol handler initialized")
+
+	log.Println("[App.startup] Checking for protocol URL...")
+	a.handleProtocolURL()
+
 	log.Println("[App.startup] Plugin system V2 initialized")
 
 	log.Println("[App.startup] Checking for unfinished jobs...")
@@ -194,6 +220,31 @@ func (a *App) ReadJobOutputFile(jobID string, filename string) (string, error) {
 	content = strings.ReplaceAll(content, "\r", "\n")
 
 	return content, nil
+}
+
+func (a *App) ListJobOutputFiles(jobID string) ([]string, error) {
+	job, err := a.jobQueue.GetJob(jobID)
+	if err != nil {
+		return nil, err
+	}
+
+	if job.OutputPath == "" {
+		return nil, fmt.Errorf("job has no output directory")
+	}
+
+	entries, err := os.ReadDir(job.OutputPath)
+	if err != nil {
+		return nil, err
+	}
+
+	var files []string
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			files = append(files, entry.Name())
+		}
+	}
+
+	return files, nil
 }
 
 func (a *App) WriteJobOutputFile(jobID string, filename string, content string) error {
@@ -1421,15 +1472,19 @@ func (a *App) GetPluginsV2() []*models.PluginV2 {
 	return a.pluginLoaderV2.GetAllPlugins()
 }
 
-func (a *App) GetPluginV2(id string) (*models.PluginV2, error) {
+func (a *App) GetPluginV2(id uint) (*models.PluginV2, error) {
 	return a.pluginLoaderV2.GetPlugin(id)
 }
 
 func (a *App) ExecutePluginV2(req models.PluginExecutionRequestV2) (string, error) {
+	log.Printf("[ExecutePluginV2] Starting execution for plugin ID: %d", req.PluginID)
 	plugin, err := a.pluginLoaderV2.GetPlugin(req.PluginID)
 	if err != nil {
+		log.Printf("[ExecutePluginV2] Failed to get plugin: %v", err)
 		return "", err
 	}
+	log.Printf("[ExecutePluginV2] Plugin loaded: %s [ID:%d] (%s), Runtime type: %s",
+		plugin.Definition.Plugin.Name, plugin.ID, plugin.Definition.Plugin.ID, plugin.Definition.Runtime.Type)
 
 	if err := a.pluginExecutor.ValidateParameters(plugin, req.Parameters); err != nil {
 		return "", fmt.Errorf("parameter validation failed: %w", err)
@@ -1451,8 +1506,10 @@ func (a *App) ExecutePluginV2(req models.PluginExecutionRequestV2) (string, erro
 		time.Now().Format("20060102_150405")))
 	os.MkdirAll(outputDir, 0755)
 
+	log.Printf("[ExecutePluginV2] Args before outputDir append: %v", args)
 	if plugin.Definition.Execution.OutputDir != "" {
 		args = append(args, plugin.Definition.Execution.OutputDir, outputDir)
+		log.Printf("[ExecutePluginV2] Args after outputDir append: %v", args)
 	}
 
 	parameters := make(map[string]interface{})
@@ -1460,7 +1517,7 @@ func (a *App) ExecutePluginV2(req models.PluginExecutionRequestV2) (string, erro
 		parameters[k] = v
 	}
 	parameters["outputDir"] = outputDir
-	parameters["pluginId"] = plugin.Definition.Plugin.ID
+	parameters["pluginId"] = plugin.ID
 
 	jobID, err := a.jobQueue.CreateJobWithParameters(
 		plugin.Definition.Plugin.ID,
@@ -1474,17 +1531,35 @@ func (a *App) ExecutePluginV2(req models.PluginExecutionRequestV2) (string, erro
 	}
 
 	go func() {
+		jobCtx, cancel := context.WithCancel(a.ctx)
+		defer cancel()
+
+		a.jobQueue.RegisterJobCancelFunc(jobID, cancel)
+		defer a.jobQueue.UnregisterJobCancelFunc(jobID)
+
+		job, err := a.jobQueue.GetJob(jobID)
+		if err == nil {
+			now := time.Now()
+			job.StartedAt = &now
+			job.Status = models.JobStatusInProgress
+			a.db.GetDB().Save(job)
+			runtime.EventsEmit(a.ctx, "job:update", job)
+		}
+
 		var execErr error
+		log.Printf("[ExecutePluginV2] Plugin runtime type: %s", plugin.Definition.Runtime.Type)
 		switch plugin.Definition.Runtime.Type {
 		case "python", "pythonWithR":
-			execErr = a.scriptExecutor.ExecutePythonScript(a.ctx, jobID, services.ScriptConfig{
-				Type:       plugin.Definition.Plugin.ID,
-				ScriptName: filepath.Base(plugin.ScriptPath),
-				Args:       args[1:],
-				OutputDir:  outputDir,
+			log.Printf("[ExecutePluginV2] Calling ExecutePythonScript with RuntimeType: %s", plugin.Definition.Runtime.Type)
+			execErr = a.scriptExecutor.ExecutePythonScript(jobCtx, jobID, services.ScriptConfig{
+				Type:        plugin.Definition.Plugin.ID,
+				RuntimeType: plugin.Definition.Runtime.Type,
+				ScriptName:  filepath.Base(plugin.ScriptPath),
+				Args:        args[1:],
+				OutputDir:   outputDir,
 			})
 		case "r":
-			execErr = a.scriptExecutor.ExecuteRScript(a.ctx, jobID, services.ScriptConfig{
+			execErr = a.scriptExecutor.ExecuteRScript(jobCtx, jobID, services.ScriptConfig{
 				Type:       plugin.Definition.Plugin.ID,
 				ScriptName: filepath.Base(plugin.ScriptPath),
 				Args:       args[1:],
@@ -1502,6 +1577,89 @@ func (a *App) ExecutePluginV2(req models.PluginExecutionRequestV2) (string, erro
 
 func (a *App) ReloadPluginsV2() error {
 	return a.pluginLoaderV2.ReloadPlugins()
+}
+
+func (a *App) SavePluginYAML(pluginID string, yamlContent string) error {
+	pluginsDir := a.pluginLoaderV2.GetPluginsDirectory()
+	pluginDir := filepath.Join(pluginsDir, pluginID)
+
+	if err := os.MkdirAll(pluginDir, 0755); err != nil {
+		return fmt.Errorf("failed to create plugin directory: %v", err)
+	}
+
+	yamlPath := filepath.Join(pluginDir, "plugin.yaml")
+	if err := os.WriteFile(yamlPath, []byte(yamlContent), 0644); err != nil {
+		return fmt.Errorf("failed to write plugin.yaml: %v", err)
+	}
+
+	log.Printf("[SavePluginYAML] Saved plugin: %s", pluginID)
+
+	return a.pluginLoaderV2.ReloadPlugins()
+}
+
+func (a *App) ValidatePluginYAML(yamlContent string) (bool, []string, error) {
+	var definition models.PluginDefinition
+	if err := yaml.Unmarshal([]byte(yamlContent), &definition); err != nil {
+		return false, []string{fmt.Sprintf("YAML parsing error: %v", err)}, nil
+	}
+
+	validator := services.NewPluginValidator()
+	valid, errors := validator.ValidateDefinition(&definition)
+
+	return valid, errors, nil
+}
+
+func (a *App) ConvertPluginToYAML(definition models.PluginDefinition) (string, error) {
+	data, err := yaml.Marshal(definition)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal plugin definition: %v", err)
+	}
+
+	return string(data), nil
+}
+
+func (a *App) ParsePluginYAML(yamlContent string) (models.PluginDefinition, error) {
+	var definition models.PluginDefinition
+	if err := yaml.Unmarshal([]byte(yamlContent), &definition); err != nil {
+		return definition, fmt.Errorf("failed to parse YAML: %v", err)
+	}
+
+	return definition, nil
+}
+
+func (a *App) GetPluginTemplates() ([]*models.PluginV2, error) {
+	allPlugins := a.pluginLoaderV2.GetAllPlugins()
+	return allPlugins, nil
+}
+
+func (a *App) DeletePlugin(pluginID string) error {
+	pluginsDir := a.pluginLoaderV2.GetPluginsDirectory()
+	pluginDir := filepath.Join(pluginsDir, pluginID)
+
+	if err := os.RemoveAll(pluginDir); err != nil {
+		return fmt.Errorf("failed to delete plugin directory: %v", err)
+	}
+
+	log.Printf("[DeletePlugin] Deleted plugin: %s", pluginID)
+
+	return a.pluginLoaderV2.ReloadPlugins()
+}
+
+func (a *App) SaveTempFile(filename string, content string) (string, error) {
+	tempDir := os.TempDir()
+	filePath := filepath.Join(tempDir, "cauldron_temp", filename)
+
+	dir := filepath.Dir(filePath)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return "", fmt.Errorf("failed to create temp directory: %v", err)
+	}
+
+	if err := os.WriteFile(filePath, []byte(content), 0644); err != nil {
+		return "", fmt.Errorf("failed to write temp file: %v", err)
+	}
+
+	log.Printf("[SaveTempFile] Saved temp file: %s", filePath)
+	return filePath, nil
 }
 
 func (a *App) LogToFile(message string) error {
@@ -1587,7 +1745,10 @@ func (a *App) OpenLogDirectory() error {
 
 func (a *App) HandleQuit() {
 	log.Println("[HandleQuit] Quit requested from menu")
-	a.handleWindowClose(a.ctx)
+	shouldPreventClose := a.beforeClose(a.ctx)
+	if !shouldPreventClose {
+		runtime.Quit(a.ctx)
+	}
 }
 
 func (a *App) PauseJobQueue() error {
@@ -1710,63 +1871,6 @@ func (a *App) checkUnfinishedJobs() {
 	}
 }
 
-func (a *App) handleWindowClose(ctx context.Context) {
-	defer func() {
-		if r := recover(); r != nil {
-			log.Printf("[handleWindowClose] PANIC recovered: %v", r)
-		}
-		log.Println("[handleWindowClose] Function exiting")
-	}()
-
-	log.Println("[handleWindowClose] ========== CLOSE REQUESTED ==========")
-	log.Printf("[handleWindowClose] Context: %v", ctx)
-	log.Printf("[handleWindowClose] App: %v", a)
-
-	if a == nil {
-		log.Println("[handleWindowClose] ERROR: App is nil! Allowing close")
-		runtime.Quit(ctx)
-		return
-	}
-
-	if a.jobQueue == nil {
-		log.Println("[handleWindowClose] Job queue is nil, allowing close")
-		runtime.Quit(ctx)
-		return
-	}
-
-	hasInProgress := a.HasInProgressJobs()
-	log.Printf("[handleWindowClose] Has in-progress jobs: %v", hasInProgress)
-
-	if hasInProgress {
-		log.Println("[handleWindowClose] Showing jobs in progress dialog")
-		selection, err := runtime.MessageDialog(ctx, runtime.MessageDialogOptions{
-			Type:          runtime.WarningDialog,
-			Title:         "Jobs in Progress",
-			Message:       "There are jobs still running. Closing the application will terminate them. Are you sure you want to exit?",
-			Buttons:       []string{"Exit Anyway", "Cancel"},
-			DefaultButton: "Cancel",
-		})
-
-		if err != nil {
-			log.Printf("[handleWindowClose] Error showing dialog: %v", err)
-			runtime.Quit(ctx)
-			return
-		}
-
-		log.Printf("[handleWindowClose] User selected: %s", selection)
-		if selection == "Exit Anyway" {
-			log.Println("[handleWindowClose] User chose to exit anyway")
-			runtime.Quit(ctx)
-		} else {
-			log.Println("[handleWindowClose] User chose to cancel close")
-		}
-		return
-	}
-
-	log.Println("[handleWindowClose] No in-progress jobs, allowing close")
-	runtime.Quit(ctx)
-}
-
 func (a *App) beforeClose(ctx context.Context) bool {
 	defer func() {
 		if r := recover(); r != nil {
@@ -1795,10 +1899,10 @@ func (a *App) beforeClose(ctx context.Context) bool {
 	if hasInProgress {
 		log.Println("[beforeClose] Showing jobs in progress dialog")
 		selection, err := runtime.MessageDialog(ctx, runtime.MessageDialogOptions{
-			Type:          runtime.WarningDialog,
+			Type:          runtime.QuestionDialog,
 			Title:         "Jobs in Progress",
-			Message:       "There are jobs still running. Closing the application will terminate them. Are you sure you want to exit?",
-			Buttons:       []string{"Exit Anyway", "Cancel"},
+			Message:       "There are jobs still running. What would you like to do?",
+			Buttons:       []string{"Stop Jobs & Exit", "Exit Anyway", "Cancel"},
 			DefaultButton: "Cancel",
 		})
 
@@ -1808,11 +1912,90 @@ func (a *App) beforeClose(ctx context.Context) bool {
 		}
 
 		log.Printf("[beforeClose] User selected: %s", selection)
-		result := selection != "Exit Anyway"
-		log.Printf("[beforeClose] Returning: %v (true = prevent close, false = allow close)", result)
-		return result
+
+		if selection == "Stop Jobs & Exit" {
+			log.Println("[beforeClose] User chose to stop jobs and exit")
+			if a.jobQueue != nil {
+				a.jobQueue.StopQueueImmediate()
+			}
+			return false
+		} else if selection == "Exit Anyway" {
+			log.Println("[beforeClose] User chose to exit without stopping jobs")
+			return false
+		}
+
+		log.Println("[beforeClose] User chose to cancel close")
+		return true
 	}
 
 	log.Println("[beforeClose] No in-progress jobs, allowing close")
 	return false
+}
+
+func (a *App) InstallPluginFromRepo(repoURL string) error {
+	log.Printf("[App] Installing plugin from repository: %s", repoURL)
+	return a.pluginInstaller.InstallPlugin(repoURL)
+}
+
+func (a *App) UpdatePluginFromRepo(repoURL string) error {
+	log.Printf("[App] Updating plugin from repository: %s", repoURL)
+	return a.pluginInstaller.UpdatePlugin(repoURL)
+}
+
+func (a *App) UninstallPluginFromRepo(repoURL string) error {
+	log.Printf("[App] Uninstalling plugin from repository: %s", repoURL)
+	return a.pluginInstaller.UninstallPlugin(repoURL)
+}
+
+func (a *App) IsPluginInstalled(repoURL string) (bool, error) {
+	return a.pluginInstaller.IsPluginInstalled(repoURL)
+}
+
+func (a *App) GetPluginVersion(repoURL string) (string, error) {
+	return a.pluginInstaller.GetInstalledVersion(repoURL)
+}
+
+func (a *App) DecodePluginRepoURL(encoded string) (string, error) {
+	return services.DecodeRepoURL(encoded)
+}
+
+func (a *App) handleProtocolURL() {
+	if len(os.Args) < 2 {
+		return
+	}
+
+	for _, arg := range os.Args[1:] {
+		if strings.HasPrefix(arg, "cauldron://") {
+			log.Printf("[App] Detected protocol URL: %s", arg)
+			go func(url string) {
+				time.Sleep(2 * time.Second)
+				if err := a.HandleProtocolURL(url); err != nil {
+					log.Printf("[App] Error handling protocol URL: %v", err)
+					runtime.EventsEmit(a.ctx, "protocol:error", map[string]string{
+						"url":   url,
+						"error": err.Error(),
+					})
+				} else {
+					runtime.EventsEmit(a.ctx, "protocol:success", map[string]string{
+						"url": url,
+					})
+				}
+			}(arg)
+		}
+	}
+}
+
+func (a *App) HandleProtocolURL(url string) error {
+	log.Printf("[App] Handling protocol URL: %s", url)
+
+	if a.protocolHandler == nil {
+		return fmt.Errorf("protocol handler not initialized")
+	}
+
+	if err := a.protocolHandler.HandleURL(url); err != nil {
+		return err
+	}
+
+	runtime.EventsEmit(a.ctx, "plugin:installed", nil)
+	return nil
 }

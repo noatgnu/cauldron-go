@@ -1,19 +1,19 @@
-Sample	Batch
-C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_BCA_LT-IP_01.raw	Batch1
-C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_BCA_LT-IP_02.raw	Batch2
-C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_BCA_LT-IP_03.raw	Batch3
-C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_BCA_LT-MockIP_01.raw	Batch1
-C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_BCA_LT-MockIP_02.raw	Batch2
-C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_BCA_LT-MockIP_03.raw	Batch3
-C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_Pepide-CBQCA_LT-IP_01.raw	Batch1
-C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_Pepide-CBQCA_LT-IP_02.raw	Batch2
-C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_Pepide-CBQCA_LT-IP_03.raw	Batch3
-C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_Pepide-CBQCA_LT-MockIP_01.raw	Batch1
-C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_Pepide-CBQCA_LT-MockIP_02.raw	Batch2
-C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_Pepide-CBQCA_LT-MockIP_03.raw	Batch3
-C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_BCA_LT-WCL_01.raw	Batch1
-C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_BCA_LT-WCL_02.raw	Batch2
-C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_BCA_LT-WCL_03.raw	Batch3
-C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_Pepide-CBQCA_LT-WCL_01.raw	Batch1
-C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_Pepide-CBQCA_LT-WCL_02.raw	Batch2
-C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_Pepide-CBQCA_LT-WCL_03.raw	Batch3
+Sample	Condition	BioReplicate	Batch
+C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_BCA_LT-IP_01.raw	BCA_IP	1	Batch1
+C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_BCA_LT-IP_02.raw	BCA_IP	2	Batch1
+C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_BCA_LT-IP_03.raw	BCA_IP	3	Batch1
+C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_BCA_LT-MockIP_01.raw	BCA_MockIP	1	Batch1
+C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_BCA_LT-MockIP_02.raw	BCA_MockIP	2	Batch1
+C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_BCA_LT-MockIP_03.raw	BCA_MockIP	3	Batch1
+C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_Pepide-CBQCA_LT-IP_01.raw	CBQCA_IP	1	Batch2
+C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_Pepide-CBQCA_LT-IP_02.raw	CBQCA_IP	2	Batch2
+C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_Pepide-CBQCA_LT-IP_03.raw	CBQCA_IP	3	Batch2
+C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_Pepide-CBQCA_LT-MockIP_01.raw	CBQCA_MockIP	1	Batch2
+C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_Pepide-CBQCA_LT-MockIP_02.raw	CBQCA_MockIP	2	Batch2
+C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_Pepide-CBQCA_LT-MockIP_03.raw	CBQCA_MockIP	3	Batch2
+C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_BCA_LT-WCL_01.raw	BCA_WCL	1	Batch3
+C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_BCA_LT-WCL_02.raw	BCA_WCL	2	Batch3
+C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_BCA_LT-WCL_03.raw	BCA_WCL	3	Batch3
+C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_Pepide-CBQCA_LT-WCL_01.raw	CBQCA_WCL	1	Batch3
+C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_Pepide-CBQCA_LT-WCL_02.raw	CBQCA_WCL	2	Batch3
+C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_Pepide-CBQCA_LT-WCL_03.raw	CBQCA_WCL	3	Batch3

@@ -27,6 +27,7 @@ import { FormatConversion } from './pages/utilities/format-conversion/format-con
 import { Plugins } from './pages/plugins/plugins';
 import { PluginList } from './pages/plugin-list/plugin-list';
 import { PluginExecute } from './pages/plugin-execute/plugin-execute';
+import { PluginEditor } from './pages/plugin-editor/plugin-editor';
 
 export const routes: Routes = [
   { path: '', component: Home },
@@ -37,6 +38,9 @@ export const routes: Routes = [
   { path: 'plugins', component: Plugins },
   { path: 'plugin-list', component: PluginList },
   { path: 'plugin/:id', component: PluginExecute },
+  { path: 'plugin-editor', component: PluginEditor },
+  { path: 'plugin-editor/new', component: PluginEditor },
+  { path: 'plugin-editor/:id', component: PluginEditor },
   { path: 'analysis/pca', component: Pca },
   { path: 'analysis/imputation', component: Imputation },
   { path: 'analysis/normalization', component: Normalization },

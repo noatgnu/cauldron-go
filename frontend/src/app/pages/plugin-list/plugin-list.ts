@@ -65,6 +65,19 @@ export class PluginList implements OnInit {
     }
   }
 
+  async reloadPlugins() {
+    try {
+      this.loading.set(true);
+      this.error.set('');
+      await this.pluginService.reloadPlugins();
+      await this.loadPlugins();
+    } catch (err) {
+      this.error.set(`Failed to reload plugins: ${err}`);
+    } finally {
+      this.loading.set(false);
+    }
+  }
+
   onSearch() {
     if (!this.searchQuery.trim()) {
       this.filteredPlugins.set(this.plugins());
@@ -83,8 +96,8 @@ export class PluginList implements OnInit {
     return this.categoryIcons[category] || 'extension';
   }
 
-  navigateToPlugin(pluginId: string) {
-    this.router.navigate(['/plugin', pluginId]);
+  navigateToPlugin(pluginId: number) {
+    this.router.navigate(['/plugin', pluginId.toString()]);
   }
 
   getRuntimeIcon(runtime: string): string {

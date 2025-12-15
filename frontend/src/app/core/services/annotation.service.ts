@@ -4,6 +4,7 @@ import { Wails } from './wails';
 export interface Annotation {
   sample: string;
   condition: string;
+  bioreplicate?: string;
   batch?: string;
   color?: string;
 }
@@ -54,23 +55,27 @@ export class AnnotationService {
     const headers = lines[0].toLowerCase().split(/[\t,]/);
     const sampleIdx = headers.findIndex(h => h.includes('sample'));
     const conditionIdx = headers.findIndex(h => h.includes('condition') || h.includes('group'));
+    const bioreplicateIdx = headers.findIndex(h => h.includes('bioreplicate') || h.includes('replicate'));
     const batchIdx = headers.findIndex(h => h.includes('batch'));
     const colorIdx = headers.findIndex(h => h.includes('color'));
 
-    if (sampleIdx === -1 || conditionIdx === -1) {
+    if (sampleIdx === -1) {
       return [];
     }
 
     const annotations: Annotation[] = [];
     for (let i = 1; i < lines.length; i++) {
       const values = lines[i].split(/[\t,]/);
-      if (values.length > Math.max(sampleIdx, conditionIdx)) {
+      if (values.length > sampleIdx) {
         const sample = values[sampleIdx]?.trim();
         const samplePath = sample.split(/[/\\]/).pop() || sample;
         const annotation: Annotation = {
           sample: samplePath,
-          condition: values[conditionIdx]?.trim()
+          condition: conditionIdx !== -1 && values[conditionIdx] ? values[conditionIdx].trim() : ''
         };
+        if (bioreplicateIdx !== -1 && values[bioreplicateIdx]) {
+          annotation.bioreplicate = values[bioreplicateIdx].trim();
+        }
         if (batchIdx !== -1 && values[batchIdx]) {
           annotation.batch = values[batchIdx].trim();
         }
@@ -89,15 +94,20 @@ export class AnnotationService {
       return;
     }
 
+    const hasBioreplicate = annotations.some(a => a.bioreplicate);
     const hasBatch = annotations.some(a => a.batch);
     const hasColor = annotations.some(a => a.color);
 
     const headers = ['Sample', 'Condition'];
+    if (hasBioreplicate) headers.push('BioReplicate');
     if (hasBatch) headers.push('Batch');
     if (hasColor) headers.push('Color');
 
     const rows = annotations.map(a => {
       const row = [a.sample || '', a.condition || ''];
+      if (hasBioreplicate) {
+        row.push(a.bioreplicate || '');
+      }
       if (hasBatch) {
         row.push(a.batch || '');
       }

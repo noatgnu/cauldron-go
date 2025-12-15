@@ -108,6 +108,8 @@
 }
 
 mat-card-actions {
+  display: flex;
+  gap: 12px;
   padding: 16px;
 
   button {

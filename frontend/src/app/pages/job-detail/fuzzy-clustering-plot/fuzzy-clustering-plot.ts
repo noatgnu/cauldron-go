@@ -97,13 +97,13 @@ export class FuzzyClusteringPlot implements OnInit {
 
   private async findAndRenderFirstPlot() {
     const clusterFiles: string[] = [];
-    for (let i = 2; i <= 10; i++) {
+    for (let i = 2; i <= 20; i++) {
       try {
         const filename = `fcm_${i}_clusters.txt`;
-        await this.wails.readJobOutputFile(this.jobId, filename); // Check existence
+        await this.wails.readJobOutputFile(this.jobId, filename);
         clusterFiles.push(filename);
       } catch (e) {
-        break; // Stop when a file is not found
+        // Continue checking other files instead of breaking
       }
     }
     this.availableFiles.set(clusterFiles);
@@ -194,8 +194,8 @@ export class FuzzyClusteringPlot implements OnInit {
   private parseClusterData(tsvData: string): ClusterData {
     const lines = tsvData.trim().split('\n');
     const headers = lines[0].split('\t');
-    const xIndex = headers.indexOf('x');
-    const yIndex = headers.indexOf('y');
+    const xIndex = headers.indexOf('PC1');
+    const yIndex = headers.indexOf('PC2');
     const sampleIndex = headers.indexOf('Sample');
     const clusterIndex = headers.indexOf('cluster');
 

@@ -117,6 +117,7 @@ htmlcov/
 # Build artifacts
 *.tar.gz
 *.zip
+*.tar.xz
 
 # Package files
 *.deb
@@ -125,3 +126,6 @@ htmlcov/
 *.pkg
 *.dmg
 *.AppImage
+
+# Auto-generated plugin documentation
+plugins/*/README.md

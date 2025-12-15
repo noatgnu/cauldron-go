@@ -29,16 +29,17 @@ type JobQueueService struct {
 	paused        bool
 	stopImmediate bool
 	currentJobID  string
-	cancelFunc    context.CancelFunc
+	cancelFuncs   map[string]context.CancelFunc
 }
 
 func NewJobQueueService(ctx context.Context, db *DatabaseService) *JobQueueService {
 	service := &JobQueueService{
-		ctx:     ctx,
-		db:      db,
-		jobs:    make(map[string]*models.Job),
-		queue:   make(chan *models.Job, 100),
-		workers: 2,
+		ctx:         ctx,
+		db:          db,
+		jobs:        make(map[string]*models.Job),
+		queue:       make(chan *models.Job, 100),
+		workers:     2,
+		cancelFuncs: make(map[string]context.CancelFunc),
 	}
 
 	service.loadFromDatabase()
@@ -262,6 +263,18 @@ func (j *JobQueueService) processJob(job *models.Job) {
 		j.currentJobID = ""
 		j.mu.Unlock()
 	}()
+
+	// Skip processing for plugin v2 jobs - they are handled by ExecutePluginV2 directly
+	if job.Command == "python" || job.Command == "pythonWithR" || job.Command == "r" {
+		if pluginID, ok := job.Parameters["pluginId"].(uint); ok && pluginID > 0 {
+			log.Printf("[processJob] Skipping plugin v2 job %s (pluginId: %d) - handled by ExecutePluginV2", job.ID, pluginID)
+			return
+		}
+		if pluginID, ok := job.Parameters["pluginId"].(float64); ok && pluginID > 0 {
+			log.Printf("[processJob] Skipping plugin v2 job %s (pluginId: %.0f) - handled by ExecutePluginV2", job.ID, pluginID)
+			return
+		}
+	}
 
 	now := time.Now()
 	job.StartedAt = &now
@@ -608,7 +621,11 @@ func (j *JobQueueService) StopQueueImmediate() error {
 	log.Println("[StopQueueImmediate] Queue stopped immediately - canceling current job and pausing queue")
 
 	if j.currentJobID != "" {
-		log.Printf("[StopQueueImmediate] Marking current job %s for cancellation", j.currentJobID)
+		log.Printf("[StopQueueImmediate] Cancelling current job %s", j.currentJobID)
+		if cancelFunc, exists := j.cancelFuncs[j.currentJobID]; exists {
+			log.Printf("[StopQueueImmediate] Calling cancel function for job %s", j.currentJobID)
+			cancelFunc()
+		}
 	}
 
 	if j.ctx.Value("wails-test") == nil {
@@ -619,6 +636,20 @@ func (j *JobQueueService) StopQueueImmediate() error {
 	}
 
 	return nil
+}
+
+func (j *JobQueueService) RegisterJobCancelFunc(jobID string, cancelFunc context.CancelFunc) {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	j.cancelFuncs[jobID] = cancelFunc
+	log.Printf("[RegisterJobCancelFunc] Registered cancel function for job %s", jobID)
+}
+
+func (j *JobQueueService) UnregisterJobCancelFunc(jobID string) {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	delete(j.cancelFuncs, jobID)
+	log.Printf("[UnregisterJobCancelFunc] Unregistered cancel function for job %s", jobID)
 }
 
 func (j *JobQueueService) ResumeQueue() error {

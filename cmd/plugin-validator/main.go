@@ -53,6 +53,40 @@ type PluginOutput struct {
 	Format      string `yaml:"format"`
 }
 
+type PlotAxes struct {
+	X       string  `yaml:"x"`
+	Y       string  `yaml:"y"`
+	Z       string  `yaml:"z,omitempty"`
+	ColorBy *string `yaml:"colorBy,omitempty"`
+	Labels  *string `yaml:"labels,omitempty"`
+}
+
+type PlotConfigData struct {
+	Axes PlotAxes `yaml:"axes"`
+}
+
+type PlotCustomization struct {
+	Name    string      `yaml:"name"`
+	Label   string      `yaml:"label"`
+	Type    string      `yaml:"type"`
+	Default interface{} `yaml:"default,omitempty"`
+}
+
+type PluginPlot struct {
+	ID            string              `yaml:"id"`
+	Name          string              `yaml:"name"`
+	Type          string              `yaml:"type"`
+	Component     string              `yaml:"component,omitempty"`
+	DataSource    string              `yaml:"dataSource"`
+	Config        PlotConfigData      `yaml:"config"`
+	Customization []PlotCustomization `yaml:"customization,omitempty"`
+}
+
+type AnnotationConfig struct {
+	SamplesFrom    string `yaml:"samplesFrom,omitempty"`
+	AnnotationFile string `yaml:"annotationFile,omitempty"`
+}
+
 type PluginMetadata struct {
 	ID          string `yaml:"id"`
 	Name        string `yaml:"name"`
@@ -61,6 +95,7 @@ type PluginMetadata struct {
 	Author      string `yaml:"author,omitempty"`
 	Category    string `yaml:"category"`
 	Icon        string `yaml:"icon,omitempty"`
+	Repository  string `yaml:"repository,omitempty"`
 }
 
 type PluginRuntime struct {
@@ -86,12 +121,14 @@ type ExampleData struct {
 }
 
 type PluginConfig struct {
-	Plugin    PluginMetadata  `yaml:"plugin"`
-	Runtime   PluginRuntime   `yaml:"runtime"`
-	Inputs    []PluginInput   `yaml:"inputs"`
-	Outputs   []PluginOutput  `yaml:"outputs,omitempty"`
-	Execution PluginExecution `yaml:"execution"`
-	Example   *ExampleData    `yaml:"example,omitempty"`
+	Plugin     PluginMetadata    `yaml:"plugin"`
+	Runtime    PluginRuntime     `yaml:"runtime"`
+	Inputs     []PluginInput     `yaml:"inputs"`
+	Outputs    []PluginOutput    `yaml:"outputs,omitempty"`
+	Plots      []PluginPlot      `yaml:"plots,omitempty"`
+	Annotation *AnnotationConfig `yaml:"annotation,omitempty"`
+	Execution  PluginExecution   `yaml:"execution"`
+	Example    *ExampleData      `yaml:"example,omitempty"`
 }
 
 func printError(msg string) {

@@ -12,14 +12,26 @@ export class PluginV2Service {
     return GetPluginsV2();
   }
 
-  async getPlugin(id: string): Promise<models.PluginV2> {
+  async getPlugin(id: number): Promise<models.PluginV2> {
     return GetPluginV2(id);
   }
 
-  async executePlugin(pluginId: string, parameters: Record<string, any>): Promise<string> {
+  async executePlugin(pluginId: number, parameters: Record<string, any>): Promise<string> {
+    const plugin = await this.getPlugin(pluginId);
+    const convertedParameters = { ...parameters };
+
+    for (const input of plugin.definition.inputs) {
+      if (input.type === 'file' && convertedParameters[input.name]) {
+        const value = convertedParameters[input.name];
+        if (typeof value === 'string') {
+          convertedParameters[input.name] = value.replace(/\\/g, '/');
+        }
+      }
+    }
+
     const request = new models.PluginExecutionRequestV2({
       pluginId,
-      parameters
+      parameters: convertedParameters
     });
     return ExecutePluginV2(request);
   }

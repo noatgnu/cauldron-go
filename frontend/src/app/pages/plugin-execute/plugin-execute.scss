@@ -32,6 +32,9 @@
   }
 
   mat-card-actions {
+    display: flex;
+    gap: 12px;
+
     button {
       display: flex;
       align-items: center;

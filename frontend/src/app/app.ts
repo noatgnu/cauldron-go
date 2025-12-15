@@ -4,6 +4,7 @@ import { MatSidenavModule } from '@angular/material/sidenav';
 import { Toolbar } from './layout/toolbar/toolbar';
 import { Sidenav } from './layout/sidenav/sidenav';
 import { Breadcrumbs } from './layout/breadcrumbs/breadcrumbs';
+import { ProtocolHandlerService } from './core/services/protocol-handler.service';
 
 @Component({
   selector: 'app-root',
@@ -15,7 +16,10 @@ export class App implements OnInit {
   protected readonly title = signal('cauldron-ui');
   protected readonly sidenavOpened = signal(true);
 
-  constructor(private router: Router) {}
+  constructor(
+    private router: Router,
+    private protocolHandler: ProtocolHandlerService
+  ) {}
 
   ngOnInit(): void {
     this.setupMenuEventListeners();

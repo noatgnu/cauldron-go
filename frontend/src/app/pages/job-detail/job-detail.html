@@ -59,35 +59,81 @@
           </div>
         }
 
-        @if (job()!.type === 'pca' && job()!.status === 'completed') {
-          <div class="plot-section">
-            <h3>PCA Plot</h3>
-            <app-pca-plot [jobId]="jobId"></app-pca-plot>
-          </div>
+        @if (dedicatedPlots().length > 0) {
+          @for (plotDef of dedicatedPlots(); track plotDef.config.id) {
+            <div class="plot-section">
+              <h3>{{ plotDef.config.name }}</h3>
+              @if (plotDef.config.component === 'PcaPlot') {
+                <app-pca-plot [jobId]="jobId"></app-pca-plot>
+              }
+              @if (plotDef.config.component === 'PhatePlot') {
+                <app-phate-plot [jobId]="jobId"></app-phate-plot>
+              }
+              @if (plotDef.config.component === 'FuzzyClusteringPlot') {
+                <app-fuzzy-clustering-plot [jobId]="jobId"></app-fuzzy-clustering-plot>
+              }
+            </div>
+          }
         }
 
-        @if (job()!.type === 'phate' && job()!.status === 'completed') {
-          <div class="plot-section">
-            <h3>PHATE Plot</h3>
-            <app-phate-plot [jobId]="jobId"></app-phate-plot>
-          </div>
-        }
-
-        @if (job()!.type === 'fuzzy-clustering' && job()!.status === 'completed') {
-          <div class="plot-section">
-            <h3>Fuzzy Clustering Plot</h3>
-            <app-fuzzy-clustering-plot [jobId]="jobId"></app-fuzzy-clustering-plot>
-          </div>
+        @if (dynamicPlots().length > 0) {
+          @if (dynamicPlots().length === 1) {
+            <div class="plot-section">
+              <h3>{{ dynamicPlots()[0].config.name }}</h3>
+              <app-generic-plot
+                [jobId]="jobId"
+                [plotConfig]="dynamicPlots()[0].config"
+                [pluginOutputs]="dynamicPlots()[0].outputs"
+              ></app-generic-plot>
+            </div>
+          } @else {
+            <div class="plot-section">
+              <h3>Analysis Plots</h3>
+              <mat-tab-group>
+                @for (plotDef of dynamicPlots(); track plotDef.config.id) {
+                  <mat-tab [label]="plotDef.config.name">
+                    <div class="tab-content">
+                      <app-generic-plot
+                        [jobId]="jobId"
+                        [plotConfig]="plotDef.config"
+                        [pluginOutputs]="plotDef.outputs"
+                      ></app-generic-plot>
+                    </div>
+                  </mat-tab>
+                }
+              </mat-tab-group>
+            </div>
+          }
         }
 
         @if (pluginPlots().length > 0) {
-          @for (plot of pluginPlots(); track plot.fileName) {
+          @if (pluginPlots().length === 1) {
             <div class="plot-section">
+              <h3>{{ pluginPlots()[0].title }}</h3>
               <app-plugin-plot
                 [jobId]="jobId"
-                [plotFileName]="plot.fileName"
-                [plotTitle]="plot.title"
+                [plotFileName]="pluginPlots()[0].fileName"
+                [plotTitle]="pluginPlots()[0].title"
+                [plotType]="pluginPlots()[0].type"
               ></app-plugin-plot>
+            </div>
+          } @else {
+            <div class="plot-section">
+              <h3>Generated Plots</h3>
+              <mat-tab-group>
+                @for (plot of pluginPlots(); track plot.fileName) {
+                  <mat-tab [label]="plot.title">
+                    <div class="tab-content">
+                      <app-plugin-plot
+                        [jobId]="jobId"
+                        [plotFileName]="plot.fileName"
+                        [plotTitle]="plot.title"
+                        [plotType]="plot.type"
+                      ></app-plugin-plot>
+                    </div>
+                  </mat-tab>
+                }
+              </mat-tab-group>
             </div>
           }
         }
@@ -104,7 +150,7 @@
                   {{ job()!.terminalOutput.length }} lines
                 </mat-panel-description>
               </mat-expansion-panel-header>
-              <div class="terminal-output">
+              <div class="terminal-output" #terminalOutput>
                 @for (line of job()!.terminalOutput; track $index) {
                   <div class="terminal-line">{{ line }}</div>
                 }

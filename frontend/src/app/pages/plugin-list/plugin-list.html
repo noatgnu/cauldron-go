@@ -5,11 +5,18 @@
       Available Plugins
     </h1>
 
-    <mat-form-field appearance="outline" class="search-field">
-      <mat-label>Search plugins</mat-label>
-      <input matInput [(ngModel)]="searchQuery" (input)="onSearch()" placeholder="Search by name, description, or ID">
-      <mat-icon matPrefix>search</mat-icon>
-    </mat-form-field>
+    <div class="header-actions">
+      <mat-form-field appearance="outline" class="search-field">
+        <mat-label>Search plugins</mat-label>
+        <input matInput [(ngModel)]="searchQuery" (input)="onSearch()" placeholder="Search by name, description, or ID">
+        <mat-icon matPrefix>search</mat-icon>
+      </mat-form-field>
+
+      <button mat-raised-button color="primary" (click)="reloadPlugins()" [disabled]="loading()">
+        <mat-icon>refresh</mat-icon>
+        Reload & Rescan
+      </button>
+    </div>
   </div>
 
   @if (loading()) {
@@ -36,8 +43,8 @@
           </h2>
 
           <div class="plugin-cards">
-            @for (plugin of category.value; track plugin.definition.plugin.id) {
-              <mat-card class="plugin-card" (click)="navigateToPlugin(plugin.definition.plugin.id)">
+            @for (plugin of category.value; track plugin.id) {
+              <mat-card class="plugin-card" (click)="navigateToPlugin(plugin.id)">
                 <mat-card-header>
                   <mat-icon mat-card-avatar>{{ plugin.definition.plugin.icon || 'extension' }}</mat-icon>
                   <mat-card-title>{{ plugin.definition.plugin.name }}</mat-card-title>

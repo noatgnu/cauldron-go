@@ -277,6 +277,11 @@ export class Wails {
     return WailsApp.ReadJobOutputFile(jobID, filename);
   }
 
+  async listJobOutputFiles(jobID: string): Promise<string[]> {
+    if (!this.isWails) throw new Error('Wails not available');
+    return WailsApp.ListJobOutputFiles(jobID);
+  }
+
   async writeJobOutputFile(jobID: string, filename: string, content: string): Promise<void> {
     if (!this.isWails) throw new Error('Wails not available');
     return WailsApp.WriteJobOutputFile(jobID, filename, content);
@@ -391,9 +396,9 @@ export class Wails {
     return WailsApp.GetPlugins();
   }
 
-  async getPlugin(id: string): Promise<any> {
+  async getPlugin(id: number): Promise<any> {
     if (!this.isWails) throw new Error('Wails not available');
-    return WailsApp.GetPlugin(id);
+    return WailsApp.GetPluginV2(id);
   }
 
   async reloadPlugins(): Promise<void> {
@@ -419,6 +424,72 @@ export class Wails {
   async logToFile(message: string): Promise<void> {
     if (!this.isWails) throw new Error('Wails not available');
     return WailsApp.LogToFile(message);
+  }
+
+  async saveTempFile(filename: string, content: string): Promise<string> {
+    if (!this.isWails) throw new Error('Wails not available');
+    return WailsApp.SaveTempFile(filename, content);
+  }
+
+  async savePluginYAML(pluginID: string, yamlContent: string): Promise<void> {
+    if (!this.isWails) throw new Error('Wails not available');
+    return WailsApp.SavePluginYAML(pluginID, yamlContent);
+  }
+
+  async validatePluginYAML(yamlContent: string): Promise<{valid: boolean, errors: string[]}> {
+    if (!this.isWails) throw new Error('Wails not available');
+    const result: any = await WailsApp.ValidatePluginYAML(yamlContent);
+    return { valid: result[0] as boolean, errors: (result[1] as string[]) || [] };
+  }
+
+  async convertPluginToYAML(definition: any): Promise<string> {
+    if (!this.isWails) throw new Error('Wails not available');
+    return WailsApp.ConvertPluginToYAML(definition);
+  }
+
+  async parsePluginYAML(yamlContent: string): Promise<any> {
+    if (!this.isWails) throw new Error('Wails not available');
+    return WailsApp.ParsePluginYAML(yamlContent);
+  }
+
+  async getPluginTemplates(): Promise<any[]> {
+    if (!this.isWails) throw new Error('Wails not available');
+    return WailsApp.GetPluginTemplates();
+  }
+
+  async deletePlugin(pluginID: string): Promise<void> {
+    if (!this.isWails) throw new Error('Wails not available');
+    return WailsApp.DeletePlugin(pluginID);
+  }
+
+  async installPluginFromRepo(repoURL: string): Promise<void> {
+    if (!this.isWails) throw new Error('Wails not available');
+    return WailsApp.InstallPluginFromRepo(repoURL);
+  }
+
+  async updatePluginFromRepo(repoURL: string): Promise<void> {
+    if (!this.isWails) throw new Error('Wails not available');
+    return WailsApp.UpdatePluginFromRepo(repoURL);
+  }
+
+  async uninstallPluginFromRepo(repoURL: string): Promise<void> {
+    if (!this.isWails) throw new Error('Wails not available');
+    return WailsApp.UninstallPluginFromRepo(repoURL);
+  }
+
+  async isPluginInstalled(repoURL: string): Promise<boolean> {
+    if (!this.isWails) throw new Error('Wails not available');
+    return WailsApp.IsPluginInstalled(repoURL);
+  }
+
+  async getPluginVersion(repoURL: string): Promise<string> {
+    if (!this.isWails) throw new Error('Wails not available');
+    return WailsApp.GetPluginVersion(repoURL);
+  }
+
+  async decodePluginRepoURL(encoded: string): Promise<string> {
+    if (!this.isWails) throw new Error('Wails not available');
+    return WailsApp.DecodePluginRepoURL(encoded);
   }
 
   async pauseJobQueue(): Promise<void> {

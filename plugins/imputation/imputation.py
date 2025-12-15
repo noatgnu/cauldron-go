@@ -36,15 +36,15 @@ def impute(file_path: str, output_folder: str, columns_name: str, imputer_type: 
 
 @click.command()
 @click.option("--file_path", "-f", help="Path to the file to be processed")
-@click.option("--output_file", "-o", help="Path to the output file")
+@click.option("--output_folder", "-o", help="Path to the output folder")
 @click.option("--columns_name", "-c", help="Name of the columns to be imputed")
 @click.option("--imputer_type", "-i", help="Type of imputer", default="knn")
-@click.option("--n_neighbors", "-n", help="Number of neighbors", default=5)
-@click.option("--max_iter", "-m", help="Maximum number of iterations", default=10)
+@click.option("--n_neighbors", "-n", type=int, help="Number of neighbors", default=5)
+@click.option("--max_iter", "-m", type=int, help="Maximum number of iterations", default=10)
 @click.option("--simple_strategy", "-s", help="Simple imputer strategy", default="mean")
-@click.option("--fill_value", "-v", help="Fill value for constant strategy", default=0.0)
-def main(file_path: str, output_file: str, columns_name: str, imputer_type: str, n_neighbors: int, max_iter: int, simple_strategy: str, fill_value: float):
-    impute(file_path, output_file, columns_name, imputer_type, n_neighbors, max_iter, simple_strategy, fill_value)
+@click.option("--fill_value", "-v", type=float, help="Fill value for constant strategy", default=0.0)
+def main(file_path: str, output_folder: str, columns_name: str, imputer_type: str, n_neighbors: int, max_iter: int, simple_strategy: str, fill_value: float):
+    impute(file_path, output_folder, columns_name, imputer_type, n_neighbors, max_iter, simple_strategy, fill_value)
 
 if __name__ == "__main__":
     main()

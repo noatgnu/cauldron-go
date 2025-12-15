@@ -74,6 +74,9 @@
               [value]="progressItems[message].percentage">
             </mat-progress-bar>
             <small>{{ progressItems[message].percentage.toFixed(1) }}%</small>
+            @if (progressItems[message].files) {
+              <small> - {{ progressItems[message].files }} files</small>
+            }
           }
         </div>
       }

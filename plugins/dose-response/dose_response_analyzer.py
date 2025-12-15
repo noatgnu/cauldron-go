@@ -2,8 +2,10 @@
 Dose-response curve analysis using the dra package.
 """
 
-import os
+import matplotlib
+matplotlib.use('Agg')
 
+import os
 import click
 import pandas as pd
 import numpy as np
@@ -166,8 +168,6 @@ def create_overlay_plot(
         plt.savefig(overlay_path, dpi=300, bbox_inches="tight")
         plt.close()
 
-        print(f"Overlay plot saved as: {overlay_path}")
-
     except ImportError:
         print("Matplotlib not available. Install it to generate plots:")
         print("pip install matplotlib")
@@ -215,6 +215,10 @@ def dose_response_analysis(
     else:
         raise ValueError("Invalid file extension. Use .csv, .tsv, or .txt")
 
+    df[concentration_col] = pd.to_numeric(df[concentration_col], errors='coerce')
+    df[response_col] = pd.to_numeric(df[response_col], errors='coerce')
+    df = df.dropna(subset=[concentration_col, response_col, compound_col])
+
     column_mapping = {
         "compound": compound_col,
         "concentration": concentration_col,
@@ -227,7 +231,6 @@ def dose_response_analysis(
         selection_metric=selection_metric,
     )
 
-    print("Fitting dose-response models...")
     results = analyzer.fit_best_models(df)
 
     os.makedirs(output_folder, exist_ok=True)
@@ -239,27 +242,156 @@ def dose_response_analysis(
         os.path.join(output_folder, "best_models.txt"), sep="\t", index=False
     )
 
-    print("\n=== BEST MODELS ===")
-    print(results["best_models"])
 
-    print("\n=== IC50 VALUES ===")
-    for _, row in results["best_models"].iterrows():
-        print(
-            f"{row['Compound']}: IC50 = {row['IC50']:.2f} (Model: {row['Model']}, RMSE: {row['RMSE']:.4f})"
-        )
+    import matplotlib.pyplot as plt
+    from datetime import datetime
+    from pathlib import Path
 
-    plotter = DoseResponsePlotter()
-    plotter.plot_dose_response_curves(
-        results,
-        analyzer,
-        df,
-        show_ic50_lines=show_ic50_lines,
-        show_dmax_lines=show_dmax_lines,
-        output_dir=output_folder,
-        filename_prefix="dose_response",
-        add_timestamp=add_timestamp,
-        file_format=file_format,
-    )
+    try:
+        concentration_col = analyzer.columns["concentration"]
+        response_col = analyzer.columns["response"]
+        compound_col = analyzer.columns["compound"]
+
+        data_filtered = df[df[concentration_col] > 0].copy()
+
+        output_path = Path(output_folder)
+        output_path.mkdir(parents=True, exist_ok=True)
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S") if add_timestamp else ""
+        timestamp_suffix = f"_{timestamp}" if timestamp else ""
+
+        for compound, model_data in results["best_fitted_models"].items():
+            compound_data = data_filtered[data_filtered[compound_col] == compound].copy()
+            model_result = model_data["model_result"]
+
+            fig, ax = plt.subplots(figsize=(8, 6))
+
+            x_min = compound_data[concentration_col].min()
+            x_max = compound_data[concentration_col].max()
+            xlim_extended = [x_min / 10, x_max * 10]
+
+            conc_smooth, response_smooth = analyzer.predict_curve(
+                model_data, concentration_range=(x_min, x_max), n_points=200
+            )
+
+            ax.scatter(
+                compound_data[concentration_col],
+                compound_data[response_col],
+                color='#1f77b4',
+                s=60,
+                alpha=0.8,
+                label='Data points',
+                zorder=3,
+            )
+
+            ax.plot(
+                conc_smooth,
+                response_smooth,
+                color='#ff7f0e',
+                linewidth=2.5,
+                label=f"{model_result['model_name']} fit",
+                zorder=2,
+            )
+
+            plotter = DoseResponsePlotter()
+            params = plotter._extract_model_parameters(model_result)
+            ic50 = params["ic50"]
+            top = params["top"]
+            bottom = params["bottom"]
+
+            if not (np.isnan(top) or np.isnan(bottom)):
+                ic50_response = (top + bottom) / 2
+            else:
+                ic50_response = np.nan
+
+            if show_ic50_lines and not np.isnan(ic50) and not np.isnan(ic50_response):
+                ax.axvline(
+                    x=ic50,
+                    color='#1f77b4',
+                    linestyle='--',
+                    linewidth=1.5,
+                    alpha=0.8,
+                    zorder=1,
+                )
+                ax.axhline(
+                    y=ic50_response,
+                    color='#000000',
+                    linestyle='--',
+                    linewidth=1.5,
+                    alpha=0.8,
+                    zorder=1,
+                )
+                ax.text(
+                    ic50 * 1.1,
+                    ax.get_ylim()[1] * 0.95,
+                    f"IC₅₀ = {ic50:.1f}",
+                    color='#ff7f0e',
+                    fontsize=12,
+                    fontweight='bold',
+                    bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.9),
+                )
+
+            if show_dmax_lines:
+                dmax_info = plotter._calculate_dmax_info(compound_data, model_result, analyzer)
+                ax.axhline(
+                    y=dmax_info["dmax_obs"],
+                    color='#d62728',
+                    linestyle='--',
+                    linewidth=1.5,
+                    alpha=0.8,
+                    label=f"Observed Dmax ({dmax_info['perc_deg_obs']:.0f}%)",
+                )
+
+                if (abs(dmax_info["dmax_obs"] - dmax_info["bottom"]) > 0.02 and
+                    dmax_info["bottom"] <= dmax_info["dmax_obs"]):
+                    ax.axhline(
+                        y=dmax_info["bottom"],
+                        color='#2ca02c',
+                        linestyle='--',
+                        linewidth=1.5,
+                        alpha=0.8,
+                        label=f"Predicted Dmax (100%)",
+                    )
+
+            ax.set_xscale('log')
+            ax.set_xlim(xlim_extended)
+            ax.set_ylim(0, 1.2)
+
+            log_min = int(np.floor(np.log10(xlim_extended[0])))
+            log_max = int(np.ceil(np.log10(xlim_extended[1])))
+            x_ticks = [10**i for i in range(log_min, log_max + 1)]
+            ax.set_xticks(x_ticks)
+            ax.set_xticklabels([f"{tick:g}" for tick in x_ticks])
+
+            ax.set_xlabel(f"{concentration_col}", fontsize=14)
+            ax.set_ylabel(f"{response_col}", fontsize=14)
+            ax.set_title(f"{compound}", fontsize=16, fontweight='bold')
+            ax.grid(True, alpha=0.3, which='both')
+            ax.legend(fontsize=10, loc='best')
+
+            rmse = model_result["rmse"]
+            ax.text(
+                0.02,
+                0.98,
+                f"RMSE: {rmse:.4f}",
+                transform=ax.transAxes,
+                fontsize=10,
+                verticalalignment='top',
+                bbox=dict(boxstyle='round,pad=0.3', facecolor='lightyellow', alpha=0.8),
+            )
+
+            plt.tight_layout()
+
+            individual_filename = f"dose_response_{compound}{timestamp_suffix}.{file_format}"
+            individual_path = output_path / individual_filename
+
+            plt.savefig(individual_path, dpi=300, bbox_inches='tight')
+            plt.close()
+
+    except Exception as e:
+        print(f"ERROR during plotting: {str(e)}")
+        import traceback
+        traceback.print_exc()
 
     if overlay_compounds:
         compounds_to_overlay = [c.strip() for c in overlay_compounds.split(",")]
@@ -283,8 +415,6 @@ def dose_response_analysis(
             add_timestamp,
         )
 
-    print(f"\nResults saved to: {output_folder}")
-
 
 def run_example():
     """
@@ -294,9 +424,7 @@ def run_example():
     dose-response characteristics and demonstrates the complete analysis workflow including
     individual plots and overlay visualization.
     """
-    print("=" * 60)
-    print("Running Example Dose-Response Analysis")
-    print("=" * 60)
+    import matplotlib.pyplot as plt
 
     np.random.seed(42)
     compounds = ["Compound_A", "Compound_B", "Compound_C"]
@@ -324,7 +452,6 @@ def run_example():
     os.makedirs(output_folder, exist_ok=True)
 
     data.to_csv(os.path.join(output_folder, "example_data.txt"), sep="\t", index=False)
-    print(f"\nExample data saved to: {os.path.join(output_folder, 'example_data.txt')}")
 
     dose_response_analysis(
         input_file=os.path.join(output_folder, "example_data.txt"),
@@ -341,11 +468,6 @@ def run_example():
         overlay_compounds="Compound_A,Compound_B,Compound_C",
         compound_colors="Compound_A:#e74c3c;Compound_B:#3498db;Compound_C:#2ecc71",
     )
-
-    print("\n" + "=" * 60)
-    print("Example analysis complete!")
-    print(f"Check the '{output_folder}' directory for results.")
-    print("=" * 60)
 
 
 @click.command()

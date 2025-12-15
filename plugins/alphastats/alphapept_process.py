@@ -7,45 +7,49 @@ import statsmodels.stats.multitest
 import numpy as np
 
 np.float = float
-from alphastats import DataSet
-from alphastats.loader import GenericLoader,SpectronautLoader,MaxQuantLoader,FragPipeLoader,DIANNLoader
-from alphastats.statistics.DifferentialExpressionAnalysis import DifferentialExpressionAnalysis
+from alphastats.dataset.dataset import DataSet
+from alphastats.loader.generic_loader import GenericLoader
+from alphastats.loader.spectronaut_loader import SpectronautLoader
+from alphastats.loader.maxquant_loader import MaxQuantLoader
+from alphastats.loader.fragpipe_loader import FragPipeLoader
+from alphastats.loader.diann_loader import DIANNLoader
+from alphastats.statistics.differential_expression_analysis import DifferentialExpressionAnalysis
 
 
 def load_file(file_path: str, metadata_path: str, engine: str, index: str=None, intensity_column: list[str]=None, evidence_file: str=None):
     if engine == 'spectronaut':
-        loader = SpectronautLoader.SpectronautLoader(file=file_path)
+        loader = SpectronautLoader(file=file_path)
         dataset = DataSet(
             loader=loader,
-            metadata_path=metadata_path,
+            metadata_path_or_df=metadata_path,
             sample_column='Sample',
         )
     elif engine == 'maxquant':
-        loader = MaxQuantLoader.MaxQuantLoader(file=file_path, evidence_file=evidence_file)
+        loader = MaxQuantLoader(file=file_path, evidence_file=evidence_file)
         dataset = DataSet(
             loader=loader,
-            metadata_path=metadata_path,
+            metadata_path_or_df=metadata_path,
             sample_column='Sample',
         )
 
     elif engine == 'fragpipe':
-        loader = FragPipeLoader.FragPipeLoader(file=file_path, intensity_column="[sample] Razor Intensity")
+        loader = FragPipeLoader(file=file_path, intensity_column="[sample] Razor Intensity")
         dataset = DataSet(
             loader=loader,
-            metadata_path=metadata_path,
+            metadata_path_or_df=metadata_path,
             sample_column='Sample',
         )
 
     elif engine == 'diann':
-        loader = DIANNLoader.DIANNLoader(file=file_path)
+        loader = DIANNLoader(file=file_path)
         dataset = DataSet(
             loader=loader,
-            metadata_path=metadata_path,
+            metadata_path_or_df=metadata_path,
             sample_column='Sample',
         )
 
     else:
-        loader = GenericLoader.GenericLoader(
+        loader = GenericLoader(
             file=file_path,
             intensity_column=intensity_column,
             index_column=index,
@@ -53,7 +57,7 @@ def load_file(file_path: str, metadata_path: str, engine: str, index: str=None, 
         )
         dataset = DataSet(
             loader=loader,
-            metadata_path=metadata_path,
+            metadata_path_or_df=metadata_path,
             sample_column='Sample',
         )
     return dataset
@@ -87,12 +91,21 @@ def differential_analysis(dataset: DataSet, group_A: str, group_B: str, p_value:
     # group should be condition and not sample
     if method in ["wald", "welch-ttest", "ttest", "sam", "paired-ttest"]:
         df = DifferentialExpressionAnalysis(
-            dataset=dataset, group1=group_A, group2=group_B, column=column, method=method, perm=permutation, fdr=p_value
+            mat=dataset.mat,
+            metadata=dataset.metadata,
+            preprocessing_info=dataset.preprocessing_info,
+            group1=group_A,
+            group2=group_B,
+            column=column,
+            method=method,
+            perm=permutation,
+            fdr=p_value
         )
         result = df.perform()
         # using multiple testing correction with statsmodels
-        _, result["adj.pval.bh"], _, _ = statsmodels.stats.multitest.multipletests(result["pval"], method="fdr_bh", alpha=p_value)
-        _, result["adj.pval.bonferroni"], _, _ = statsmodels.stats.multitest.multipletests(result["pval"], method="bonferroni", alpha=p_value)
+        if "pval" in result.columns:
+            _, result["adj.pval.bh"], _, _ = statsmodels.stats.multitest.multipletests(result["pval"], method="fdr_bh", alpha=p_value)
+            _, result["adj.pval.bonferroni"], _, _ = statsmodels.stats.multitest.multipletests(result["pval"], method="bonferroni", alpha=p_value)
         result["comparison"] = f"{group_A} vs {group_B}"
         return result
 
@@ -203,15 +216,19 @@ def main(file_path, metadata_path, engine, index, intensity_column, impute, norm
         dataset.batch_correction(batch=batch_column)
     preprocessed_file = os.path.join(output_folder, 'preprocessed.txt')
     data = dataset.mat.T
+    data.index.name = index
     data.reset_index(inplace=True)
-    if merge_column_list:
+    if merge_column_list and index:
         data = data.merge(original_data[[index]+merge_column_list], on=index, how='left')
     data.to_csv(preprocessed_file, sep='\t', index=False)
     if method == 'limma' and r_home:
         result = differential_analysis_limma(dataset, comparison_matrix, 'Condition', log2, r_home)
 
-        if merge_column_list:
-            result = result.merge(original_data[[index]+merge_column_list], left_on="index", right_on=index, how='left')
+        if merge_column_list and index:
+            if "index" in result.columns and index != "index":
+                result = result.merge(original_data[[index]+merge_column_list], left_on="index", right_on=index, how='left')
+            elif index in result.columns:
+                result = result.merge(original_data[[index]+merge_column_list], on=index, how='left')
         result_file = os.path.join(output_folder, 'result.txt')
         result.to_csv(result_file, sep='\t', index=False)
     else:
@@ -221,8 +238,11 @@ def main(file_path, metadata_path, engine, index, intensity_column, impute, norm
                 group_a = row['condition_A']
                 group_b = row['condition_B']
                 result = differential_analysis(dataset, group_a, group_b, p_value, method, 'Condition', permutation)
-                if merge_column_list:
-                    result = result.merge(original_data[[index]+merge_column_list], on=index, how='left')
+                if merge_column_list and index:
+                    if 'index_' in result.columns:
+                        result = result.rename(columns={'index_': index})
+                    if index in result.columns:
+                        result = result.merge(original_data[[index]+merge_column_list], on=index, how='left')
 
                 result["comparison"] = row['comparison_label']
                 results.append(result)
@@ -230,8 +250,11 @@ def main(file_path, metadata_path, engine, index, intensity_column, impute, norm
             pd.concat(results, ignore_index=True).to_csv(result_file, sep='\t', index=False)
         else:
             result = differential_analysis(dataset, group_a, group_b, p_value, method, 'Condition', permutation)
-            if merge_column_list:
-                result = result.merge(original_data[[index]+merge_column_list], on=index, how='left')
+            if merge_column_list and index:
+                if 'index_' in result.columns:
+                    result = result.rename(columns={'index_': index})
+                if index in result.columns:
+                    result = result.merge(original_data[[index]+merge_column_list], on=index, how='left')
 
             result_file = os.path.join(output_folder, 'result.txt')
             result.to_csv(result_file, sep='\t', index=False)

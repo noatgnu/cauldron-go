@@ -118,9 +118,10 @@ inputs:
 
   - name: "comparisons"
     label: "Comparison Matrix"
-    type: "text"
+    type: "file"
     required: false
-    description: "Comma-separated comparisons for differential analysis"
+    accept: ".csv,.tsv,.txt"
+    description: "Comparison matrix file for differential analysis"
 
 outputs:
   - name: "preprocessed"

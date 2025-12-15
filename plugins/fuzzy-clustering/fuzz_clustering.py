@@ -32,7 +32,16 @@ def fuzz_cluster(file_path: str, annotation_path: str, output_folder: str, cente
     else:
         raise ValueError("annotation_path should be a csv or tsv or txt file")
 
-    df_t = df[annotation["Sample"].tolist()].transpose()
+    sample_col = None
+    for col in annotation.columns:
+        if col.lower() == "sample":
+            sample_col = col
+            break
+
+    if sample_col is None:
+        raise ValueError("annotation file must have a 'Sample' or 'sample' column")
+
+    df_t = df[annotation[sample_col].tolist()].transpose()
     for center in center_count:
         pca = PCA(n_components=2)
         points = pca.fit_transform(df_t)
@@ -42,7 +51,7 @@ def fuzz_cluster(file_path: str, annotation_path: str, output_folder: str, cente
         fcm_instance = fcm(points, initial_centers)
         fcm_instance.process()
         clusters = fcm_instance.get_clusters()
-        points = pd.DataFrame(points, columns=["x", "y"])
+        points = pd.DataFrame(points, columns=["PC1", "PC2"])
         for i in clusters:
             for j in i:
                 points.at[j, "cluster"] = str(clusters.index(i))

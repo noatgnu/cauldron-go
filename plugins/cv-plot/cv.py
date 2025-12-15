@@ -1,3 +1,6 @@
+import matplotlib
+matplotlib.use('Agg')
+
 import re
 import click
 import numpy as np
@@ -14,9 +17,9 @@ import matplotlib.pyplot as plt
 @click.option("--report_pg_file_path", "-g", help="Path to the file to be processed", default="")
 @click.option("--intensity_col", "-i", help="Name of the intensity column", default="Intensity")
 @click.option("--annotation_file", "-a", help="Path to the annotation file", default="")
-@click.option("--output_file", "-o", help="Path to the output file", default="./diann_output.txt")
+@click.option("--output_folder", "-o", help="Path to the output folder", default="./diann_output")
 @click.option("--sample_names", "-s", help="Sample names delimited with ','", default="")
-def diann_main(log_file_path: str, report_pr_file_path: str, report_pg_file_path: str, intensity_col: str, annotation_file: str, output_file: str, sample_names: str):
+def diann_main(log_file_path: str, report_pr_file_path: str, report_pg_file_path: str, intensity_col: str, annotation_file: str, output_folder: str, sample_names: str):
     """
     Main function to process DIA-NN output files and generate coefficient of variation (CV) plots.
 
@@ -25,12 +28,12 @@ def diann_main(log_file_path: str, report_pr_file_path: str, report_pg_file_path
     :param report_pg_file_path: Path to the protein group report file.
     :param intensity_col: Name of the intensity column.
     :param annotation_file: Path to the annotation file.
-    :param output_file: Path to the output file.
+    :param output_folder: Path to the output folder.
     :param sample_names: Comma-delimited sample names.
     """
-    main(log_file_path, report_pr_file_path, report_pg_file_path, intensity_col, annotation_file, output_file, sample_names)
+    main(log_file_path, report_pr_file_path, report_pg_file_path, intensity_col, annotation_file, output_folder, sample_names)
 
-def main(log_file_path: str, report_pr_file_path: str, report_pg_file_path: str, intensity_col: str, annotation_file: str, output_file: str, sample_names: str):
+def main(log_file_path: str, report_pr_file_path: str, report_pg_file_path: str, intensity_col: str, annotation_file: str, output_folder: str, sample_names: str):
     """
     Core function to process DIA-NN output files and generate CV plots.
 
@@ -39,7 +42,7 @@ def main(log_file_path: str, report_pr_file_path: str, report_pg_file_path: str,
     :param report_pg_file_path: Path to the protein group report file.
     :param intensity_col: Name of the intensity column.
     :param annotation_file: Path to the annotation file.
-    :param output_file: Path to the output file.
+    :param output_folder: Path to the output folder.
     :param sample_names: Comma-delimited sample names.
     """
     if log_file_path == "":
@@ -48,7 +51,7 @@ def main(log_file_path: str, report_pr_file_path: str, report_pg_file_path: str,
         samples = extract_filename(log_file_path)
     assert len(samples) > 0, "Please provide sample names"
     annotation = pd.read_csv(annotation_file, sep="\t")
-    os.makedirs(output_file, exist_ok=True)
+    os.makedirs(output_folder, exist_ok=True)
     if report_pr_file_path != "":
         pr_df = pd.read_csv(report_pr_file_path, sep="\t")
         pr_df = pr_df.melt(id_vars=[k for k in pr_df.columns if k not in samples], value_vars=samples, var_name="Sample", value_name=intensity_col)
@@ -56,7 +59,7 @@ def main(log_file_path: str, report_pr_file_path: str, report_pg_file_path: str,
         pr_df = pr_df.merge(annotation, on="Sample", how="left")
         pr_df = pr_df.groupby(["Condition", "Protein.Group", "Modified.Sequence"]).apply(lambda x: variation(x[intensity_col], nan_policy="omit")).reset_index()
         pr_df.rename(columns={0: "CV"}, inplace=True)
-        draw_cv_intensity(pr_df,  os.path.join(output_file, "pr_cv.svg"))
+        draw_cv_intensity(pr_df,  os.path.join(output_folder, "pr_cv.svg"))
     if report_pg_file_path != "":
         pg_df = pd.read_csv(report_pg_file_path, sep="\t")
         pg_df = pg_df.melt(id_vars=[k for k in pg_df.columns if k not in samples], value_vars=samples, var_name="Sample", value_name=intensity_col)
@@ -64,7 +67,8 @@ def main(log_file_path: str, report_pr_file_path: str, report_pg_file_path: str,
         pg_df = pg_df.merge(annotation, on="Sample", how="left")
         pg_df = pg_df.groupby(["Condition", "Protein.Group"]).apply(lambda x: variation(x[intensity_col], nan_policy="omit")).reset_index()
         pg_df.rename(columns={0: "CV"}, inplace=True)
-        draw_cv_intensity(pg_df, os.path.join(output_file, "pg_cv.svg"))
+        draw_cv_intensity(pg_df, os.path.join(output_folder, "pg_cv.svg"))
+    plt.close('all')
 
 def extract_filename(log_file_path):
     """

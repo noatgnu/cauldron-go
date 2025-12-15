@@ -72,10 +72,10 @@ def diff_analysis(input_file: str, output_folder: str, annotation_file: str, com
 @click.option("--aggregate_column", "-g", help="Name of the column to aggregate")
 @click.option("--aggregate_method", "-m", help="Method to aggregate the data", default="MsCoreUtils::robustSummary")
 @click.option("--col_filter", "-f", help="Filter unprocessed data columns with missing values more than threshold", default=0.7)
-@click.option("--row_filter", "-r", help="Filter unprocessed data rows with missing values more than threshold", default=0.7)
+@click.option("--row_filter", "-w", help="Filter unprocessed data rows with missing values more than threshold", default=0.7)
 @click.option("--impute", "-p", help="Impute missing values with method", default="")
 @click.option("--normalize", "-n", help="Normalize data with method", default="")
-@click.option("--r_home", "-r", help="Path to the R home")
+@click.option("--r_home", "-e", help="Path to the R home")
 def main(input_file: str, output_folder: str, annotation_file: str, comparison_file: str, index_col: str, log2: bool = False,
          aggregate_column: str = "", aggregate_method: str = "MsCoreUtils::robustSummary",  col_filter: float = 0.7,
          row_filter: float = 0.7, impute: str = "", normalize: str = "",r_home: str = ""):

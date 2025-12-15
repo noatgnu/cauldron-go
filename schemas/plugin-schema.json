@@ -50,6 +50,12 @@
           "type": "string",
           "description": "Material icon name",
           "examples": ["analytics", "scatter_plot", "timeline"]
+        },
+        "repository": {
+          "type": "string",
+          "description": "Git repository URL for remote plugins (omit for built-in/local plugins)",
+          "pattern": "^(https?://|git@)[\\w.-]+[:/][\\w.-]+/[\\w.-]+(\\.git)?$",
+          "examples": ["https://github.com/username/plugin-name", "https://github.com/org/plugin-repo.git"]
         }
       }
     },
@@ -92,6 +98,9 @@
       "items": {
         "$ref": "#/definitions/plot"
       }
+    },
+    "annotation": {
+      "$ref": "#/definitions/annotation"
     },
     "execution": {
       "type": "object",
@@ -472,6 +481,28 @@
           "minItems": 1
         }
       }
+    },
+    "annotation": {
+      "type": "object",
+      "description": "Configuration for sample annotation support",
+      "properties": {
+        "samplesFrom": {
+          "type": "string",
+          "description": "Name of the input field containing sample names (typically a column-selector)",
+          "pattern": "^[a-z][a-zA-Z0-9_]*$",
+          "examples": ["columns_name", "samples"]
+        },
+        "annotationFile": {
+          "type": "string",
+          "description": "Name of the optional input field for uploading an annotation file",
+          "pattern": "^[a-z][a-zA-Z0-9_]*$",
+          "examples": ["annotation_file"]
+        }
+      },
+      "anyOf": [
+        { "required": ["samplesFrom"] },
+        { "required": ["annotationFile"] }
+      ]
     },
     "example": {
       "type": "object",

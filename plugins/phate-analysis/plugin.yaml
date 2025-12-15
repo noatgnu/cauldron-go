@@ -57,6 +57,10 @@ outputs:
     description: "PHATE coordinates for each sample"
     format: "tsv"
 
+annotation:
+  samplesFrom: "columns_name"
+  annotationFile: "annotation_file"
+
 plots:
   - id: "phate-scatter"
     name: "PHATE Scatter Plot"
@@ -140,7 +144,6 @@ execution:
     log2:
       flag: "--log2"
       when: "true"
-      value: "true"
 
   outputDir: "--output_folder"
 

@@ -13,6 +13,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { ImportedFileSelection } from '../../../components/imported-file-selection/imported-file-selection';
 import { EnvironmentIndicator } from '../../../components/environment-indicator/environment-indicator';
 import { Wails } from '../../../core/services/wails';
+import { NotificationService } from '../../../core/services/notification.service';
 
 @Component({
   selector: 'app-batch-correction',
@@ -42,11 +43,11 @@ export class BatchCorrection implements OnInit {
   constructor(
     private fb: FormBuilder,
     private wails: Wails,
-    private router: Router
+    private router: Router,
+    private notificationService: NotificationService
   ) {
     this.form = this.fb.group({
       filePath: ['', Validators.required],
-      sampleCols: [[], Validators.required],
       batchInfo: ['', Validators.required],
       method: ['combat', Validators.required],
       preserveGroup: [''],
@@ -71,6 +72,17 @@ export class BatchCorrection implements OnInit {
     }
   }
 
+  async openBatchFile() {
+    try {
+      const path = await this.wails.openDataFileDialog();
+      if (path) {
+        this.form.controls['batchInfo'].setValue(path);
+      }
+    } catch (error) {
+      console.error('Failed to open batch file dialog:', error);
+    }
+  }
+
   updateFormWithSelected(e: string, formControl: string) {
     this.form.controls[formControl].setValue(e);
   }
@@ -90,7 +102,6 @@ export class BatchCorrection implements OnInit {
         name: 'Batch Correction',
         inputFiles: [this.form.value.filePath],
         parameters: {
-          sample_cols: this.form.value.sampleCols,
           batch_info: this.form.value.batchInfo,
           method: this.form.value.method,
           preserve_group: this.form.value.preserveGroup,
@@ -115,7 +126,6 @@ export class BatchCorrection implements OnInit {
   reset() {
     this.form.reset({
       filePath: '',
-      sampleCols: [],
       batchInfo: '',
       method: 'combat',
       preserveGroup: '',
@@ -128,17 +138,13 @@ export class BatchCorrection implements OnInit {
   async loadExample() {
     try {
       const filePath = await this.wails.getExampleFilePath('diann', 'imputed.data.txt');
-      this.form.patchValue({ filePath });
-      const preview = await this.wails.parseDataFile(filePath, 1);
-      if (preview && preview.headers) {
-        this.columns = preview.headers;
-        const sampleColumns = this.columns.filter(h => !['Protein.Ids', 'Precursor.Id', 'Genes'].includes(h));
-        this.form.patchValue({
-          sampleCols: sampleColumns.slice(0, 10),
-          batchInfo: '1,1,1,1,1,2,2,2,2,2',
-          method: 'combat'
-        });
-      }
+      const batchInfoPath = await this.wails.getExampleFilePath('differential_analysis', 'batch_info.txt');
+
+      this.form.patchValue({
+        filePath,
+        batchInfo: batchInfoPath,
+        method: 'combat'
+      });
     } catch (error) {
       alert('Failed to load example data. Please ensure example files are available.');
     }

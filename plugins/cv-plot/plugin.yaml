@@ -75,7 +75,7 @@ execution:
     annotation_file: "--annotation_file"
     sample_names: "--sample_names"
 
-  outputDir: "--output_file"
+  outputDir: "--output_folder"
 
   requirements:
     python: ">=3.11"

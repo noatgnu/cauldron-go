@@ -39,8 +39,8 @@ def pca_(input_file: str, output_folder: str, columns_name: list[str], n_compone
 @click.option("--input_file", "-i", help="Path to the input file")
 @click.option("--output_folder", "-o", help="Path to the output folder")
 @click.option("--columns_name", "-c", help="Name of the columns to be included in the analysis")
-@click.option("--n_components", "-n", help="Number of components", default=2)
-@click.option("--log2", "-l", help="Log2 transform the data", default=False)
+@click.option("--n_components", "-n", type=int, help="Number of components", default=2)
+@click.option("--log2", "-l", is_flag=True, help="Log2 transform the data")
 def main(input_file: str, output_folder: str, columns_name: str, n_components: int, log2: bool):
     pca_(input_file, output_folder, columns_name.split(","), n_components, log2)
 

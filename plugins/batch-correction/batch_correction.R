@@ -1,3 +1,11 @@
+if (!requireNamespace("sva", quietly = TRUE)) {
+  stop("Package 'sva' is not installed. Please install it using: install.packages('BiocManager'); BiocManager::install('sva')")
+}
+
+if (!requireNamespace("limma", quietly = TRUE)) {
+  stop("Package 'limma' is not installed. Please install it using: install.packages('BiocManager'); BiocManager::install('limma')")
+}
+
 library(sva)
 library(limma)
 
@@ -29,11 +37,64 @@ params <- parse_args(args)
 
 file_path <- params$file_path
 output_folder <- params$output_folder
-sample_cols <- strsplit(params$sample_cols, ",")[[1]]
-batch_info <- strsplit(params$batch_info, ",")[[1]]
+batch_info_file <- params$batch_info
 method <- ifelse(is.null(params$method), "combat", params$method)
 use_log2 <- ifelse(is.null(params$use_log2) || params$use_log2 == "true", TRUE, FALSE)
-preserve_group <- ifelse(is.null(params$preserve_group), "", params$preserve_group)
+preserve_column <- ifelse(is.null(params$preserve_column), "", params$preserve_column)
+
+if (is.null(params$sample_cols)) {
+  stop("sample_cols parameter is required")
+}
+sample_cols <- strsplit(params$sample_cols, ",")[[1]]
+
+if (!file.exists(batch_info_file)) {
+  stop(paste("Annotation file not found:", batch_info_file))
+}
+
+if (grepl("\\.csv$", batch_info_file)) {
+  batch_df <- read.csv(batch_info_file, check.names = FALSE, stringsAsFactors = FALSE)
+} else if (grepl("\\.tsv$|\\.txt$", batch_info_file)) {
+  batch_df <- read.delim(batch_info_file, check.names = FALSE, sep = "\t", stringsAsFactors = FALSE)
+} else {
+  stop(paste("Unsupported annotation file format:", batch_info_file))
+}
+
+if (ncol(batch_df) < 2) {
+  stop("Annotation file must have at least 2 columns")
+}
+
+if (!("Sample" %in% colnames(batch_df))) {
+  stop("Annotation file must have a 'Sample' column")
+}
+
+if (!("Batch" %in% colnames(batch_df))) {
+  stop("Annotation file must have a 'Batch' column")
+}
+
+batch_df <- batch_df[batch_df$Sample %in% sample_cols, ]
+
+if (nrow(batch_df) == 0) {
+  stop("No matching samples found in annotation file")
+}
+
+if (nrow(batch_df) != length(sample_cols)) {
+  missing_samples <- setdiff(sample_cols, batch_df$Sample)
+  if (length(missing_samples) > 0) {
+    cat("Warning: Some samples not found in annotation file:\n")
+    cat(paste(missing_samples, collapse = "\n"), "\n")
+  }
+}
+
+sample_cols <- batch_df$Sample
+batch_info <- batch_df$Batch
+
+preserve_info <- NULL
+if (preserve_column != "" && preserve_column %in% colnames(batch_df)) {
+  preserve_info <- batch_df[[preserve_column]]
+  cat(paste("Will preserve column:", preserve_column, "\n"))
+} else if (preserve_column != "") {
+  cat(paste("Warning: Column", preserve_column, "not found in annotation file\n"))
+}
 
 if (!file.exists(file_path)) {
   stop(paste("File not found:", file_path))
@@ -81,17 +142,13 @@ batch <- as.factor(batch_info)
 if (method == "combat") {
   cat("Running ComBat batch correction...\n")
 
-  if (preserve_group != "" && preserve_group %in% colnames(data)) {
-    group_info <- data[[preserve_group]]
-    if (length(group_info) == length(sample_cols)) {
-      mod <- model.matrix(~as.factor(group_info))
-      cat("Preserving biological group structure during batch correction\n")
-    } else {
-      mod <- NULL
-      cat("Warning: Group info length doesn't match samples, proceeding without group preservation\n")
-    }
+  if (!is.null(preserve_info) && length(preserve_info) == length(sample_cols)) {
+    mod <- model.matrix(~as.factor(preserve_info))
+    cat(paste("Preserving", preserve_column, "column during batch correction\n"))
+    cat(paste("Values:", paste(unique(preserve_info), collapse=", "), "\n"))
   } else {
     mod <- NULL
+    cat("No column preservation, proceeding without covariate adjustment\n")
   }
 
   corrected_matrix <- tryCatch({
@@ -104,17 +161,13 @@ if (method == "combat") {
 } else if (method == "limma") {
   cat("Running limma removeBatchEffect...\n")
 
-  if (preserve_group != "" && preserve_group %in% colnames(data)) {
-    group_info <- data[[preserve_group]]
-    if (length(group_info) == length(sample_cols)) {
-      design <- model.matrix(~as.factor(group_info))
-      cat("Preserving biological group structure during batch correction\n")
-    } else {
-      design <- NULL
-      cat("Warning: Group info length doesn't match samples, proceeding without design matrix\n")
-    }
+  if (!is.null(preserve_info) && length(preserve_info) == length(sample_cols)) {
+    design <- model.matrix(~as.factor(preserve_info))
+    cat(paste("Preserving", preserve_column, "column during batch correction\n"))
+    cat(paste("Values:", paste(unique(preserve_info), collapse=", "), "\n"))
   } else {
     design <- NULL
+    cat("No column preservation, proceeding without design matrix\n")
   }
 
   corrected_matrix <- removeBatchEffect(intensity_matrix, batch = batch, design = design)

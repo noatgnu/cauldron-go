@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/noatgnu/cauldron-go/backend/models"
@@ -18,6 +20,7 @@ type ScriptExecutor struct {
 	runningJobs     map[string]*exec.Cmd
 	mu              sync.RWMutex
 	updateCallback  func(string, models.Job)
+	outputCallback  func(string, string)
 }
 
 func NewScriptExecutor(settingsService *SettingsService) *ScriptExecutor {
@@ -31,14 +34,20 @@ func (s *ScriptExecutor) SetUpdateCallback(callback func(string, models.Job)) {
 	s.updateCallback = callback
 }
 
+func (s *ScriptExecutor) SetOutputCallback(callback func(string, string)) {
+	s.outputCallback = callback
+}
+
 type ScriptConfig struct {
-	Type       string
-	ScriptName string
-	Args       []string
-	OutputDir  string
+	Type        string
+	RuntimeType string
+	ScriptName  string
+	Args        []string
+	OutputDir   string
 }
 
 func (s *ScriptExecutor) ExecutePythonScript(ctx context.Context, jobID string, config ScriptConfig) error {
+	log.Printf("[ExecutePythonScript] Called for job %s with RuntimeType: '%s'", jobID, config.RuntimeType)
 	cfg := s.settingsService.GetConfig()
 	if cfg.PythonPath == "" {
 		return fmt.Errorf("python path not configured")
@@ -46,10 +55,44 @@ func (s *ScriptExecutor) ExecutePythonScript(ctx context.Context, jobID string, 
 
 	pythonPath := cfg.PythonPath
 
-	scriptPath := filepath.Join("scripts", "python", config.ScriptName)
+	scriptPath := filepath.Join("plugins", config.Type, config.ScriptName)
 	args := append([]string{scriptPath}, config.Args...)
 
 	cmd := exec.CommandContext(ctx, pythonPath, args...)
+	hideConsoleWindow(cmd)
+
+	exePath, err := os.Executable()
+	if err == nil {
+		cmd.Dir = filepath.Dir(exePath)
+	}
+
+	if config.RuntimeType == "pythonWithR" {
+		if cfg.RPath == "" {
+			return fmt.Errorf("R path not configured for pythonWithR runtime")
+		}
+
+		rBinPath := filepath.Dir(cfg.RPath)
+
+		if filepath.Base(rBinPath) == "x64" || filepath.Base(rBinPath) == "i386" {
+			rBinPath = filepath.Dir(rBinPath)
+		}
+
+		rHomePath := filepath.Dir(rBinPath)
+
+		env := os.Environ()
+		rhomeSet := false
+		for i, e := range env {
+			if len(e) > 7 && e[:7] == "R_HOME=" {
+				env[i] = fmt.Sprintf("R_HOME=%s", rHomePath)
+				rhomeSet = true
+				break
+			}
+		}
+		if !rhomeSet {
+			env = append(env, fmt.Sprintf("R_HOME=%s", rHomePath))
+		}
+		cmd.Env = env
+	}
 
 	return s.executeCommand(ctx, jobID, cmd, config.OutputDir)
 }
@@ -62,12 +105,27 @@ func (s *ScriptExecutor) ExecuteRScript(ctx context.Context, jobID string, confi
 
 	rPath := cfg.RPath
 
-	scriptPath := filepath.Join("scripts", "r", config.ScriptName)
+	scriptPath := filepath.Join("plugins", config.Type, config.ScriptName)
+	scriptPath = strings.ReplaceAll(scriptPath, "\\", "/")
+	log.Printf("[ExecuteRScript] Script path: %s", scriptPath)
+	log.Printf("[ExecuteRScript] R path: %s", rPath)
 
-	args := []string{"--vanilla", "-f", scriptPath, "--args"}
+	args := []string{"--vanilla", "--slave", scriptPath, "--args"}
 	args = append(args, config.Args...)
+	log.Printf("[ExecuteRScript] Full command: %s %v", rPath, args)
 
 	cmd := exec.CommandContext(ctx, rPath, args...)
+	hideConsoleWindow(cmd)
+
+	env := os.Environ()
+	env = append(env, "R_DEFAULT_DEVICE=null")
+	cmd.Env = env
+
+	exePath, err := os.Executable()
+	if err == nil {
+		cmd.Dir = filepath.Dir(exePath)
+		log.Printf("[ExecuteRScript] Working directory: %s", cmd.Dir)
+	}
 
 	return s.executeCommand(ctx, jobID, cmd, config.OutputDir)
 }
@@ -97,36 +155,58 @@ func (s *ScriptExecutor) executeCommand(ctx context.Context, jobID string, cmd *
 		return fmt.Errorf("failed to start command: %w", err)
 	}
 
+	done := make(chan error, 1)
+	go func() {
+		done <- cmd.Wait()
+	}()
+
 	var wg sync.WaitGroup
 	wg.Add(2)
 
 	go s.streamOutput(jobID, stdout, &wg, false)
 	go s.streamOutput(jobID, stderr, &wg, true)
 
-	wg.Wait()
-
-	if err := cmd.Wait(); err != nil {
-		log.Printf("[ScriptExecutor] Command failed for job %s: %v", jobID, err)
+	select {
+	case <-ctx.Done():
+		log.Printf("[ScriptExecutor] Context cancelled for job %s, killing process", jobID)
+		if cmd.Process != nil {
+			cmd.Process.Kill()
+		}
+		wg.Wait()
 		if s.updateCallback != nil {
 			s.updateCallback(jobID, models.Job{
 				Status:     "failed",
-				Error:      err.Error(),
+				Error:      "Job cancelled by user",
 				OutputPath: outputDir,
 			})
 		}
-		return err
-	}
+		return fmt.Errorf("job cancelled")
 
-	log.Printf("[ScriptExecutor] Command completed successfully for job %s", jobID)
-	if s.updateCallback != nil {
-		s.updateCallback(jobID, models.Job{
-			Status:     "completed",
-			Progress:   100,
-			OutputPath: outputDir,
-		})
-	}
+	case err := <-done:
+		wg.Wait()
+		if err != nil {
+			log.Printf("[ScriptExecutor] Command failed for job %s: %v", jobID, err)
+			if s.updateCallback != nil {
+				s.updateCallback(jobID, models.Job{
+					Status:     "failed",
+					Error:      err.Error(),
+					OutputPath: outputDir,
+				})
+			}
+			return err
+		}
 
-	return nil
+		log.Printf("[ScriptExecutor] Command completed successfully for job %s", jobID)
+		if s.updateCallback != nil {
+			s.updateCallback(jobID, models.Job{
+				Status:     "completed",
+				Progress:   100,
+				OutputPath: outputDir,
+			})
+		}
+
+		return nil
+	}
 }
 
 func (s *ScriptExecutor) streamOutput(jobID string, reader io.Reader, wg *sync.WaitGroup, isError bool) {
@@ -139,6 +219,10 @@ func (s *ScriptExecutor) streamOutput(jobID string, reader io.Reader, wg *sync.W
 			log.Printf("[ScriptExecutor][STDERR][%s] %s", jobID, line)
 		} else {
 			log.Printf("[ScriptExecutor][STDOUT][%s] %s", jobID, line)
+		}
+
+		if s.outputCallback != nil {
+			s.outputCallback(jobID, line)
 		}
 	}
 

@@ -30,11 +30,19 @@ params <- parse_args(args)
 file_path <- params$file_path
 output_folder <- params$output_folder
 sample_cols <- strsplit(params$sample_cols, ",")[[1]]
-set_names <- strsplit(params$set_names, ",")[[1]]
+set_names <- if(is.null(params$set_names) || params$set_names == "") NULL else strsplit(params$set_names, ",")[[1]]
 threshold <- ifelse(is.null(params$threshold), 0, as.numeric(params$threshold))
 use_presence <- ifelse(is.null(params$use_presence) || params$use_presence == "true", TRUE, FALSE)
 fill_colors <- ifelse(is.null(params$fill_colors), "", params$fill_colors)
 alpha <- ifelse(is.null(params$alpha), 0.5, as.numeric(params$alpha))
+
+cat("Parameters received:\n")
+cat(paste("  File path:", file_path, "\n"))
+cat(paste("  Sample cols:", paste(sample_cols, collapse=", "), "\n"))
+cat(paste("  Set names:", ifelse(is.null(set_names), "NULL", paste(set_names, collapse=", ")), "\n"))
+cat(paste("  Threshold:", threshold, "\n"))
+cat(paste("  Use presence:", use_presence, "\n"))
+cat(paste("  Alpha:", alpha, "\n"))
 
 if (!file.exists(file_path)) {
   stop(paste("File not found:", file_path))
@@ -109,7 +117,8 @@ if (!dir.exists(output_folder)) {
   dir.create(output_folder, recursive = TRUE)
 }
 
-output_file <- file.path(output_folder, "venn_diagram.png")
+output_file_svg <- file.path(output_folder, "venn_diagram.svg")
+output_file_pdf <- file.path(output_folder, "venn_diagram.pdf")
 
 venn_obj <- venn.diagram(
   x = sets_list,
@@ -123,10 +132,15 @@ venn_obj <- venn.diagram(
   margin = 0.1,
   lwd = 2,
   cat.fontface = "bold",
-  fontfamily = "sans"
+  fontfamily = "sans",
+  disable.logging = TRUE
 )
 
-png(output_file, width = 800, height = 800, res = 150)
+svg(output_file_svg, width = 10, height = 10)
+grid.draw(venn_obj)
+dev.off()
+
+pdf(output_file_pdf, width = 10, height = 10)
 grid.draw(venn_obj)
 dev.off()
 
@@ -164,7 +178,8 @@ presence_file <- file.path(output_folder, "venn_presence.txt")
 write.table(presence_df, file = presence_file, sep = "\t", quote = FALSE, row.names = FALSE)
 
 cat("Venn diagram created successfully\n")
-cat(paste("Output saved to:", output_file, "\n"))
+cat(paste("SVG output saved to:", output_file_svg, "\n"))
+cat(paste("PDF output saved to:", output_file_pdf, "\n"))
 cat(paste("Summary saved to:", summary_file, "\n"))
 cat(paste("Presence matrix saved to:", presence_file, "\n"))
 cat(paste("Total unique features:", length(all_elements), "\n"))

@@ -98,6 +98,8 @@
 
 mat-card-actions {
   padding: 16px;
+  display: flex;
+  gap: 12px;
 
   button {
     font-size: 13px;

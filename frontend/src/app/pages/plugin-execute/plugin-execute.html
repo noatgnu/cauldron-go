@@ -27,14 +27,16 @@
       </app-environment-indicator>
 
       <mat-card-content>
-        <app-dynamic-form
-          [plugin]="plugin()!"
-          [disabled]="executing()"
-          (formSubmit)="onExecute($event)">
-        </app-dynamic-form>
+        @for (p of [plugin()!]; track p.definition.plugin.id) {
+          <app-dynamic-form
+            [plugin]="p"
+            [disabled]="executing()"
+            (formSubmit)="onExecute($event)">
+          </app-dynamic-form>
+        }
       </mat-card-content>
 
-      <mat-card-actions align="end">
+      <mat-card-actions>
         @if (plugin()!.definition.example?.enabled) {
           <button mat-button (click)="loadExample()" [disabled]="executing() || loading()">
             Load Example

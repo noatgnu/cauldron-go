@@ -1,0 +1,51 @@
+<div class="install-dialog">
+  <h2 mat-dialog-title>Install Plugin from Repository</h2>
+
+  <mat-dialog-content>
+    <form [formGroup]="form">
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Repository URL</mat-label>
+        <input matInput formControlName="repoURL" placeholder="https://github.com/username/plugin-name">
+        <mat-icon matPrefix>link</mat-icon>
+        @if (form.get('repoURL')?.invalid && form.get('repoURL')?.touched) {
+          <mat-error>{{ getErrorMessage() }}</mat-error>
+        }
+        <mat-hint>Enter a Git repository URL (GitHub, GitLab, etc.)</mat-hint>
+      </mat-form-field>
+
+      <div class="info-section">
+        <mat-icon>info</mat-icon>
+        <div class="info-text">
+          <strong>Supported formats:</strong>
+          <ul>
+            <li>https://github.com/username/repo</li>
+            <li>https://github.com/username/repo.git</li>
+            <li>git@github.com:username/repo.git</li>
+          </ul>
+        </div>
+      </div>
+
+      @if (error) {
+        <div class="error-message">
+          <mat-icon>error</mat-icon>
+          <span>{{ error }}</span>
+        </div>
+      }
+    </form>
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end">
+    <button mat-button (click)="cancel()" [disabled]="installing">
+      Cancel
+    </button>
+    <button mat-raised-button color="primary" (click)="install()" [disabled]="form.invalid || installing">
+      @if (installing) {
+        <mat-spinner diameter="20"></mat-spinner>
+        <span>Installing...</span>
+      } @else {
+        <mat-icon>download</mat-icon>
+        <span>Install</span>
+      }
+    </button>
+  </mat-dialog-actions>
+</div>

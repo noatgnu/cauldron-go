@@ -63,6 +63,10 @@ outputs:
     description: "Variance explained by each principal component"
     format: "json"
 
+annotation:
+  samplesFrom: "columns_name"
+  annotationFile: "annotation_file"
+
 plots:
   - id: "pca-scatter"
     name: "PCA Scatter Plot"
@@ -75,7 +79,6 @@ plots:
         y: "y_pca"
         colorBy: "condition"
         labels: "sample"
-
     customization:
       - name: "title"
         label: "Plot Title"
@@ -146,7 +149,6 @@ execution:
     log2:
       flag: "--log2"
       when: "true"
-      value: "true"
 
   outputDir: "--output_folder"
 

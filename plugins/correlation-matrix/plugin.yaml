@@ -101,6 +101,12 @@ inputs:
       - "lower"
     description: "Which part of the matrix to display"
 
+  - name: "plot_only"
+    label: "Plot Only (Skip Correlation)"
+    type: "boolean"
+    default: false
+    description: "Plot the input data directly without computing correlations"
+
   - name: "color_ramp_palette"
     label: "Color Palette"
     type: "text"
@@ -166,7 +172,7 @@ inputs:
   - name: "grid_color"
     label: "Grid Color"
     type: "text"
-    default: "white"
+    default: "black"
     description: "Color of grid lines (if enabled)"
 
   - name: "number_digits"
@@ -184,6 +190,21 @@ inputs:
     required: false
     description: "Title for the correlation plot"
 
+  - name: "use_basename"
+    label: "Use Basename Only"
+    type: "boolean"
+    default: true
+    description: "Extract only the filename from full file paths"
+
+  - name: "max_label_length"
+    label: "Max Label Length"
+    type: "number"
+    default: 50
+    min: 10
+    max: 200
+    step: 5
+    description: "Maximum length for axis labels (characters)"
+
 outputs:
   - name: "correlation_matrix"
     path: "correlation_matrix.txt"
@@ -191,11 +212,26 @@ outputs:
     description: "Correlation matrix values"
     format: "tsv"
 
-  - name: "correlation_plot"
+  - name: "correlation_plot_pdf"
     path: "correlation_matrix.pdf"
     type: "image"
-    description: "Correlation matrix visualization"
+    description: "Correlation matrix visualization (PDF)"
     format: "pdf"
+
+  - name: "correlation_plot_svg"
+    path: "correlation_matrix.svg"
+    type: "image"
+    description: "Correlation matrix visualization (SVG)"
+    format: "svg"
+
+plots:
+  - id: "correlation_plot"
+    name: "Correlation Matrix"
+    type: "image-grid"
+    dataSource: "correlation_plot_svg"
+    config:
+      imagePattern: "*.svg"
+      columns: 1
 
 execution:
   argsMapping:
@@ -210,6 +246,10 @@ execution:
     hclust_method: "--hclust_method"
     presenting_method: "--presenting_method"
     cor_shape: "--cor_shape"
+    plot_only:
+      flag: "--plot_only"
+      value: "true"
+      when: "true"
     color_ramp_palette: "--color_ramp_palette"
     plot_width: "--plot_width"
     plot_height: "--plot_height"
@@ -227,6 +267,11 @@ execution:
     grid_color: "--grid_color"
     number_digits: "--number_digits"
     plot_title: "--plot_title"
+    use_basename:
+      flag: "--use_basename"
+      value: "true"
+      when: "true"
+    max_label_length: "--max_label_length"
 
   outputDir: "--output_folder"
 
@@ -249,4 +294,11 @@ example:
       - 'C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_BCA_LT-MockIP_02.raw'
       - 'C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_BCA_LT-MockIP_03.raw'
     index_col: "Precursor.Id"
+    method: "pearson"
     order: "hclust"
+    hclust_method: "ward.D"
+    presenting_method: "ellipse"
+    cor_shape: "upper"
+    color_ramp_palette: "#053061,#2166AC,#4393C3,#92C5DE,#D1E5F0,#FFFFFF,#FDDBC7,#F4A582,#D6604D,#B2182B,#67001F"
+    use_basename: true
+    max_label_length: 50

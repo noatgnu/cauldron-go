@@ -109,6 +109,16 @@
     font-weight: 500;
     margin-bottom: 16px;
   }
+
+  mat-tab-group {
+    background-color: #ffffff;
+    border-radius: 4px;
+  }
+
+  .tab-content {
+    padding: 16px;
+    min-height: 400px;
+  }
 }
 
 .terminal-section {

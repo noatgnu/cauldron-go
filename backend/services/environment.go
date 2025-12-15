@@ -227,6 +227,7 @@ func (e *EnvironmentService) detectCondaEnvironments() ([]PythonEnvironment, err
 	}
 
 	cmd := exec.Command(condaCmd, "env", "list")
+	hideConsoleWindow(cmd)
 	output, err := cmd.Output()
 	if err != nil {
 		return environments, err

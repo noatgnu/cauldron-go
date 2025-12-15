@@ -1,0 +1,66 @@
+@if (loading()) {
+  <div class="loading-container">
+    <mat-spinner></mat-spinner>
+    <p>Loading plot...</p>
+  </div>
+} @else if (error()) {
+  <div class="error-container">
+    <mat-icon color="warn">error</mat-icon>
+    <p>{{ error() }}</p>
+  </div>
+} @else {
+  <div class="plot-container">
+    <plotly-plot
+      id="generic-plot-div"
+      [data]="plotData"
+      [layout]="plotLayout"
+      [config]="plotConfig_"
+      [revision]="revision"
+    ></plotly-plot>
+
+    @if (plotConfig.customization && plotConfig.customization.length > 0) {
+      <mat-expansion-panel [expanded]="showCustomization()">
+        <mat-expansion-panel-header>
+          <mat-panel-title>
+            <mat-icon>tune</mat-icon>
+            <span>Customization Options</span>
+          </mat-panel-title>
+        </mat-expansion-panel-header>
+
+        <form [formGroup]="customizationForm" class="customization-form">
+          @for (option of plotConfig.customization; track option.name) {
+            @if (option.type === 'text') {
+              <mat-form-field appearance="outline">
+                <mat-label>{{ option.label || option.name }}</mat-label>
+                <input matInput [formControlName]="option.name" type="text">
+              </mat-form-field>
+            }
+            @if (option.type === 'number') {
+              <mat-form-field appearance="outline">
+                <mat-label>{{ option.label || option.name }}</mat-label>
+                <input matInput [formControlName]="option.name" type="number"
+                       [min]="option.min" [max]="option.max" [step]="option.step || 1">
+              </mat-form-field>
+            }
+            @if (option.type === 'boolean') {
+              <mat-checkbox [formControlName]="option.name">
+                {{ option.label || option.name }}
+              </mat-checkbox>
+            }
+          }
+
+          <div class="form-actions">
+            <button mat-raised-button color="primary" (click)="applyCustomization()">
+              <mat-icon>check</mat-icon>
+              Apply
+            </button>
+            <button mat-button (click)="exportToSVG()">
+              <mat-icon>save</mat-icon>
+              Export to SVG
+            </button>
+          </div>
+        </form>
+      </mat-expansion-panel>
+    }
+  </div>
+}

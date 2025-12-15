@@ -43,6 +43,8 @@ export class Sidenav implements OnInit {
 
   hardcodedNavItems: NavItem[] = [
     { label: 'Home', icon: 'home', route: '/' },
+    { label: 'Plugins', icon: 'extension', route: '/plugins' },
+    { label: 'Plugin List', icon: 'list', route: '/plugin-list' },
     {
       label: 'Data Transformation',
       icon: 'transform',
@@ -112,11 +114,19 @@ export class Sidenav implements OnInit {
       categoryMap.get(category)!.push(plugin);
     }
 
-    for (const [category, pluginList] of categoryMap) {
-      const children: NavItem[] = pluginList.map(plugin => ({
+    const sortedCategories = Array.from(categoryMap.keys()).sort((a, b) => a.localeCompare(b));
+
+    for (const category of sortedCategories) {
+      const pluginList = categoryMap.get(category)!;
+
+      const sortedPlugins = [...pluginList].sort((a, b) =>
+        a.definition.plugin.name.localeCompare(b.definition.plugin.name)
+      );
+
+      const children: NavItem[] = sortedPlugins.map(plugin => ({
         label: plugin.definition.plugin.name,
         icon: plugin.definition.plugin.icon || 'extension',
-        route: `/plugin/${plugin.definition.plugin.id}`
+        route: `/plugin/${plugin.id}`
       }));
 
       navItems.push({

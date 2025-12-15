@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter, OnInit, signal, computed } from '@angular/core';
+import { Component, Input, Output, EventEmitter, OnInit, OnChanges, OnDestroy, SimpleChanges, signal, computed } from '@angular/core';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -8,9 +8,13 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatDialog } from '@angular/material/dialog';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { models } from '../../../wailsjs/go/models';
 import { Wails } from '../../core/services/wails';
 import { NotificationService } from '../../core/services/notification.service';
+import { SampleAnnotation } from '../sample-annotation/sample-annotation';
+import { Subscription } from 'rxjs';
 
 @Component({
   selector: 'app-dynamic-form',
@@ -23,18 +27,20 @@ import { NotificationService } from '../../core/services/notification.service';
     MatCheckboxModule,
     MatButtonModule,
     MatIconModule,
-    MatProgressSpinnerModule
+    MatProgressSpinnerModule,
+    MatTooltipModule
   ],
   templateUrl: './dynamic-form.html',
   styleUrl: './dynamic-form.scss'
 })
-export class DynamicFormComponent implements OnInit {
+export class DynamicFormComponent implements OnInit, OnChanges, OnDestroy {
   @Input() plugin!: models.PluginV2;
   @Input() disabled = false;
   @Output() formSubmit = new EventEmitter<Record<string, any>>();
   @Output() formChange = new EventEmitter<Record<string, any>>();
 
   form!: FormGroup;
+  formKey = signal(0);
   columnOptions = new Map<string, string[]>();
   selectOptions = new Map<string, string[]>();
   groupedOptions = new Map<string, models.FieldGroup[]>();
@@ -42,17 +48,44 @@ export class DynamicFormComponent implements OnInit {
   formValues = signal<Record<string, any>>({});
   validationErrors = signal<string[]>([]);
   lastSelectedIndex = new Map<string, number>();
+  private valueChangesSubscription?: Subscription;
 
   constructor(
     private fb: FormBuilder,
     private wails: Wails,
-    private notificationService: NotificationService
+    private notificationService: NotificationService,
+    private dialog: MatDialog
   ) {}
 
   async ngOnInit() {
+    await this.initializeForm();
+  }
+
+  async ngOnChanges(changes: SimpleChanges) {
+    if (changes['plugin'] && !changes['plugin'].firstChange) {
+      await this.wails.logToFile(`[DynamicForm] Plugin changed from ${changes['plugin'].previousValue?.definition.plugin.id} to ${changes['plugin'].currentValue?.definition.plugin.id}`);
+      this.formKey.update(k => k + 1);
+      await this.initializeForm();
+    }
+  }
+
+  ngOnDestroy() {
+    this.valueChangesSubscription?.unsubscribe();
+  }
+
+  private async initializeForm() {
+    this.valueChangesSubscription?.unsubscribe();
+
+    this.columnOptions.clear();
+    this.selectOptions.clear();
+    this.groupedOptions.clear();
+    this.lastSelectedIndex.clear();
+    this.validationErrors.set([]);
+
     this.buildForm();
     await this.loadExternalOptions();
-    this.form.valueChanges.subscribe((values) => {
+
+    this.valueChangesSubscription = this.form.valueChanges.subscribe((values) => {
       this.formValues.set(values);
       this.formChange.emit(this.getFormValue());
       if (this.validationErrors().length > 0) {
@@ -165,7 +198,13 @@ export class DynamicFormComponent implements OnInit {
   private async loadOptionsFromFile(inputName: string, filePath: string) {
     try {
       this.loading.set(true);
-      const content = await this.wails.readFile(filePath);
+
+      const fullPath = this.plugin.folderPath
+        ? `${this.plugin.folderPath}/${filePath}`
+        : filePath;
+
+      await this.wails.logToFile(`[DynamicForm] Loading options from: ${fullPath}`);
+      const content = await this.wails.readFile(fullPath);
       if (!content) return;
 
       const options = content
@@ -174,9 +213,10 @@ export class DynamicFormComponent implements OnInit {
         .filter(line => line.length > 0);
 
       this.selectOptions.set(inputName, options);
+      await this.wails.logToFile(`[DynamicForm] Loaded ${options.length} options for ${inputName}`);
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
-      await this.wails.logToFile(`Error loading options from file: ${errorMsg}`);
+      await this.wails.logToFile(`[DynamicForm] Error loading options from file: ${errorMsg}`);
       this.notificationService.showError(`Failed to load options: ${errorMsg}`);
     } finally {
       this.loading.set(false);
@@ -186,14 +226,21 @@ export class DynamicFormComponent implements OnInit {
   private async loadGroupsFromFile(inputName: string, filePath: string) {
     try {
       this.loading.set(true);
-      const content = await this.wails.readFile(filePath);
+
+      const fullPath = this.plugin.folderPath
+        ? `${this.plugin.folderPath}/${filePath}`
+        : filePath;
+
+      await this.wails.logToFile(`[DynamicForm] Loading groups from: ${fullPath}`);
+      const content = await this.wails.readFile(fullPath);
       if (!content) return;
 
       const groups: models.FieldGroup[] = JSON.parse(content);
       this.groupedOptions.set(inputName, groups);
+      await this.wails.logToFile(`[DynamicForm] Loaded ${groups.length} groups for ${inputName}`);
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
-      await this.wails.logToFile(`Error loading groups from file: ${errorMsg}`);
+      await this.wails.logToFile(`[DynamicForm] Error loading groups from file: ${errorMsg}`);
       this.notificationService.showError(`Failed to load grouped options: ${errorMsg}`);
     } finally {
       this.loading.set(false);
@@ -372,5 +419,126 @@ export class DynamicFormComponent implements OnInit {
 
     event.preventDefault();
     event.stopPropagation();
+  }
+
+  isAnnotationFileInput(input: models.PluginInputV2): boolean {
+    if (input.type !== 'file') return false;
+    const name = input.name.toLowerCase();
+    const label = input.label?.toLowerCase() || '';
+    return name.includes('annotation') ||
+           name.includes('metadata') ||
+           label.includes('annotation') ||
+           label.includes('metadata') ||
+           label.includes('sample annotation');
+  }
+
+  async openAnnotationManager(inputName: string) {
+    const sampleNames = this.getSampleNamesForAnnotation();
+    if (!sampleNames || sampleNames.length === 0) {
+      this.notificationService.showWarning('Please select sample columns first to create an annotation file');
+      return;
+    }
+
+    const currentFilePath = this.form.get(inputName)?.value;
+    let existingAnnotation: any[] | undefined;
+
+    if (currentFilePath) {
+      try {
+        const content = await this.wails.readFile(currentFilePath);
+        existingAnnotation = this.parseAnnotationFile(content, sampleNames);
+      } catch (error) {
+        await this.wails.logToFile(`Error reading annotation file: ${error}`);
+      }
+    }
+
+    const dialogRef = this.dialog.open(SampleAnnotation, {
+      width: '90vw',
+      maxWidth: '1400px',
+      height: '80vh',
+      data: {
+        samples: existingAnnotation ? undefined : sampleNames,
+        annotation: existingAnnotation,
+        mode: existingAnnotation ? 'edit' : 'create'
+      }
+    });
+
+    dialogRef.afterClosed().subscribe(async (result) => {
+      if (result && Array.isArray(result)) {
+        try {
+          const filePath = await this.saveAnnotationFile(result);
+          this.form.patchValue({ [inputName]: filePath });
+          this.notificationService.showSuccess('Annotation file saved successfully');
+        } catch (error) {
+          const errorMsg = error instanceof Error ? error.message : String(error);
+          await this.wails.logToFile(`Error saving annotation file: ${errorMsg}`);
+          this.notificationService.showError(`Failed to save annotation file: ${errorMsg}`);
+        }
+      }
+    });
+  }
+
+  private getSampleNamesForAnnotation(): string[] {
+    const columnSelectors = this.plugin.definition.inputs.filter(
+      i => i.type === 'column-selector' && i.multiple
+    );
+
+    for (const selector of columnSelectors) {
+      const value = this.form.get(selector.name)?.value;
+      if (Array.isArray(value) && value.length > 0) {
+        return value;
+      }
+    }
+
+    return [];
+  }
+
+  private parseAnnotationFile(content: string, sampleNames: string[]): any[] {
+    const lines = content.trim().split('\n');
+    if (lines.length < 2) {
+      console.log('[DynamicForm] Annotation file has less than 2 lines');
+      return [];
+    }
+
+    const headers = lines[0].split('\t').map(h => h.trim());
+    console.log('[DynamicForm] Annotation headers:', headers);
+    const sampleIdx = headers.findIndex(h => h.toLowerCase().includes('sample'));
+    const conditionIdx = headers.findIndex(h => h.toLowerCase().includes('condition') || h.toLowerCase().includes('group'));
+    const bioreplicateIdx = headers.findIndex(h => h.toLowerCase().includes('bioreplicate') || h.toLowerCase().includes('replicate'));
+    const batchIdx = headers.findIndex(h => h.toLowerCase().includes('batch'));
+    const colorIdx = headers.findIndex(h => h.toLowerCase().includes('color'));
+
+    if (sampleIdx === -1) {
+      console.log('[DynamicForm] No Sample column found in annotation file');
+      return [];
+    }
+
+    const annotations = [];
+    for (let i = 1; i < lines.length; i++) {
+      const values = lines[i].split('\t');
+      annotations.push({
+        Sample: values[sampleIdx] || '',
+        Condition: conditionIdx !== -1 ? (values[conditionIdx] || '') : '',
+        BioReplicate: bioreplicateIdx !== -1 ? (values[bioreplicateIdx] || '') : '',
+        Batch: batchIdx !== -1 ? (values[batchIdx] || '') : '',
+        Color: colorIdx !== -1 ? (values[colorIdx] || '') : ''
+      });
+    }
+
+    console.log('[DynamicForm] Parsed annotations:', annotations.length);
+    return annotations;
+  }
+
+  private async saveAnnotationFile(annotations: any[]): Promise<string> {
+    const headers = ['Sample', 'Condition', 'BioReplicate', 'Batch', 'Color'];
+    const rows = annotations.map(a =>
+      [a.Sample || '', a.Condition || '', a.BioReplicate || '', a.Batch || '', a.Color || ''].join('\t')
+    );
+    const content = [headers.join('\t'), ...rows].join('\n');
+
+    const timestamp = Date.now();
+    const filename = `annotation_${timestamp}.txt`;
+    const filePath = await this.wails.saveTempFile(filename, content);
+
+    return filePath;
   }
 }

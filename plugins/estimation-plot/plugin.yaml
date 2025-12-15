@@ -65,6 +65,15 @@ outputs:
     description: "Statistical test results for each protein"
     format: "tsv"
 
+plots:
+  - id: "estimation_plots"
+    name: "Estimation Plots"
+    type: "image-grid"
+    dataSource: "estimation_plots"
+    config:
+      imagePattern: "*.svg"
+      columns: 1
+
 execution:
   argsMapping:
     input_file: "--file_path"
@@ -72,13 +81,13 @@ execution:
     index_col: "--index_col"
     selected_proteins:
       flag: "--selected_protein"
-      transform: "space-join"
+      transform: "comma-join"
     log2:
       flag: "--log2"
       when: "true"
     condition_order: "--condition_order"
 
-  outputDir: "--out_folder"
+  outputDir: "--output_folder"
 
   requirements:
     python: ">=3.11"
@@ -94,4 +103,5 @@ example:
     input_file: "diann/imputed.data.txt"
     annotation_file: "differential_analysis/annotation.txt"
     index_col: "Precursor.Id"
+    selected_proteins: "AAAAAAPAGGPAAAAPSGENEAESR3,AAAAADLANR2,AAAAATVVPPMVGGPPFVGPVGFGPADR3"
     log2: true

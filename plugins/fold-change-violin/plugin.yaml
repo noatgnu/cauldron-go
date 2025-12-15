@@ -26,10 +26,12 @@ inputs:
     description: "Prefix of columns to include in analysis"
 
   - name: "categories"
-    label: "Categories"
-    type: "text"
-    default: "C..Lysosome,C..Mitochondira,Endosome,Golgi,ER,Ribosome,Nuclear"
-    description: "Comma-separated list of organelle/category names"
+    label: "Organelle Columns"
+    type: "column-selector"
+    required: true
+    multiple: true
+    sourceFile: "input_file"
+    description: "Select columns representing different organelles/categories"
 
   - name: "match_value"
     label: "Match Value"
@@ -59,7 +61,7 @@ inputs:
   - name: "colors"
     label: "Category Colors"
     type: "text"
-    default: "C..Lysosome:#ffb3ba,C..Mitochondira:#ffdfba,Endosome:#ffffba,Golgi:#baffc9,ER:#bae1ff,Ribosome:#d7baff,Nuclear:#ffbaff"
+    default: "C..Lysosome:#ffb3ba,C..Mitochondria:#ffdfba,Endosome:#ffffba,Golgi:#baffc9,ER:#bae1ff,Ribosome:#d7baff,Nuclear:#ffbaff"
     description: "Comma-separated category:color pairs (e.g., Lysosome:#ffb3ba)"
 
   - name: "figsize"
@@ -69,17 +71,34 @@ inputs:
     description: "Figure size in inches (width,height)"
 
 outputs:
-  - name: "violin_plots"
+  - name: "violin_plots_pdf"
     path: "*.pdf"
     type: "image"
-    description: "Violin plots for each comparison group (or single plot.pdf)"
+    description: "Violin plots for each comparison group (PDF format)"
     format: "pdf"
+
+  - name: "violin_plots_svg"
+    path: "*.svg"
+    type: "image"
+    description: "Violin plots for each comparison group (SVG format)"
+    format: "svg"
+
+plots:
+  - id: "violin_plots"
+    name: "Violin Plots"
+    type: "image-grid"
+    dataSource: "violin_plots_svg"
+    config:
+      imagePattern: "*.svg"
+      columns: 1
 
 execution:
   argsMapping:
     input_file: "--file_path"
     columns_prefix: "--columns_prefix"
-    categories: "--categories"
+    categories:
+      flag: "--categories"
+      transform: "comma-join"
     match_value: "--match_value"
     fold_enrichment_col: "--fold_enrichment_col"
     organelle_col: "--organelle_col"
@@ -100,8 +119,16 @@ example:
   enabled: true
   values:
     input_file: "fold_change/enrichment.txt"
+    categories_source: "fold_change/enrichment.txt"
+    categories:
+      - "C..Lysosome"
+      - "C..Mitochondria"
+      - "Endosome"
+      - "Golgi"
+      - "ER"
+      - "Ribosome"
+      - "Nuclear"
     columns_prefix: "Difference"
-    categories: "C..Lysosome,C..Mitochondira,Endosome,Golgi,ER,Ribosome,Nuclear"
     match_value: "+"
     fold_enrichment_col: "Fold enrichment"
     organelle_col: "Organelle"

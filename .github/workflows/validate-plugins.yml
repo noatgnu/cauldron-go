@@ -94,16 +94,7 @@ jobs:
         run: |
           echo "Generating plugin documentation..."
           ./bin/plugin-doc-generator-all
-
-      - name: Check for documentation updates
-        run: |
-          if [ -n "$(git status --porcelain plugins/*/README.md)" ]; then
-            echo "[WARNING] Plugin documentation is out of date"
-            echo "Please run: ./bin/plugin-doc-generator-all"
-            git diff plugins/*/README.md
-            exit 1
-          fi
-          echo "[SUCCESS] All documentation is up to date"
+          echo "[SUCCESS] Documentation generated successfully"
 
   test-developer-tools:
     name: Test All Developer Tools

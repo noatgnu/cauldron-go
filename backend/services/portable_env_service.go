@@ -227,18 +227,84 @@ func (p *PortableEnvService) DownloadPortableEnvironment(url, environment string
 		return err
 	}
 
-	p.progressNotifier.EmitStart(ProgressTypeInstall, "move-"+fileName, "Moving new environment")
+	log.Printf("[DownloadPortableEnvironment] Extraction complete, detecting directory structure...")
 
 	var srcPath, destPath string
 	if environment == "python" {
-		srcPath = filepath.Join(tempFolder, "resources", "bin", platformName, "python")
+		srcPath = filepath.Join(tempFolder, "bin", platformName, "python")
 		destPath = filepath.Join(binFolder, platformName, "python")
 	} else {
-		srcPath = filepath.Join(tempFolder, "resources", "bin", platformName, "R-Portable")
+		srcPath = filepath.Join(tempFolder, "bin", platformName, "R-Portable")
 		destPath = filepath.Join(binFolder, platformName, "R-Portable")
 	}
 
+	if _, err := os.Stat(srcPath); os.IsNotExist(err) {
+		log.Printf("[DownloadPortableEnvironment] Expected path not found: %s", srcPath)
+		log.Printf("[DownloadPortableEnvironment] Searching for python directory...")
+
+		targetDirName := "python"
+		if environment == "r-portable" {
+			targetDirName = "R-Portable"
+		}
+
+		found := false
+		var foundPath string
+
+		err := filepath.Walk(tempFolder, func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				return nil
+			}
+			if info.IsDir() && info.Name() == targetDirName {
+				entries, err := os.ReadDir(path)
+				if err == nil && len(entries) > 0 {
+					hasExecutable := false
+					for _, entry := range entries {
+						if environment == "python" {
+							if entry.Name() == "python.exe" || entry.Name() == "bin" {
+								hasExecutable = true
+								break
+							}
+						} else {
+							if entry.Name() == "bin" || entry.Name() == "R-Portable" {
+								hasExecutable = true
+								break
+							}
+						}
+					}
+					if hasExecutable {
+						foundPath = path
+						found = true
+						return filepath.SkipDir
+					}
+				}
+			}
+			return nil
+		})
+
+		if err == nil && found {
+			log.Printf("[DownloadPortableEnvironment] Found environment at: %s", foundPath)
+			srcPath = foundPath
+		} else {
+			log.Printf("[DownloadPortableEnvironment] Listing temp folder structure...")
+			filepath.Walk(tempFolder, func(path string, info os.FileInfo, err error) error {
+				if err != nil {
+					return nil
+				}
+				relPath, _ := filepath.Rel(tempFolder, path)
+				log.Printf("[DownloadPortableEnvironment]   %s (isDir: %v)", relPath, info.IsDir())
+				return nil
+			})
+			return fmt.Errorf("portable environment files not found. Expected '%s' directory in temp folder", targetDirName)
+		}
+	}
+
+	log.Printf("[DownloadPortableEnvironment] Source path: %s", srcPath)
+	log.Printf("[DownloadPortableEnvironment] Destination path: %s", destPath)
+
+	p.progressNotifier.EmitStart(ProgressTypeInstall, "move-"+fileName, "Moving new environment")
+
 	if _, err := os.Stat(destPath); err == nil {
+		log.Printf("[DownloadPortableEnvironment] Removing existing environment at: %s", destPath)
 		if err := os.RemoveAll(destPath); err != nil {
 			return err
 		}
@@ -253,7 +319,7 @@ func (p *PortableEnvService) DownloadPortableEnvironment(url, environment string
 	}
 
 	log.Printf("[DownloadPortableEnvironment] Cleaning up temporary files...")
-	os.RemoveAll(filepath.Join(tempFolder, "resources"))
+	os.RemoveAll(filepath.Join(tempFolder, "bin"))
 	os.Remove(tempFilePath)
 
 	p.progressNotifier.EmitComplete(ProgressTypeInstall, fileName, "Installation completed")
@@ -337,30 +403,16 @@ func getAppDataFolder() (string, error) {
 }
 
 func (p *PortableEnvService) copyDirWithProgress(src, dst string, id string) error {
-	p.progressNotifier.EmitProgress(ProgressTypeInstall, id, "Moving new environment", 0)
+	log.Printf("[copyDirWithProgress] Starting file copy from %s to %s", src, dst)
 
-	var totalFiles int
-	filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
-		if err == nil && !info.IsDir() {
-			totalFiles++
-		}
-		return nil
-	})
-
-	if totalFiles == 0 {
-		p.progressNotifier.EmitComplete(ProgressTypeInstall, id, "Environment moved")
-		return nil
-	}
-
+	messageKey := "Moving new environment"
 	copiedFiles := 0
 	lastEmitCount := 0
-	emitThreshold := totalFiles / 20
-	if emitThreshold < 1 {
-		emitThreshold = 1
-	}
+	emitInterval := 50
 
 	err := filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
+			log.Printf("[copyDirWithProgress] Walk error: %v", err)
 			return err
 		}
 
@@ -376,18 +428,18 @@ func (p *PortableEnvService) copyDirWithProgress(src, dst string, id string) err
 		}
 
 		if err := copyFile(path, dstPath); err != nil {
+			log.Printf("[copyDirWithProgress] Copy error for %s: %v", path, err)
 			return err
 		}
 
 		copiedFiles++
 
-		if copiedFiles-lastEmitCount >= emitThreshold || copiedFiles == totalFiles {
-			percentage := float64(copiedFiles) / float64(totalFiles) * 100
-			if percentage > 100 {
-				percentage = 100
-			}
-
-			p.progressNotifier.EmitProgress(ProgressTypeInstall, id, "Moving new environment", percentage)
+		if copiedFiles-lastEmitCount >= emitInterval {
+			log.Printf("[copyDirWithProgress] Progress: %d files copied", copiedFiles)
+			p.progressNotifier.EmitWithData(ProgressTypeInstall, messageKey,
+				messageKey, 50, map[string]interface{}{
+					"files": copiedFiles,
+				})
 
 			lastEmitCount = copiedFiles
 		}
@@ -395,11 +447,16 @@ func (p *PortableEnvService) copyDirWithProgress(src, dst string, id string) err
 		return nil
 	})
 
-	if err == nil {
-		p.progressNotifier.EmitComplete(ProgressTypeInstall, id, "Environment moved")
+	if err != nil {
+		log.Printf("[copyDirWithProgress] Failed with error: %v", err)
+		return err
 	}
 
-	return err
+	log.Printf("[copyDirWithProgress] Completed successfully, %d files copied", copiedFiles)
+	p.progressNotifier.EmitComplete(ProgressTypeInstall, messageKey,
+		fmt.Sprintf("Environment moved (%d files)", copiedFiles))
+
+	return nil
 }
 
 func copyDir(src, dst string) error {

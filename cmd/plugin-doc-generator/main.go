@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -49,6 +50,7 @@ type PluginMetadata struct {
 	Author      string `yaml:"author,omitempty"`
 	Category    string `yaml:"category"`
 	Icon        string `yaml:"icon,omitempty"`
+	Repository  string `yaml:"repository,omitempty"`
 }
 
 type PluginRuntime struct {
@@ -260,6 +262,24 @@ func generateOutputTable(outputs []PluginOutput) string {
 	return strings.Join(lines, "\n") + "\n"
 }
 
+func generateInstallSection(repository string) string {
+	if repository == "" {
+		return ""
+	}
+
+	installURL := fmt.Sprintf("cauldron://install?repo=%s", url.QueryEscape(repository))
+
+	lines := []string{
+		"",
+		fmt.Sprintf("**[⬇️ Install in Cauldron](%s)**", installURL),
+		"",
+		fmt.Sprintf("> Click the link above to install this plugin directly in Cauldron, or manually install using: `%s`", repository),
+		"",
+	}
+
+	return strings.Join(lines, "\n")
+}
+
 func generateExampleSection(example *ExampleData) string {
 	if example == nil || !example.Enabled {
 		return ""
@@ -284,6 +304,14 @@ func generateExampleSection(example *ExampleData) string {
 func generatePluginDoc(plugin PluginConfig) string {
 	lines := []string{
 		fmt.Sprintf("# %s\n", plugin.Plugin.Name),
+	}
+
+	installSection := generateInstallSection(plugin.Plugin.Repository)
+	if installSection != "" {
+		lines = append(lines, installSection)
+	}
+
+	lines = append(lines,
 		fmt.Sprintf("**ID**: `%s`  ", plugin.Plugin.ID),
 		fmt.Sprintf("**Version**: %s  ", plugin.Plugin.Version),
 		fmt.Sprintf("**Category**: %s  ", plugin.Plugin.Category),
@@ -298,7 +326,7 @@ func generatePluginDoc(plugin PluginConfig) string {
 		generateInputDetails(plugin.Inputs),
 		"## Outputs\n",
 		generateOutputTable(plugin.Outputs),
-	}
+	)
 
 	if len(plugin.Plots) > 0 {
 		lines = append(lines, "## Visualizations\n")

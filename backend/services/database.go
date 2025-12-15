@@ -129,6 +129,7 @@ func (d *DatabaseService) autoMigrate() error {
 		&PythonEnvironmentDB{},
 		&REnvironmentDB{},
 		&models.Job{},
+		&models.PluginRegistry{},
 	)
 }
 
