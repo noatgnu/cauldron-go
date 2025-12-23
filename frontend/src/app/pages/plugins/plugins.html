@@ -72,7 +72,9 @@
           <app-environment-indicator
             [python]="plugin.config.runtime === 'python'"
             [r]="plugin.config.runtime === 'r'"
-            [pythonWithR]="plugin.config.runtime === 'pythonWithR'">
+            [pythonWithR]="plugin.config.runtime === 'pythonWithR'"
+            [pythonBound]="isBound(plugin.id, 'python')"
+            [rBound]="isBound(plugin.id, 'r')">
           </app-environment-indicator>
 
           <mat-card-content>

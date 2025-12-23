@@ -1,0 +1,216 @@
+:host {
+  display: block;
+  width: 100%;
+}
+
+.r-settings {
+  width: 100%;
+}
+
+.full-width-field {
+  width: 100%;
+  margin-bottom: 12px;
+}
+
+.button-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+
+  button {
+    height: 40px;
+    font-size: 13px;
+    padding: 0 16px;
+
+    mat-icon {
+      margin-right: 4px;
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+    }
+  }
+}
+
+.env-option {
+  padding: 4px 0;
+  width: 100%;
+
+  .env-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+
+    .env-name {
+      font-weight: 500;
+      font-size: 13px;
+    }
+
+    .env-type-chip {
+      font-size: 10px;
+      min-height: 18px;
+      padding: 2px 6px;
+    }
+  }
+
+  .env-details {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: rgba(0, 0, 0, 0.6);
+
+    small {
+      font-size: 11px;
+    }
+  }
+}
+
+.detecting-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 0;
+  color: rgba(0, 0, 0, 0.6);
+  font-size: 13px;
+}
+
+.version-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: rgba(0, 0, 0, 0.6);
+  font-size: 13px;
+  margin-top: -8px;
+
+  mat-icon {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+  }
+}
+
+mat-divider {
+  margin: 24px 0;
+}
+
+.package-section {
+  margin-top: 8px;
+
+  h3 {
+    font-size: 16px;
+    font-weight: 500;
+    margin: 0 0 16px 0;
+  }
+
+  .package-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+
+    button {
+      height: 40px;
+      font-size: 13px;
+      padding: 0 16px;
+
+      mat-icon {
+        margin-right: 4px;
+        font-size: 18px;
+        width: 18px;
+        height: 18px;
+      }
+    }
+  }
+
+  .install-progress {
+    margin-bottom: 12px;
+    padding: 12px;
+    background: rgba(0, 0, 0, 0.02);
+    border-radius: 4px;
+
+    small {
+      display: block;
+      font-size: 12px;
+      color: rgba(0, 0, 0, 0.6);
+      margin-bottom: 6px;
+    }
+  }
+
+  .package-hint {
+    margin: 0;
+    font-size: 13px;
+    color: rgba(0, 0, 0, 0.54);
+    padding-left: 4px;
+  }
+}
+
+.venv-section {
+  margin-top: 8px;
+
+  h3 {
+    font-size: 16px;
+    font-weight: 500;
+    margin: 0 0 16px 0;
+  }
+
+  .section-description {
+    margin: 0 0 16px 0;
+    font-size: 14px;
+    color: rgba(0, 0, 0, 0.6);
+    line-height: 1.5;
+  }
+
+  .no-venvs {
+    color: rgba(0, 0, 0, 0.54);
+    font-size: 13px;
+    margin: 0;
+    padding: 8px 0;
+  }
+
+  mat-list {
+    padding: 0;
+  }
+
+  mat-list-item {
+    border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+    height: auto !important;
+    min-height: 48px;
+    overflow: visible;
+  }
+
+  .venv-details {
+    display: flex;
+    gap: 16px;
+    font-size: 12px;
+    color: rgba(0, 0, 0, 0.6);
+
+    .venv-date {
+      color: rgba(0, 0, 0, 0.4);
+    }
+  }
+
+  .meta-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    height: 100%;
+
+    button[mat-icon-button] {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 40px;
+      height: 40px;
+
+      mat-icon {
+        margin: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 24px;
+        width: 24px;
+        height: 24px;
+      }
+    }
+  }
+}

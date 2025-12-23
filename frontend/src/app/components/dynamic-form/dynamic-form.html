@@ -34,7 +34,12 @@
               <button mat-raised-button color="primary" type="button" (click)="openFile(input.name)" [disabled]="disabled">
                 Browse
               </button>
-              @if (isAnnotationFileInput(input)) {
+              @if (hasTableColumns(input)) {
+                <button mat-raised-button color="accent" type="button" (click)="openTableEditor(input.name)" [disabled]="disabled" matTooltip="Create or edit table file">
+                  <mat-icon>table_chart</mat-icon>
+                  Manage Table
+                </button>
+              } @else if (isAnnotationFileInput(input)) {
                 <button mat-raised-button color="accent" type="button" (click)="openAnnotationManager(input.name)" [disabled]="disabled" matTooltip="Create or edit annotation file">
                   <mat-icon>edit_note</mat-icon>
                   Manage Annotation
@@ -133,10 +138,12 @@
             </mat-form-field>
           }
           @case ('column-selector') {
-            @if (getColumns(input.name).length > 0) {
-              <mat-form-field appearance="outline" class="full-width">
-                <mat-label>{{ input.label }}</mat-label>
-                <mat-select [formControlName]="input.name" [multiple]="input.multiple">
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>{{ input.label }}</mat-label>
+              <mat-select [formControlName]="input.name" [multiple]="input.multiple" [disabled]="getColumns(input.name).length === 0 || disabled">
+                @if (getColumns(input.name).length === 0) {
+                  <mat-option disabled>Select {{ input.sourceFile }} file first</mat-option>
+                } @else {
                   @for (col of getColumns(input.name); track col; let idx = $index) {
                     <mat-option
                       [value]="col"
@@ -144,19 +151,15 @@
                       {{ col }}
                     </mat-option>
                   }
-                </mat-select>
-                @if (input.description) {
-                  <mat-hint>{{ input.description }}</mat-hint>
                 }
-                @if (form.get(input.name)?.hasError('required')) {
-                  <mat-error>{{ input.label }} is required</mat-error>
-                }
-              </mat-form-field>
-            } @else {
-              <p class="info-text">
-                Select {{ input.sourceFile }} file first to load columns
-              </p>
-            }
+              </mat-select>
+              @if (input.description) {
+                <mat-hint>{{ input.description }}</mat-hint>
+              }
+              @if (form.get(input.name)?.hasError('required')) {
+                <mat-error>{{ input.label }} is required</mat-error>
+              }
+            </mat-form-field>
           }
           }
         </div>

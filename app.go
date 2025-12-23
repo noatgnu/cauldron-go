@@ -18,21 +18,23 @@ import (
 )
 
 type App struct {
-	ctx                context.Context
-	db                 *services.DatabaseService
-	settings           *services.SettingsService
-	fileService        *services.FileService
-	jobQueue           *services.JobQueueService
-	pythonRunner       *services.PythonRunner
-	rRunner            *services.RRunner
-	envService         *services.EnvironmentService
-	scriptExecutor     *services.ScriptExecutor
-	portableEnvService *services.PortableEnvService
-	pluginService      *services.PluginService
-	pluginLoaderV2     *services.PluginLoaderV2
-	pluginExecutor     *services.PluginExecutor
-	pluginInstaller    *services.PluginInstaller
-	protocolHandler    *services.ProtocolHandler
+	ctx                   context.Context
+	db                    *services.DatabaseService
+	settings              *services.SettingsService
+	fileService           *services.FileService
+	jobQueue              *services.JobQueueService
+	pythonRunner          *services.PythonRunner
+	rRunner               *services.RRunner
+	envService            *services.EnvironmentService
+	scriptExecutor        *services.ScriptExecutor
+	portableEnvService    *services.PortableEnvService
+	pluginService         *services.PluginService
+	pluginLoaderV2        *services.PluginLoaderV2
+	pluginExecutor        *services.PluginExecutor
+	pluginInstaller       *services.PluginInstaller
+	protocolHandler       *services.ProtocolHandler
+	httpInstallServer     *services.HTTPInstallServer
+	pluginRegistryService *services.PluginRegistryService
 }
 
 func NewApp() *App {
@@ -76,7 +78,7 @@ func (a *App) startup(ctx context.Context) {
 	a.jobQueue.SetRunners(a.pythonRunner, a.rRunner, directRunner, a.settings)
 
 	log.Println("[App.startup] Initializing script executor...")
-	a.scriptExecutor = services.NewScriptExecutor(a.settings)
+	a.scriptExecutor = services.NewScriptExecutor(a.settings, a.db)
 	a.scriptExecutor.SetUpdateCallback(func(jobID string, update models.Job) {
 		job, err := a.jobQueue.GetJob(jobID)
 		if err != nil {
@@ -140,12 +142,25 @@ func (a *App) startup(ctx context.Context) {
 	a.pluginInstaller = services.NewPluginInstaller(pluginsDir, a.db, a.pluginLoaderV2)
 	log.Println("[App.startup] Plugin installer initialized")
 
+	log.Println("[App.startup] Initializing plugin registry service...")
+	a.pluginRegistryService = services.NewPluginRegistryService(ctx, a.settings)
+	log.Println("[App.startup] Plugin registry service initialized")
+
 	log.Println("[App.startup] Initializing protocol handler...")
 	a.protocolHandler = services.NewProtocolHandler(a.pluginInstaller)
+	a.protocolHandler.SetContext(ctx)
 	if err := a.protocolHandler.RegisterProtocol(); err != nil {
 		log.Printf("[App.startup] Warning: Failed to register protocol handler: %v", err)
 	}
 	log.Println("[App.startup] Protocol handler initialized")
+
+	log.Println("[App.startup] Starting HTTP install server...")
+	a.httpInstallServer = services.NewHTTPInstallServer(a.protocolHandler)
+	if err := a.httpInstallServer.Start(ctx); err != nil {
+		log.Printf("[App.startup] Warning: Failed to start HTTP install server: %v", err)
+	} else {
+		log.Printf("[App.startup] HTTP install server ready at http://localhost:%d", a.httpInstallServer.GetPort())
+	}
 
 	log.Println("[App.startup] Checking for protocol URL...")
 	a.handleProtocolURL()
@@ -159,6 +174,12 @@ func (a *App) startup(ctx context.Context) {
 }
 
 func (a *App) shutdown(ctx context.Context) {
+	if a.httpInstallServer != nil {
+		log.Println("[App.shutdown] Stopping HTTP install server...")
+		if err := a.httpInstallServer.Stop(); err != nil {
+			log.Printf("[App.shutdown] Error stopping HTTP install server: %v", err)
+		}
+	}
 	if a.jobQueue != nil {
 		a.jobQueue.Shutdown()
 	}
@@ -1058,8 +1079,8 @@ func (a *App) ListRPackages(rPath string) ([]string, error) {
 	return a.envService.ListRPackages(rPath)
 }
 
-func (a *App) CreatePythonVirtualEnv(basePythonPath string, venvPath string) error {
-	return a.envService.CreatePythonVirtualEnv(basePythonPath, venvPath)
+func (a *App) CreatePythonVirtualEnv(basePythonPath string, venvPath string, pluginID string) error {
+	return a.envService.CreatePythonVirtualEnv(basePythonPath, venvPath, pluginID)
 }
 
 func (a *App) GetVirtualEnvironments() ([]services.VirtualEnvironment, error) {
@@ -1068,6 +1089,42 @@ func (a *App) GetVirtualEnvironments() ([]services.VirtualEnvironment, error) {
 
 func (a *App) DeleteVirtualEnvironment(id uint) error {
 	return a.envService.DeleteVirtualEnvironment(id)
+}
+
+func (a *App) CreateRenvEnvironment(name string, packages []string, pluginID string) error {
+	log.Printf("[App] Creating renv environment: %s with %d packages for plugin: %s", name, len(packages), pluginID)
+	return a.envService.CreateRenvEnvironment(name, packages, pluginID)
+}
+
+func (a *App) GetRenvEnvironments() ([]services.RenvEnvironment, error) {
+	return a.envService.GetRenvEnvironments()
+}
+
+func (a *App) DeleteRenvEnvironment(id uint) error {
+	return a.envService.DeleteRenvEnvironment(id)
+}
+
+func (a *App) BindPluginToEnvironment(pluginID string, envType string, envID uint, envPath string) error {
+	log.Printf("[App] Binding plugin %s to %s environment %d", pluginID, envType, envID)
+	binding := services.PluginEnvironmentBinding{
+		PluginID:        pluginID,
+		EnvironmentType: envType,
+		EnvironmentID:   envID,
+		EnvironmentPath: envPath,
+	}
+	return a.db.SavePluginEnvironmentBinding(binding)
+}
+
+func (a *App) GetPluginEnvironmentBinding(pluginID string, envType string) (*services.PluginEnvironmentBinding, error) {
+	return a.db.GetPluginEnvironmentBinding(pluginID, envType)
+}
+
+func (a *App) DeletePluginEnvironmentBinding(pluginID string, envType string) error {
+	return a.db.DeletePluginEnvironmentBinding(pluginID, envType)
+}
+
+func (a *App) GetAllPluginEnvironmentBindings() ([]services.PluginEnvironmentBinding, error) {
+	return a.db.GetAllPluginEnvironmentBindings()
 }
 
 func (a *App) GetBundledRequirementsPath(requirementType string) (string, error) {
@@ -1899,11 +1956,9 @@ func (a *App) beforeClose(ctx context.Context) bool {
 	if hasInProgress {
 		log.Println("[beforeClose] Showing jobs in progress dialog")
 		selection, err := runtime.MessageDialog(ctx, runtime.MessageDialogOptions{
-			Type:          runtime.QuestionDialog,
-			Title:         "Jobs in Progress",
-			Message:       "There are jobs still running. What would you like to do?",
-			Buttons:       []string{"Stop Jobs & Exit", "Exit Anyway", "Cancel"},
-			DefaultButton: "Cancel",
+			Type:    runtime.QuestionDialog,
+			Title:   "Jobs in Progress",
+			Message: "There are jobs still running.\n\nClick YES to stop all jobs and exit.\nClick NO to cancel and keep jobs running.",
 		})
 
 		if err != nil {
@@ -1913,14 +1968,13 @@ func (a *App) beforeClose(ctx context.Context) bool {
 
 		log.Printf("[beforeClose] User selected: %s", selection)
 
-		if selection == "Stop Jobs & Exit" {
+		if selection == "Yes" {
 			log.Println("[beforeClose] User chose to stop jobs and exit")
 			if a.jobQueue != nil {
 				a.jobQueue.StopQueueImmediate()
+				time.Sleep(2 * time.Second)
+				log.Println("[beforeClose] Waited 2 seconds for jobs to terminate")
 			}
-			return false
-		} else if selection == "Exit Anyway" {
-			log.Println("[beforeClose] User chose to exit without stopping jobs")
 			return false
 		}
 
@@ -1957,6 +2011,32 @@ func (a *App) GetPluginVersion(repoURL string) (string, error) {
 
 func (a *App) DecodePluginRepoURL(encoded string) (string, error) {
 	return services.DecodeRepoURL(encoded)
+}
+
+func (a *App) ConfirmPluginInstallation(repoURL string) error {
+	log.Printf("[App] User confirmed plugin installation from: %s", repoURL)
+
+	runtime.EventsEmit(a.ctx, "plugin:install:start", map[string]interface{}{
+		"repo": repoURL,
+	})
+
+	go func() {
+		if err := a.pluginInstaller.InstallPlugin(repoURL); err != nil {
+			log.Printf("[App] Plugin installation failed: %v", err)
+			runtime.EventsEmit(a.ctx, "plugin:install:error", map[string]interface{}{
+				"repo":  repoURL,
+				"error": err.Error(),
+			})
+			return
+		}
+
+		log.Printf("[App] Plugin installed successfully from: %s", repoURL)
+		runtime.EventsEmit(a.ctx, "plugin:install:success", map[string]interface{}{
+			"repo": repoURL,
+		})
+	}()
+
+	return nil
 }
 
 func (a *App) handleProtocolURL() {
@@ -1998,4 +2078,34 @@ func (a *App) HandleProtocolURL(url string) error {
 
 	runtime.EventsEmit(a.ctx, "plugin:installed", nil)
 	return nil
+}
+
+func (a *App) ListRegistryPlugins(searchQuery string, categoryName string, authorName string, limit int, offset int) (interface{}, error) {
+	log.Printf("[App] Listing registry plugins - search: %s, category: %s, author: %s, limit: %d, offset: %d", searchQuery, categoryName, authorName, limit, offset)
+	return a.pluginRegistryService.ListPlugins(searchQuery, categoryName, authorName, limit, offset)
+}
+
+func (a *App) GetRegistryPlugin(pluginID string) (interface{}, error) {
+	log.Printf("[App] Getting registry plugin: %s", pluginID)
+	return a.pluginRegistryService.GetPlugin(pluginID)
+}
+
+func (a *App) ListRegistryCategories() (interface{}, error) {
+	log.Printf("[App] Listing registry categories")
+	return a.pluginRegistryService.ListCategories()
+}
+
+func (a *App) InstallPluginFromRegistry(pluginID string) error {
+	log.Printf("[App] Installing plugin from registry: %s", pluginID)
+
+	plugin, err := a.pluginRegistryService.GetPlugin(pluginID)
+	if err != nil {
+		return fmt.Errorf("failed to get plugin details: %w", err)
+	}
+
+	if plugin.Repository == "" {
+		return fmt.Errorf("plugin does not have a repository URL")
+	}
+
+	return a.ConfirmPluginInstallation(plugin.Repository)
 }

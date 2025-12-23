@@ -1,0 +1,278 @@
+plugin:
+  id: "msqrob2-dia"
+  name: "MSqRob2 DIA Analysis"
+  description: "Robust statistical inference for quantitative DIA proteomics using msqrob2"
+  version: "1.0.0"
+  author: "CauldronGO Team"
+  category: "statistics"
+  subcategory: "msqrob2"
+  icon: "analytics"
+
+runtime:
+  type: "r"
+  script: "msqrob2.R"
+
+inputs:
+  - name: "input_file"
+    label: "Peptide Intensity File"
+    type: "file"
+    required: true
+    accept: ".csv,.tsv,.txt"
+    description: "DIA peptide-level intensity data (columns: feature identifiers + sample intensities)"
+
+  - name: "annotation_file"
+    label: "Sample Annotation File"
+    type: "file"
+    required: true
+    accept: ".csv,.tsv,.txt"
+    description: "Sample annotation with columns: Sample (matching sample column names in data), Condition, BioReplicate"
+
+  - name: "comparison_file"
+    label: "Comparison Matrix File"
+    type: "file"
+    required: false
+    accept: ".csv,.tsv,.txt"
+    description: "Pairwise comparisons (columns: comparison_label, condition_A, condition_B)"
+
+  - name: "feature_id_col"
+    label: "Feature ID Column"
+    type: "column-selector"
+    multiple: false
+    required: true
+    sourceFile: "input_file"
+    description: "Column name for peptide/feature identifiers"
+
+  - name: "protein_col"
+    label: "Protein Column"
+    type: "column-selector"
+    multiple: false
+    required: true
+    sourceFile: "input_file"
+    description: "Column name containing protein identifiers"
+
+  - name: "log2_transform"
+    label: "Apply Log2 Transformation"
+    type: "boolean"
+    default: true
+    description: "Apply log2 transformation to intensities"
+
+  - name: "filter_min_identified"
+    label: "Minimum Identifications"
+    type: "number"
+    required: false
+    default: 2
+    description: "Minimum number of identified samples required per feature"
+
+  - name: "col_filter"
+    label: "Column Completeness Threshold"
+    type: "number"
+    required: false
+    default: 0.7
+    min: 0
+    max: 1
+    step: 0.05
+    description: "Maximum proportion of missing values allowed in columns (samples). Default 0.7 means keep columns with <70% missing (≥30% data present). Lower values are more stringent."
+
+  - name: "row_filter"
+    label: "Row Completeness Threshold"
+    type: "number"
+    required: false
+    default: 0.7
+    min: 0
+    max: 1
+    step: 0.05
+    description: "Maximum proportion of missing values allowed in rows (features). Default 0.7 means keep rows with <70% missing (≥30% data present). Lower values are more stringent."
+
+  - name: "impute_order"
+    label: "Imputation Order"
+    type: "select"
+    required: false
+    default: "before"
+    options:
+      - "before"
+      - "after"
+    description: "When to perform imputation relative to normalization (before or after normalization)"
+
+  - name: "impute"
+    label: "Imputation Method"
+    type: "select"
+    required: false
+    default: "none"
+    options:
+      - "none"
+      - "knn"
+      - "MinDet"
+      - "MinProb"
+      - "min"
+      - "zero"
+      - "mixed"
+      - "nbavg"
+      - "with"
+      - "QRILC"
+      - "MLE"
+      - "bpca"
+    description: "Imputation method for missing values (select 'none' to skip imputation)"
+
+  - name: "normalize_method"
+    label: "Normalization"
+    type: select
+    required: false
+    default: "center.median"
+    options:
+      - "none"
+      - "center.median"
+      - "center.mean"
+      - "quantiles"
+      - "quantiles.robust"
+      - "vsn"
+    description: "Normalization method to apply"
+
+  - name: "aggregation_method"
+    label: "Protein Aggregation Method"
+    type: "select"
+    required: false
+    default: "robust"
+    options:
+      - "robust"
+      - "sum"
+      - "mean"
+      - "median"
+      - "iPQF"
+    description: "Method for aggregating peptides to proteins (robust = msqrobAggregate)"
+
+  - name: "ridge_penalty"
+    label: "Ridge Penalty"
+    type: "number"
+    required: false
+    default: 0
+    min: 0
+    max: 1
+    step: 0.01
+    description: "Ridge penalty for regularization (0 = no penalty)"
+
+  - name: "robust_regression"
+    label: "Use Robust Regression"
+    type: "boolean"
+    default: true
+    description: "Use robust regression (M-estimation)"
+
+  - name: "max_iterations"
+    label: "Maximum Iterations"
+    type: "number"
+    required: false
+    default: 20
+    min: 5
+    max: 100
+    step: 5
+    description: "Maximum iterations for model fitting"
+
+  - name: "adjust_method"
+    label: "P-value Adjustment Method"
+    type: "select"
+    required: false
+    default: "BH"
+    options:
+      - "BH"
+      - "bonferroni"
+      - "holm"
+      - "hochberg"
+      - "BY"
+      - "none"
+    description: "Method for multiple testing correction"
+
+  - name: "alpha"
+    label: "Significance Level"
+    type: "number"
+    required: false
+    default: 0.05
+    min: 0.001
+    max: 0.2
+    step: 0.001
+    description: "Significance threshold for hypothesis testing"
+
+  - name: "lfc_threshold"
+    label: "Log2 Fold Change Threshold"
+    type: "number"
+    required: false
+    default: 0
+    min: 0
+    max: 5
+    step: 0.1
+    description: "Minimum log2 fold change threshold for significance (0 = no threshold)"
+
+outputs:
+  - name: "differential_results"
+    path: "msqrob2_results.txt"
+    type: "data"
+    description: "Differential expression analysis results"
+    format: "tsv"
+
+  - name: "protein_intensities"
+    path: "protein_intensities.txt"
+    type: "data"
+    description: "Aggregated protein-level intensities"
+    format: "tsv"
+
+  - name: "normalized_peptides"
+    path: "normalized_peptides.txt"
+    type: "data"
+    description: "Normalized peptide-level intensities"
+    format: "tsv"
+
+  - name: "imputed_peptides"
+    path: "imputed_peptides.txt"
+    type: "data"
+    description: "Imputed peptide-level intensities"
+    format: "tsv"
+
+  - name: "qc_plot"
+    path: "qc_plot.pdf"
+    type: "plot"
+    description: "Quality control plots (PCA, intensity distributions)"
+    format: "pdf"
+
+execution:
+  argsMapping:
+    input_file: "--input_file"
+    annotation_file: "--annotation_file"
+    comparison_file: "--comparison_file"
+    feature_id_col: "--feature_id_col"
+    protein_col: "--protein_col"
+    log2_transform:
+      flag: "--log2_transform"
+      when: "true"
+    filter_min_identified: "--filter_min_identified"
+    col_filter: "--col_filter"
+    row_filter: "--row_filter"
+    impute_order: "--impute_order"
+    impute: "--impute"
+    normalize_method: "--normalize_method"
+    aggregation_method: "--aggregation_method"
+    ridge_penalty: "--ridge_penalty"
+    robust_regression:
+      flag: "--robust_regression"
+      when: "true"
+    max_iterations: "--max_iterations"
+    adjust_method: "--adjust_method"
+    alpha: "--alpha"
+    lfc_threshold: "--lfc_threshold"
+
+  outputDir: "--output_folder"
+
+  requirements:
+    r: ">=4.0"
+    rPackagesFile: "r-packages.txt"
+
+example:
+  enabled: true
+  values:
+    input_file: "diann/Reports.pr_matrix.tsv"
+    annotation_file: "diann/annotation_msqrob2.txt"
+    feature_id_col: "Precursor.Id"
+    protein_col: "Protein.Group"
+    log2_transform: true
+    impute: "knn"
+    impute_order: "before"
+    normalize_method: "center.median"
+    aggregation_method: "robust"
+    robust_regression: true

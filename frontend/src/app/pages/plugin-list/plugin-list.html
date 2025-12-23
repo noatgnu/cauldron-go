@@ -6,6 +6,21 @@
     </h1>
 
     <div class="header-actions">
+      <mat-button-toggle-group [(ngModel)]="sourceFilter" (change)="onSourceFilterChange()" class="source-filter">
+        <mat-button-toggle value="all">
+          <mat-icon>all_inclusive</mat-icon>
+          All
+        </mat-button-toggle>
+        <mat-button-toggle value="builtin">
+          <mat-icon>inventory_2</mat-icon>
+          Built-in
+        </mat-button-toggle>
+        <mat-button-toggle value="remote">
+          <mat-icon>cloud_download</mat-icon>
+          External
+        </mat-button-toggle>
+      </mat-button-toggle-group>
+
       <mat-form-field appearance="outline" class="search-field">
         <mat-label>Search plugins</mat-label>
         <input matInput [(ngModel)]="searchQuery" (input)="onSearch()" placeholder="Search by name, description, or ID">
@@ -47,7 +62,12 @@
               <mat-card class="plugin-card" (click)="navigateToPlugin(plugin.id)">
                 <mat-card-header>
                   <mat-icon mat-card-avatar>{{ plugin.definition.plugin.icon || 'extension' }}</mat-icon>
-                  <mat-card-title>{{ plugin.definition.plugin.name }}</mat-card-title>
+                  <mat-card-title>
+                    {{ plugin.definition.plugin.name }}
+                    @if (hasCustomBinding(plugin.id)) {
+                      <mat-icon class="binding-indicator" [matTooltip]="getBindingTooltip(plugin.id)" color="accent">link</mat-icon>
+                    }
+                  </mat-card-title>
                   <mat-card-subtitle>v{{ plugin.definition.plugin.version }}</mat-card-subtitle>
                 </mat-card-header>
 
@@ -78,6 +98,9 @@
                 </mat-card-content>
 
                 <mat-card-actions align="end">
+                  <button mat-icon-button (click)="openEnvironmentDialog($event, plugin)" matTooltip="Environment Settings">
+                    <mat-icon>settings</mat-icon>
+                  </button>
                   <button mat-button color="primary">
                     <mat-icon>play_arrow</mat-icon>
                     Run

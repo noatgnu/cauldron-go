@@ -6,10 +6,12 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { DynamicFormComponent } from '../../components/dynamic-form/dynamic-form';
 import { PluginV2Service } from '../../core/services/plugin-v2';
 import { models } from '../../../wailsjs/go/models';
 import { EnvironmentIndicator } from '../../components/environment-indicator/environment-indicator';
+import { Wails } from '../../core/services/wails';
 
 @Component({
   selector: 'app-plugin-execute',
@@ -20,6 +22,7 @@ import { EnvironmentIndicator } from '../../components/environment-indicator/env
     MatIconModule,
     MatProgressSpinnerModule,
     MatSnackBarModule,
+    MatTooltipModule,
     DynamicFormComponent,
     EnvironmentIndicator
   ],
@@ -34,12 +37,17 @@ export class PluginExecute implements OnInit {
   executing = signal(false);
   error = signal('');
   createdJobId = signal<string | null>(null);
+  hasCustomBinding = signal(false);
+  bindingTooltip = signal('');
+  pythonBound = signal(false);
+  rBound = signal(false);
 
   constructor(
     private route: ActivatedRoute,
     private router: Router,
     private pluginService: PluginV2Service,
-    private snackBar: MatSnackBar
+    private snackBar: MatSnackBar,
+    private wails: Wails
   ) {}
 
   async ngOnInit() {
@@ -61,6 +69,13 @@ export class PluginExecute implements OnInit {
       this.createdJobId.set(null);
       await this.loadPlugin(pluginId);
     });
+
+    this.wails.bindingsUpdated$.subscribe(() => {
+      const p = this.plugin();
+      if (p) {
+        this.loadPluginBinding(p.id.toString());
+      }
+    });
   }
 
   async loadPlugin(id: number) {
@@ -69,10 +84,40 @@ export class PluginExecute implements OnInit {
       this.error.set('');
       const plugin = await this.pluginService.getPlugin(id);
       this.plugin.set(plugin);
+      await this.loadPluginBinding(id.toString());
     } catch (err) {
       this.error.set(`Failed to load plugin: ${err}`);
     } finally {
       this.loading.set(false);
+    }
+  }
+
+  async loadPluginBinding(pluginId: string) {
+    let hasPython = false;
+    let hasR = false;
+
+    try {
+      const pythonBinding = await this.wails.getPluginEnvironmentBinding(pluginId, 'python');
+      hasPython = !!pythonBinding;
+    } catch {}
+
+    try {
+      const rBinding = await this.wails.getPluginEnvironmentBinding(pluginId, 'r');
+      hasR = !!rBinding;
+    } catch {}
+
+    this.pythonBound.set(hasPython);
+    this.rBound.set(hasR);
+
+    if (hasPython || hasR) {
+      this.hasCustomBinding.set(true);
+      const parts: string[] = [];
+      if (hasPython) parts.push('Python');
+      if (hasR) parts.push('R');
+      this.bindingTooltip.set(`Custom environment bound: ${parts.join(' & ')}`);
+    } else {
+      this.hasCustomBinding.set(false);
+      this.bindingTooltip.set('');
     }
   }
 

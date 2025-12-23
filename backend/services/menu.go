@@ -30,9 +30,20 @@ func BuildApplicationMenu(ctx context.Context, appCallbacks AppCallbacks) *menu.
 		appCallbacks.HandleQuit()
 	})
 
-	analysisMenu := appMenu.AddSubmenu("Analysis")
+	viewMenu := appMenu.AddSubmenu("View")
+	viewMenu.AddText("Home", keys.CmdOrCtrl("1"), func(_ *menu.CallbackData) {
+		runtime.EventsEmit(ctx, "menu:view-home")
+	})
+	viewMenu.AddText("Jobs", keys.CmdOrCtrl("2"), func(_ *menu.CallbackData) {
+		runtime.EventsEmit(ctx, "menu:view-jobs")
+	})
+	viewMenu.AddText("Plugin List", keys.CmdOrCtrl("3"), func(_ *menu.CallbackData) {
+		runtime.EventsEmit(ctx, "menu:view-plugin-list")
+	})
 
-	transformMenu := analysisMenu.AddSubmenu("Data Transformation")
+	toolsMenu := appMenu.AddSubmenu("Tools")
+
+	transformMenu := toolsMenu.AddSubmenu("Data Transformation")
 	transformMenu.AddText("Imputation", nil, func(_ *menu.CallbackData) {
 		runtime.EventsEmit(ctx, "menu:imputation")
 	})
@@ -40,7 +51,7 @@ func BuildApplicationMenu(ctx context.Context, appCallbacks AppCallbacks) *menu.
 		runtime.EventsEmit(ctx, "menu:normalization")
 	})
 
-	dimRedMenu := analysisMenu.AddSubmenu("Dimensionality Reduction")
+	dimRedMenu := toolsMenu.AddSubmenu("Dimensionality Reduction")
 	dimRedMenu.AddText("PCA", nil, func(_ *menu.CallbackData) {
 		runtime.EventsEmit(ctx, "menu:pca")
 	})
@@ -51,9 +62,7 @@ func BuildApplicationMenu(ctx context.Context, appCallbacks AppCallbacks) *menu.
 		runtime.EventsEmit(ctx, "menu:fuzzy-clustering")
 	})
 
-	analysisMenu.AddSeparator()
-
-	diffMenu := analysisMenu.AddSubmenu("Differential Analysis")
+	diffMenu := toolsMenu.AddSubmenu("Differential Analysis")
 	diffMenu.AddText("Limma", nil, func(_ *menu.CallbackData) {
 		runtime.EventsEmit(ctx, "menu:limma")
 	})
@@ -64,15 +73,15 @@ func BuildApplicationMenu(ctx context.Context, appCallbacks AppCallbacks) *menu.
 		runtime.EventsEmit(ctx, "menu:alphastats")
 	})
 
-	analysisMenu.AddSeparator()
-	analysisMenu.AddText("Estimation Plot", nil, func(_ *menu.CallbackData) {
+	visualizationMenu := toolsMenu.AddSubmenu("Visualization")
+	visualizationMenu.AddText("Estimation Plot", nil, func(_ *menu.CallbackData) {
 		runtime.EventsEmit(ctx, "menu:estimation-plot")
 	})
-	analysisMenu.AddText("Correlation Matrix", nil, func(_ *menu.CallbackData) {
+	visualizationMenu.AddText("Correlation Matrix", nil, func(_ *menu.CallbackData) {
 		runtime.EventsEmit(ctx, "menu:correlation-matrix")
 	})
 
-	utilitiesMenu := appMenu.AddSubmenu("Utilities")
+	utilitiesMenu := toolsMenu.AddSubmenu("Utilities")
 	utilitiesMenu.AddText("UniProt Lookup", nil, func(_ *menu.CallbackData) {
 		runtime.EventsEmit(ctx, "menu:uniprot")
 	})
@@ -90,18 +99,12 @@ func BuildApplicationMenu(ctx context.Context, appCallbacks AppCallbacks) *menu.
 		runtime.EventsEmit(ctx, "menu:format-conversion")
 	})
 
-	viewMenu := appMenu.AddSubmenu("View")
-	viewMenu.AddText("Home", keys.CmdOrCtrl("1"), func(_ *menu.CallbackData) {
-		runtime.EventsEmit(ctx, "menu:view-home")
+	windowMenu := appMenu.AddSubmenu("Window")
+	windowMenu.AddText("Minimize", keys.CmdOrCtrl("m"), func(_ *menu.CallbackData) {
+		runtime.WindowMinimise(ctx)
 	})
-	viewMenu.AddText("Jobs", keys.CmdOrCtrl("2"), func(_ *menu.CallbackData) {
-		runtime.EventsEmit(ctx, "menu:view-jobs")
-	})
-	viewMenu.AddText("Custom Workflows", keys.CmdOrCtrl("3"), func(_ *menu.CallbackData) {
-		runtime.EventsEmit(ctx, "menu:view-plugins")
-	})
-	viewMenu.AddText("Settings", keys.CmdOrCtrl("4"), func(_ *menu.CallbackData) {
-		runtime.EventsEmit(ctx, "menu:view-settings")
+	windowMenu.AddText("Zoom", nil, func(_ *menu.CallbackData) {
+		runtime.WindowToggleMaximise(ctx)
 	})
 
 	helpMenu := appMenu.AddSubmenu("Help")

@@ -7,4 +7,5 @@ type Config struct {
 	RPath             string `json:"rPath"`
 	RLibPath          string `json:"rLibPath"`
 	CurtainBackendURL string `json:"curtainBackendUrl"`
+	PluginRegistryURL string `json:"pluginRegistryUrl"`
 }

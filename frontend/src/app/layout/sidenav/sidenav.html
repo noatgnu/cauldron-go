@@ -1,34 +1,26 @@
-<div class="sidebar-header">
-  <div class="view-toggle">
-    <mat-checkbox
-      [checked]="showPlugins()"
-      (change)="togglePluginView()"
-      color="primary">
-      <span class="toggle-label">
-        <mat-icon>{{ showPlugins() ? 'extension' : 'apps' }}</mat-icon>
-        {{ showPlugins() ? 'Plugin View' : 'Classic View' }}
-      </span>
-    </mat-checkbox>
+@if (!isSettingsRoute()) {
+  <div class="sidebar-header">
+    <div class="search-container">
+      <mat-form-field appearance="outline" class="search-field">
+        <mat-label>Search plugins</mat-label>
+        <input matInput
+               [value]="searchQuery()"
+               (input)="updateSearch($any($event.target).value)"
+               placeholder="Type to search...">
+        <mat-icon matPrefix>search</mat-icon>
+        @if (searchQuery()) {
+          <button matSuffix mat-icon-button (click)="clearSearch()" type="button">
+            <mat-icon>clear</mat-icon>
+          </button>
+        }
+      </mat-form-field>
+    </div>
   </div>
-
-  <mat-divider></mat-divider>
-
-  <div class="search-container">
-    <mat-form-field appearance="outline" class="search-field">
-      <mat-label>Search tools & analysis</mat-label>
-      <input matInput
-             [value]="searchQuery()"
-             (input)="updateSearch($any($event.target).value)"
-             placeholder="Type to search...">
-      <mat-icon matPrefix>search</mat-icon>
-      @if (searchQuery()) {
-        <button matSuffix mat-icon-button (click)="clearSearch()" type="button">
-          <mat-icon>clear</mat-icon>
-        </button>
-      }
-    </mat-form-field>
+} @else {
+  <div class="sidebar-header settings-header">
+    <h2>Settings</h2>
   </div>
-</div>
+}
 
 <mat-nav-list class="sidenav-list">
   @if (filteredNavItems().length === 0) {
@@ -48,10 +40,29 @@
         </mat-expansion-panel-header>
         <mat-nav-list>
           @for (child of item.children; track child.label) {
-            <a mat-list-item (click)="navigate(child.route!)" class="nav-child-item">
-              <mat-icon matListItemIcon>{{ child.icon }}</mat-icon>
-              <span matListItemTitle>{{ child.label }}</span>
-            </a>
+            @if (child.children) {
+              <mat-expansion-panel class="nav-expansion-panel subcategory-panel">
+                <mat-expansion-panel-header>
+                  <mat-panel-title>
+                    <mat-icon>{{ child.icon }}</mat-icon>
+                    <span>{{ child.label }}</span>
+                  </mat-panel-title>
+                </mat-expansion-panel-header>
+                <mat-nav-list>
+                  @for (subchild of child.children; track subchild.label) {
+                    <a mat-list-item (click)="navigate(subchild.route!)" class="nav-subchild-item">
+                      <mat-icon matListItemIcon>{{ subchild.icon }}</mat-icon>
+                      <span matListItemTitle>{{ subchild.label }}</span>
+                    </a>
+                  }
+                </mat-nav-list>
+              </mat-expansion-panel>
+            } @else {
+              <a mat-list-item (click)="navigate(child.route!)" class="nav-child-item">
+                <mat-icon matListItemIcon>{{ child.icon }}</mat-icon>
+                <span matListItemTitle>{{ child.label }}</span>
+              </a>
+            }
           }
         </mat-nav-list>
       </mat-expansion-panel>

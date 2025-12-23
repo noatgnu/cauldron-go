@@ -21,6 +21,7 @@ export namespace models {
 	    rPath: string;
 	    rLibPath: string;
 	    curtainBackendUrl: string;
+	    pluginRegistryUrl: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new Config(source);
@@ -34,6 +35,7 @@ export namespace models {
 	        this.rPath = source["rPath"];
 	        this.rLibPath = source["rLibPath"];
 	        this.curtainBackendUrl = source["curtainBackendUrl"];
+	        this.pluginRegistryUrl = source["pluginRegistryUrl"];
 	    }
 	}
 	export class ExampleData {
@@ -204,6 +206,8 @@ export namespace models {
 	}
 	export class PlotConfigData {
 	    axes: PlotAxes;
+	    imagePattern?: string;
+	    imagePatternType?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new PlotConfigData(source);
@@ -212,6 +216,8 @@ export namespace models {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.axes = this.convertValues(source["axes"], PlotAxes);
+	        this.imagePattern = source["imagePattern"];
+	        this.imagePatternType = source["imagePatternType"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -391,6 +397,8 @@ export namespace models {
 	    python?: string;
 	    r?: string;
 	    packages?: string[];
+	    pythonRequirementsFile?: string;
+	    rPackagesFile?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new Requirements(source);
@@ -401,6 +409,8 @@ export namespace models {
 	        this.python = source["python"];
 	        this.r = source["r"];
 	        this.packages = source["packages"];
+	        this.pythonRequirementsFile = source["pythonRequirementsFile"];
+	        this.rPackagesFile = source["rPackagesFile"];
 	    }
 	}
 	export class PluginExecution {
@@ -499,6 +509,26 @@ export namespace models {
 	        this.format = source["format"];
 	    }
 	}
+	export class TableColumn {
+	    name: string;
+	    label: string;
+	    type?: string;
+	    required?: boolean;
+	    description?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new TableColumn(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.label = source["label"];
+	        this.type = source["type"];
+	        this.required = source["required"];
+	        this.description = source["description"];
+	    }
+	}
 	export class VisibilityCondition {
 	    field: string;
 	    equals?: any;
@@ -534,6 +564,8 @@ export namespace models {
 	    max?: number;
 	    step?: number;
 	    visibleWhen?: VisibilityCondition;
+	    disableAnnotationManagement?: boolean;
+	    tableColumns?: TableColumn[];
 	
 	    static createFrom(source: any = {}) {
 	        return new PluginInputV2(source);
@@ -559,6 +591,8 @@ export namespace models {
 	        this.max = source["max"];
 	        this.step = source["step"];
 	        this.visibleWhen = this.convertValues(source["visibleWhen"], VisibilityCondition);
+	        this.disableAnnotationManagement = source["disableAnnotationManagement"];
+	        this.tableColumns = this.convertValues(source["tableColumns"], TableColumn);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -600,6 +634,7 @@ export namespace models {
 	    version: string;
 	    author?: string;
 	    category: string;
+	    subcategory?: string;
 	    icon?: string;
 	    repository?: string;
 	
@@ -615,6 +650,7 @@ export namespace models {
 	        this.version = source["version"];
 	        this.author = source["author"];
 	        this.category = source["category"];
+	        this.subcategory = source["subcategory"];
 	        this.icon = source["icon"];
 	        this.repository = source["repository"];
 	    }
@@ -705,6 +741,7 @@ export namespace models {
 	    definition: PluginDefinition;
 	    folderPath: string;
 	    scriptPath: string;
+	    installSource: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new PluginV2(source);
@@ -716,6 +753,7 @@ export namespace models {
 	        this.definition = this.convertValues(source["definition"], PluginDefinition);
 	        this.folderPath = source["folderPath"];
 	        this.scriptPath = source["scriptPath"];
+	        this.installSource = source["installSource"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -736,6 +774,7 @@ export namespace models {
 		    return a;
 		}
 	}
+	
 	
 
 }
@@ -784,6 +823,30 @@ export namespace services {
 	        this.Preview = source["Preview"];
 	    }
 	}
+	export class PluginEnvironmentBinding {
+	    ID: number;
+	    PluginID: string;
+	    EnvironmentType: string;
+	    EnvironmentID: number;
+	    EnvironmentPath: string;
+	    CreatedAt: number;
+	    UpdatedAt: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new PluginEnvironmentBinding(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ID = source["ID"];
+	        this.PluginID = source["PluginID"];
+	        this.EnvironmentType = source["EnvironmentType"];
+	        this.EnvironmentID = source["EnvironmentID"];
+	        this.EnvironmentPath = source["EnvironmentPath"];
+	        this.CreatedAt = source["CreatedAt"];
+	        this.UpdatedAt = source["UpdatedAt"];
+	    }
+	}
 	export class PythonEnvironment {
 	    name: string;
 	    path: string;
@@ -828,6 +891,30 @@ export namespace services {
 	        this.libPath = source["libPath"];
 	        this.hasPackages = source["hasPackages"];
 	        this.isDefault = source["isDefault"];
+	    }
+	}
+	export class RenvEnvironment {
+	    ID: number;
+	    Name: string;
+	    Path: string;
+	    ProjectPath: string;
+	    BaseRPath: string;
+	    RenvVersion: string;
+	    CreatedAt: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new RenvEnvironment(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ID = source["ID"];
+	        this.Name = source["Name"];
+	        this.Path = source["Path"];
+	        this.ProjectPath = source["ProjectPath"];
+	        this.BaseRPath = source["BaseRPath"];
+	        this.RenvVersion = source["RenvVersion"];
+	        this.CreatedAt = source["CreatedAt"];
 	    }
 	}
 	export class VirtualEnvironment {

@@ -1,0 +1,368 @@
+plugin:
+  id: "diann-msstats-ptm-tmt"
+  name: "DIA-NN MSstatsPTM TMT Analysis"
+  description: "Statistical analysis of TMT-labeled post-translational modifications from DIA-NN data using MSstatsPTM package"
+  version: "1.0.0"
+  author: "CauldronGO Team"
+  category: "statistics"
+  subcategory: "msstats"
+  icon: "science"
+
+runtime:
+  type: "r"
+  script: "msstatsptm_tmt.R"
+
+inputs:
+  - name: "input_file"
+    label: "PTM Report File"
+    type: "file"
+    required: true
+    accept: ".tsv,.txt"
+    description: "DIA-NN report file with PTM data (PSM/precursor level)"
+
+  - name: "annotation_file"
+    label: "PTM Annotation File"
+    type: "file"
+    required: true
+    accept: ".csv,.tsv,.txt"
+    disableAnnotationManagement: true
+    description: "TMT annotation file for PTM data (columns: Run, Channel, Condition, Mixture, TechRepMixture, Fraction, BioReplicate)"
+    tableColumns:
+      - name: "Run"
+        label: "Run"
+        type: "text"
+        required: true
+        description: "Run identifier from DIA-NN"
+      - name: "Channel"
+        label: "Channel"
+        type: "text"
+        required: true
+        description: "TMT channel (e.g., channel1, channel2, ..., channel16)"
+      - name: "Condition"
+        label: "Condition"
+        type: "text"
+        required: true
+        description: "Experimental condition/group name"
+      - name: "Mixture"
+        label: "Mixture"
+        type: "text"
+        required: true
+        description: "TMT plex identifier (e.g., mixture1)"
+      - name: "TechRepMixture"
+        label: "TechRepMixture"
+        type: "text"
+        required: true
+        description: "Technical replicate mixture identifier (usually 1)"
+      - name: "Fraction"
+        label: "Fraction"
+        type: "text"
+        required: true
+        description: "Fraction number identifying which fraction this run represents"
+      - name: "BioReplicate"
+        label: "BioReplicate"
+        type: "text"
+        required: true
+        description: "Biological replicate number"
+
+  - name: "input_protein_file"
+    label: "Protein Report File"
+    type: "file"
+    required: false
+    accept: ".tsv,.txt"
+    description: "DIA-NN report file for protein-level data (optional but recommended)"
+
+  - name: "annotation_protein_file"
+    label: "Protein Annotation File"
+    type: "file"
+    required: false
+    accept: ".csv,.tsv,.txt"
+    disableAnnotationManagement: true
+    description: "TMT annotation file for protein data (same structure as PTM annotation)"
+    tableColumns:
+      - name: "Run"
+        label: "Run"
+        type: "text"
+        required: true
+        description: "Run identifier from DIA-NN"
+      - name: "Channel"
+        label: "Channel"
+        type: "text"
+        required: true
+        description: "TMT channel (e.g., channel1, channel2, ..., channel16)"
+      - name: "Condition"
+        label: "Condition"
+        type: "text"
+        required: true
+        description: "Experimental condition/group name"
+      - name: "Mixture"
+        label: "Mixture"
+        type: "text"
+        required: true
+        description: "TMT plex identifier (e.g., mixture1)"
+      - name: "TechRepMixture"
+        label: "TechRepMixture"
+        type: "text"
+        required: true
+        description: "Technical replicate mixture identifier (usually 1)"
+      - name: "Fraction"
+        label: "Fraction"
+        type: "text"
+        required: true
+        description: "Fraction number identifying which fraction this run represents"
+      - name: "BioReplicate"
+        label: "BioReplicate"
+        type: "text"
+        required: true
+        description: "Biological replicate number"
+
+  - name: "fasta_file"
+    label: "FASTA File"
+    type: "file"
+    required: false
+    accept: ".fasta,.fa"
+    description: "FASTA file for protein database (recommended for accurate PTM site localization)"
+
+  - name: "protein_id_col"
+    label: "Protein ID Column"
+    type: "text"
+    required: false
+    default: "Protein.Group"
+    description: "Column name containing protein identifiers in DIA-NN report"
+
+  - name: "fasta_protein_name"
+    label: "FASTA Protein Name Column"
+    type: "text"
+    required: false
+    default: "uniprot_ac"
+    description: "Column name in FASTA for protein identifier"
+
+  - name: "localization_cutoff"
+    label: "Localization Score Cutoff"
+    type: "number"
+    required: false
+    default: 0.75
+    min: 0
+    max: 1
+    step: 0.05
+    description: "Minimum PTM localization confidence score (0-1)"
+
+  - name: "summarization_method"
+    label: "Summarization Method"
+    type: "select"
+    required: false
+    default: "msstats"
+    options:
+      - "msstats"
+      - "MedianPolish"
+      - "Median"
+    description: "Method for summarizing TMT reporter intensities"
+
+  - name: "global_norm"
+    label: "Global Normalization (Protein)"
+    type: "boolean"
+    required: false
+    default: true
+    description: "Apply global normalization to protein data"
+
+  - name: "global_norm_PTM"
+    label: "Global Normalization (PTM)"
+    type: "boolean"
+    required: false
+    default: true
+    description: "Apply global normalization to PTM data"
+
+  - name: "reference_norm"
+    label: "Reference Channel Normalization (Protein)"
+    type: "boolean"
+    required: false
+    default: true
+    description: "Apply reference channel normalization to protein data (TMT-specific)"
+
+  - name: "reference_norm_PTM"
+    label: "Reference Channel Normalization (PTM)"
+    type: "boolean"
+    required: false
+    default: true
+    description: "Apply reference channel normalization to PTM data (TMT-specific)"
+
+  - name: "remove_norm_channel"
+    label: "Remove Normalization Channel"
+    type: "boolean"
+    required: false
+    default: true
+    description: "Remove normalization channel from final output"
+
+  - name: "remove_empty_channel"
+    label: "Remove Empty Channels"
+    type: "boolean"
+    required: false
+    default: true
+    description: "Remove empty TMT channels from output"
+
+  - name: "MBimpute"
+    label: "MBimpute for Protein"
+    type: "boolean"
+    required: false
+    default: true
+    description: "Use model-based imputation for missing values in protein data"
+
+  - name: "MBimpute_PTM"
+    label: "MBimpute for PTM"
+    type: "boolean"
+    required: false
+    default: true
+    description: "Use model-based imputation for missing values in PTM data"
+
+  - name: "maxQuantileforCensored"
+    label: "Max Quantile for Censored"
+    type: "number"
+    required: false
+    default: null
+    min: 0.9
+    max: 1
+    step: 0.001
+    description: "Maximum quantile for determining censored missing values (leave empty for automatic)"
+
+  - name: "comparison_matrix_file"
+    label: "Comparison Matrix File"
+    type: "file"
+    required: false
+    accept: ".csv,.tsv,.txt"
+    description: "Custom comparison matrix file (if not provided, all pairwise comparisons will be performed)"
+
+  - name: "moderated"
+    label: "Moderated T-Statistic"
+    type: "boolean"
+    required: false
+    default: false
+    description: "Use moderated t-statistic (empirical Bayes, not typically used for TMT)"
+
+  - name: "adj_method"
+    label: "Multiple Testing Adjustment"
+    type: "select"
+    required: false
+    default: "BH"
+    options:
+      - "BH"
+      - "bonferroni"
+      - "holm"
+      - "hochberg"
+      - "BY"
+      - "none"
+    description: "Method for multiple testing correction"
+
+  - name: "log_base"
+    label: "Log Base for Fold Change"
+    type: "select"
+    required: false
+    default: "2"
+    options:
+      - "2"
+      - "10"
+    description: "Base of logarithm for reporting fold changes"
+
+  - name: "save_fitted_models"
+    label: "Save Fitted Models"
+    type: "boolean"
+    required: false
+    default: false
+    description: "Save fitted statistical models in the output (can be memory intensive)"
+
+outputs:
+  - name: "group_comparison_ptm"
+    path: "group_comparison_ptm.txt"
+    type: "data"
+    description: "PTM-level differential analysis results"
+    format: "tsv"
+
+  - name: "group_comparison_protein"
+    path: "group_comparison_protein.txt"
+    type: "data"
+    description: "Protein-level differential analysis results"
+    format: "tsv"
+
+  - name: "group_comparison_adjusted"
+    path: "group_comparison_adjusted.txt"
+    type: "data"
+    description: "PTM results adjusted for protein abundance changes (recommended for interpretation)"
+    format: "tsv"
+
+  - name: "peptide_intensities_wide"
+    path: "peptide_intensities_wide.txt"
+    type: "data"
+    description: "Peptide-level summarized intensities in wide format (can be joined with PTM and adjusted results)"
+    format: "tsv"
+
+  - name: "protein_intensities_wide"
+    path: "protein_intensities_wide.txt"
+    type: "data"
+    description: "Protein-level summarized intensities in wide format (can be joined with protein results)"
+    format: "tsv"
+
+execution:
+  argsMapping:
+    input_file: "--input_file"
+    annotation_file: "--annotation_file"
+    input_protein_file: "--input_protein_file"
+    annotation_protein_file: "--annotation_protein_file"
+    fasta_file: "--fasta_file"
+    protein_id_col: "--protein_id_col"
+    fasta_protein_name: "--fasta_protein_name"
+    localization_cutoff: "--localization_cutoff"
+    summarization_method: "--summarization_method"
+    global_norm:
+      flag: "--global_norm"
+      when: "true"
+      value: "true"
+    global_norm_PTM:
+      flag: "--global_norm_PTM"
+      when: "true"
+      value: "true"
+    reference_norm:
+      flag: "--reference_norm"
+      when: "true"
+      value: "true"
+    reference_norm_PTM:
+      flag: "--reference_norm_PTM"
+      when: "true"
+      value: "true"
+    remove_norm_channel:
+      flag: "--remove_norm_channel"
+      when: "true"
+      value: "true"
+    remove_empty_channel:
+      flag: "--remove_empty_channel"
+      when: "true"
+      value: "true"
+    MBimpute:
+      flag: "--MBimpute"
+      when: "true"
+      value: "true"
+    MBimpute_PTM:
+      flag: "--MBimpute_PTM"
+      when: "true"
+      value: "true"
+    maxQuantileforCensored: "--maxQuantileforCensored"
+    comparison_matrix_file: "--comparison_matrix_file"
+    moderated:
+      flag: "--moderated"
+      when: "true"
+      value: "true"
+    adj_method: "--adj_method"
+    log_base: "--log_base"
+    save_fitted_models:
+      flag: "--save_fitted_models"
+      when: "true"
+      value: "true"
+
+  outputDir: "--output_folder"
+
+  requirements:
+    r: ">=4.0"
+    packages:
+      - "MSstatsPTM"
+      - "MSstatsTMT"
+      - "tidyverse"
+
+example:
+  enabled: false

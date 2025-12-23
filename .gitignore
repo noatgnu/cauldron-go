@@ -130,3 +130,4 @@ htmlcov/
 # Auto-generated plugin documentation
 plugins/*/README.md
 bin
+examples

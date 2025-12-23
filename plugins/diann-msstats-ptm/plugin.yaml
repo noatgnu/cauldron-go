@@ -1,0 +1,495 @@
+plugin:
+  id: "diann-msstats-ptm"
+  name: "DIA-NN MSstatsPTM Analysis"
+  description: "Statistical analysis of post-translational modifications (PTMs) from DIA-NN data using MSstatsPTM package"
+  version: "1.0.0"
+  author: "CauldronGO Team"
+  category: "statistics"
+  subcategory: "msstats"
+  icon: "science"
+
+runtime:
+  type: "r"
+  script: "msstatsptm.R"
+
+inputs:
+  - name: "input_file"
+    label: "PTM Input File"
+    type: "file"
+    required: true
+    accept: ".tsv,.txt"
+    description: "DIA-NN report file with PTM data (PSM level)"
+
+  - name: "annotation_file"
+    label: "PTM Annotation File"
+    type: "file"
+    required: true
+    accept: ".csv,.tsv,.txt"
+    description: "Annotation file mapping runs to conditions for PTM data (columns: Sample, Condition, BioReplicate)"
+
+  - name: "input_protein_file"
+    label: "Protein Input File"
+    type: "file"
+    required: false
+    accept: ".tsv,.txt"
+    description: "DIA-NN protein-level report file (optional but recommended for protein abundance adjustment)"
+
+  - name: "annotation_protein_file"
+    label: "Protein Annotation File"
+    type: "file"
+    required: false
+    accept: ".csv,.tsv,.txt"
+    description: "Annotation file for protein data (columns: Sample, Condition, BioReplicate)"
+
+  - name: "fasta_file"
+    label: "FASTA File"
+    type: "file"
+    required: false
+    accept: ".fasta,.fa"
+    description: "FASTA file for matching PTM peptides and determining specific modified amino acids"
+
+  - name: "protein_id_col"
+    label: "Protein ID Column"
+    type: "text"
+    required: false
+    default: "Protein.Group"
+    description: "Column name containing protein identifiers"
+
+  - name: "fasta_protein_name"
+    label: "FASTA Protein Name Column"
+    type: "text"
+    required: false
+    default: "uniprot_ac"
+    description: "Column name in FASTA for protein identifier"
+
+  - name: "global_qvalue_cutoff"
+    label: "Global Q-Value Cutoff"
+    type: "number"
+    required: false
+    default: 0.01
+    min: 0
+    max: 1
+    step: 0.01
+    description: "Global q-value threshold for filtering (0-1)"
+
+  - name: "qvalue_cutoff"
+    label: "Q-Value Cutoff"
+    type: "number"
+    required: false
+    default: 0.01
+    min: 0
+    max: 1
+    step: 0.01
+    description: "Q-value threshold for peptide filtering (0-1)"
+
+  - name: "pg_qvalue_cutoff"
+    label: "Protein Group Q-Value Cutoff"
+    type: "number"
+    required: false
+    default: 0.01
+    min: 0
+    max: 1
+    step: 0.01
+    description: "Protein group q-value threshold (0-1)"
+
+  - name: "localization_cutoff"
+    label: "Localization Score Cutoff"
+    type: "number"
+    required: false
+    default: 0.75
+    min: 0
+    max: 1
+    step: 0.05
+    description: "Minimum PTM localization confidence score (0-1, default 0.75)"
+
+  - name: "useUniquePeptide"
+    label: "Use Unique Peptides Only"
+    type: "boolean"
+    required: false
+    default: true
+    description: "Use only peptides unique to a single protein"
+
+  - name: "removeFewMeasurements"
+    label: "Remove Features with Few Measurements"
+    type: "boolean"
+    required: false
+    default: true
+    description: "Remove features with insufficient measurements across samples"
+
+  - name: "removeOxidationMpeptides"
+    label: "Remove Oxidation M Peptides"
+    type: "boolean"
+    required: false
+    default: true
+    description: "Remove peptides with oxidation on methionine (common artifact)"
+
+  - name: "RemoveProtein_with1Feature"
+    label: "Remove Proteins with 1 Feature"
+    type: "boolean"
+    required: false
+    default: false
+    description: "Remove proteins with only one peptide and charge combination"
+
+  - name: "use_unmod_peptides"
+    label: "Use Unmodified Peptides"
+    type: "boolean"
+    required: false
+    default: false
+    description: "Include unmodified peptides in the analysis"
+
+  - name: "MBR"
+    label: "Match Between Runs (MBR)"
+    type: "boolean"
+    required: false
+    default: true
+    description: "Use match-between-runs quantification"
+
+  - name: "logTrans"
+    label: "Log Transformation Base"
+    type: "select"
+    required: false
+    default: "2"
+    options:
+      - "2"
+      - "10"
+    description: "Logarithm transformation base for intensities"
+
+  - name: "normalization"
+    label: "Protein Normalization Method"
+    type: "select"
+    required: false
+    default: "equalizeMedians"
+    options:
+      - "equalizeMedians"
+      - "quantile"
+      - "globalStandards"
+      - "false"
+    description: "Normalization method for protein-level data"
+
+  - name: "normalization_PTM"
+    label: "PTM Normalization Method"
+    type: "select"
+    required: false
+    default: "equalizeMedians"
+    options:
+      - "equalizeMedians"
+      - "quantile"
+      - "globalStandards"
+      - "false"
+    description: "Normalization method for PTM-level data"
+
+  - name: "featureSubset"
+    label: "Protein Feature Subset"
+    type: "select"
+    required: false
+    default: "all"
+    options:
+      - "all"
+      - "top3"
+      - "topN"
+      - "highQuality"
+    description: "Feature subset selection for protein summarization"
+
+  - name: "featureSubset_PTM"
+    label: "PTM Feature Subset"
+    type: "select"
+    required: false
+    default: "all"
+    options:
+      - "all"
+      - "top3"
+      - "topN"
+      - "highQuality"
+    description: "Feature subset selection for PTM summarization"
+
+  - name: "remove_uninformative_feature_outlier"
+    label: "Remove Uninformative Features (Protein)"
+    type: "boolean"
+    required: false
+    default: false
+    description: "Remove uninformative features and outliers from protein data"
+
+  - name: "remove_uninformative_feature_outlier_PTM"
+    label: "Remove Uninformative Features (PTM)"
+    type: "boolean"
+    required: false
+    default: false
+    description: "Remove uninformative features and outliers from PTM data"
+
+  - name: "min_feature_count"
+    label: "Minimum Feature Count (Protein)"
+    type: "number"
+    required: false
+    default: 2
+    min: 1
+    max: 10
+    step: 1
+    description: "Minimum number of features required per protein"
+
+  - name: "min_feature_count_PTM"
+    label: "Minimum Feature Count (PTM)"
+    type: "number"
+    required: false
+    default: 1
+    min: 1
+    max: 10
+    step: 1
+    description: "Minimum number of features required per PTM site"
+
+  - name: "n_top_feature"
+    label: "Number of Top Features (Protein)"
+    type: "number"
+    required: false
+    default: 3
+    min: 1
+    max: 10
+    step: 1
+    description: "Number of top features to use when featureSubset is topN"
+
+  - name: "n_top_feature_PTM"
+    label: "Number of Top Features (PTM)"
+    type: "number"
+    required: false
+    default: 3
+    min: 1
+    max: 10
+    step: 1
+    description: "Number of top features to use for PTM when featureSubset is topN"
+
+  - name: "summaryMethod"
+    label: "Summarization Method"
+    type: "select"
+    required: false
+    default: "TMP"
+    options:
+      - "TMP"
+      - "linear"
+      - "logOfSum"
+    description: "Method for summarizing features to protein/peptide level"
+
+  - name: "equalFeatureVar"
+    label: "Equal Feature Variance"
+    type: "boolean"
+    required: false
+    default: true
+    description: "Assume equal variance across features in linear model"
+
+  - name: "censoredInt"
+    label: "Censored Intensity Value"
+    type: "text"
+    required: false
+    default: "NA"
+    description: "How to handle censored missing values (NA, 0, or NULL)"
+
+  - name: "MBimpute"
+    label: "MBimpute for Protein"
+    type: "boolean"
+    required: false
+    default: true
+    description: "Use model-based imputation for missing values in protein data"
+
+  - name: "MBimpute_PTM"
+    label: "MBimpute for PTM"
+    type: "boolean"
+    required: false
+    default: true
+    description: "Use model-based imputation for missing values in PTM data"
+
+  - name: "maxQuantileforCensored"
+    label: "Max Quantile for Censored"
+    type: "number"
+    required: false
+    default: 0.999
+    min: 0.9
+    max: 1
+    step: 0.001
+    description: "Maximum quantile for determining censored missing values"
+
+  - name: "comparison_matrix_file"
+    label: "Comparison Matrix File"
+    type: "file"
+    required: false
+    accept: ".csv,.tsv,.txt"
+    description: "Custom comparison matrix file (if not provided, all pairwise comparisons will be performed)"
+
+  - name: "moderated"
+    label: "Moderated T-Statistic"
+    type: "boolean"
+    required: false
+    default: true
+    description: "Use moderated t-statistic (limma approach)"
+
+  - name: "adj_method"
+    label: "Multiple Testing Adjustment"
+    type: "select"
+    required: false
+    default: "BH"
+    options:
+      - "BH"
+      - "bonferroni"
+      - "holm"
+      - "hochberg"
+      - "BY"
+      - "none"
+    description: "Method for multiple testing correction"
+
+  - name: "log_base"
+    label: "Log Base for Fold Change"
+    type: "select"
+    required: false
+    default: "2"
+    options:
+      - "2"
+      - "10"
+    description: "Base of logarithm for reporting fold changes"
+
+  - name: "save_fitted_models"
+    label: "Save Fitted Models"
+    type: "boolean"
+    required: false
+    default: true
+    description: "Save fitted statistical models in the output"
+
+outputs:
+  - name: "group_comparison_ptm"
+    path: "group_comparison_ptm.txt"
+    type: "data"
+    description: "PTM-level differential analysis results"
+    format: "tsv"
+
+  - name: "group_comparison_protein"
+    path: "group_comparison_protein.txt"
+    type: "data"
+    description: "Protein-level differential analysis results"
+    format: "tsv"
+
+  - name: "group_comparison_adjusted"
+    path: "group_comparison_adjusted.txt"
+    type: "data"
+    description: "PTM results adjusted for protein abundance changes"
+    format: "tsv"
+
+  - name: "peptide_intensities_wide"
+    path: "peptide_intensities_wide.txt"
+    type: "data"
+    description: "Peptide-level summarized intensities in wide format (can be joined with PTM and adjusted results)"
+    format: "tsv"
+
+  - name: "protein_intensities_wide"
+    path: "protein_intensities_wide.txt"
+    type: "data"
+    description: "Protein-level summarized intensities in wide format (can be joined with protein results)"
+    format: "tsv"
+
+execution:
+  argsMapping:
+    input_file: "--input_file"
+    annotation_file: "--annotation_file"
+    input_protein_file: "--input_protein_file"
+    annotation_protein_file: "--annotation_protein_file"
+    fasta_file: "--fasta_file"
+    protein_id_col: "--protein_id_col"
+    fasta_protein_name: "--fasta_protein_name"
+    global_qvalue_cutoff: "--global_qvalue_cutoff"
+    qvalue_cutoff: "--qvalue_cutoff"
+    pg_qvalue_cutoff: "--pg_qvalue_cutoff"
+    localization_cutoff: "--localization_cutoff"
+    useUniquePeptide:
+      flag: "--useUniquePeptide"
+      when: "true"
+      value: "true"
+    removeFewMeasurements:
+      flag: "--removeFewMeasurements"
+      when: "true"
+      value: "true"
+    removeOxidationMpeptides:
+      flag: "--removeOxidationMpeptides"
+      when: "true"
+      value: "true"
+    RemoveProtein_with1Feature:
+      flag: "--RemoveProtein_with1Feature"
+      when: "true"
+      value: "true"
+    use_unmod_peptides:
+      flag: "--use_unmod_peptides"
+      when: "true"
+      value: "true"
+    MBR:
+      flag: "--MBR"
+      when: "true"
+      value: "true"
+    logTrans: "--logTrans"
+    normalization: "--normalization"
+    normalization_PTM: "--normalization_PTM"
+    featureSubset: "--featureSubset"
+    featureSubset_PTM: "--featureSubset_PTM"
+    remove_uninformative_feature_outlier:
+      flag: "--remove_uninformative_feature_outlier"
+      when: "true"
+      value: "true"
+    remove_uninformative_feature_outlier_PTM:
+      flag: "--remove_uninformative_feature_outlier_PTM"
+      when: "true"
+      value: "true"
+    min_feature_count: "--min_feature_count"
+    min_feature_count_PTM: "--min_feature_count_PTM"
+    n_top_feature: "--n_top_feature"
+    n_top_feature_PTM: "--n_top_feature_PTM"
+    summaryMethod: "--summaryMethod"
+    equalFeatureVar:
+      flag: "--equalFeatureVar"
+      when: "true"
+      value: "true"
+    censoredInt: "--censoredInt"
+    MBimpute:
+      flag: "--MBimpute"
+      when: "true"
+      value: "true"
+    MBimpute_PTM:
+      flag: "--MBimpute_PTM"
+      when: "true"
+      value: "true"
+    maxQuantileforCensored: "--maxQuantileforCensored"
+    comparison_matrix_file: "--comparison_matrix_file"
+    moderated:
+      flag: "--moderated"
+      when: "true"
+      value: "true"
+    adj_method: "--adj_method"
+    log_base: "--log_base"
+    save_fitted_models:
+      flag: "--save_fitted_models"
+      when: "true"
+      value: "true"
+
+  outputDir: "--output_folder"
+
+  requirements:
+    r: ">=4.0"
+    packages:
+      - "MSstatsPTM"
+      - "tidyverse"
+
+example:
+  enabled: true
+  values:
+    input_file: "diann/report_ptm.tsv"
+    annotation_file: "diann/annotation.txt"
+    input_protein_file: "diann/report_protein.tsv"
+    annotation_protein_file: "diann/annotation.txt"
+    fasta_file: "diann/uniprot.fasta"
+    global_qvalue_cutoff: 0.01
+    qvalue_cutoff: 0.01
+    pg_qvalue_cutoff: 0.01
+    localization_cutoff: 0.75
+    useUniquePeptide: true
+    removeFewMeasurements: true
+    removeOxidationMpeptides: true
+    RemoveProtein_with1Feature: false
+    use_unmod_peptides: false
+    MBR: true
+    logTrans: "2"
+    normalization: "equalizeMedians"
+    normalization_PTM: "equalizeMedians"
+    moderated: true
+    adj_method: "BH"

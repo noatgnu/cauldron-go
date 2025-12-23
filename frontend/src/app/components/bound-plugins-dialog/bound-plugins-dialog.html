@@ -1,0 +1,26 @@
+<h2 mat-dialog-title>
+  <mat-icon class="title-icon">link</mat-icon>
+  <span>Bound Plugins</span>
+</h2>
+
+<mat-dialog-content>
+  <p class="env-info">Plugins using environment: <strong>{{ data.envName }}</strong></p>
+  
+  <mat-divider></mat-divider>
+
+  <mat-list>
+    @for (plugin of data.plugins; track plugin.id) {
+      <mat-list-item>
+        <mat-icon matListItemIcon>extension</mat-icon>
+        <div matListItemTitle>{{ plugin.name }}</div>
+        <div matListItemLine>{{ plugin.description }}</div>
+      </mat-list-item>
+    } @empty {
+      <p class="no-plugins">No plugins found for this environment.</p>
+    }
+  </mat-list>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button (click)="close()">Close</button>
+</mat-dialog-actions>

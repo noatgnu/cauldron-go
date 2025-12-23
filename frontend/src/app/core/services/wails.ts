@@ -18,6 +18,8 @@ export type PythonEnvironment = services.PythonEnvironment;
 export type REnvironment = services.REnvironment;
 export type DataFilePreview = services.DataFilePreview;
 export type VirtualEnvironment = services.VirtualEnvironment;
+export type RenvEnvironment = services.RenvEnvironment;
+export type PluginEnvironmentBinding = services.PluginEnvironmentBinding;
 
 export interface ImportedFile {
   id: number;
@@ -60,6 +62,9 @@ export class Wails {
 
   private queueStatusSubject = new BehaviorSubject<any | null>(null);
   queueStatus$: Observable<any | null> = this.queueStatusSubject.asObservable();
+
+  private bindingsUpdatedSubject = new BehaviorSubject<void>(undefined);
+  bindingsUpdated$: Observable<void> = this.bindingsUpdatedSubject.asObservable();
 
   constructor() {
     this.setupEventListeners();
@@ -361,9 +366,10 @@ export class Wails {
     return WailsApp.DeleteImportedFile(id);
   }
 
-  async createPythonVirtualEnv(basePythonPath: string, venvPath: string): Promise<void> {
+  async createPythonVirtualEnv(basePythonPath: string, venvPath: string, pluginID: string = ''): Promise<void> {
     if (!this.isWails) throw new Error('Wails not available');
-    return WailsApp.CreatePythonVirtualEnv(basePythonPath, venvPath);
+    await WailsApp.CreatePythonVirtualEnv(basePythonPath, venvPath, pluginID);
+    this.bindingsUpdatedSubject.next();
   }
 
   async getVirtualEnvironments(): Promise<services.VirtualEnvironment[]> {
@@ -373,7 +379,47 @@ export class Wails {
 
   async deleteVirtualEnvironment(id: number): Promise<void> {
     if (!this.isWails) throw new Error('Wails not available');
-    return WailsApp.DeleteVirtualEnvironment(id);
+    await WailsApp.DeleteVirtualEnvironment(id);
+    this.bindingsUpdatedSubject.next();
+  }
+
+  async createRenvEnvironment(name: string, packages: string[], pluginID: string = ''): Promise<void> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await WailsApp.CreateRenvEnvironment(name, packages, pluginID);
+    this.bindingsUpdatedSubject.next();
+  }
+
+  async getRenvEnvironments(): Promise<services.RenvEnvironment[]> {
+    if (!this.isWails) throw new Error('Wails not available');
+    return WailsApp.GetRenvEnvironments();
+  }
+
+  async deleteRenvEnvironment(id: number): Promise<void> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await WailsApp.DeleteRenvEnvironment(id);
+    this.bindingsUpdatedSubject.next();
+  }
+
+  async bindPluginToEnvironment(pluginID: string, envType: string, envID: number, envPath: string): Promise<void> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await WailsApp.BindPluginToEnvironment(pluginID, envType, envID, envPath);
+    this.bindingsUpdatedSubject.next();
+  }
+
+  async getPluginEnvironmentBinding(pluginID: string, envType: string): Promise<services.PluginEnvironmentBinding | null> {
+    if (!this.isWails) throw new Error('Wails not available');
+    return WailsApp.GetPluginEnvironmentBinding(pluginID, envType);
+  }
+
+  async deletePluginEnvironmentBinding(pluginID: string, envType: string): Promise<void> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await WailsApp.DeletePluginEnvironmentBinding(pluginID, envType);
+    this.bindingsUpdatedSubject.next();
+  }
+
+  async getAllPluginEnvironmentBindings(): Promise<services.PluginEnvironmentBinding[]> {
+    if (!this.isWails) throw new Error('Wails not available');
+    return WailsApp.GetAllPluginEnvironmentBindings();
   }
 
   async getPortableEnvironmentURL(platform: string, arch: string, version: string, environment: string): Promise<string> {
@@ -394,6 +440,11 @@ export class Wails {
   async getPlugins(): Promise<any[]> {
     if (!this.isWails) throw new Error('Wails not available');
     return WailsApp.GetPlugins();
+  }
+
+  async getPluginsV2(): Promise<any[]> {
+    if (!this.isWails) throw new Error('Wails not available');
+    return WailsApp.GetPluginsV2();
   }
 
   async getPlugin(id: number): Promise<any> {
@@ -419,6 +470,11 @@ export class Wails {
   async executePlugin(request: any): Promise<string> {
     if (!this.isWails) throw new Error('Wails not available');
     return WailsApp.ExecutePlugin(request);
+  }
+
+  async executePluginV2(request: any): Promise<string> {
+    if (!this.isWails) throw new Error('Wails not available');
+    return WailsApp.ExecutePluginV2(request);
   }
 
   async logToFile(message: string): Promise<void> {
@@ -525,5 +581,20 @@ export class Wails {
   async getLogFilePath(): Promise<string> {
     if (!this.isWails) throw new Error('Wails not available');
     return WailsApp.GetLogFilePath();
+  }
+
+  async listRegistryPlugins(searchQuery: string, categoryName: string, authorName: string, limit: number, offset: number): Promise<any> {
+    if (!this.isWails) throw new Error('Wails not available');
+    return WailsApp.ListRegistryPlugins(searchQuery, categoryName, authorName, limit, offset);
+  }
+
+  async listRegistryCategories(): Promise<any> {
+    if (!this.isWails) throw new Error('Wails not available');
+    return WailsApp.ListRegistryCategories();
+  }
+
+  async installPluginFromRegistry(pluginID: string): Promise<void> {
+    if (!this.isWails) throw new Error('Wails not available');
+    return WailsApp.InstallPluginFromRegistry(pluginID);
   }
 }

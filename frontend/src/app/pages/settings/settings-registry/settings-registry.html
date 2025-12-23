@@ -1,0 +1,31 @@
+<div class="registry-settings">
+  <p class="section-description">
+    Configure the plugin registry URL to browse and install third-party plugins from the community.
+  </p>
+
+  <mat-form-field appearance="outline" class="full-width-field">
+    <mat-label>Plugin Registry URL</mat-label>
+    <input matInput [(ngModel)]="pluginRegistryURL" placeholder="https://your-registry.com">
+    <mat-icon matPrefix>cloud</mat-icon>
+  </mat-form-field>
+
+  <div class="button-row">
+    <button mat-raised-button color="primary" (click)="savePluginRegistryURL()" [disabled]="saving()">
+      <mat-icon>save</mat-icon>
+      Save
+    </button>
+    @if (saving()) {
+      <mat-spinner diameter="20"></mat-spinner>
+    }
+  </div>
+
+  @if (config().pluginRegistryUrl) {
+    <div class="info-box">
+      <mat-icon>info</mat-icon>
+      <div>
+        <strong>Current registry:</strong><br>
+        <code>{{ config().pluginRegistryUrl }}</code>
+      </div>
+    </div>
+  }
+</div>

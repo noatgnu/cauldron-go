@@ -69,13 +69,15 @@ func (l *PluginLoaderV2) LoadPlugins() error {
 		}
 
 		plugin.ID = registry.ID
+		plugin.InstallSource = registry.InstallSource
 		l.plugins[registry.ID] = plugin
 		loadedCount++
-		log.Printf("[PluginLoader] Loaded plugin: %s [ID:%d] (%s) from %s",
+		log.Printf("[PluginLoader] Loaded plugin: %s [ID:%d] (%s) from %s [%s]",
 			plugin.Definition.Plugin.Name,
 			registry.ID,
 			plugin.Definition.Plugin.ID,
-			pluginPath)
+			pluginPath,
+			registry.InstallSource)
 	}
 
 	log.Printf("[PluginLoader] Successfully loaded %d plugins", loadedCount)
@@ -101,6 +103,10 @@ func (l *PluginLoaderV2) loadPlugin(pluginDir string) (*models.PluginV2, error) 
 
 	if err := l.loadOptionsFromFiles(pluginDir, &definition); err != nil {
 		return nil, fmt.Errorf("failed to load options from files: %w", err)
+	}
+
+	if err := l.loadRequirementsFromFiles(pluginDir, &definition); err != nil {
+		return nil, fmt.Errorf("failed to load requirements from files: %w", err)
 	}
 
 	scriptPath := filepath.Join(pluginDir, definition.Runtime.Script)
@@ -272,6 +278,55 @@ func (l *PluginLoaderV2) ReloadPlugins() error {
 
 func (l *PluginLoaderV2) GetPluginsDirectory() string {
 	return l.pluginsDir
+}
+
+func (l *PluginLoaderV2) loadRequirementsFromFiles(pluginDir string, def *models.PluginDefinition) error {
+	if def.Execution.Requirements.PythonRequirementsFile != "" {
+		requirementsPath := filepath.Join(pluginDir, def.Execution.Requirements.PythonRequirementsFile)
+		packages, err := l.loadPackagesFromTextFile(requirementsPath)
+		if err != nil {
+			log.Printf("[PluginLoader] Warning: failed to load Python requirements from %s: %v", def.Execution.Requirements.PythonRequirementsFile, err)
+		} else {
+			def.Execution.Requirements.Packages = append(def.Execution.Requirements.Packages, packages...)
+			log.Printf("[PluginLoader] Loaded %d Python packages from %s", len(packages), def.Execution.Requirements.PythonRequirementsFile)
+		}
+	}
+
+	if def.Execution.Requirements.RPackagesFile != "" {
+		packagesPath := filepath.Join(pluginDir, def.Execution.Requirements.RPackagesFile)
+		packages, err := l.loadPackagesFromTextFile(packagesPath)
+		if err != nil {
+			log.Printf("[PluginLoader] Warning: failed to load R packages from %s: %v", def.Execution.Requirements.RPackagesFile, err)
+		} else {
+			def.Execution.Requirements.Packages = append(def.Execution.Requirements.Packages, packages...)
+			log.Printf("[PluginLoader] Loaded %d R packages from %s", len(packages), def.Execution.Requirements.RPackagesFile)
+		}
+	}
+
+	return nil
+}
+
+func (l *PluginLoaderV2) loadPackagesFromTextFile(filePath string) ([]string, error) {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	var packages []string
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line != "" && !strings.HasPrefix(line, "#") {
+			packages = append(packages, line)
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+
+	return packages, nil
 }
 
 func (l *PluginLoaderV2) loadOptionsFromFiles(pluginDir string, def *models.PluginDefinition) error {

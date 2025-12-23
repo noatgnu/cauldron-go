@@ -4,20 +4,35 @@
 </h2>
 
 <mat-dialog-content>
-  @if (loading) {
+  @if (loading()) {
     <div class="loading-container">
       <mat-spinner diameter="40"></mat-spinner>
       <p>Loading packages...</p>
     </div>
   } @else {
-    @if (packages.length > 0) {
+    <mat-form-field appearance="outline" class="search-field">
+      <mat-label>Search packages</mat-label>
+      <input matInput [(ngModel)]="searchQuery" placeholder="Search...">
+      <mat-icon matPrefix>search</mat-icon>
+      @if (searchQuery()) {
+        <button matSuffix mat-icon-button (click)="clearSearch()">
+          <mat-icon>clear</mat-icon>
+        </button>
+      }
+    </mat-form-field>
+
+    <div class="package-count">
+      {{ filteredPackages().length }} of {{ packages().length }} packages
+    </div>
+
+    @if (filteredPackages().length > 0) {
       <mat-list>
-        @for (pkg of packages; track pkg) {
+        @for (pkg of filteredPackages(); track pkg) {
           <mat-list-item>{{ pkg }}</mat-list-item>
         }
       </mat-list>
     } @else {
-      <p class="no-packages">No packages found</p>
+      <p class="no-packages">No packages found matching "{{ searchQuery() }}"</p>
     }
   }
 </mat-dialog-content>

@@ -13,7 +13,7 @@ import { MatChipsModule } from '@angular/material/chips';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
-import { Wails } from '../../core/services/wails';
+import { Wails, PluginEnvironmentBinding } from '../../core/services/wails';
 import { Plugin, PluginInput, PluginExecutionRequest } from '../../core/models/plugin';
 import { EnvironmentIndicator } from '../../components/environment-indicator/environment-indicator';
 import { InstallPluginDialog } from '../../components/install-plugin-dialog/install-plugin-dialog';
@@ -45,6 +45,7 @@ export class Plugins implements OnInit {
   protected loading = signal(false);
   protected executing = signal<Record<string, boolean>>({});
   protected pluginsDirectory = signal('');
+  protected bindings = signal<PluginEnvironmentBinding[]>([]);
 
   mainFormGroup!: FormGroup;
 
@@ -65,13 +66,20 @@ export class Plugins implements OnInit {
 
     await this.loadPlugins();
     await this.loadPluginsDirectory();
+
+    this.wails.bindingsUpdated$.subscribe(() => {
+      this.loadPlugins();
+    });
   }
 
   async loadPlugins() {
     this.loading.set(true);
 
     try {
-      const plugins = await this.wails.getPlugins();
+      const [plugins, bindings] = await Promise.all([
+        this.wails.getPlugins(),
+        this.wails.getAllPluginEnvironmentBindings()
+      ]);
 
       await this.wails.logToFile(`[Plugins] Before sort: ${plugins.map(p => p.config.name).join(', ')}`);
 
@@ -89,6 +97,7 @@ export class Plugins implements OnInit {
       await this.wails.logToFile(`[Plugins] After sort: ${sortedPlugins.map(p => p.config.name).join(', ')}`);
 
       this.plugins.set(sortedPlugins);
+      this.bindings.set(bindings || []);
 
       const pluginsArray = this.mainFormGroup.get('plugins') as FormArray;
       pluginsArray.clear();
@@ -250,5 +259,15 @@ export class Plugins implements OnInit {
         }
       }
     });
+  }
+
+  isBound(pluginId: string, runtime: string): boolean {
+    const bindings = this.bindings();
+    if (runtime === 'pythonWithR') {
+      const hasPython = bindings.some(b => b.PluginID === pluginId && b.EnvironmentType === 'python');
+      const hasR = bindings.some(b => b.PluginID === pluginId && b.EnvironmentType === 'r');
+      return hasPython && hasR;
+    }
+    return bindings.some(b => b.PluginID === pluginId && b.EnvironmentType === runtime);
   }
 }

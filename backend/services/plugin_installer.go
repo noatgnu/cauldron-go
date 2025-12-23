@@ -3,6 +3,7 @@ package services
 import (
 	"encoding/base64"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -36,6 +37,29 @@ func (pi *PluginInstaller) IsPluginInstalled(repoURL string) (bool, error) {
 	return count > 0, nil
 }
 
+func (pi *PluginInstaller) FetchPluginInfo(repoURL string) (*models.PluginDefinition, error) {
+	log.Printf("[PluginInstaller] Fetching plugin info from: %s", repoURL)
+
+	tempDir := filepath.Join(pi.pluginsDir, ".temp-info-"+fmt.Sprintf("%d", time.Now().Unix()))
+	defer os.RemoveAll(tempDir)
+
+	_, err := git.PlainClone(tempDir, false, &git.CloneOptions{
+		URL:      repoURL,
+		Progress: io.Discard,
+		Depth:    1,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to clone repository: %w", err)
+	}
+
+	pluginDef, err := pi.readPluginDefinition(tempDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read plugin definition: %w", err)
+	}
+
+	return pluginDef, nil
+}
+
 func (pi *PluginInstaller) InstallPlugin(repoURL string) error {
 	log.Printf("[PluginInstaller] Installing plugin from: %s", repoURL)
 
@@ -49,7 +73,7 @@ func (pi *PluginInstaller) InstallPlugin(repoURL string) error {
 
 	_, err := git.PlainClone(tempDir, false, &git.CloneOptions{
 		URL:      repoURL,
-		Progress: os.Stdout,
+		Progress: io.Discard,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to clone repository: %w", err)
@@ -132,7 +156,10 @@ func (pi *PluginInstaller) UpdatePlugin(repoURL string) error {
 		return fmt.Errorf("failed to get worktree: %w", err)
 	}
 
-	err = w.Pull(&git.PullOptions{RemoteName: "origin"})
+	err = w.Pull(&git.PullOptions{
+		RemoteName: "origin",
+		Progress:   io.Discard,
+	})
 	if err != nil && err != git.NoErrAlreadyUpToDate {
 		return fmt.Errorf("failed to pull updates: %w", err)
 	}

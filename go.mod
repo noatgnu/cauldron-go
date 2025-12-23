@@ -8,6 +8,7 @@ require (
 	github.com/noatgnu/uniprotparser-go v0.0.0-20251201170658-be6b6f22f793
 	github.com/ulikunitz/xz v0.5.15
 	github.com/wailsapp/wails/v2 v2.11.0
+	github.com/yuin/goldmark v1.7.13
 	gopkg.in/yaml.v3 v3.0.1
 	gorm.io/driver/sqlite v1.6.0
 	gorm.io/gorm v1.31.1

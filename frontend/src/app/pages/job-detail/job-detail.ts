@@ -50,6 +50,8 @@ export class JobDetail implements OnInit, OnDestroy, AfterViewChecked {
   protected pluginPlots = signal<Array<{ fileName: string, title: string, type: string }>>([]);
   protected dynamicPlots = signal<Array<{ config: any, outputs: any[] }>>([]);
   protected dedicatedPlots = signal<Array<{ config: any }>>([]);
+  protected defaultDynamicPlotIndex = signal<number>(0);
+  protected defaultPluginPlotIndex = signal<number>(0);
   protected currentPlugin: any = null;
   private shouldAutoScroll = false;
 
@@ -275,13 +277,31 @@ export class JobDetail implements OnInit, OnDestroy, AfterViewChecked {
   async detectImageGridPlots(plotConfig: any, jsonPlots: Array<{ fileName: string, title: string, type: string }>) {
     try {
       const imagePattern = plotConfig.config?.imagePattern || '*.svg';
-      await this.wails.logToFile(`[Job Detail] Detecting image grid plots with pattern: ${imagePattern}`);
+      const matchType = plotConfig.config?.imagePatternType || 'auto';
+      await this.wails.logToFile(`[Job Detail] Detecting image grid plots with pattern: ${imagePattern}, type: ${matchType}`);
 
       const files = await this.wails.listJobOutputFiles(this.jobId);
       await this.wails.logToFile(`[Job Detail] Found ${files.length} output files`);
 
-      const extension = imagePattern.replace('*.', '');
-      const matchingFiles = files.filter((f: string) => f.endsWith(`.${extension}`) && !f.startsWith('.'));
+      let matchingFiles: string[];
+      let extension: string;
+
+      if (matchType === 'exact') {
+        matchingFiles = files.filter((f: string) => f === imagePattern);
+        extension = imagePattern.split('.').pop() || 'svg';
+      } else if (matchType === 'pattern' || (matchType === 'auto' && imagePattern.includes('*'))) {
+        if (imagePattern.startsWith('*')) {
+          extension = imagePattern.replace('*.', '');
+          matchingFiles = files.filter((f: string) => f.endsWith(`.${extension}`) && !f.startsWith('.'));
+        } else {
+          const regex = new RegExp('^' + imagePattern.replace(/\*/g, '.*').replace(/\./g, '\\.') + '$');
+          matchingFiles = files.filter((f: string) => regex.test(f) && !f.startsWith('.'));
+          extension = imagePattern.split('.').pop() || 'svg';
+        }
+      } else {
+        matchingFiles = files.filter((f: string) => f === imagePattern);
+        extension = imagePattern.split('.').pop() || 'svg';
+      }
 
       await this.wails.logToFile(`[Job Detail] Found ${matchingFiles.length} matching image files`);
 
@@ -315,19 +335,29 @@ export class JobDetail implements OnInit, OnDestroy, AfterViewChecked {
 
       if (plugin.definition.plots && plugin.definition.plots.length > 0) {
         await this.wails.logToFile(`[Job Detail] Found ${plugin.definition.plots.length} plot(s) in plugin definition`);
-        for (const plotConfig of plugin.definition.plots) {
+        for (let i = 0; i < plugin.definition.plots.length; i++) {
+          const plotConfig = plugin.definition.plots[i];
           const component = plotConfig.component;
           const plotType = plotConfig.type;
           const knownComponents = ['PcaPlot', 'PhatePlot', 'FuzzyClusteringPlot'];
 
-          await this.wails.logToFile(`[Job Detail] Processing plot: ${plotConfig.id}, type: ${plotType}, component: ${component}`);
+          await this.wails.logToFile(`[Job Detail] Processing plot: ${plotConfig.id}, type: ${plotType}, component: ${component}, default: ${plotConfig.default}`);
 
           if (component && knownComponents.includes(component)) {
             dedicatedPlotsArray.push({ config: plotConfig });
             await this.wails.logToFile(`[Job Detail] Added dedicated plot: ${plotConfig.id}`);
           } else if (plotType === 'image-grid') {
+            const plotsBeforeImageGrid = jsonPlots.length;
             await this.detectImageGridPlots(plotConfig, jsonPlots);
+            if (plotConfig.default && jsonPlots.length > plotsBeforeImageGrid) {
+              this.defaultPluginPlotIndex.set(plotsBeforeImageGrid);
+              await this.wails.logToFile(`[Job Detail] Set default plugin plot index to ${plotsBeforeImageGrid}`);
+            }
           } else if (!component) {
+            if (plotConfig.default) {
+              this.defaultDynamicPlotIndex.set(dynamicPlotsArray.length);
+              await this.wails.logToFile(`[Job Detail] Set default dynamic plot index to ${dynamicPlotsArray.length}`);
+            }
             dynamicPlotsArray.push({
               config: plotConfig,
               outputs: plugin.definition.outputs || []

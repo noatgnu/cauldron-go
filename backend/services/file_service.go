@@ -207,7 +207,9 @@ func (f *FileService) ExtractTarXz(archivePath string, destPath string) error {
 	}
 	defer file.Close()
 
-	xzReader, err := xz.NewReader(file)
+	bufferedFile := bufio.NewReaderSize(file, 1024*1024)
+
+	xzReader, err := xz.NewReader(bufferedFile)
 	if err != nil {
 		return err
 	}
@@ -220,7 +222,11 @@ func (f *FileService) ExtractTarXz(archivePath string, destPath string) error {
 
 	filesExtracted := 0
 	lastEmitCount := 0
-	emitInterval := 50
+	emitInterval := 100
+
+	dirCache := make(map[string]bool)
+
+	buffer := make([]byte, 4*1024*1024)
 
 	for {
 		header, err := tarReader.Next()
@@ -235,15 +241,36 @@ func (f *FileService) ExtractTarXz(archivePath string, destPath string) error {
 
 		switch header.Typeflag {
 		case tar.TypeDir:
-			if err := os.MkdirAll(target, 0755); err != nil {
-				return err
+			if !dirCache[target] {
+				if err := os.MkdirAll(target, 0755); err != nil {
+					return err
+				}
+				dirCache[target] = true
 			}
 		case tar.TypeReg:
+			dir := filepath.Dir(target)
+			if !dirCache[dir] {
+				if err := os.MkdirAll(dir, 0755); err != nil {
+					return err
+				}
+				dirCache[dir] = true
+			}
+
 			outFile, err := os.Create(target)
 			if err != nil {
 				return err
 			}
-			if _, err := io.Copy(outFile, tarReader); err != nil {
+
+			bufferedWriter := bufio.NewWriterSize(outFile, 256*1024)
+
+			_, err = io.CopyBuffer(bufferedWriter, tarReader, buffer)
+			if err != nil {
+				bufferedWriter.Flush()
+				outFile.Close()
+				return err
+			}
+
+			if err := bufferedWriter.Flush(); err != nil {
 				outFile.Close()
 				return err
 			}

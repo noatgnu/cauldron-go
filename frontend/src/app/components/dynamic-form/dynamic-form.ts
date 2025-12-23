@@ -14,6 +14,7 @@ import { models } from '../../../wailsjs/go/models';
 import { Wails } from '../../core/services/wails';
 import { NotificationService } from '../../core/services/notification.service';
 import { SampleAnnotation } from '../sample-annotation/sample-annotation';
+import { GenericTableEditor, TableColumn } from '../generic-table-editor/generic-table-editor';
 import { Subscription } from 'rxjs';
 
 @Component({
@@ -170,7 +171,11 @@ export class DynamicFormComponent implements OnInit, OnChanges, OnDestroy {
       const lines = content.split('\n');
       if (lines.length === 0) return;
 
-      const headers = lines[0].split('\t').map(h => h.trim());
+      const firstLine = lines[0].trim();
+      const delimiter = firstLine.includes('\t') ? '\t' : ',';
+      const headers = firstLine.split(delimiter).map(h => h.trim());
+
+      await this.wails.logToFile(`[DynamicForm] Loaded ${headers.length} columns for ${inputName}: ${headers.join(', ')}`);
       this.columnOptions.set(inputName, headers);
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
@@ -423,6 +428,7 @@ export class DynamicFormComponent implements OnInit, OnChanges, OnDestroy {
 
   isAnnotationFileInput(input: models.PluginInputV2): boolean {
     if (input.type !== 'file') return false;
+    if ((input as any).disableAnnotationManagement === true) return false;
     const name = input.name.toLowerCase();
     const label = input.label?.toLowerCase() || '';
     return name.includes('annotation') ||
@@ -430,6 +436,10 @@ export class DynamicFormComponent implements OnInit, OnChanges, OnDestroy {
            label.includes('annotation') ||
            label.includes('metadata') ||
            label.includes('sample annotation');
+  }
+
+  hasTableColumns(input: models.PluginInputV2): boolean {
+    return input.type === 'file' && !!input.tableColumns && input.tableColumns.length > 0;
   }
 
   async openAnnotationManager(inputName: string) {
@@ -537,6 +547,102 @@ export class DynamicFormComponent implements OnInit, OnChanges, OnDestroy {
 
     const timestamp = Date.now();
     const filename = `annotation_${timestamp}.txt`;
+    const filePath = await this.wails.saveTempFile(filename, content);
+
+    return filePath;
+  }
+
+  async openTableEditor(inputName: string) {
+    const input = this.plugin.definition.inputs.find(i => i.name === inputName);
+    if (!input || !input.tableColumns) return;
+
+    const currentFilePath = this.form.get(inputName)?.value;
+    let existingData: any[] | undefined;
+
+    if (currentFilePath) {
+      try {
+        const content = await this.wails.readFile(currentFilePath);
+        existingData = this.parseTableFile(content, input.tableColumns);
+      } catch (error) {
+        await this.wails.logToFile(`Error reading table file: ${error}`);
+      }
+    }
+
+    const dialogRef = this.dialog.open(GenericTableEditor, {
+      width: '90vw',
+      maxWidth: '1400px',
+      height: '80vh',
+      data: {
+        columns: input.tableColumns,
+        data: existingData,
+        title: input.label || 'Edit Table',
+        mode: existingData ? 'edit' : 'create'
+      }
+    });
+
+    dialogRef.afterClosed().subscribe(async (result) => {
+      if (result && Array.isArray(result) && input.tableColumns) {
+        try {
+          const filePath = await this.saveTableFile(result, input.tableColumns, inputName);
+          this.form.patchValue({ [inputName]: filePath });
+          this.notificationService.showSuccess('Table file saved successfully');
+        } catch (error) {
+          const errorMsg = error instanceof Error ? error.message : String(error);
+          await this.wails.logToFile(`Error saving table file: ${errorMsg}`);
+          this.notificationService.showError(`Failed to save table file: ${errorMsg}`);
+        }
+      }
+    });
+  }
+
+  private parseTableFile(content: string, columns: models.TableColumn[]): any[] {
+    const lines = content.trim().split('\n');
+    if (lines.length < 2) return [];
+
+    const headers = lines[0].split('\t').map(h => h.trim());
+    const data: any[] = [];
+
+    for (let i = 1; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line) continue;
+
+      const values = lines[i].split('\t');
+      const row: any = {};
+      columns.forEach((col, idx) => {
+        const headerIdx = headers.findIndex(h => h.toLowerCase() === col.name.toLowerCase());
+        row[col.name] = headerIdx !== -1 ? (values[headerIdx] || '').trim() : '';
+      });
+
+      const hasNonEmptyValue = columns.some(col => {
+        const value = row[col.name];
+        return value !== null && value !== undefined && value !== '';
+      });
+
+      if (hasNonEmptyValue) {
+        data.push(row);
+      }
+    }
+
+    return data;
+  }
+
+  private async saveTableFile(data: any[], columns: models.TableColumn[], inputName: string): Promise<string> {
+    const headers = columns.map(c => c.name);
+
+    const filteredData = data.filter(row => {
+      return columns.some(col => {
+        const value = row[col.name];
+        return value !== null && value !== undefined && value !== '';
+      });
+    });
+
+    const rows = filteredData.map(row =>
+      columns.map(col => row[col.name] || '').join('\t')
+    );
+    const content = [headers.join('\t'), ...rows].join('\n');
+
+    const timestamp = Date.now();
+    const filename = `${inputName}_${timestamp}.txt`;
     const filePath = await this.wails.saveTempFile(filename, content);
 
     return filePath;

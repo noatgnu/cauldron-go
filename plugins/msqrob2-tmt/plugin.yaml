@@ -1,0 +1,318 @@
+plugin:
+  id: "msqrob2-tmt"
+  name: "MSqRob2 TMT Analysis"
+  description: "Robust statistical inference for TMT-labeled quantitative proteomics using msqrob2"
+  version: "1.0.0"
+  author: "CauldronGO Team"
+  category: "statistics"
+  subcategory: "msqrob2"
+  icon: "analytics"
+
+runtime:
+  type: "r"
+  script: "msqrob2_tmt.R"
+
+inputs:
+  - name: "input_file"
+    label: "Peptide Intensity File"
+    type: "file"
+    required: true
+    accept: ".csv,.tsv,.txt"
+    description: "TMT peptide-level intensity data"
+
+  - name: "annotation_file"
+    label: "Sample Annotation File"
+    type: "file"
+    required: true
+    accept: ".csv,.tsv,.txt"
+    description: "Sample annotation with columns: Sample (matching intensity column names in data), Condition, BioReplicate"
+
+  - name: "comparison_file"
+    label: "Comparison Matrix File"
+    type: "file"
+    required: false
+    accept: ".csv,.tsv,.txt"
+    description: "Pairwise comparisons (columns: comparison_label, condition_A, condition_B)"
+
+  - name: "feature_id_col"
+    label: "Feature ID Column"
+    type: "column-selector"
+    multiple: false
+    required: true
+    sourceFile: "input_file"
+    description: "Column name for feature identifiers (e.g. Peptide Sequence, Modified Sequence)"
+
+  - name: "protein_col"
+    label: "Protein Column"
+    type: "column-selector"
+    multiple: false
+    required: true
+    sourceFile: "input_file"
+    description: "Column name containing protein identifiers"
+
+  - name: "log2_transform"
+    label: "Apply Log2 Transformation"
+    type: "boolean"
+    default: true
+    description: "Apply log2 transformation to intensities"
+
+  - name: "filter_min_peptides"
+    label: "Minimum Peptides per Protein"
+    type: "number"
+    required: false
+    default: 2
+    min: 1
+    max: 10
+    step: 1
+    description: "Minimum number of peptides required per protein"
+
+  - name: "remove_shared_peptides"
+    label: "Remove Shared Peptides"
+    type: "boolean"
+    default: false
+    description: "Remove peptides mapping to multiple proteins"
+
+  - name: "exclude_conditions"
+    label: "Exclude Conditions (comma-separated)"
+    type: "text"
+    required: false
+    description: "Comma-separated list of conditions to exclude from analysis (e.g., 'Norm,Empty,Reference'). These channels will be filtered out before statistical testing."
+
+  - name: "col_filter"
+    label: "Column Completeness Threshold"
+    type: "number"
+    required: false
+    default: 0.7
+    min: 0
+    max: 1
+    step: 0.05
+    description: "Maximum proportion of missing values allowed per sample. Default 0.7 = keep samples with ≥30% valid measurements."
+
+  - name: "row_filter"
+    label: "Row Completeness Threshold"
+    type: "number"
+    required: false
+    default: 0.7
+    min: 0
+    max: 1
+    step: 0.05
+    description: "Maximum proportion of missing values allowed per feature. Default 0.7 = keep features with ≥30% valid measurements."
+
+  - name: "impute_order"
+    label: "Imputation Order"
+    type: "select"
+    required: false
+    default: "after"
+    options:
+      - "before"
+      - "after"
+    description: "When to impute missing values relative to normalization. 'after': normalize then impute. 'before': impute then normalize. Only applies when aggregation_order='after'."
+
+  - name: "impute"
+    label: "Imputation Method"
+    type: "select"
+    required: false
+    default: "none"
+    options:
+      - "none"
+      - "knn"
+      - "MinDet"
+      - "MinProb"
+      - "min"
+      - "zero"
+      - "mixed"
+      - "nbavg"
+      - "with"
+      - "QRILC"
+      - "MLE"
+      - "bpca"
+    description: "Imputation method for missing values (select 'none' to skip imputation)"
+
+  - name: "normalize_method"
+    label: "Normalization Method"
+    type: "select"
+    required: false
+    default: "center.median"
+    options:
+      - "none"
+      - "center.median"
+      - "center.mean"
+      - "quantiles"
+      - "quantiles.robust"
+      - "vsn"
+    description: "Normalization method to apply"
+
+  - name: "aggregation_order"
+    label: "Aggregation Order"
+    type: "select"
+    required: false
+    default: "after"
+    options:
+      - "before"
+      - "after"
+    description: "When to aggregate peptides to proteins. 'after': normalize/impute peptides then aggregate. 'before': aggregate peptides then normalize proteins."
+
+  - name: "summarization_method"
+    label: "Protein Summarization Method"
+    type: "select"
+    required: false
+    default: "robust"
+    options:
+      - "robust"
+      - "sum"
+      - "mean"
+      - "median"
+    description: "Method for combining peptide intensities. 'robust': Tukey's median polish. 'median': median. 'mean': arithmetic mean. 'sum': sum."
+
+  - name: "model_run_effect"
+    label: "Model Run Effect"
+    type: "boolean"
+    default: false
+    description: "Include TMT run as random effect in the model. Requires 'Run' column in annotation file."
+
+  - name: "robust_regression"
+    label: "Use Robust Regression"
+    type: "boolean"
+    default: true
+    description: "Use M-estimation with Huber weights for model fitting."
+
+  - name: "ridge_penalty"
+    label: "Ridge Penalty"
+    type: "number"
+    required: false
+    default: 0
+    min: 0
+    max: 1
+    step: 0.01
+    description: "L2 regularization penalty for model fitting. 0 = no regularization."
+
+  - name: "max_iterations"
+    label: "Maximum Iterations"
+    type: "number"
+    required: false
+    default: 20
+    min: 5
+    max: 100
+    step: 5
+    description: "Maximum number of iterations for robust regression convergence."
+
+  - name: "adjust_method"
+    label: "P-value Adjustment Method"
+    type: "select"
+    required: false
+    default: "BH"
+    options:
+      - "BH"
+      - "bonferroni"
+      - "holm"
+      - "hochberg"
+      - "BY"
+      - "none"
+    description: "Method for multiple testing correction. 'BH': Benjamini-Hochberg FDR control. 'bonferroni': family-wise error rate control. 'holm'/'hochberg': step-down procedures. 'BY': Benjamini-Yekutieli. 'none': no correction."
+
+  - name: "alpha"
+    label: "Significance Level"
+    type: "number"
+    required: false
+    default: 0.05
+    min: 0.001
+    max: 0.2
+    step: 0.001
+    description: "Adjusted p-value threshold for significance."
+
+  - name: "lfc_threshold"
+    label: "Log2 Fold Change Threshold"
+    type: "number"
+    required: false
+    default: 0
+    min: 0
+    max: 5
+    step: 0.1
+    description: "Minimum absolute log2 fold-change threshold. 0 = no fold-change filter."
+
+outputs:
+  - name: "differential_results"
+    path: "tmt_results.txt"
+    type: "data"
+    description: "Differential expression analysis results"
+    format: "tsv"
+
+  - name: "protein_intensities"
+    path: "protein_intensities.txt"
+    type: "data"
+    description: "Summarized protein-level intensities"
+    format: "tsv"
+
+  - name: "normalized_peptides"
+    path: "normalized_peptides.txt"
+    type: "data"
+    description: "Normalized peptide-level intensities"
+    format: "tsv"
+
+  - name: "imputed_peptides"
+    path: "imputed_peptides.txt"
+    type: "data"
+    description: "Imputed peptide intensities"
+    format: "tsv"
+
+  - name: "qc_plots"
+    path: "qc_plots.pdf"
+    type: "plot"
+    description: "Quality control plots (PCA, boxplots, volcano plots)"
+    format: "pdf"
+
+execution:
+  argsMapping:
+    input_file: "--input_file"
+    annotation_file: "--annotation_file"
+    comparison_file: "--comparison_file"
+    feature_id_col: "--feature_id_col"
+    protein_col: "--protein_col"
+    log2_transform:
+      flag: "--log2_transform"
+      when: "true"
+    filter_min_peptides: "--filter_min_peptides"
+    remove_shared_peptides:
+      flag: "--remove_shared_peptides"
+      when: "true"
+    exclude_conditions: "--exclude_conditions"
+    col_filter: "--col_filter"
+    row_filter: "--row_filter"
+    impute_order: "--impute_order"
+    impute: "--impute"
+    normalize_method: "--normalize_method"
+    aggregation_order: "--aggregation_order"
+    summarization_method: "--summarization_method"
+    model_run_effect:
+      flag: "--model_run_effect"
+      when: "true"
+    robust_regression:
+      flag: "--robust_regression"
+      when: "true"
+    ridge_penalty: "--ridge_penalty"
+    max_iterations: "--max_iterations"
+    adjust_method: "--adjust_method"
+    alpha: "--alpha"
+    lfc_threshold: "--lfc_threshold"
+
+  outputDir: "--output_folder"
+
+  requirements:
+    r: ">=4.0"
+    rPackagesFile: "r-packages.txt"
+
+example:
+  enabled: true
+  values:
+    input_file: "maxquant-tmt/evidence_protein.txt"
+    annotation_file: "maxquant-tmt/annotation_ptm_msqrob2.txt"
+    feature_id_col: "Modified sequence"
+    protein_col: "Proteins"
+    log2_transform: true
+    exclude_conditions: "Norm"
+    impute: "knn"
+    impute_order: "after"
+    normalize_method: "center.median"
+    aggregation_order: "after"
+    summarization_method: "robust"
+    robust_regression: true

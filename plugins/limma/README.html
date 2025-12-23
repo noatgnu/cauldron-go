@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plugin Documentation</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            max-width: 900px;
+            margin: 50px auto;
+            padding: 20px;
+            line-height: 1.6;
+            color: #333;
+        }
+        h1 {
+            border-bottom: 2px solid #2196f3;
+            padding-bottom: 10px;
+            color: #1976d2;
+        }
+        h2 {
+            margin-top: 30px;
+            color: #1976d2;
+            border-bottom: 1px solid #e0e0e0;
+            padding-bottom: 5px;
+        }
+        h3 {
+            margin-top: 20px;
+            color: #424242;
+        }
+        h4 {
+            color: #616161;
+        }
+        a {
+            color: #2196f3;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        code {
+            background: #f5f5f5;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+        pre {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        pre code {
+            background: none;
+            padding: 0;
+        }
+        blockquote {
+            border-left: 4px solid #2196f3;
+            margin: 0;
+            padding-left: 15px;
+            color: #666;
+            background: #f5f9fc;
+            padding: 10px 15px;
+            border-radius: 4px;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%!;(string=<h1 id="limma-differential-expression">Limma Differential Expression</h1>
+<p><strong>ID</strong>: <code>limma</code><br>
+<strong>Version</strong>: 1.0.0<br>
+<strong>Category</strong>: analysis<br>
+<strong>Author</strong>: CauldronGO Team</p>
+<h2 id="description">Description</h2>
+<p>Linear models for differential expression analysis using limma</p>
+<h2 id="runtime">Runtime</h2>
+<ul>
+<li><strong>Type</strong>: <code>r</code></li>
+<li><strong>Script</strong>: <code>limma.R</code></li>
+</ul>
+<h2 id="inputs">Inputs</h2>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Label</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Visibility</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>input_file</code></td>
+<td>Input Data File</td>
+<td>file</td>
+<td>Yes</td>
+<td>-</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>annotation_file</code></td>
+<td>Annotation File</td>
+<td>file</td>
+<td>Yes</td>
+<td>-</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>index_col</code></td>
+<td>Index Column</td>
+<td>text</td>
+<td>No</td>
+<td>-</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>log2</code></td>
+<td>Apply Log2 Transformation</td>
+<td>boolean</td>
+<td>No</td>
+<td>false</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>comparisons</code></td>
+<td>Comparisons</td>
+<td>file</td>
+<td>No</td>
+<td>-</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>impute_order</code></td>
+<td>Imputation Order</td>
+<td>select (before, after)</td>
+<td>No</td>
+<td>before</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>impute</code></td>
+<td>Imputation Method</td>
+<td>select (none, knn, MinDet, MinProb, min, zero, mixed, nbavg, with, QRILC, MLE, bpca)</td>
+<td>No</td>
+<td>none</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>normalize</code></td>
+<td>Normalization Method</td>
+<td>select (none, quantiles, quantiles.robust, vsn, center.median, center.mean)</td>
+<td>No</td>
+<td>none</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>aggregate_column</code></td>
+<td>Aggregate By Column</td>
+<td>text</td>
+<td>No</td>
+<td>-</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>aggregate_method</code></td>
+<td>Aggregation Method</td>
+<td>text</td>
+<td>No</td>
+<td>MsCoreUtils::robustSummary</td>
+<td>Always visible</td>
+</tr>
+</tbody>
+</table>
+<h3 id="input-details">Input Details</h3>
+<h4 id="input-data-file-input-file">Input Data File (<code>input_file</code>)</h4>
+<p>Proteomics or expression data file</p>
+<h4 id="annotation-file-annotation-file">Annotation File (<code>annotation_file</code>)</h4>
+<p>Sample annotation file with conditions</p>
+<h4 id="index-column-index-col">Index Column (<code>index_col</code>)</h4>
+<p>Column name to use as feature identifier</p>
+<h4 id="apply-log2-transformation-log2">Apply Log2 Transformation (<code>log2</code>)</h4>
+<p>Apply log2 transformation before analysis</p>
+<h4 id="comparisons-comparisons">Comparisons (<code>comparisons</code>)</h4>
+<p>Comparison groups for differential analysis</p>
+<h4 id="imputation-order-impute-order">Imputation Order (<code>impute_order</code>)</h4>
+<p>When to perform imputation relative to normalization (before or after normalization)</p>
+<ul>
+<li><strong>Options</strong>: <code>before</code>, <code>after</code></li>
+</ul>
+<h4 id="imputation-method-impute">Imputation Method (<code>impute</code>)</h4>
+<p>Imputation method for missing values (select 'none' to skip imputation)</p>
+<ul>
+<li><strong>Options</strong>: <code>none</code>, <code>knn</code>, <code>MinDet</code>, <code>MinProb</code>, <code>min</code>, <code>zero</code>, <code>mixed</code>, <code>nbavg</code>, <code>with</code>, <code>QRILC</code>, <code>MLE</code>, <code>bpca</code></li>
+</ul>
+<h4 id="normalization-method-normalize">Normalization Method (<code>normalize</code>)</h4>
+<p>Normalization method to apply (select 'none' to skip normalization)</p>
+<ul>
+<li><strong>Options</strong>: <code>none</code>, <code>quantiles</code>, <code>quantiles.robust</code>, <code>vsn</code>, <code>center.median</code>, <code>center.mean</code></li>
+</ul>
+<h4 id="aggregate-by-column-aggregate-column">Aggregate By Column (<code>aggregate_column</code>)</h4>
+<p>Column name to aggregate features (e.g., aggregate peptides to proteins). Leave empty to skip aggregation.</p>
+<h4 id="aggregation-method-aggregate-method">Aggregation Method (<code>aggregate_method</code>)</h4>
+<p>Method to use for feature aggregation (e.g., MsCoreUtils::robustSummary, median, mean)</p>
+<h2 id="outputs">Outputs</h2>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>File</th>
+<th>Type</th>
+<th>Format</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>differential_results</code></td>
+<td><code>differential_analysis.txt</code></td>
+<td>data</td>
+<td>tsv</td>
+<td>Differential expression analysis results</td>
+</tr>
+<tr>
+<td><code>contrast_matrix_info</code></td>
+<td><code>contrast_matrix_info.txt</code></td>
+<td>data</td>
+<td>tsv</td>
+<td>Contrast matrix information showing comparison directions</td>
+</tr>
+</tbody>
+</table>
+<h2 id="requirements">Requirements</h2>
+<ul>
+<li><strong>R</strong>: &gt;=4.0</li>
+</ul>
+<h2 id="example-data">Example Data</h2>
+<p>This plugin includes example data for testing:</p>
+<pre><code class="language-yaml">  input_file: diann/imputed.data.txt
+  annotation_file: differential_analysis/annotation.txt
+  comparisons: differential_analysis/comparison.bca.txt
+  index_col: Protein.Ids
+  log2: true
+</code></pre>
+<p>Load example data by clicking the <strong>Load Example</strong> button in the UI.</p>
+<h2 id="usage">Usage</h2>
+<h3 id="via-ui">Via UI</h3>
+<ol>
+<li>Navigate to <strong>analysis</strong> → <strong>Limma Differential Expression</strong></li>
+<li>Fill in the required inputs</li>
+<li>Click <strong>Run Analysis</strong></li>
+</ol>
+<h3 id="via-plugin-system">Via Plugin System</h3>
+<pre><code class="language-typescript">const jobId = await pluginService.executePlugin('limma', {
+  // Add parameters here
+});
+</code></pre>
+)
+            margin: 15px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #2196f3;
+            color: white;
+            font-weight: 600;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        ul, ol {
+            padding-left: 25px;
+        }
+        li {
+            margin: 5px 0;
+        }
+        strong {
+            font-weight: 600;
+            color: #1976d2;
+        }
+    </style>
+</head>
+<body>
+%!s(MISSING)
+</body>
+</html>

@@ -67,6 +67,26 @@ type REnvironmentDB struct {
 	UpdatedAt   int64  `gorm:"autoUpdateTime"`
 }
 
+type RenvEnvironment struct {
+	ID          uint   `gorm:"primaryKey"`
+	Name        string `gorm:"not null"`
+	Path        string `gorm:"not null;unique"`
+	ProjectPath string `gorm:"not null"`
+	BaseRPath   string `gorm:"not null"`
+	RenvVersion string
+	CreatedAt   int64 `gorm:"not null"`
+}
+
+type PluginEnvironmentBinding struct {
+	ID              uint   `gorm:"primaryKey"`
+	PluginID        string `gorm:"not null;index"`
+	EnvironmentType string `gorm:"not null"`
+	EnvironmentID   uint   `gorm:"not null"`
+	EnvironmentPath string `gorm:"not null"`
+	CreatedAt       int64  `gorm:"autoCreateTime"`
+	UpdatedAt       int64  `gorm:"autoUpdateTime"`
+}
+
 func NewDatabaseService(ctx context.Context) (*DatabaseService, error) {
 	userConfigDir, _ := os.UserConfigDir()
 	dbDir := filepath.Join(userConfigDir, "cauldron")
@@ -126,6 +146,8 @@ func (d *DatabaseService) autoMigrate() error {
 		&Setting{},
 		&ImportedFile{},
 		&VirtualEnvironment{},
+		&RenvEnvironment{},
+		&PluginEnvironmentBinding{},
 		&PythonEnvironmentDB{},
 		&REnvironmentDB{},
 		&models.Job{},
@@ -348,4 +370,61 @@ func (d *DatabaseService) GetActiveREnvironment() (*REnvironment, error) {
 		Version:     dbEnv.Version,
 		HasPackages: dbEnv.HasPackages,
 	}, nil
+}
+
+func (d *DatabaseService) SaveRenvEnvironment(env RenvEnvironment) error {
+	var existing RenvEnvironment
+	result := d.db.Where("path = ?", env.Path).First(&existing)
+
+	if result.Error == nil {
+		return d.db.Model(&existing).Updates(env).Error
+	}
+
+	return d.db.Create(&env).Error
+}
+
+func (d *DatabaseService) GetRenvEnvironments() ([]RenvEnvironment, error) {
+	var envs []RenvEnvironment
+	err := d.db.Order("created_at DESC").Find(&envs).Error
+	return envs, err
+}
+
+func (d *DatabaseService) DeleteRenvEnvironment(id uint) error {
+	return d.db.Delete(&RenvEnvironment{}, id).Error
+}
+
+func (d *DatabaseService) GetRenvEnvironmentByID(id uint) (*RenvEnvironment, error) {
+	var env RenvEnvironment
+	err := d.db.First(&env, id).Error
+	return &env, err
+}
+
+func (d *DatabaseService) SavePluginEnvironmentBinding(binding PluginEnvironmentBinding) error {
+	var existing PluginEnvironmentBinding
+	result := d.db.Where("plugin_id = ? AND environment_type = ?", binding.PluginID, binding.EnvironmentType).First(&existing)
+
+	if result.Error == nil {
+		return d.db.Model(&existing).Updates(binding).Error
+	}
+
+	return d.db.Create(&binding).Error
+}
+
+func (d *DatabaseService) GetPluginEnvironmentBinding(pluginID string, envType string) (*PluginEnvironmentBinding, error) {
+	var binding PluginEnvironmentBinding
+	err := d.db.Where("plugin_id = ? AND environment_type = ?", pluginID, envType).First(&binding).Error
+	if err != nil {
+		return nil, err
+	}
+	return &binding, nil
+}
+
+func (d *DatabaseService) DeletePluginEnvironmentBinding(pluginID string, envType string) error {
+	return d.db.Where("plugin_id = ? AND environment_type = ?", pluginID, envType).Delete(&PluginEnvironmentBinding{}).Error
+}
+
+func (d *DatabaseService) GetAllPluginEnvironmentBindings() ([]PluginEnvironmentBinding, error) {
+	var bindings []PluginEnvironmentBinding
+	err := d.db.Order("created_at DESC").Find(&bindings).Error
+	return bindings, err
 }

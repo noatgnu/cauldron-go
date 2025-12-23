@@ -1,0 +1,489 @@
+plugin:
+  id: "maxquant-msstats-ptm-tmt"
+  name: "MaxQuant MSstatsPTM TMT Analysis"
+  description: "Statistical analysis of TMT-labeled post-translational modifications from MaxQuant data using MSstatsPTM package"
+  version: "1.0.0"
+  author: "CauldronGO Team"
+  category: "statistics"
+  subcategory: "msstats"
+  icon: "science"
+
+runtime:
+  type: "r"
+  script: "msstatsptm_tmt.R"
+
+inputs:
+  - name: "evidence_file"
+    label: "PTM Evidence File"
+    type: "file"
+    required: true
+    accept: ".txt"
+    description: "MaxQuant evidence.txt file with PTM data (e.g., from phospho search)"
+
+  - name: "annotation_file"
+    label: "PTM Annotation File"
+    type: "file"
+    required: true
+    accept: ".csv,.tsv,.txt"
+    disableAnnotationManagement: true
+    description: "TMT annotation file for PTM data (columns: Run, Channel, Condition, Mixture, TechRepMixture, Fraction, BioReplicate). Channel should be 'channel1', 'channel2', etc."
+    tableColumns:
+      - name: "Run"
+        label: "Run"
+        type: "text"
+        required: true
+        description: "Run identifier (e.g., Nico_phospho_1)"
+      - name: "Channel"
+        label: "Channel"
+        type: "text"
+        required: true
+        description: "TMT channel (e.g., channel1, channel2, ..., channel16)"
+      - name: "Condition"
+        label: "Condition"
+        type: "text"
+        required: true
+        description: "Experimental condition/group name"
+      - name: "Mixture"
+        label: "Mixture"
+        type: "text"
+        required: true
+        description: "TMT plex identifier (e.g., mixture1)"
+      - name: "TechRepMixture"
+        label: "TechRepMixture"
+        type: "text"
+        required: true
+        description: "Technical replicate mixture identifier (usually 1)"
+      - name: "Fraction"
+        label: "Fraction"
+        type: "text"
+        required: true
+        description: "Fraction number identifying which fraction this run represents"
+      - name: "BioReplicate"
+        label: "BioReplicate"
+        type: "text"
+        required: true
+        description: "Biological replicate number"
+
+  - name: "evidence_protein_file"
+    label: "Protein Evidence File"
+    type: "file"
+    required: false
+    accept: ".txt"
+    description: "MaxQuant evidence.txt file for protein-level data (total protein, optional but recommended)"
+
+  - name: "annotation_protein_file"
+    label: "Protein Annotation File"
+    type: "file"
+    required: false
+    accept: ".csv,.tsv,.txt"
+    disableAnnotationManagement: true
+    description: "TMT annotation file for protein data (same structure as PTM annotation)"
+    tableColumns:
+      - name: "Run"
+        label: "Run"
+        type: "text"
+        required: true
+        description: "Run identifier (e.g., Nico_tp_1)"
+      - name: "Channel"
+        label: "Channel"
+        type: "text"
+        required: true
+        description: "TMT channel (e.g., channel1, channel2, ..., channel16)"
+      - name: "Condition"
+        label: "Condition"
+        type: "text"
+        required: true
+        description: "Experimental condition/group name"
+      - name: "Mixture"
+        label: "Mixture"
+        type: "text"
+        required: true
+        description: "TMT plex identifier (e.g., mixture1)"
+      - name: "TechRepMixture"
+        label: "TechRepMixture"
+        type: "text"
+        required: true
+        description: "Technical replicate mixture identifier (usually 1)"
+      - name: "Fraction"
+        label: "Fraction"
+        type: "text"
+        required: true
+        description: "Fraction number identifying which fraction this run represents"
+      - name: "BioReplicate"
+        label: "BioReplicate"
+        type: "text"
+        required: true
+        description: "Biological replicate number"
+
+  - name: "protein_groups_file"
+    label: "Protein Groups File"
+    type: "file"
+    required: false
+    accept: ".txt"
+    description: "MaxQuant proteinGroups.txt file (optional)"
+
+  - name: "sites_data_file"
+    label: "PTM Sites File"
+    type: "file"
+    required: false
+    accept: ".txt"
+    description: "MaxQuant PTM sites file (e.g., Phospho (STY)Sites.txt, optional)"
+
+  - name: "fasta_file"
+    label: "FASTA File"
+    type: "file"
+    required: false
+    accept: ".fasta,.fa"
+    description: "FASTA file for protein database (recommended for accurate PTM site localization)"
+
+  - name: "fasta_protein_name"
+    label: "FASTA Protein Name Column"
+    type: "text"
+    required: false
+    default: "uniprot_ac"
+    description: "Column name in FASTA for protein identifier"
+
+  - name: "mod_id"
+    label: "Modification ID Pattern"
+    type: "text"
+    required: false
+    default: "\\(Phospho \\(STY\\)\\)"
+    description: "Regular expression for modification identification (default for phosphorylation)"
+
+  - name: "mod_num"
+    label: "Modification Number"
+    type: "select"
+    required: false
+    default: "Single"
+    options:
+      - "Single"
+      - "Multiple"
+    description: "Type of modification per peptide"
+
+  - name: "TMT_keyword"
+    label: "TMT Keyword"
+    type: "text"
+    required: false
+    default: "Reporter intensity corrected"
+    description: "Keyword to identify TMT channels in data (MaxQuant uses 'Reporter intensity corrected')"
+
+  - name: "ptm_keyword"
+    label: "PTM Keyword"
+    type: "text"
+    required: false
+    default: "phos"
+    description: "Keyword identifier for PTM type (e.g., 'phos', 'acetyl', 'ubiquitin')"
+
+  - name: "which_proteinid_ptm"
+    label: "Protein ID Column (PTM)"
+    type: "text"
+    required: false
+    default: "Proteins"
+    description: "Column name for protein identifiers in PTM data"
+
+  - name: "which_proteinid_protein"
+    label: "Protein ID Column (Protein)"
+    type: "text"
+    required: false
+    default: "Proteins"
+    description: "Column name for protein identifiers in protein data"
+
+  - name: "remove_other_mods"
+    label: "Remove Other Modifications"
+    type: "boolean"
+    required: false
+    default: true
+    description: "Remove peptides with modifications other than the target PTM"
+
+  - name: "removeMpeptides"
+    label: "Remove Methionine Peptides"
+    type: "boolean"
+    required: false
+    default: false
+    description: "Remove peptides containing methionine residues"
+
+  - name: "removeOxidationMpeptides"
+    label: "Remove Oxidation M Peptides"
+    type: "boolean"
+    required: false
+    default: false
+    description: "Remove peptides with oxidized methionine (common artifact)"
+
+  - name: "removeProtein_with1Peptide"
+    label: "Remove Proteins with 1 Peptide"
+    type: "boolean"
+    required: false
+    default: false
+    description: "Remove proteins identified by only one peptide"
+
+  - name: "use_unmod_peptides"
+    label: "Use Unmodified Peptides"
+    type: "boolean"
+    required: false
+    default: true
+    description: "Include unmodified peptides for protein-level adjustment (recommended for TMT)"
+
+  - name: "summarization_method"
+    label: "Summarization Method"
+    type: "select"
+    required: false
+    default: "msstats"
+    options:
+      - "msstats"
+      - "MedianPolish"
+      - "Median"
+    description: "Method for summarizing TMT reporter intensities"
+
+  - name: "global_norm"
+    label: "Global Normalization (Protein)"
+    type: "boolean"
+    required: false
+    default: true
+    description: "Apply global normalization to protein data"
+
+  - name: "global_norm_PTM"
+    label: "Global Normalization (PTM)"
+    type: "boolean"
+    required: false
+    default: true
+    description: "Apply global normalization to PTM data"
+
+  - name: "reference_norm"
+    label: "Reference Channel Normalization (Protein)"
+    type: "boolean"
+    required: false
+    default: true
+    description: "Apply reference channel normalization to protein data (TMT-specific)"
+
+  - name: "reference_norm_PTM"
+    label: "Reference Channel Normalization (PTM)"
+    type: "boolean"
+    required: false
+    default: true
+    description: "Apply reference channel normalization to PTM data (TMT-specific)"
+
+  - name: "remove_norm_channel"
+    label: "Remove Normalization Channel"
+    type: "boolean"
+    required: false
+    default: true
+    description: "Remove normalization channel from final output"
+
+  - name: "remove_empty_channel"
+    label: "Remove Empty Channels"
+    type: "boolean"
+    required: false
+    default: true
+    description: "Remove empty TMT channels from output"
+
+  - name: "MBimpute"
+    label: "MBimpute for Protein"
+    type: "boolean"
+    required: false
+    default: true
+    description: "Use model-based imputation for missing values in protein data"
+
+  - name: "MBimpute_PTM"
+    label: "MBimpute for PTM"
+    type: "boolean"
+    required: false
+    default: true
+    description: "Use model-based imputation for missing values in PTM data"
+
+  - name: "maxQuantileforCensored"
+    label: "Max Quantile for Censored"
+    type: "number"
+    required: false
+    default: null
+    min: 0.9
+    max: 1
+    step: 0.001
+    description: "Maximum quantile for determining censored missing values (leave empty for automatic)"
+
+  - name: "comparison_matrix_file"
+    label: "Comparison Matrix File"
+    type: "file"
+    required: false
+    accept: ".csv,.tsv,.txt"
+    description: "Custom comparison matrix file (if not provided, all pairwise comparisons will be performed)"
+
+  - name: "moderated"
+    label: "Moderated T-Statistic"
+    type: "boolean"
+    required: false
+    default: false
+    description: "Use moderated t-statistic (empirical Bayes, not typically used for TMT)"
+
+  - name: "adj_method"
+    label: "Multiple Testing Adjustment"
+    type: "select"
+    required: false
+    default: "BH"
+    options:
+      - "BH"
+      - "bonferroni"
+      - "holm"
+      - "hochberg"
+      - "BY"
+      - "none"
+    description: "Method for multiple testing correction"
+
+  - name: "log_base"
+    label: "Log Base for Fold Change"
+    type: "select"
+    required: false
+    default: "2"
+    options:
+      - "2"
+      - "10"
+    description: "Base of logarithm for reporting fold changes"
+
+  - name: "save_fitted_models"
+    label: "Save Fitted Models"
+    type: "boolean"
+    required: false
+    default: false
+    description: "Save fitted statistical models in the output (can be memory intensive)"
+
+outputs:
+  - name: "group_comparison_ptm"
+    path: "group_comparison_ptm.txt"
+    type: "data"
+    description: "PTM-level differential analysis results"
+    format: "tsv"
+
+  - name: "group_comparison_protein"
+    path: "group_comparison_protein.txt"
+    type: "data"
+    description: "Protein-level differential analysis results"
+    format: "tsv"
+
+  - name: "group_comparison_adjusted"
+    path: "group_comparison_adjusted.txt"
+    type: "data"
+    description: "PTM results adjusted for protein abundance changes (recommended for interpretation)"
+    format: "tsv"
+
+  - name: "peptide_intensities_wide"
+    path: "peptide_intensities_wide.txt"
+    type: "data"
+    description: "Peptide-level summarized intensities in wide format (can be joined with PTM and adjusted results)"
+    format: "tsv"
+
+  - name: "protein_intensities_wide"
+    path: "protein_intensities_wide.txt"
+    type: "data"
+    description: "Protein-level summarized intensities in wide format (can be joined with protein results)"
+    format: "tsv"
+
+execution:
+  argsMapping:
+    evidence_file: "--evidence_file"
+    annotation_file: "--annotation_file"
+    evidence_protein_file: "--evidence_protein_file"
+    annotation_protein_file: "--annotation_protein_file"
+    protein_groups_file: "--protein_groups_file"
+    sites_data_file: "--sites_data_file"
+    fasta_file: "--fasta_file"
+    fasta_protein_name: "--fasta_protein_name"
+    mod_id: "--mod_id"
+    mod_num: "--mod_num"
+    TMT_keyword: "--TMT_keyword"
+    ptm_keyword: "--ptm_keyword"
+    which_proteinid_ptm: "--which_proteinid_ptm"
+    which_proteinid_protein: "--which_proteinid_protein"
+    remove_other_mods:
+      flag: "--remove_other_mods"
+      when: "true"
+      value: "true"
+    removeMpeptides:
+      flag: "--removeMpeptides"
+      when: "true"
+      value: "true"
+    removeOxidationMpeptides:
+      flag: "--removeOxidationMpeptides"
+      when: "true"
+      value: "true"
+    removeProtein_with1Peptide:
+      flag: "--removeProtein_with1Peptide"
+      when: "true"
+      value: "true"
+    use_unmod_peptides:
+      flag: "--use_unmod_peptides"
+      when: "true"
+      value: "true"
+    summarization_method: "--summarization_method"
+    global_norm:
+      flag: "--global_norm"
+      when: "true"
+      value: "true"
+    global_norm_PTM:
+      flag: "--global_norm_PTM"
+      when: "true"
+      value: "true"
+    reference_norm:
+      flag: "--reference_norm"
+      when: "true"
+      value: "true"
+    reference_norm_PTM:
+      flag: "--reference_norm_PTM"
+      when: "true"
+      value: "true"
+    remove_norm_channel:
+      flag: "--remove_norm_channel"
+      when: "true"
+      value: "true"
+    remove_empty_channel:
+      flag: "--remove_empty_channel"
+      when: "true"
+      value: "true"
+    MBimpute:
+      flag: "--MBimpute"
+      when: "true"
+      value: "true"
+    MBimpute_PTM:
+      flag: "--MBimpute_PTM"
+      when: "true"
+      value: "true"
+    maxQuantileforCensored: "--maxQuantileforCensored"
+    comparison_matrix_file: "--comparison_matrix_file"
+    moderated:
+      flag: "--moderated"
+      when: "true"
+      value: "true"
+    adj_method: "--adj_method"
+    log_base: "--log_base"
+    save_fitted_models:
+      flag: "--save_fitted_models"
+      when: "true"
+      value: "true"
+
+  outputDir: "--output_folder"
+
+  requirements:
+    r: ">=4.0"
+    packages:
+      - "MSstatsPTM"
+      - "MSstatsTMT"
+      - "tidyverse"
+
+example:
+  enabled: true
+  values:
+    evidence_file: "maxquant-tmt/evidence_ptm.txt"
+    annotation_file: "maxquant-tmt/annotation_ptm.txt"
+    evidence_protein_file: "maxquant-tmt/evidence_protein.txt"
+    annotation_protein_file: "maxquant-tmt/annotation_protein.txt"
+    protein_groups_file: "maxquant-tmt/proteinGroups_ptm.txt"
+    sites_data_file: "maxquant-tmt/phospho_sites.txt"
+    fasta_file: "maxquant-tmt/uniprot_human.fasta"
+    mod_id: "\\(Phospho \\(STY\\)\\)"
+    use_unmod_peptides: true
+    global_norm: true
+    global_norm_PTM: true
+    reference_norm: true
+    reference_norm_PTM: true
+    MBimpute: true
+    MBimpute_PTM: true
+    moderated: false
+    adj_method: "BH"

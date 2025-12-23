@@ -9,6 +9,7 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatExpansionModule } from '@angular/material/expansion';
+import { MatSnackBar } from '@angular/material/snack-bar';
 import { ImportedFileSelection } from '../../../components/imported-file-selection/imported-file-selection';
 import { Wails } from '../../../core/services/wails';
 import { PlotlyExport } from '../../../core/services/plotly-export';
@@ -62,7 +63,8 @@ export class ViolinPlot implements OnInit {
   constructor(
     private fb: FormBuilder,
     private wails: Wails,
-    private plotlyExport: PlotlyExport
+    private plotlyExport: PlotlyExport,
+    private snackBar: MatSnackBar
   ) {
     this.form = this.fb.group({
       filePath: ['', Validators.required],
@@ -154,7 +156,12 @@ export class ViolinPlot implements OnInit {
       const fullData = await this.wails.parseDataFile(filePath, 0);
 
       if (!fullData || !fullData.rows) {
-        alert('Failed to load data');
+        this.snackBar.open('Failed to load data', 'Close', {
+          duration: 5000,
+          horizontalPosition: 'center',
+          verticalPosition: 'top',
+          panelClass: ['error-snackbar']
+        });
         return;
       }
 
@@ -250,7 +257,12 @@ export class ViolinPlot implements OnInit {
       }
     } catch (error) {
       console.error('Failed to generate plot:', error);
-      alert('Failed to generate plot. Please check your data.');
+      this.snackBar.open('Failed to generate plot. Please check your data.', 'Close', {
+        duration: 5000,
+        horizontalPosition: 'center',
+        verticalPosition: 'top',
+        panelClass: ['error-snackbar']
+      });
     }
   }
 
@@ -301,7 +313,12 @@ export class ViolinPlot implements OnInit {
         this.selectedColumns.set(selected);
       }
     } catch (error) {
-      alert('Failed to load example data. Please ensure example files are available.');
+      this.snackBar.open('Failed to load example data. Please ensure example files are available.', 'Close', {
+        duration: 5000,
+        horizontalPosition: 'center',
+        verticalPosition: 'top',
+        panelClass: ['error-snackbar']
+      });
     }
   }
 
@@ -313,7 +330,12 @@ export class ViolinPlot implements OnInit {
         height: 800
       });
     } catch (error) {
-      alert('Failed to export plot to SVG. Please try again.');
+      this.snackBar.open('Failed to export plot to SVG. Please try again.', 'Close', {
+        duration: 5000,
+        horizontalPosition: 'center',
+        verticalPosition: 'top',
+        panelClass: ['error-snackbar']
+      });
     }
   }
 }

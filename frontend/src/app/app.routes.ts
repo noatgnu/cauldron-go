@@ -28,15 +28,19 @@ import { Plugins } from './pages/plugins/plugins';
 import { PluginList } from './pages/plugin-list/plugin-list';
 import { PluginExecute } from './pages/plugin-execute/plugin-execute';
 import { PluginEditor } from './pages/plugin-editor/plugin-editor';
+import { PluginRegistry } from './pages/plugin-registry/plugin-registry';
 
 export const routes: Routes = [
-  { path: '', component: Home },
-  { path: 'settings', component: Settings },
+  { path: '', redirectTo: 'home', pathMatch: 'full' },
+  { path: 'home', component: Home },
+  { path: 'settings', redirectTo: 'settings/general', pathMatch: 'full' },
+  { path: 'settings/:section', component: Settings },
   { path: 'jobs', component: Jobs },
   { path: 'jobs/:id', component: JobDetail },
   { path: 'job/:id', component: JobDetail },
   { path: 'plugins', component: Plugins },
   { path: 'plugin-list', component: PluginList },
+  { path: 'plugin-registry', component: PluginRegistry },
   { path: 'plugin/:id', component: PluginExecute },
   { path: 'plugin-editor', component: PluginEditor },
   { path: 'plugin-editor/new', component: PluginEditor },

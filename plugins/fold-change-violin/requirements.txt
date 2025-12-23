@@ -1,0 +1,5 @@
+# Python requirements for fold change violin plot plugin
+click
+pandas>=2.0.0
+seaborn>=0.12.0
+matplotlib>=3.7.0

@@ -159,6 +159,7 @@
 "RCurl" "1.98-1.16"
 "rematch2" "2.1.2"
 "remotes" "2.5.0"
+"renv" "1.0.7"
 "rlang" "1.1.3"
 "rmarkdown" "2.27"
 "rngtools" "1.5.2"

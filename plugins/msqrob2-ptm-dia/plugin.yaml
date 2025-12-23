@@ -1,0 +1,354 @@
+plugin:
+  id: "msqrob2-ptm-dia"
+  name: "MSqRob2 PTM DIA Analysis"
+  description: "Differential abundance and usage analysis for PTM data from DIA/label-free experiments using msqrob2PTM"
+  version: "1.0.0"
+  author: "CauldronGO Team"
+  category: "statistics"
+  subcategory: "msqrob2"
+  icon: "biotech"
+
+runtime:
+  type: "r"
+  script: "msqrob2ptm_dia.R"
+
+inputs:
+  - name: "input_file"
+    label: "Peptide Intensity File"
+    type: "file"
+    required: true
+    accept: ".csv,.tsv,.txt"
+    description: "DIA/label-free peptide-level intensity data with PTM information"
+
+  - name: "annotation_file"
+    label: "Sample Annotation File"
+    type: "file"
+    required: true
+    accept: ".csv,.tsv,.txt"
+    description: "Sample annotation with columns: Sample (matching sample column names in data), Condition, BioReplicate"
+
+  - name: "comparison_file"
+    label: "Comparison Matrix File"
+    type: "file"
+    required: false
+    accept: ".csv,.tsv,.txt"
+    description: "Pairwise comparisons (columns: comparison_label, condition_A, condition_B)"
+
+  - name: "peptide_col"
+    label: "Peptide Column"
+    type: "column-selector"
+    multiple: false
+    required: true
+    sourceFile: "input_file"
+    description: "Column name for peptide sequences"
+
+  - name: "protein_col"
+    label: "Protein Column"
+    type: "column-selector"
+    multiple: false
+    required: true
+    sourceFile: "input_file"
+    description: "Column name containing protein identifiers"
+
+  - name: "ptm_col"
+    label: "PTM Site Column"
+    type: "column-selector"
+    multiple: false
+    required: false
+    sourceFile: "input_file"
+    description: "Column name for PTM site information"
+
+  - name: "protein_file"
+    label: "Protein Abundance File (Optional)"
+    type: "file"
+    required: false
+    accept: ".csv,.tsv,.txt"
+    description: "Optional protein-level abundance file for DPU calculation. If not provided, proteins will be aggregated from peptides."
+
+  - name: "protein_id_col"
+    label: "Protein ID Column (for protein file)"
+    type: "column-selector"
+    multiple: false
+    required: false
+    sourceFile: "protein_file"
+    description: "Column name for protein identifiers in the protein file"
+
+  - name: "log2_transform"
+    label: "Apply Log2 Transformation"
+    type: "boolean"
+    default: true
+    description: "Apply log2 transformation to intensities"
+
+  - name: "analysis_type"
+    label: "Analysis Type"
+    type: "select"
+    required: false
+    default: "both"
+    options:
+      - "DPA"
+      - "DPU"
+      - "both"
+    description: "DPA = Differential Peptidoform Abundance, DPU = Differential Peptidoform Usage"
+
+  - name: "filter_min_peptides"
+    label: "Minimum Peptides per Protein"
+    type: "number"
+    required: false
+    default: 2
+    min: 1
+    max: 10
+    step: 1
+    description: "Minimum number of peptides required per protein"
+
+  - name: "filter_min_ptm_sites"
+    label: "Minimum PTM Sites"
+    type: "number"
+    required: false
+    default: 1
+    min: 1
+    max: 10
+    step: 1
+    description: "Minimum number of PTM sites required"
+
+  - name: "filter_min_identified"
+    label: "Minimum Identifications per Feature"
+    type: "number"
+    required: false
+    default: 2
+    min: 1
+    max: 10
+    step: 1
+    description: "Minimum number of non-missing values required per peptidoform"
+
+  - name: "col_filter"
+    label: "Column Completeness Threshold"
+    type: "number"
+    required: false
+    default: 0.7
+    min: 0
+    max: 1
+    step: 0.05
+    description: "Maximum proportion of missing values allowed in columns (samples). Default 0.7 means keep columns with <70% missing (≥30% data present). Lower values are more stringent."
+
+  - name: "row_filter"
+    label: "Row Completeness Threshold"
+    type: "number"
+    required: false
+    default: 0.7
+    min: 0
+    max: 1
+    step: 0.05
+    description: "Maximum proportion of missing values allowed in rows (features). Default 0.7 means keep rows with <70% missing (≥30% data present). Lower values are more stringent."
+
+  - name: "impute_order"
+    label: "Imputation Order"
+    type: "select"
+    required: false
+    default: "before"
+    options:
+      - "before"
+      - "after"
+    description: "When to perform imputation relative to normalization (before or after normalization)"
+
+  - name: "impute"
+    label: "Imputation Method"
+    type: "select"
+    required: false
+    default: "none"
+    options:
+      - "none"
+      - "knn"
+      - "MinDet"
+      - "MinProb"
+      - "min"
+      - "zero"
+      - "mixed"
+      - "nbavg"
+      - "with"
+      - "QRILC"
+      - "MLE"
+      - "bpca"
+    description: "Imputation method for missing values (select 'none' to skip imputation)"
+
+  - name: "normalize_method"
+    label: "Normalization Method"
+    type: "select"
+    required: false
+    default: "center.median"
+    options:
+      - "none"
+      - "center.median"
+      - "center.mean"
+      - "quantiles"
+      - "quantiles.robust"
+      - "vsn"
+    description: "Normalization method for peptide intensities"
+
+  - name: "protein_aggregation"
+    label: "Protein Aggregation Method"
+    type: "select"
+    required: false
+    default: "robust"
+    options:
+      - "robust"
+      - "sum"
+      - "mean"
+      - "median"
+    description: "Method for aggregating peptides to proteins"
+
+  - name: "robust_regression"
+    label: "Use Robust Regression"
+    type: "boolean"
+    default: true
+    description: "Use robust M-estimation for model fitting"
+
+  - name: "ridge_penalty"
+    label: "Ridge Penalty"
+    type: "number"
+    required: false
+    default: 0
+    min: 0
+    max: 1
+    step: 0.01
+    description: "Ridge penalty for regularization (0 = no penalty)"
+
+  - name: "max_iterations"
+    label: "Maximum Iterations"
+    type: "number"
+    required: false
+    default: 20
+    min: 5
+    max: 100
+    step: 5
+    description: "Maximum iterations for robust regression"
+
+  - name: "adjust_method"
+    label: "P-value Adjustment Method"
+    type: "select"
+    required: false
+    default: "BH"
+    options:
+      - "BH"
+      - "bonferroni"
+      - "holm"
+      - "hochberg"
+      - "BY"
+      - "none"
+    description: "Method for multiple testing correction"
+
+  - name: "alpha"
+    label: "Significance Level"
+    type: "number"
+    required: false
+    default: 0.05
+    min: 0.001
+    max: 0.2
+    step: 0.001
+    description: "Significance threshold for hypothesis testing"
+
+  - name: "lfc_threshold"
+    label: "Log2 Fold Change Threshold"
+    type: "number"
+    required: false
+    default: 0
+    min: 0
+    max: 5
+    step: 0.1
+    description: "Minimum log2 fold change threshold (0 = no threshold)"
+
+outputs:
+  - name: "dpa_results"
+    path: "dpa_results.txt"
+    type: "data"
+    description: "Differential peptidoform abundance (DPA) results"
+    format: "tsv"
+
+  - name: "dpu_results"
+    path: "dpu_results.txt"
+    type: "data"
+    description: "Differential peptidoform usage (DPU) results"
+    format: "tsv"
+
+  - name: "protein_results"
+    path: "protein_results.txt"
+    type: "data"
+    description: "Protein-level differential abundance results"
+    format: "tsv"
+
+  - name: "peptidoform_intensities"
+    path: "peptidoform_intensities.txt"
+    type: "data"
+    description: "Normalized peptidoform intensities"
+    format: "tsv"
+
+  - name: "imputed_peptides"
+    path: "imputed_peptides.txt"
+    type: "data"
+    description: "Imputed peptide intensities"
+    format: "tsv"
+
+  - name: "protein_intensities"
+    path: "protein_intensities.txt"
+    type: "data"
+    description: "Aggregated protein intensities"
+    format: "tsv"
+
+  - name: "qc_plots"
+    path: "qc_plots.pdf"
+    type: "plot"
+    description: "Quality control plots for PTM analysis"
+    format: "pdf"
+
+execution:
+  argsMapping:
+    input_file: "--input_file"
+    annotation_file: "--annotation_file"
+    comparison_file: "--comparison_file"
+    peptide_col: "--peptide_col"
+    protein_col: "--protein_col"
+    ptm_col: "--ptm_col"
+    protein_file: "--protein_file"
+    protein_id_col: "--protein_id_col"
+    log2_transform:
+      flag: "--log2_transform"
+      when: "true"
+    analysis_type: "--analysis_type"
+    filter_min_peptides: "--filter_min_peptides"
+    filter_min_ptm_sites: "--filter_min_ptm_sites"
+    filter_min_identified: "--filter_min_identified"
+    col_filter: "--col_filter"
+    row_filter: "--row_filter"
+    impute_order: "--impute_order"
+    impute: "--impute"
+    normalize_method: "--normalize_method"
+    protein_aggregation: "--protein_aggregation"
+    robust_regression:
+      flag: "--robust_regression"
+      when: "true"
+    ridge_penalty: "--ridge_penalty"
+    max_iterations: "--max_iterations"
+    adjust_method: "--adjust_method"
+    alpha: "--alpha"
+    lfc_threshold: "--lfc_threshold"
+
+  outputDir: "--output_folder"
+
+  requirements:
+    r: ">=4.0"
+    rPackagesFile: "r-packages.txt"
+
+example:
+  enabled: true
+  values:
+    input_file: "diann/Reports.pr_matrix.tsv"
+    annotation_file: "diann/annotation_msqrob2.txt"
+    peptide_col: "Stripped.Sequence"
+    protein_col: "Protein.Group"
+    ptm_col: "Modified.Sequence"
+    log2_transform: true
+    analysis_type: "both"
+    impute: "knn"
+    impute_order: "before"
+    normalize_method: "center.median"
+    protein_aggregation: "robust"
+    robust_regression: true

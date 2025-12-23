@@ -408,7 +408,10 @@ func (p *PortableEnvService) copyDirWithProgress(src, dst string, id string) err
 	messageKey := "Moving new environment"
 	copiedFiles := 0
 	lastEmitCount := 0
-	emitInterval := 50
+	emitInterval := 100
+
+	dirCache := make(map[string]bool)
+	buffer := make([]byte, 2*1024*1024)
 
 	err := filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -424,10 +427,24 @@ func (p *PortableEnvService) copyDirWithProgress(src, dst string, id string) err
 		dstPath := filepath.Join(dst, relPath)
 
 		if info.IsDir() {
-			return os.MkdirAll(dstPath, info.Mode())
+			if !dirCache[dstPath] {
+				if err := os.MkdirAll(dstPath, info.Mode()); err != nil {
+					return err
+				}
+				dirCache[dstPath] = true
+			}
+			return nil
 		}
 
-		if err := copyFile(path, dstPath); err != nil {
+		dir := filepath.Dir(dstPath)
+		if !dirCache[dir] {
+			if err := os.MkdirAll(dir, 0755); err != nil {
+				return err
+			}
+			dirCache[dir] = true
+		}
+
+		if err := copyFileBuffered(path, dstPath, buffer); err != nil {
 			log.Printf("[copyDirWithProgress] Copy error for %s: %v", path, err)
 			return err
 		}
@@ -497,6 +514,24 @@ func copyFile(src, dst string) error {
 	}
 	defer destFile.Close()
 
-	_, err = io.Copy(destFile, sourceFile)
+	buffer := make([]byte, 1024*1024)
+	_, err = io.CopyBuffer(destFile, sourceFile, buffer)
+	return err
+}
+
+func copyFileBuffered(src, dst string, buffer []byte) error {
+	sourceFile, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer sourceFile.Close()
+
+	destFile, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer destFile.Close()
+
+	_, err = io.CopyBuffer(destFile, sourceFile, buffer)
 	return err
 }

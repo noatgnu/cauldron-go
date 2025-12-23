@@ -214,9 +214,20 @@ func (e *PluginExecutor) validateInputType(input models.PluginInputV2, value int
 			return fmt.Errorf("expected boolean, got %T", value)
 		}
 
-	case models.PluginInputTypeMultiSelect, models.PluginInputTypeColumnSelector:
+	case models.PluginInputTypeMultiSelect:
 		if _, ok := value.([]interface{}); !ok {
 			return fmt.Errorf("expected array, got %T", value)
+		}
+
+	case models.PluginInputTypeColumnSelector:
+		if input.Multiple {
+			if _, ok := value.([]interface{}); !ok {
+				return fmt.Errorf("expected array, got %T", value)
+			}
+		} else {
+			if _, ok := value.(string); !ok {
+				return fmt.Errorf("expected string, got %T", value)
+			}
 		}
 
 	case models.PluginInputTypeSelect:

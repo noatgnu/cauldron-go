@@ -1,18 +1,36 @@
 <div class="environment-indicator">
   <span class="label">Requires:</span>
   @if (pythonWithR) {
-    <mat-chip class="env-chip python-r-chip" matTooltip="Uses Python with R integration via rpy2">
+    <mat-chip class="env-chip python-r-chip"
+              [class.bound]="pythonBound && rBound"
+              [class.unbound]="!pythonBound || !rBound"
+              matTooltip="Uses Python with R integration via rpy2">
       Python + R
+      <mat-icon matChipTrailingIcon [class.success-icon]="pythonBound && rBound" [class.warn-icon]="!pythonBound || !rBound">
+        {{ (pythonBound && rBound) ? 'check_circle' : 'error' }}
+      </mat-icon>
     </mat-chip>
   } @else {
     @if (python) {
-      <mat-chip class="env-chip python-chip" matTooltip="Uses Python runtime environment">
+      <mat-chip class="env-chip python-chip"
+                [class.bound]="pythonBound"
+                [class.unbound]="!pythonBound"
+                matTooltip="Uses Python runtime environment">
         Python
+        <mat-icon matChipTrailingIcon [class.success-icon]="pythonBound" [class.warn-icon]="!pythonBound">
+          {{ pythonBound ? 'check_circle' : 'error' }}
+        </mat-icon>
       </mat-chip>
     }
     @if (r) {
-      <mat-chip class="env-chip r-chip" matTooltip="Uses R runtime environment">
+      <mat-chip class="env-chip r-chip"
+                [class.bound]="rBound"
+                [class.unbound]="!rBound"
+                matTooltip="Uses R runtime environment">
         R
+        <mat-icon matChipTrailingIcon [class.success-icon]="rBound" [class.warn-icon]="!rBound">
+          {{ rBound ? 'check_circle' : 'error' }}
+        </mat-icon>
       </mat-chip>
     }
     @if (direct) {

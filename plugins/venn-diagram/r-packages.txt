@@ -1,0 +1,3 @@
+# R packages for Venn diagram plugin
+VennDiagram
+grid

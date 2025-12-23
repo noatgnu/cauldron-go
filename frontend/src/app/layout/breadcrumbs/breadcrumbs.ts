@@ -73,6 +73,11 @@ export class Breadcrumbs implements OnInit {
       currentUrl += `/${path}`;
 
       let label = this.routeLabels[path] || path;
+      let breadcrumbUrl = currentUrl;
+
+      if (path === 'plugin' && i + 1 < paths.length && !isNaN(parseInt(paths[i + 1], 10))) {
+        breadcrumbUrl = '/plugin-list';
+      }
 
       if (paths[i - 1] === 'plugin' && !isNaN(parseInt(path, 10))) {
         try {
@@ -84,7 +89,7 @@ export class Breadcrumbs implements OnInit {
         }
       }
 
-      crumbs.push({ label, url: currentUrl });
+      crumbs.push({ label, url: breadcrumbUrl });
     }
 
     this.breadcrumbs.set(crumbs);

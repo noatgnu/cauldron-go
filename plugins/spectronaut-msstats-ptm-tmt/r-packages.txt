@@ -1,0 +1,4 @@
+# R packages for Spectronaut MSstatsPTM TMT plugin
+MSstatsPTM
+MSstatsTMT
+tidyverse

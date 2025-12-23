@@ -61,13 +61,7 @@ inputs:
     label: "Use Log2 Transform"
     type: "boolean"
     default: false
-    description: "Apply log2 transformation to intensities"
-
-  - name: "normalize"
-    label: "Normalize"
-    type: "boolean"
-    default: true
-    description: "Perform median normalization"
+    description: "Apply log2 transformation to peptide intensities before MaxLFQ. When enabled, MaxLFQ works in log2 space and outputs log2 values. When disabled, works in raw intensity space."
 
   - name: "max_cores"
     label: "Maximum Cores"
@@ -90,13 +84,23 @@ annotation:
   annotationFile: "annotation_file"
 
 plots:
-  - id: "normalization_comparison"
+  - id: "boxplot_before"
     type: "image-grid"
-    title: "Normalization Quality Control"
-    description: "Boxplots showing protein intensities before and after normalization"
+    title: "Before Normalization"
+    description: "Protein intensities before normalization grouped by condition"
+    dataSource: "maxlfq_results"
+    default: true
+    config:
+      imagePattern: "boxplot_before_normalization.svg"
+      imagePatternType: "exact"
+  - id: "boxplot_after"
+    type: "image-grid"
+    title: "After Normalization"
+    description: "Protein intensities after normalization grouped by condition"
     dataSource: "maxlfq_results"
     config:
-      imagePattern: "*.svg"
+      imagePattern: "boxplot_after_normalization.svg"
+      imagePatternType: "exact"
 
 execution:
   argsMapping:
@@ -112,21 +116,13 @@ execution:
       flag: "--use_log2"
       when: "true"
       value: "true"
-    normalize:
-      flag: "--normalize"
-      when: "true"
-      value: "true"
     max_cores: "--max_cores"
 
   outputDir: "--output_folder"
 
   requirements:
     r: ">=4.0"
-    packages:
-      - "iq"
-      - "tidyverse"
-      - "data.table"
-      - "reshape2"
+    rPackagesFile: "r-packages.txt"
 
 example:
   enabled: true
@@ -142,6 +138,6 @@ example:
       - 'C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_BCA_LT-MockIP_01.raw'
       - 'C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_BCA_LT-MockIP_02.raw'
       - 'C:\Raja\DIA-NN searches\June 2022\LT-CBQCA-Test_DIA\RN-DS_220106_BCA_LT-MockIP_03.raw'
+    annotation_file: "diann/annotation.txt"
     data_completeness: 0.7
-    use_log2: false
-    normalize: true
+    use_log2: true

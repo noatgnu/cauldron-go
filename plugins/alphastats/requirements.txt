@@ -1,0 +1,6 @@
+# Python requirements for alphastats plugin
+click
+pandas>=2.0.0
+numpy>=1.24.0
+statsmodels
+alphastats

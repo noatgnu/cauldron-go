@@ -1,5 +1,7 @@
 library(iq)
 library(data.table)
+library(ggplot2)
+library(reshape2)
 
 args <- commandArgs(trailingOnly = TRUE)
 
@@ -34,9 +36,11 @@ peptide_col <- ifelse(is.null(params$peptide_col), "Precursor.Id", params$peptid
 sample_cols <- strsplit(params$sample_cols, ",")[[1]]
 annotation_file <- params$annotation_file
 data_completeness <- ifelse(is.null(params$data_completeness), 0.7, as.numeric(params$data_completeness))
-use_log2 <- ifelse(is.null(params$use_log2) || params$use_log2 == "true", TRUE, FALSE)
-normalize <- ifelse(is.null(params$normalize) || params$normalize == "true", TRUE, FALSE)
+use_log2 <- !is.null(params$use_log2) && (params$use_log2 == "true" || params$use_log2 == TRUE)
 max_cores <- ifelse(is.null(params$max_cores), -1, as.numeric(params$max_cores))
+
+cat(paste("Parameter use_log2 raw value:", params$use_log2, "\n"))
+cat(paste("Parameter use_log2 parsed:", use_log2, "\n"))
 
 annotation_df <- NULL
 if (!is.null(annotation_file) && file.exists(annotation_file)) {
@@ -51,11 +55,15 @@ if (!is.null(annotation_file) && file.exists(annotation_file)) {
     if (!("Sample" %in% colnames(annotation_df))) {
       cat("Warning: Annotation file missing 'Sample' column, ignoring annotations\n")
       annotation_df <- NULL
-    } else if (!("Condition" %in% colnames(annotation_df))) {
-      cat("Warning: Annotation file missing 'Condition' column, ignoring annotations\n")
-      annotation_df <- NULL
     } else {
       cat(paste("Loaded", nrow(annotation_df), "sample annotations\n"))
+
+      annotation_df$Sample_short <- gsub(".*[\\\\/]", "", annotation_df$Sample)
+      annotation_df$Sample_short <- gsub("\\.raw$", "", annotation_df$Sample_short)
+
+      if ("Color" %in% colnames(annotation_df)) {
+        cat("Using colors from annotation file\n")
+      }
     }
   }
 }
@@ -102,7 +110,7 @@ cat(paste("Protein column:", protein_col, "\n"))
 cat(paste("Peptide column:", peptide_col, "\n"))
 cat(paste("Sample columns:", paste(sample_cols, collapse = ", "), "\n"))
 
-annotation_df <- data.frame(
+protein_peptide_df <- data.frame(
   protein_list = data[[protein_col]],
   id = data[[peptide_col]],
   stringsAsFactors = FALSE
@@ -121,30 +129,38 @@ valid_counts <- rowSums(!is.na(intensity_df))
 min_valid <- max(1, ceiling(length(sample_cols) * data_completeness))
 keep_rows <- valid_counts >= min_valid
 
-annotation_df <- annotation_df[keep_rows, , drop = FALSE]
+protein_peptide_df <- protein_peptide_df[keep_rows, , drop = FALSE]
 intensity_df <- intensity_df[keep_rows, , drop = FALSE]
 
 cat(paste("Kept", sum(keep_rows), "of", length(keep_rows), "rows (", round(100 * sum(keep_rows) / length(keep_rows), 1), "%) after filtering\n"))
 
 cat("Running MaxLFQ normalization...\n")
 
-peptide_ids <- as.character(annotation_df$id)
-protein_ids <- as.character(annotation_df$protein_list)
+peptide_ids <- as.character(protein_peptide_df$id)
+protein_ids <- as.character(protein_peptide_df$protein_list)
 
 cat("Converting data to long format for iq::fast_MaxLFQ...\n")
+
+if (use_log2) {
+  cat("Applying log2 transformation to input intensities...\n")
+  for (col in colnames(intensity_df)) {
+    intensity_df[[col]] <- log2(intensity_df[[col]])
+  }
+  cat("Data range after log2:", min(unlist(intensity_df), na.rm = TRUE), "to", max(unlist(intensity_df), na.rm = TRUE), "\n")
+}
 
 dt_intensity <- as.data.table(intensity_df)
 dt_intensity$protein_list <- protein_ids
 dt_intensity$id <- peptide_ids
 
-long_data <- melt(dt_intensity,
+long_data <- data.table::melt(dt_intensity,
                   id.vars = c("protein_list", "id"),
                   measure.vars = sample_cols,
                   variable.name = "sample_list",
                   value.name = "quant",
                   na.rm = FALSE)
 
-long_data <- long_data[!is.na(quant) & quant > 0]
+long_data <- long_data[!is.na(quant) & quant > 0, ]
 long_data$sample_list <- as.character(long_data$sample_list)
 
 cat(paste("Prepared", nrow(long_data), "valid intensity values for MaxLFQ\n"))
@@ -174,103 +190,147 @@ if (!dir.exists(output_folder)) {
 }
 
 cat("Generating boxplot before normalization...\n")
-numeric_cols <- setdiff(colnames(protein_quant), "Protein.Group")
-plot_data_before <- reshape2::melt(protein_quant[, numeric_cols], variable.name = "Sample", value.name = "Intensity")
 
+before_norm_dt <- as.data.table(intensity_df)
+before_norm_dt$protein_list <- protein_ids
+
+protein_before <- before_norm_dt[, lapply(.SD, function(x) median(x, na.rm = TRUE)),
+                                  by = protein_list, .SDcols = sample_cols]
+
+protein_before_df <- as.data.frame(protein_before)
+colnames(protein_before_df)[1] <- "Protein.Group"
+
+before_numeric_cols <- setdiff(colnames(protein_before_df), "Protein.Group")
+
+cat(paste("Before normalization - use_log2:", use_log2, "\n"))
+cat(paste("Before normalization - sample data range:",
+          min(protein_before_df[[before_numeric_cols[1]]], na.rm = TRUE), "to",
+          max(protein_before_df[[before_numeric_cols[1]]], na.rm = TRUE), "\n"))
+
+plot_data_before <- reshape2::melt(protein_before_df[, before_numeric_cols],
+                                    variable.name = "Sample", value.name = "Intensity")
+
+plot_data_before <- plot_data_before[is.finite(plot_data_before$Intensity), ]
+
+cat(paste("Before normalization data range:", min(plot_data_before$Intensity, na.rm = TRUE), "to",
+          max(plot_data_before$Intensity, na.rm = TRUE), "\n"))
+cat(paste("Before normalization median:", median(plot_data_before$Intensity, na.rm = TRUE), "\n"))
+
+plot_data_before$Sample <- gsub(".*[\\\\/]", "", plot_data_before$Sample)
+plot_data_before$Sample <- gsub("\\.raw$", "", plot_data_before$Sample)
+
+unique_samples <- unique(plot_data_before$Sample)
+
+cat(paste("Annotation df is null:", is.null(annotation_df), "\n"))
 if (!is.null(annotation_df)) {
-  sample_lookup <- setNames(annotation_df$Sample, annotation_df$Sample)
-  for (i in 1:nrow(plot_data_before)) {
-    sample_path <- as.character(plot_data_before$Sample[i])
-    sample_name <- gsub(".*[\\\\/]", "", sample_path)
-    sample_name <- gsub("\\.raw$", "", sample_name)
-    matching_rows <- which(annotation_df$Sample == sample_path | annotation_df$Sample == sample_name)
-    if (length(matching_rows) > 0) {
-      plot_data_before$Condition[i] <- annotation_df$Condition[matching_rows[1]]
-    } else {
-      plot_data_before$Condition[i] <- "Unknown"
-    }
-  }
-  plot_data_before$Sample <- gsub(".*[\\\\/]", "", plot_data_before$Sample)
-  plot_data_before$Sample <- gsub("\\.raw$", "", plot_data_before$Sample)
+  cat(paste("Annotation df columns:", paste(colnames(annotation_df), collapse=", "), "\n"))
+  cat(paste("Has Color column:", "Color" %in% colnames(annotation_df), "\n"))
+}
 
-  svg(file.path(output_folder, "boxplot_before_normalization.svg"), width = 12, height = 6)
-  par(mar = c(10, 4, 4, 2))
-  boxplot(Intensity ~ Condition, data = plot_data_before,
-          main = "Protein Intensities Before Normalization (by Condition)",
-          xlab = "", ylab = "Intensity",
-          las = 2, col = rainbow(length(unique(plot_data_before$Condition))), outline = FALSE)
-  dev.off()
+if (!is.null(annotation_df) && "Color" %in% colnames(annotation_df)) {
+  sample_color_map <- setNames(annotation_df$Color, annotation_df$Sample_short)
+  cat(paste("Color map entries:", length(sample_color_map), "\n"))
+  cat(paste("Sample names in data:", paste(head(unique_samples), collapse=", "), "\n"))
+  cat(paste("Sample names in annotation:", paste(head(annotation_df$Sample_short), collapse=", "), "\n"))
+
+  sample_color_vector <- sample_color_map[unique_samples]
+  sample_color_vector <- sample_color_vector[!is.na(sample_color_vector)]
+
+  cat(paste("Matched colors:", length(sample_color_vector), "\n"))
+
+  if (length(sample_color_vector) == 0) {
+    cat("Warning: No colors matched, using rainbow colors\n")
+    sample_color_vector <- setNames(rainbow(length(unique_samples)), unique_samples)
+  }
 } else {
-  plot_data_before$Sample <- gsub(".*[\\\\/]", "", plot_data_before$Sample)
-  plot_data_before$Sample <- gsub("\\.raw$", "", plot_data_before$Sample)
-
-  svg(file.path(output_folder, "boxplot_before_normalization.svg"), width = 12, height = 6)
-  par(mar = c(10, 4, 4, 2))
-  boxplot(Intensity ~ Sample, data = plot_data_before,
-          main = "Protein Intensities Before Normalization",
-          xlab = "", ylab = "Intensity",
-          las = 2, col = "lightblue", outline = FALSE)
-  dev.off()
+  sample_color_vector <- setNames(rainbow(length(unique_samples)), unique_samples)
 }
 
-if (normalize) {
-  cat("Applying median normalization...\n")
-  for (col in numeric_cols) {
-    col_data <- protein_quant[[col]]
-    valid_data <- col_data[!is.na(col_data) & is.finite(col_data)]
-    if (length(valid_data) > 0) {
-      median_val <- median(valid_data, na.rm = TRUE)
-      global_median <- median(unlist(protein_quant[, numeric_cols]), na.rm = TRUE)
-      protein_quant[[col]] <- col_data - median_val + global_median
-    }
-  }
+plot_data_before$Sample <- factor(plot_data_before$Sample, levels = unique_samples)
 
-  cat("Generating boxplot after normalization...\n")
-  plot_data_after <- reshape2::melt(protein_quant[, numeric_cols], variable.name = "Sample", value.name = "Intensity")
+p <- ggplot(plot_data_before, aes(x = Sample, y = Intensity, fill = Sample)) +
+  geom_boxplot(outlier.shape = NA, alpha = 0.8) +
+  scale_fill_manual(values = sample_color_vector) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5, size = 10),
+    axis.text.y = element_text(size = 10),
+    axis.title = element_text(size = 12, face = "bold"),
+    plot.title = element_text(size = 14, face = "bold", hjust = 0.5),
+    legend.position = "none",
+    panel.grid.major = element_line(color = "grey90"),
+    panel.grid.minor = element_line(color = "grey95")
+  ) +
+  labs(
+    title = "Protein Intensities Before Normalization",
+    x = "Sample",
+    y = "Intensity"
+  )
 
-  if (!is.null(annotation_df)) {
-    for (i in 1:nrow(plot_data_after)) {
-      sample_path <- as.character(plot_data_after$Sample[i])
-      sample_name <- gsub(".*[\\\\/]", "", sample_path)
-      sample_name <- gsub("\\.raw$", "", sample_name)
-      matching_rows <- which(annotation_df$Sample == sample_path | annotation_df$Sample == sample_name)
-      if (length(matching_rows) > 0) {
-        plot_data_after$Condition[i] <- annotation_df$Condition[matching_rows[1]]
-      } else {
-        plot_data_after$Condition[i] <- "Unknown"
-      }
-    }
-    plot_data_after$Sample <- gsub(".*[\\\\/]", "", plot_data_after$Sample)
-    plot_data_after$Sample <- gsub("\\.raw$", "", plot_data_after$Sample)
+ggsave(file.path(output_folder, "boxplot_before_normalization.svg"), plot = p, width = 14, height = 6, dpi = 300)
 
-    svg(file.path(output_folder, "boxplot_after_normalization.svg"), width = 12, height = 6)
-    par(mar = c(10, 4, 4, 2))
-    boxplot(Intensity ~ Condition, data = plot_data_after,
-            main = "Protein Intensities After Normalization (by Condition)",
-            xlab = "", ylab = "Intensity",
-            las = 2, col = rainbow(length(unique(plot_data_after$Condition))), outline = FALSE)
-    dev.off()
-  } else {
-    plot_data_after$Sample <- gsub(".*[\\\\/]", "", plot_data_after$Sample)
-    plot_data_after$Sample <- gsub("\\.raw$", "", plot_data_after$Sample)
-
-    svg(file.path(output_folder, "boxplot_after_normalization.svg"), width = 12, height = 6)
-    par(mar = c(10, 4, 4, 2))
-    boxplot(Intensity ~ Sample, data = plot_data_after,
-            main = "Protein Intensities After Normalization",
-            xlab = "", ylab = "Intensity",
-            las = 2, col = "lightgreen", outline = FALSE)
-    dev.off()
-  }
-}
-
+cat("Generating boxplot after normalization...\n")
 if (use_log2) {
-  cat("Converting to log2 scale...\n")
-  numeric_cols <- setdiff(colnames(protein_quant), "Protein.Group")
-  for (col in numeric_cols) {
-    protein_quant[[col]] <- log2(protein_quant[[col]])
-  }
+  cat("Data is in log2 space (transformed before MaxLFQ)\n")
+} else {
+  cat("Data is in raw intensity space (no log2 transformation)\n")
 }
+
+numeric_cols <- setdiff(colnames(protein_quant), "Protein.Group")
+after_plot_data <- protein_quant[, c("Protein.Group", numeric_cols)]
+
+plot_data_after <- reshape2::melt(after_plot_data[, numeric_cols], variable.name = "Sample", value.name = "Intensity")
+plot_data_after <- plot_data_after[is.finite(plot_data_after$Intensity), ]
+
+cat(paste("After normalization data range:", min(plot_data_after$Intensity, na.rm = TRUE), "to",
+          max(plot_data_after$Intensity, na.rm = TRUE), "\n"))
+cat(paste("After normalization median:", median(plot_data_after$Intensity, na.rm = TRUE), "\n"))
+
+plot_data_after$Sample <- gsub(".*[\\\\/]", "", plot_data_after$Sample)
+plot_data_after$Sample <- gsub("\\.raw$", "", plot_data_after$Sample)
+
+unique_samples_after <- unique(plot_data_after$Sample)
+
+if (!is.null(annotation_df) && "Color" %in% colnames(annotation_df)) {
+  sample_color_map <- setNames(annotation_df$Color, annotation_df$Sample_short)
+  cat(paste("After norm - Color map entries:", length(sample_color_map), "\n"))
+  cat(paste("After norm - Sample names in data:", paste(head(unique_samples_after), collapse=", "), "\n"))
+
+  sample_color_vector_after <- sample_color_map[unique_samples_after]
+  sample_color_vector_after <- sample_color_vector_after[!is.na(sample_color_vector_after)]
+
+  cat(paste("After norm - Matched colors:", length(sample_color_vector_after), "\n"))
+
+  if (length(sample_color_vector_after) == 0) {
+    cat("Warning: No colors matched for after plot, using rainbow colors\n")
+    sample_color_vector_after <- setNames(rainbow(length(unique_samples_after)), unique_samples_after)
+  }
+} else {
+  sample_color_vector_after <- setNames(rainbow(length(unique_samples_after)), unique_samples_after)
+}
+
+plot_data_after$Sample <- factor(plot_data_after$Sample, levels = unique_samples_after)
+
+p_after <- ggplot(plot_data_after, aes(x = Sample, y = Intensity, fill = Sample)) +
+  geom_boxplot(outlier.shape = NA, alpha = 0.8) +
+  scale_fill_manual(values = sample_color_vector_after) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5, size = 10),
+    axis.text.y = element_text(size = 10),
+    axis.title = element_text(size = 12, face = "bold"),
+    plot.title = element_text(size = 14, face = "bold", hjust = 0.5),
+    legend.position = "none",
+    panel.grid.major = element_line(color = "grey90"),
+    panel.grid.minor = element_line(color = "grey95")
+  ) +
+  labs(
+    title = "Protein Intensities After Normalization",
+    x = "Sample",
+    y = "Intensity"
+  )
+
+ggsave(file.path(output_folder, "boxplot_after_normalization.svg"), plot = p_after, width = 14, height = 6, dpi = 300)
 
 output_file <- file.path(output_folder, "maxlfq.data.txt")
 write.table(protein_quant, file = output_file, sep = "\t", quote = FALSE, row.names = FALSE)

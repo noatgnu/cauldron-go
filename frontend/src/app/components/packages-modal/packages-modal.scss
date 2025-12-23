@@ -14,6 +14,18 @@ mat-dialog-content {
   overflow-y: auto;
 }
 
+.search-field {
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+.package-count {
+  margin-bottom: 16px;
+  font-size: 14px;
+  color: rgba(0, 0, 0, 0.6);
+  text-align: right;
+}
+
 .loading-container {
   display: flex;
   flex-direction: column;

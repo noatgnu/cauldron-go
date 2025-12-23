@@ -24,25 +24,35 @@ type FieldGroup struct {
 	Options []FieldOption `yaml:"options"`
 }
 
+type TableColumn struct {
+	Name        string `yaml:"name"`
+	Label       string `yaml:"label"`
+	Type        string `yaml:"type,omitempty"`
+	Required    bool   `yaml:"required,omitempty"`
+	Description string `yaml:"description,omitempty"`
+}
+
 type PluginInput struct {
-	Name            string               `yaml:"name"`
-	Label           string               `yaml:"label"`
-	Type            string               `yaml:"type"`
-	Required        bool                 `yaml:"required"`
-	Default         interface{}          `yaml:"default,omitempty"`
-	Options         []string             `yaml:"options,omitempty"`
-	OptionsFromFile string               `yaml:"optionsFromFile,omitempty"`
-	Groups          []FieldGroup         `yaml:"groups,omitempty"`
-	GroupsFromFile  string               `yaml:"groupsFromFile,omitempty"`
-	Description     string               `yaml:"description,omitempty"`
-	Placeholder     string               `yaml:"placeholder,omitempty"`
-	Accept          string               `yaml:"accept,omitempty"`
-	Multiple        bool                 `yaml:"multiple,omitempty"`
-	SourceFile      string               `yaml:"sourceFile,omitempty"`
-	Min             *float64             `yaml:"min,omitempty"`
-	Max             *float64             `yaml:"max,omitempty"`
-	Step            *float64             `yaml:"step,omitempty"`
-	VisibleWhen     *VisibilityCondition `yaml:"visibleWhen,omitempty"`
+	Name                        string               `yaml:"name"`
+	Label                       string               `yaml:"label"`
+	Type                        string               `yaml:"type"`
+	Required                    bool                 `yaml:"required"`
+	Default                     interface{}          `yaml:"default,omitempty"`
+	Options                     []string             `yaml:"options,omitempty"`
+	OptionsFromFile             string               `yaml:"optionsFromFile,omitempty"`
+	Groups                      []FieldGroup         `yaml:"groups,omitempty"`
+	GroupsFromFile              string               `yaml:"groupsFromFile,omitempty"`
+	Description                 string               `yaml:"description,omitempty"`
+	Placeholder                 string               `yaml:"placeholder,omitempty"`
+	Accept                      string               `yaml:"accept,omitempty"`
+	Multiple                    bool                 `yaml:"multiple,omitempty"`
+	SourceFile                  string               `yaml:"sourceFile,omitempty"`
+	Min                         *float64             `yaml:"min,omitempty"`
+	Max                         *float64             `yaml:"max,omitempty"`
+	Step                        *float64             `yaml:"step,omitempty"`
+	VisibleWhen                 *VisibilityCondition `yaml:"visibleWhen,omitempty"`
+	DisableAnnotationManagement bool                 `yaml:"disableAnnotationManagement,omitempty"`
+	TableColumns                []TableColumn        `yaml:"tableColumns,omitempty"`
 }
 
 type PluginOutput struct {
@@ -62,7 +72,9 @@ type PlotAxes struct {
 }
 
 type PlotConfigData struct {
-	Axes PlotAxes `yaml:"axes"`
+	Axes             PlotAxes `yaml:"axes"`
+	ImagePattern     string   `yaml:"imagePattern,omitempty"`
+	ImagePatternType string   `yaml:"imagePatternType,omitempty"`
 }
 
 type PlotCustomization struct {
@@ -104,9 +116,11 @@ type PluginRuntime struct {
 }
 
 type Requirements struct {
-	Python   string   `yaml:"python,omitempty"`
-	R        string   `yaml:"r,omitempty"`
-	Packages []string `yaml:"packages,omitempty"`
+	Python                 string   `yaml:"python,omitempty"`
+	R                      string   `yaml:"r,omitempty"`
+	Packages               []string `yaml:"packages,omitempty"`
+	PythonRequirementsFile string   `yaml:"pythonRequirementsFile,omitempty"`
+	RPackagesFile          string   `yaml:"rPackagesFile,omitempty"`
 }
 
 type PluginExecution struct {
@@ -258,6 +272,21 @@ func validatePlugin(pluginPath string) (bool, []string) {
 	// Validate execution
 	if plugin.Execution.OutputDir == "" {
 		errors = append(errors, "execution.outputDir is required")
+	}
+
+	// Validate requirements files if specified
+	pluginDir := filepath.Dir(pluginPath)
+	if plugin.Execution.Requirements.PythonRequirementsFile != "" {
+		reqPath := filepath.Join(pluginDir, plugin.Execution.Requirements.PythonRequirementsFile)
+		if _, err := os.Stat(reqPath); os.IsNotExist(err) {
+			errors = append(errors, fmt.Sprintf("Python requirements file not found: %s", plugin.Execution.Requirements.PythonRequirementsFile))
+		}
+	}
+	if plugin.Execution.Requirements.RPackagesFile != "" {
+		reqPath := filepath.Join(pluginDir, plugin.Execution.Requirements.RPackagesFile)
+		if _, err := os.Stat(reqPath); os.IsNotExist(err) {
+			errors = append(errors, fmt.Sprintf("R packages file not found: %s", plugin.Execution.Requirements.RPackagesFile))
+		}
 	}
 
 	// Print warnings

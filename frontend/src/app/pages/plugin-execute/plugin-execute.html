@@ -13,7 +13,12 @@
     <mat-card class="plugin-card">
       <mat-card-header>
         <mat-icon mat-card-avatar>{{ plugin()!.definition.plugin.icon || 'extension' }}</mat-icon>
-        <mat-card-title>{{ plugin()!.definition.plugin.name }}</mat-card-title>
+        <mat-card-title>
+          {{ plugin()!.definition.plugin.name }}
+          @if (hasCustomBinding()) {
+            <mat-icon class="binding-indicator" [matTooltip]="bindingTooltip()" color="accent">link</mat-icon>
+          }
+        </mat-card-title>
         <mat-card-subtitle>
           {{ plugin()!.definition.plugin.description }}
         </mat-card-subtitle>
@@ -23,7 +28,9 @@
         [python]="getRuntimeIcon(plugin()!.definition.runtime.type).python"
         [r]="getRuntimeIcon(plugin()!.definition.runtime.type).r"
         [pythonWithR]="getRuntimeIcon(plugin()!.definition.runtime.type).pythonWithR"
-        [direct]="getRuntimeIcon(plugin()!.definition.runtime.type).direct">
+        [direct]="getRuntimeIcon(plugin()!.definition.runtime.type).direct"
+        [pythonBound]="pythonBound()"
+        [rBound]="rBound()">
       </app-environment-indicator>
 
       <mat-card-content>

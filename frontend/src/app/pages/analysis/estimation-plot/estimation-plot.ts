@@ -10,6 +10,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatIconModule } from '@angular/material/icon';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatChipsModule } from '@angular/material/chips';
+import { MatSnackBar } from '@angular/material/snack-bar';
 import { EnvironmentIndicator } from '../../../components/environment-indicator/environment-indicator';
 import { Wails } from '../../../core/services/wails';
 
@@ -40,7 +41,8 @@ export class EstimationPlot implements OnInit {
   constructor(
     private fb: FormBuilder,
     private wails: Wails,
-    private router: Router
+    private router: Router,
+    private snackBar: MatSnackBar
   ) {
     this.form = this.fb.group({
       inputFile: ['', Validators.required],
@@ -152,7 +154,12 @@ export class EstimationPlot implements OnInit {
         this.proteins = preview.headers;
       }
     } catch (error) {
-      alert('Failed to load example data. Please ensure example files are available.');
+      this.snackBar.open('Failed to load example data. Please ensure example files are available.', 'Close', {
+        duration: 5000,
+        horizontalPosition: 'center',
+        verticalPosition: 'top',
+        panelClass: ['error-snackbar']
+      });
     }
   }
 }

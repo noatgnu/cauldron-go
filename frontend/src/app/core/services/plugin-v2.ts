@@ -51,7 +51,18 @@ export class PluginV2Service {
       categoryMap.get(category)!.push(plugin);
     }
 
-    return categoryMap;
+    const sortedCategoryMap = new Map<string, models.PluginV2[]>();
+    const sortedCategories = Array.from(categoryMap.keys()).sort((a, b) => a.localeCompare(b));
+
+    for (const category of sortedCategories) {
+      const pluginList = categoryMap.get(category)!;
+      const sortedPlugins = [...pluginList].sort((a, b) =>
+        a.definition.plugin.name.localeCompare(b.definition.plugin.name)
+      );
+      sortedCategoryMap.set(category, sortedPlugins);
+    }
+
+    return sortedCategoryMap;
   }
 
   filterPluginsByRuntime(plugins: models.PluginV2[], runtime: string): models.PluginV2[] {

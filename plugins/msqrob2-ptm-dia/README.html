@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plugin Documentation</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            max-width: 900px;
+            margin: 50px auto;
+            padding: 20px;
+            line-height: 1.6;
+            color: #333;
+        }
+        h1 {
+            border-bottom: 2px solid #2196f3;
+            padding-bottom: 10px;
+            color: #1976d2;
+        }
+        h2 {
+            margin-top: 30px;
+            color: #1976d2;
+            border-bottom: 1px solid #e0e0e0;
+            padding-bottom: 5px;
+        }
+        h3 {
+            margin-top: 20px;
+            color: #424242;
+        }
+        h4 {
+            color: #616161;
+        }
+        a {
+            color: #2196f3;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        code {
+            background: #f5f5f5;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+        pre {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        pre code {
+            background: none;
+            padding: 0;
+        }
+        blockquote {
+            border-left: 4px solid #2196f3;
+            margin: 0;
+            padding-left: 15px;
+            color: #666;
+            background: #f5f9fc;
+            padding: 10px 15px;
+            border-radius: 4px;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%!;(string=<h1 id="msqrob2-ptm-dia-analysis">MSqRob2 PTM DIA Analysis</h1>
+<p><strong>ID</strong>: <code>msqrob2-ptm-dia</code><br>
+<strong>Version</strong>: 1.0.0<br>
+<strong>Category</strong>: statistics<br>
+<strong>Author</strong>: CauldronGO Team</p>
+<h2 id="description">Description</h2>
+<p>Differential abundance and usage analysis for PTM data from DIA/label-free experiments using msqrob2PTM</p>
+<h2 id="runtime">Runtime</h2>
+<ul>
+<li><strong>Type</strong>: <code>r</code></li>
+<li><strong>Script</strong>: <code>msqrob2ptm_dia.R</code></li>
+</ul>
+<h2 id="inputs">Inputs</h2>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Label</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Visibility</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>input_file</code></td>
+<td>Peptide Intensity File</td>
+<td>file</td>
+<td>Yes</td>
+<td>-</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>annotation_file</code></td>
+<td>Sample Annotation File</td>
+<td>file</td>
+<td>Yes</td>
+<td>-</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>comparison_file</code></td>
+<td>Comparison Matrix File</td>
+<td>file</td>
+<td>No</td>
+<td>-</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>peptide_col</code></td>
+<td>Peptide Column</td>
+<td>column-selector (single)</td>
+<td>Yes</td>
+<td>-</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>protein_col</code></td>
+<td>Protein Column</td>
+<td>column-selector (single)</td>
+<td>Yes</td>
+<td>-</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>ptm_col</code></td>
+<td>PTM Site Column</td>
+<td>column-selector (single)</td>
+<td>No</td>
+<td>-</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>protein_file</code></td>
+<td>Protein Abundance File (Optional)</td>
+<td>file</td>
+<td>No</td>
+<td>-</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>protein_id_col</code></td>
+<td>Protein ID Column (for protein file)</td>
+<td>column-selector (single)</td>
+<td>No</td>
+<td>-</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>log2_transform</code></td>
+<td>Apply Log2 Transformation</td>
+<td>boolean</td>
+<td>No</td>
+<td>true</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>analysis_type</code></td>
+<td>Analysis Type</td>
+<td>select (DPA, DPU, both)</td>
+<td>No</td>
+<td>both</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>filter_min_peptides</code></td>
+<td>Minimum Peptides per Protein</td>
+<td>number (min: 1, max: 10, step: 1)</td>
+<td>No</td>
+<td>2</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>filter_min_ptm_sites</code></td>
+<td>Minimum PTM Sites</td>
+<td>number (min: 1, max: 10, step: 1)</td>
+<td>No</td>
+<td>1</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>filter_min_identified</code></td>
+<td>Minimum Identifications per Feature</td>
+<td>number (min: 1, max: 10, step: 1)</td>
+<td>No</td>
+<td>2</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>normalize_method</code></td>
+<td>Normalization Method</td>
+<td>select (none, center.median, center.mean, quantiles, quantiles.robust, vsn)</td>
+<td>No</td>
+<td>center.median</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>protein_aggregation</code></td>
+<td>Protein Aggregation Method</td>
+<td>select (robust, sum, mean, median)</td>
+<td>No</td>
+<td>robust</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>robust_regression</code></td>
+<td>Use Robust Regression</td>
+<td>boolean</td>
+<td>No</td>
+<td>true</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>ridge_penalty</code></td>
+<td>Ridge Penalty</td>
+<td>number (min: 0, max: 1, step: 0)</td>
+<td>No</td>
+<td>0</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>max_iterations</code></td>
+<td>Maximum Iterations</td>
+<td>number (min: 5, max: 100, step: 5)</td>
+<td>No</td>
+<td>20</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>adjust_method</code></td>
+<td>P-value Adjustment Method</td>
+<td>select (BH, bonferroni, holm, hochberg, BY, none)</td>
+<td>No</td>
+<td>BH</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>alpha</code></td>
+<td>Significance Level</td>
+<td>number (min: 0, max: 0, step: 0)</td>
+<td>No</td>
+<td>0.05</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>lfc_threshold</code></td>
+<td>Log2 Fold Change Threshold</td>
+<td>number (min: 0, max: 5, step: 0)</td>
+<td>No</td>
+<td>0</td>
+<td>Always visible</td>
+</tr>
+</tbody>
+</table>
+<h3 id="input-details">Input Details</h3>
+<h4 id="peptide-intensity-file-input-file">Peptide Intensity File (<code>input_file</code>)</h4>
+<p>DIA/label-free peptide-level intensity data with PTM information</p>
+<h4 id="sample-annotation-file-annotation-file">Sample Annotation File (<code>annotation_file</code>)</h4>
+<p>Sample annotation with columns: Sample (matching sample column names in data), Condition, BioReplicate</p>
+<h4 id="comparison-matrix-file-comparison-file">Comparison Matrix File (<code>comparison_file</code>)</h4>
+<p>Pairwise comparisons (columns: comparison_label, condition_A, condition_B)</p>
+<h4 id="peptide-column-peptide-col">Peptide Column (<code>peptide_col</code>)</h4>
+<p>Column name for peptide sequences</p>
+<ul>
+<li><strong>Column Source</strong>: <code>input_file</code></li>
+</ul>
+<h4 id="protein-column-protein-col">Protein Column (<code>protein_col</code>)</h4>
+<p>Column name containing protein identifiers</p>
+<ul>
+<li><strong>Column Source</strong>: <code>input_file</code></li>
+</ul>
+<h4 id="ptm-site-column-ptm-col">PTM Site Column (<code>ptm_col</code>)</h4>
+<p>Column name for PTM site information</p>
+<ul>
+<li><strong>Column Source</strong>: <code>input_file</code></li>
+</ul>
+<h4 id="protein-abundance-file-optional-protein-file">Protein Abundance File (Optional) (<code>protein_file</code>)</h4>
+<p>Optional protein-level abundance file for DPU calculation. If not provided, proteins will be aggregated from peptides.</p>
+<h4 id="protein-id-column-for-protein-file-protein-id-col">Protein ID Column (for protein file) (<code>protein_id_col</code>)</h4>
+<p>Column name for protein identifiers in the protein file</p>
+<ul>
+<li><strong>Column Source</strong>: <code>protein_file</code></li>
+</ul>
+<h4 id="apply-log2-transformation-log2-transform">Apply Log2 Transformation (<code>log2_transform</code>)</h4>
+<p>Apply log2 transformation to intensities</p>
+<h4 id="analysis-type-analysis-type">Analysis Type (<code>analysis_type</code>)</h4>
+<p>DPA = Differential Peptidoform Abundance, DPU = Differential Peptidoform Usage</p>
+<ul>
+<li><strong>Options</strong>: <code>DPA</code>, <code>DPU</code>, <code>both</code></li>
+</ul>
+<h4 id="minimum-peptides-per-protein-filter-min-peptides">Minimum Peptides per Protein (<code>filter_min_peptides</code>)</h4>
+<p>Minimum number of peptides required per protein</p>
+<h4 id="minimum-ptm-sites-filter-min-ptm-sites">Minimum PTM Sites (<code>filter_min_ptm_sites</code>)</h4>
+<p>Minimum number of PTM sites required</p>
+<h4 id="minimum-identifications-per-feature-filter-min-identified">Minimum Identifications per Feature (<code>filter_min_identified</code>)</h4>
+<p>Minimum number of non-missing values required per peptidoform</p>
+<h4 id="normalization-method-normalize-method">Normalization Method (<code>normalize_method</code>)</h4>
+<p>Normalization method for peptide intensities</p>
+<ul>
+<li><strong>Options</strong>: <code>none</code>, <code>center.median</code>, <code>center.mean</code>, <code>quantiles</code>, <code>quantiles.robust</code>, <code>vsn</code></li>
+</ul>
+<h4 id="protein-aggregation-method-protein-aggregation">Protein Aggregation Method (<code>protein_aggregation</code>)</h4>
+<p>Method for aggregating peptides to proteins</p>
+<ul>
+<li><strong>Options</strong>: <code>robust</code>, <code>sum</code>, <code>mean</code>, <code>median</code></li>
+</ul>
+<h4 id="use-robust-regression-robust-regression">Use Robust Regression (<code>robust_regression</code>)</h4>
+<p>Use robust M-estimation for model fitting</p>
+<h4 id="ridge-penalty-ridge-penalty">Ridge Penalty (<code>ridge_penalty</code>)</h4>
+<p>Ridge penalty for regularization (0 = no penalty)</p>
+<h4 id="maximum-iterations-max-iterations">Maximum Iterations (<code>max_iterations</code>)</h4>
+<p>Maximum iterations for robust regression</p>
+<h4 id="p-value-adjustment-method-adjust-method">P-value Adjustment Method (<code>adjust_method</code>)</h4>
+<p>Method for multiple testing correction</p>
+<ul>
+<li><strong>Options</strong>: <code>BH</code>, <code>bonferroni</code>, <code>holm</code>, <code>hochberg</code>, <code>BY</code>, <code>none</code></li>
+</ul>
+<h4 id="significance-level-alpha">Significance Level (<code>alpha</code>)</h4>
+<p>Significance threshold for hypothesis testing</p>
+<h4 id="log2-fold-change-threshold-lfc-threshold">Log2 Fold Change Threshold (<code>lfc_threshold</code>)</h4>
+<p>Minimum log2 fold change threshold (0 = no threshold)</p>
+<h2 id="outputs">Outputs</h2>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>File</th>
+<th>Type</th>
+<th>Format</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>dpa_results</code></td>
+<td><code>dpa_results.txt</code></td>
+<td>data</td>
+<td>tsv</td>
+<td>Differential peptidoform abundance (DPA) results</td>
+</tr>
+<tr>
+<td><code>dpu_results</code></td>
+<td><code>dpu_results.txt</code></td>
+<td>data</td>
+<td>tsv</td>
+<td>Differential peptidoform usage (DPU) results</td>
+</tr>
+<tr>
+<td><code>protein_results</code></td>
+<td><code>protein_results.txt</code></td>
+<td>data</td>
+<td>tsv</td>
+<td>Protein-level differential abundance results</td>
+</tr>
+<tr>
+<td><code>peptidoform_intensities</code></td>
+<td><code>peptidoform_intensities.txt</code></td>
+<td>data</td>
+<td>tsv</td>
+<td>Normalized peptidoform intensities</td>
+</tr>
+<tr>
+<td><code>protein_intensities</code></td>
+<td><code>protein_intensities.txt</code></td>
+<td>data</td>
+<td>tsv</td>
+<td>Aggregated protein intensities</td>
+</tr>
+<tr>
+<td><code>qc_plots</code></td>
+<td><code>qc_plots.pdf</code></td>
+<td>plot</td>
+<td>pdf</td>
+<td>Quality control plots for PTM analysis</td>
+</tr>
+</tbody>
+</table>
+<h2 id="requirements">Requirements</h2>
+<ul>
+<li><strong>R Version</strong>: &gt;=4.0</li>
+</ul>
+<h3 id="r-dependencies-external-file">R Dependencies (External File)</h3>
+<p>Dependencies are defined in: <code>r-packages.txt</code></p>
+<ul>
+<li><code>QFeatures</code></li>
+<li><code>msqrob2</code></li>
+<li><code>limma</code></li>
+<li><code>MsCoreUtils</code></li>
+</ul>
+<blockquote>
+<p><strong>Note</strong>: When you create a custom environment for this plugin, these dependencies will be automatically installed.</p>
+</blockquote>
+<h2 id="example-data">Example Data</h2>
+<p>This plugin includes example data for testing:</p>
+<pre><code class="language-yaml">  robust_regression: true
+  input_file: diann/Reports.pr_matrix.tsv
+  annotation_file: diann/annotation_msqrob2.txt
+  peptide_col: Stripped.Sequence
+  log2_transform: true
+  protein_aggregation: robust
+  protein_col: Protein.Group
+  ptm_col: Modified.Sequence
+  analysis_type: both
+  normalize_method: center.median
+</code></pre>
+<p>Load example data by clicking the <strong>Load Example</strong> button in the UI.</p>
+<h2 id="usage">Usage</h2>
+<h3 id="via-ui">Via UI</h3>
+<ol>
+<li>Navigate to <strong>statistics</strong> → <strong>MSqRob2 PTM DIA Analysis</strong></li>
+<li>Fill in the required inputs</li>
+<li>Click <strong>Run Analysis</strong></li>
+</ol>
+<h3 id="via-plugin-system">Via Plugin System</h3>
+<pre><code class="language-typescript">const jobId = await pluginService.executePlugin('msqrob2-ptm-dia', {
+  // Add parameters here
+});
+</code></pre>
+)
+            margin: 15px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #2196f3;
+            color: white;
+            font-weight: 600;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        ul, ol {
+            padding-left: 25px;
+        }
+        li {
+            margin: 5px 0;
+        }
+        strong {
+            font-weight: 600;
+            color: #1976d2;
+        }
+    </style>
+</head>
+<body>
+%!s(MISSING)
+</body>
+</html>

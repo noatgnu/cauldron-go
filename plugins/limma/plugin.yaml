@@ -8,8 +8,8 @@ plugin:
   icon: "difference"
 
 runtime:
-  type: "pythonWithR"
-  script: "differential_analysis.py"
+  type: "r"
+  script: "limma.R"
 
 inputs:
   - name: "input_file"
@@ -45,11 +45,74 @@ inputs:
     accept: ".csv,.tsv,.txt"
     description: "Comparison groups for differential analysis"
 
+  - name: "impute_order"
+    label: "Imputation Order"
+    type: "select"
+    required: false
+    default: "before"
+    options:
+      - "before"
+      - "after"
+    description: "When to perform imputation relative to normalization (before or after normalization)"
+
+  - name: "impute"
+    label: "Imputation Method"
+    type: "select"
+    required: false
+    default: "none"
+    options:
+      - "none"
+      - "knn"
+      - "MinDet"
+      - "MinProb"
+      - "min"
+      - "zero"
+      - "mixed"
+      - "nbavg"
+      - "with"
+      - "QRILC"
+      - "MLE"
+      - "bpca"
+    description: "Imputation method for missing values (select 'none' to skip imputation)"
+
+  - name: "normalize"
+    label: "Normalization Method"
+    type: "select"
+    required: false
+    default: "none"
+    options:
+      - "none"
+      - "quantiles"
+      - "quantiles.robust"
+      - "vsn"
+      - "center.median"
+      - "center.mean"
+    description: "Normalization method to apply (select 'none' to skip normalization)"
+
+  - name: "aggregate_column"
+    label: "Aggregate By Column"
+    type: "text"
+    required: false
+    description: "Column name to aggregate features (e.g., aggregate peptides to proteins). Leave empty to skip aggregation."
+
+  - name: "aggregate_method"
+    label: "Aggregation Method"
+    type: "text"
+    required: false
+    default: "MsCoreUtils::robustSummary"
+    description: "Method to use for feature aggregation (e.g., MsCoreUtils::robustSummary, median, mean)"
+
 outputs:
   - name: "differential_results"
     path: "differential_analysis.txt"
     type: "data"
     description: "Differential expression analysis results"
+    format: "tsv"
+
+  - name: "contrast_matrix_info"
+    path: "contrast_matrix_info.txt"
+    type: "data"
+    description: "Contrast matrix information showing comparison directions"
     format: "tsv"
 
 execution:
@@ -61,16 +124,17 @@ execution:
       flag: "--log2"
       when: "true"
     comparisons: "--comparison_file"
+    impute: "--impute"
+    impute_order: "--impute_order"
+    normalize: "--normalize"
+    aggregate_column: "--aggregate_column"
+    aggregate_method: "--aggregate_method"
 
   outputDir: "--output_folder"
 
   requirements:
-    python: ">=3.11"
     r: ">=4.0"
-    packages:
-      - "pandas>=2.0.0"
-      - "numpy>=1.24.0"
-      - "rpy2>=3.5.0"
+    rPackagesFile: "r-packages.txt"
 
 example:
   enabled: true

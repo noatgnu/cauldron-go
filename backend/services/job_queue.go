@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -437,6 +438,71 @@ func (j *JobQueueService) RerunJob(jobID string, useSameEnvironment bool, python
 		}
 	}
 
+	// Create new output directory with timestamp for rerun
+	newArgs := make([]string, len(originalJob.Args))
+	copy(newArgs, originalJob.Args)
+
+	// Update output directory in args if present
+	for i := 0; i < len(newArgs)-1; i++ {
+		if newArgs[i] == "--output_folder" || newArgs[i] == "--output_dir" || newArgs[i] == "-o" {
+			// Found output directory argument
+			if oldOutputDir, ok := originalJob.Parameters["outputDir"].(string); ok {
+				// Extract base directory and plugin ID
+				basePath := filepath.Dir(oldOutputDir)
+				pluginID := filepath.Base(strings.Split(filepath.Base(oldOutputDir), "_")[0])
+
+				// Create new output directory with new timestamp
+				newOutputDir := filepath.Join(basePath, fmt.Sprintf("%s_%s",
+					pluginID,
+					time.Now().Format("20060102_150405")))
+
+				newArgs[i+1] = newOutputDir
+
+				// Update parameters map
+				newParameters := make(map[string]interface{})
+				for k, v := range originalJob.Parameters {
+					if k == "outputDir" {
+						newParameters[k] = newOutputDir
+					} else {
+						newParameters[k] = v
+					}
+				}
+
+				newJob := &models.Job{
+					ID:             uuid.New().String(),
+					Type:           originalJob.Type,
+					Name:           originalJob.Name + " (Rerun)",
+					Status:         models.JobStatusPending,
+					Progress:       0,
+					Command:        originalJob.Command,
+					Args:           newArgs,
+					Parameters:     newParameters,
+					PythonEnvPath:  newPythonPath,
+					PythonEnvType:  newPythonType,
+					REnvPath:       newRPath,
+					REnvType:       newRType,
+					TerminalOutput: []string{},
+					CreatedAt:      time.Now(),
+				}
+
+				j.mu.Lock()
+				j.jobs[newJob.ID] = newJob
+				j.mu.Unlock()
+
+				if err := j.db.GetDB().Create(newJob).Error; err != nil {
+					return "", err
+				}
+
+				j.queue <- newJob
+				j.emitJobUpdate(newJob)
+
+				return newJob.ID, nil
+			}
+			break
+		}
+	}
+
+	// Fallback: if no output directory found, use original behavior
 	newJob := &models.Job{
 		ID:             uuid.New().String(),
 		Type:           originalJob.Type,
@@ -618,15 +684,41 @@ func (j *JobQueueService) StopQueueImmediate() error {
 
 	j.paused = true
 	j.stopImmediate = true
-	log.Println("[StopQueueImmediate] Queue stopped immediately - canceling current job and pausing queue")
+	log.Println("[StopQueueImmediate] Queue stopped immediately - stopping ALL in-progress jobs")
 
-	if j.currentJobID != "" {
-		log.Printf("[StopQueueImmediate] Cancelling current job %s", j.currentJobID)
-		if cancelFunc, exists := j.cancelFuncs[j.currentJobID]; exists {
-			log.Printf("[StopQueueImmediate] Calling cancel function for job %s", j.currentJobID)
+	var inProgressJobs []*models.Job
+	j.db.GetDB().Where("status = ?", models.JobStatusInProgress).Find(&inProgressJobs)
+
+	log.Printf("[StopQueueImmediate] Found %d in-progress jobs to stop", len(inProgressJobs))
+
+	for _, job := range inProgressJobs {
+		log.Printf("[StopQueueImmediate] Stopping job %s", job.ID)
+
+		job.Status = models.JobStatusPending
+		job.StartedAt = nil
+		job.CompletedAt = nil
+		job.Error = ""
+		j.db.GetDB().Save(job)
+
+		if cancelFunc, exists := j.cancelFuncs[job.ID]; exists {
+			log.Printf("[StopQueueImmediate] Calling cancel function for job %s", job.ID)
 			cancelFunc()
+			delete(j.cancelFuncs, job.ID)
+		}
+
+		if j.ctx.Value("wails-test") == nil {
+			runtime.EventsEmit(j.ctx, "job:update", map[string]interface{}{
+				"jobId":       job.ID,
+				"status":      job.Status,
+				"startedAt":   nil,
+				"completedAt": nil,
+				"error":       "",
+			})
 		}
 	}
+
+	j.currentJobID = ""
+	log.Println("[StopQueueImmediate] Cleared currentJobID and stopped all jobs")
 
 	if j.ctx.Value("wails-test") == nil {
 		runtime.EventsEmit(j.ctx, "queue:status", map[string]interface{}{

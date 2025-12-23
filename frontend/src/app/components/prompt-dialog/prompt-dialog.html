@@ -1,0 +1,12 @@
+<h2 mat-dialog-title>{{ data.title }}</h2>
+<mat-dialog-content>
+  <p *ngIf="data.message" class="dialog-message">{{ data.message }}</p>
+  <mat-form-field appearance="outline" class="w-full">
+    <mat-label>{{ data.label }}</mat-label>
+    <input matInput [placeholder]="data.placeholder || ''" [(ngModel)]="inputValue" (keyup.enter)="onConfirm()" cdkFocusInitial>
+  </mat-form-field>
+</mat-dialog-content>
+<mat-dialog-actions align="end">
+  <button mat-button (click)="onCancel()">{{ data.cancelText }}</button>
+  <button mat-raised-button color="primary" (click)="onConfirm()">{{ data.confirmText }}</button>
+</mat-dialog-actions>

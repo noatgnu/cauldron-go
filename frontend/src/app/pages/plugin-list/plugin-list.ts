@@ -9,8 +9,15 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
+import { MatMenuModule } from '@angular/material/menu';
+import { MatButtonToggleModule } from '@angular/material/button-toggle';
+import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatBadgeModule } from '@angular/material/badge';
 import { PluginV2Service } from '../../core/services/plugin-v2';
 import { models } from '../../../wailsjs/go/models';
+import { PluginEnvironmentDialog } from '../../components/plugin-environment-dialog/plugin-environment-dialog';
+import { Wails } from '../../core/services/wails';
 
 @Component({
   selector: 'app-plugin-list',
@@ -23,7 +30,12 @@ import { models } from '../../../wailsjs/go/models';
     MatFormFieldModule,
     MatInputModule,
     MatChipsModule,
-    MatProgressSpinnerModule
+    MatProgressSpinnerModule,
+    MatDialogModule,
+    MatMenuModule,
+    MatButtonToggleModule,
+    MatTooltipModule,
+    MatBadgeModule
   ],
   templateUrl: './plugin-list.html',
   styleUrl: './plugin-list.scss',
@@ -34,6 +46,8 @@ export class PluginList implements OnInit {
   loading = signal(true);
   error = signal('');
   searchQuery = '';
+  sourceFilter: 'all' | 'builtin' | 'remote' = 'all';
+  pluginBindings = signal<Map<string, { python: boolean, r: boolean }>>(new Map());
 
   categoryIcons: Record<string, string> = {
     'analysis': 'analytics',
@@ -44,11 +58,17 @@ export class PluginList implements OnInit {
 
   constructor(
     private pluginService: PluginV2Service,
-    private router: Router
+    private router: Router,
+    private dialog: MatDialog,
+    private wails: Wails
   ) {}
 
   async ngOnInit() {
     await this.loadPlugins();
+
+    this.wails.bindingsUpdated$.subscribe(() => {
+      this.loadPluginBindings(this.plugins());
+    });
   }
 
   async loadPlugins() {
@@ -58,11 +78,53 @@ export class PluginList implements OnInit {
       const plugins = await this.pluginService.getAllPlugins();
       this.plugins.set(plugins);
       this.filteredPlugins.set(plugins);
+      await this.loadPluginBindings(plugins);
     } catch (err) {
       this.error.set(`Failed to load plugins: ${err}`);
     } finally {
       this.loading.set(false);
     }
+  }
+
+  async loadPluginBindings(plugins: models.PluginV2[]) {
+    const bindingsMap = new Map<string, { python: boolean, r: boolean }>();
+
+    for (const plugin of plugins) {
+      const pluginId = plugin.id.toString();
+      let hasPython = false;
+      let hasR = false;
+
+      try {
+        const pythonBinding = await this.wails.getPluginEnvironmentBinding(pluginId, 'python');
+        hasPython = !!pythonBinding;
+      } catch {}
+
+      try {
+        const rBinding = await this.wails.getPluginEnvironmentBinding(pluginId, 'r');
+        hasR = !!rBinding;
+      } catch {}
+
+      if (hasPython || hasR) {
+        bindingsMap.set(pluginId, { python: hasPython, r: hasR });
+      }
+    }
+
+    this.pluginBindings.set(bindingsMap);
+  }
+
+  hasCustomBinding(pluginId: number): boolean {
+    return this.pluginBindings().has(pluginId.toString());
+  }
+
+  getBindingTooltip(pluginId: number): string {
+    const binding = this.pluginBindings().get(pluginId.toString());
+    if (!binding) return '';
+
+    const parts: string[] = [];
+    if (binding.python) parts.push('Python');
+    if (binding.r) parts.push('R');
+
+    return `Custom environment bound: ${parts.join(' & ')}`;
   }
 
   async reloadPlugins() {
@@ -79,12 +141,24 @@ export class PluginList implements OnInit {
   }
 
   onSearch() {
-    if (!this.searchQuery.trim()) {
-      this.filteredPlugins.set(this.plugins());
-      return;
+    this.applyFilters();
+  }
+
+  onSourceFilterChange() {
+    this.applyFilters();
+  }
+
+  private applyFilters() {
+    let results = this.plugins();
+
+    if (this.sourceFilter !== 'all') {
+      results = results.filter(p => p.installSource === this.sourceFilter);
     }
 
-    const results = this.pluginService.searchPlugins(this.plugins(), this.searchQuery);
+    if (this.searchQuery.trim()) {
+      results = this.pluginService.searchPlugins(results, this.searchQuery);
+    }
+
     this.filteredPlugins.set(results);
   }
 
@@ -124,5 +198,18 @@ export class PluginList implements OnInit {
       default:
         return runtime;
     }
+  }
+
+  openEnvironmentDialog(event: Event, plugin: models.PluginV2) {
+    event.stopPropagation();
+
+    this.dialog.open(PluginEnvironmentDialog, {
+      width: '600px',
+      data: {
+        pluginId: plugin.id.toString(),
+        pluginName: plugin.definition.plugin.name,
+        runtimeType: plugin.definition.runtime.type
+      }
+    });
   }
 }

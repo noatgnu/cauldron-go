@@ -43,8 +43,13 @@
         "category": {
           "type": "string",
           "description": "Plugin category for organization",
-          "enum": ["analysis", "preprocessing", "visualization", "utilities"],
-          "examples": ["analysis"]
+          "enum": ["analysis", "preprocessing", "visualization", "utilities", "statistics"],
+          "examples": ["analysis", "statistics"]
+        },
+        "subcategory": {
+          "type": "string",
+          "description": "Plugin subcategory for finer organization (optional)",
+          "examples": ["msstats", "msqrob2", "dose-response"]
         },
         "icon": {
           "type": "string",
@@ -228,6 +233,19 @@
         },
         "visibleWhen": {
           "$ref": "#/definitions/visibilityCondition"
+        },
+        "disableAnnotationManagement": {
+          "type": "boolean",
+          "description": "Disable automatic annotation management for file inputs (e.g., when using custom table editor)",
+          "default": false
+        },
+        "tableColumns": {
+          "type": "array",
+          "description": "Column definitions for generic table editor (for file inputs)",
+          "items": {
+            "$ref": "#/definitions/tableColumn"
+          },
+          "minItems": 1
         }
       },
       "allOf": [
@@ -404,6 +422,7 @@
     },
     "requirements": {
       "type": "object",
+      "description": "Package requirements. Use EITHER inline 'packages' OR external file references (pythonRequirementsFile/rPackagesFile), not both.",
       "properties": {
         "python": {
           "type": "string",
@@ -419,13 +438,29 @@
         },
         "packages": {
           "type": "array",
-          "description": "Required packages",
+          "description": "Inline list of required packages (works for both Python and R). Use this OR external files, not both. For Python, supports version specifiers (e.g., 'pandas>=2.0'). For R, package names only (e.g., 'ggplot2').",
           "items": {
             "type": "string"
           },
-          "examples": [["pandas>=2.0.0", "numpy>=1.24.0"]]
+          "examples": [
+            ["pandas>=2.0.0", "numpy>=1.24.0"],
+            ["ggplot2", "dplyr", "tidyr"]
+          ]
+        },
+        "pythonRequirementsFile": {
+          "type": "string",
+          "description": "Path to Python requirements.txt file (relative to plugin directory). Use this OR inline 'packages', not both. File should contain one package per line with optional version specifiers.",
+          "pattern": "^[a-zA-Z0-9_.-]+\\.txt$",
+          "examples": ["requirements.txt", "python-requirements.txt"]
+        },
+        "rPackagesFile": {
+          "type": "string",
+          "description": "Path to R packages file (relative to plugin directory). Use this OR inline 'packages', not both. File should contain one package name per line (no version specifiers). Lines starting with # are treated as comments.",
+          "pattern": "^[a-zA-Z0-9_.-]+\\.txt$",
+          "examples": ["r-packages.txt", "r-requirements.txt"]
         }
-      }
+      },
+      "additionalProperties": false
     },
     "visibilityCondition": {
       "type": "object",
@@ -479,6 +514,38 @@
             "$ref": "#/definitions/fieldOption"
           },
           "minItems": 1
+        }
+      }
+    },
+    "tableColumn": {
+      "type": "object",
+      "required": ["name", "label"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Column name (as it appears in the file header)",
+          "pattern": "^[a-zA-Z][a-zA-Z0-9_]*$",
+          "examples": ["Run", "Channel", "Condition", "BioReplicate"]
+        },
+        "label": {
+          "type": "string",
+          "description": "Human-readable column label shown in the table editor",
+          "minLength": 1
+        },
+        "type": {
+          "type": "string",
+          "description": "Column data type",
+          "enum": ["text", "number"],
+          "default": "text"
+        },
+        "required": {
+          "type": "boolean",
+          "description": "Whether this column is required (must have non-empty values)",
+          "default": false
+        },
+        "description": {
+          "type": "string",
+          "description": "Help text/tooltip for this column"
         }
       }
     },

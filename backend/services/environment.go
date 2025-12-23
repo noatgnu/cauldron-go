@@ -11,6 +11,11 @@ import (
 	"runtime"
 	"strings"
 	"time"
+
+	"strconv"
+
+	"github.com/noatgnu/cauldron-go/backend/models"
+	"gopkg.in/yaml.v3"
 )
 
 type PythonEnvironment struct {
@@ -32,10 +37,17 @@ type REnvironment struct {
 	IsDefault   bool   `json:"isDefault"`
 }
 
+type packageCacheEntry struct {
+	packages  []string
+	timestamp time.Time
+}
+
 type EnvironmentService struct {
 	ctx              context.Context
 	db               *DatabaseService
 	progressNotifier *ProgressNotifier
+	packageCache     map[string]*packageCacheEntry
+	cacheTTL         time.Duration
 }
 
 func NewEnvironmentService(ctx context.Context, db *DatabaseService, progressNotifier *ProgressNotifier) *EnvironmentService {
@@ -43,6 +55,8 @@ func NewEnvironmentService(ctx context.Context, db *DatabaseService, progressNot
 		ctx:              ctx,
 		db:               db,
 		progressNotifier: progressNotifier,
+		packageCache:     make(map[string]*packageCacheEntry),
+		cacheTTL:         5 * time.Minute,
 	}
 }
 
@@ -128,12 +142,13 @@ func (e *EnvironmentService) detectPortablePython() (PythonEnvironment, error) {
 	version := e.getPythonVersion(pythonPath)
 
 	return PythonEnvironment{
-		Name:      "Portable Python",
-		Path:      pythonPath,
-		Type:      "portable",
-		Version:   version,
-		IsVirtual: false,
-	}, nil
+			Name:      "Portable Python",
+			Path:      pythonPath,
+			Type:      "portable",
+			Version:   version,
+			IsVirtual: false,
+		},
+		nil
 }
 
 func (e *EnvironmentService) detectSystemPython() (PythonEnvironment, error) {
@@ -150,12 +165,13 @@ func (e *EnvironmentService) detectSystemPython() (PythonEnvironment, error) {
 	version := e.getPythonVersion(path)
 
 	return PythonEnvironment{
-		Name:      "System Python",
-		Path:      path,
-		Type:      "system",
-		Version:   version,
-		IsVirtual: false,
-	}, nil
+			Name:      "System Python",
+			Path:      path,
+			Type:      "system",
+			Version:   version,
+			IsVirtual: false,
+		},
+		nil
 }
 
 func (e *EnvironmentService) detectPortableR() (REnvironment, error) {
@@ -208,13 +224,14 @@ func (e *EnvironmentService) detectPortableR() (REnvironment, error) {
 	libPath := e.getRLibPath(rPath)
 
 	return REnvironment{
-		Name:      "Portable R",
-		Path:      rPath,
-		Type:      "portable",
-		Version:   version,
-		LibPath:   libPath,
-		IsDefault: false,
-	}, nil
+			Name:      "Portable R",
+			Path:      rPath,
+			Type:      "portable",
+			Version:   version,
+			LibPath:   libPath,
+			IsDefault: false,
+		},
+		nil
 }
 
 func (e *EnvironmentService) detectCondaEnvironments() ([]PythonEnvironment, error) {
@@ -408,6 +425,10 @@ func (e *EnvironmentService) InstallPythonRequirements(pythonPath string, requir
 		return err
 	}
 
+	cacheKey := "python:" + pythonPath
+	delete(e.packageCache, cacheKey)
+	log.Printf("[InstallPythonRequirements] Invalidated package cache for %s\n", pythonPath)
+
 	e.progressNotifier.EmitComplete(ProgressTypeInstall, "python-requirements", "Python packages installed successfully")
 	return nil
 }
@@ -456,19 +477,84 @@ func (e *EnvironmentService) detectDefaultR() (REnvironment, error) {
 	libPath := e.getRLibPath(path)
 
 	return REnvironment{
-		Name:      "System R",
-		Path:      path,
-		Type:      "system",
-		Version:   version,
-		LibPath:   libPath,
-		IsDefault: true,
-	}, nil
+			Name:      "System R",
+			Path:      path,
+			Type:      "system",
+			Version:   version,
+			LibPath:   libPath,
+			IsDefault: true,
+		},
+		nil
 }
 
-func (e *EnvironmentService) detectRenvEnvironments() []REnvironment {
-	var environments []REnvironment
+func (e *EnvironmentService) detectRenvEnvironments() []RenvEnvironment {
+	var environments []RenvEnvironment
+
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return environments
+	}
+
+	var appFolder string
+	switch runtime.GOOS {
+	case "windows":
+		localAppData := os.Getenv("LOCALAPPDATA")
+		if localAppData != "" {
+			appFolder = filepath.Join(localAppData, "cauldron")
+		} else {
+			appFolder = filepath.Join(homeDir, "AppData", "Local", "cauldron")
+		}
+	case "darwin":
+		appFolder = filepath.Join(homeDir, "Library", "Application Support", "cauldron")
+	case "linux":
+		xdgDataHome := os.Getenv("XDG_DATA_HOME")
+		if xdgDataHome != "" {
+			appFolder = filepath.Join(xdgDataHome, "cauldron")
+		} else {
+			appFolder = filepath.Join(homeDir, ".local", "share", "cauldron")
+		}
+	default:
+		appFolder = filepath.Join(homeDir, ".cauldron")
+	}
+
+	renvDir := filepath.Join(appFolder, "renv-projects")
+	if _, err := os.Stat(renvDir); err == nil {
+		dirs, _ := os.ReadDir(renvDir)
+		for _, dir := range dirs {
+			if dir.IsDir() {
+				projectPath := filepath.Join(renvDir, dir.Name())
+				lockfilePath := filepath.Join(projectPath, "renv.lock")
+				if _, err := os.Stat(lockfilePath); err == nil {
+					env := e.getRenvEnvironmentInfo(projectPath, dir.Name())
+					if env != nil {
+						environments = append(environments, *env)
+					}
+				}
+			}
+		}
+	}
 
 	return environments
+}
+
+func (e *EnvironmentService) getRenvEnvironmentInfo(projectPath string, name string) *RenvEnvironment {
+	rPath, err := e.getActiveRPath()
+	if err != nil {
+		return nil
+	}
+
+	renvDir := filepath.Join(projectPath, "renv")
+	if _, err := os.Stat(renvDir); err != nil {
+		return nil
+	}
+
+	return &RenvEnvironment{
+		Name:        name,
+		Path:        projectPath,
+		ProjectPath: projectPath,
+		BaseRPath:   rPath,
+		CreatedAt:   time.Now().Unix(),
+	}
 }
 
 func (e *EnvironmentService) getRVersion(rPath string) string {
@@ -554,6 +640,10 @@ func (e *EnvironmentService) InstallRPackages(rPath string, packages []string) e
 			return err
 		}
 	}
+
+	cacheKey := "r:" + rPath
+	delete(e.packageCache, cacheKey)
+	log.Printf("[InstallRPackages] Invalidated package cache for %s\n", rPath)
 
 	e.progressNotifier.EmitComplete(ProgressTypeInstall, "r-packages", "R packages installed successfully")
 	return nil
@@ -654,6 +744,16 @@ func (e *EnvironmentService) checkBiocManagerInstalled(rPath string) (bool, erro
 
 func (e *EnvironmentService) ListPythonPackages(pythonPath string) ([]string, error) {
 	log.Printf("[ListPythonPackages] Listing packages for: %s\n", pythonPath)
+
+	cacheKey := "python:" + pythonPath
+	if cached, ok := e.packageCache[cacheKey]; ok {
+		if time.Since(cached.timestamp) < e.cacheTTL {
+			log.Printf("[ListPythonPackages] Using cached result (%d packages)\n", len(cached.packages))
+			return cached.packages, nil
+		}
+	}
+
+	log.Printf("[ListPythonPackages] Cache miss, fetching from pip...\n")
 	cmd := exec.Command(pythonPath, "-m", "pip", "list", "--format=freeze")
 	hideConsoleWindow(cmd)
 	output, err := cmd.Output()
@@ -671,12 +771,27 @@ func (e *EnvironmentService) ListPythonPackages(pythonPath string) ([]string, er
 		}
 	}
 
-	log.Printf("[ListPythonPackages] Found %d packages\n", len(packages))
+	e.packageCache[cacheKey] = &packageCacheEntry{
+		packages:  packages,
+		timestamp: time.Now(),
+	}
+
+	log.Printf("[ListPythonPackages] Found %d packages (cached for %v)\n", len(packages), e.cacheTTL)
 	return packages, nil
 }
 
 func (e *EnvironmentService) ListRPackages(rPath string) ([]string, error) {
 	log.Printf("[ListRPackages] Listing packages for: %s\n", rPath)
+
+	cacheKey := "r:" + rPath
+	if cached, ok := e.packageCache[cacheKey]; ok {
+		if time.Since(cached.timestamp) < e.cacheTTL {
+			log.Printf("[ListRPackages] Using cached result (%d packages)\n", len(cached.packages))
+			return cached.packages, nil
+		}
+	}
+
+	log.Printf("[ListRPackages] Cache miss, fetching from R...\n")
 	listCmd := "cat(installed.packages()[,1], sep='\\n')"
 	cmd := exec.Command(rPath, "-e", listCmd)
 	hideConsoleWindow(cmd)
@@ -695,27 +810,135 @@ func (e *EnvironmentService) ListRPackages(rPath string) ([]string, error) {
 		}
 	}
 
-	log.Printf("[ListRPackages] Found %d packages\n", len(packages))
+	e.packageCache[cacheKey] = &packageCacheEntry{
+		packages:  packages,
+		timestamp: time.Now(),
+	}
+
+	log.Printf("[ListRPackages] Found %d packages (cached for %v)\n", len(packages), e.cacheTTL)
 	return packages, nil
 }
 
-func (e *EnvironmentService) CreatePythonVirtualEnv(basePythonPath string, venvPath string) error {
-	log.Printf("[CreatePythonVirtualEnv] Creating virtual environment at %s using %s\n", venvPath, basePythonPath)
+func (e *EnvironmentService) loadPluginDefinition(pluginYamlPath string) (*models.PluginDefinition, error) {
+	data, err := os.ReadFile(pluginYamlPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read plugin.yaml: %w", err)
+	}
 
+	var pluginDef models.PluginDefinition
+	if err := yaml.Unmarshal(data, &pluginDef); err != nil {
+		return nil, fmt.Errorf("failed to parse plugin.yaml: %w", err)
+	}
+
+	return &pluginDef, nil
+}
+
+func (e *EnvironmentService) installPythonPackagesList(pythonPath string, packages []string) error {
+	if len(packages) == 0 {
+		return nil
+	}
+
+	e.progressNotifier.EmitStart(ProgressTypeInstall, "python-packages", "Installing Python packages...")
+
+	args := append([]string{"-m", "pip", "install"}, packages...)
+	cmd := exec.Command(pythonPath, args...)
+	hideConsoleWindow(cmd)
+
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		e.progressNotifier.EmitError(ProgressTypeInstall, "python-packages", "Failed to create stdout pipe", err.Error())
+		return err
+	}
+
+	if err := cmd.Start(); err != nil {
+		e.progressNotifier.EmitError(ProgressTypeInstall, "python-packages", "Failed to start pip install", err.Error())
+		return err
+	}
+
+	scanner := bufio.NewScanner(stdout)
+	for scanner.Scan() {
+		line := scanner.Text()
+		log.Printf("[PIP] %s\n", line)
+		e.progressNotifier.EmitProgress(ProgressTypeInstall, "python-packages", line, 50)
+	}
+
+	if err := cmd.Wait(); err != nil {
+		e.progressNotifier.EmitError(ProgressTypeInstall, "python-packages", "Failed to install packages", err.Error())
+		return err
+	}
+
+	e.progressNotifier.EmitComplete(ProgressTypeInstall, "python-packages", "Packages installed successfully")
+	return nil
+}
+
+func (e *EnvironmentService) CreatePythonVirtualEnv(basePythonPath string, venvPath string, pluginID string) error {
+	log.Printf("[CreatePythonVirtualEnv] Creating virtual environment at %s using %s for plugin %s\n", venvPath, basePythonPath, pluginID)
+
+	venvName := filepath.Base(venvPath)
+	e.progressNotifier.EmitStart(ProgressTypeInstall, "python-venv", fmt.Sprintf("Creating virtual environment '%s'...", venvName))
+
+	e.progressNotifier.EmitProgress(ProgressTypeInstall, "python-venv", "Setting up virtual environment structure...", 20)
 	cmd := exec.Command(basePythonPath, "-m", "venv", venvPath)
 	hideConsoleWindow(cmd)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		log.Printf("[CreatePythonVirtualEnv] ERROR: %v\nOutput: %s\n", err, string(output))
+		e.progressNotifier.EmitError(ProgressTypeInstall, "python-venv", "Failed to create virtual environment", err.Error())
 		return fmt.Errorf("failed to create virtual environment: %w", err)
 	}
 
-	venvName := filepath.Base(venvPath)
 	pythonExe := filepath.Join(venvPath, "Scripts", "python.exe")
 	if runtime.GOOS != "windows" {
 		pythonExe = filepath.Join(venvPath, "bin", "python")
 	}
 
+	// Auto-install plugin requirements if pluginID provided
+	if pluginID != "" {
+		// Attempt to resolve numeric ID to plugin string ID (folder name)
+		resolvedPluginID := pluginID
+		if id, err := strconv.ParseUint(pluginID, 10, 64); err == nil {
+			var pluginRegistry models.PluginRegistry
+			if err := e.db.GetDB().First(&pluginRegistry, id).Error; err == nil {
+				resolvedPluginID = pluginRegistry.PluginID
+				log.Printf("[CreatePythonVirtualEnv] Resolved numeric ID %s to plugin ID %s", pluginID, resolvedPluginID)
+			}
+		}
+
+		e.progressNotifier.EmitProgress(ProgressTypeInstall, "python-venv", "Installing plugin requirements...", 40)
+
+		// Try to load plugin definition to get inline packages
+		pluginYamlPath := filepath.Join("plugins", resolvedPluginID, "plugin.yaml")
+		var inlinePackages []string
+		var requirementsFile string
+
+		if pluginDef, err := e.loadPluginDefinition(pluginYamlPath); err == nil {
+			inlinePackages = pluginDef.Execution.Requirements.Packages
+			requirementsFile = pluginDef.Execution.Requirements.PythonRequirementsFile
+		}
+
+		// Use inline packages if available
+		if len(inlinePackages) > 0 {
+			log.Printf("[CreatePythonVirtualEnv] Installing inline packages from plugin.yaml: %v\n", inlinePackages)
+			if err := e.installPythonPackagesList(pythonExe, inlinePackages); err != nil {
+				log.Printf("[CreatePythonVirtualEnv] Warning: Failed to install inline packages: %v\n", err)
+			}
+		} else if requirementsFile != "" {
+			// Use explicit pythonRequirementsFile from plugin.yaml
+			requirementsPath := filepath.Join("plugins", resolvedPluginID, requirementsFile)
+			if _, err := os.Stat(requirementsPath); err == nil {
+				log.Printf("[CreatePythonVirtualEnv] Installing requirements from %s\n", requirementsPath)
+				if err := e.InstallPythonRequirements(pythonExe, requirementsPath); err != nil {
+					log.Printf("[CreatePythonVirtualEnv] Warning: Failed to install plugin requirements: %v\n", err)
+				}
+			} else {
+				log.Printf("[CreatePythonVirtualEnv] Warning: Specified pythonRequirementsFile '%s' not found\n", requirementsPath)
+			}
+		} else {
+			log.Printf("[CreatePythonVirtualEnv] No package requirements specified for plugin %s (resolved from %s)\n", resolvedPluginID, pluginID)
+		}
+	}
+
+	e.progressNotifier.EmitProgress(ProgressTypeInstall, "python-venv", "Saving environment configuration...", 90)
 	venv := VirtualEnvironment{
 		Name:           venvName,
 		Path:           pythonExe,
@@ -728,6 +951,7 @@ func (e *EnvironmentService) CreatePythonVirtualEnv(basePythonPath string, venvP
 	}
 
 	log.Printf("[CreatePythonVirtualEnv] Successfully created virtual environment\n")
+	e.progressNotifier.EmitComplete(ProgressTypeInstall, "python-venv", fmt.Sprintf("Virtual environment '%s' created successfully", venvName))
 	return nil
 }
 
@@ -738,5 +962,284 @@ func (e *EnvironmentService) GetVirtualEnvironments() ([]VirtualEnvironment, err
 }
 
 func (e *EnvironmentService) DeleteVirtualEnvironment(id uint) error {
+	log.Printf("[DeleteVirtualEnvironment] Deleting environment with ID: %d\n", id)
+
+	var bindings []PluginEnvironmentBinding
+	if err := e.db.GetDB().Where("environment_id = ? AND environment_type = ?", id, "python").Find(&bindings).Error; err != nil {
+		log.Printf("[DeleteVirtualEnvironment] Error finding bindings: %v\n", err)
+	} else {
+		log.Printf("[DeleteVirtualEnvironment] Found %d bindings to delete\n", len(bindings))
+		for _, binding := range bindings {
+			log.Printf("[DeleteVirtualEnvironment] Binding: ID=%d, PluginID=%s, EnvID=%d, EnvType=%s\n",
+				binding.ID, binding.PluginID, binding.EnvironmentID, binding.EnvironmentType)
+		}
+	}
+
+	result := e.db.GetDB().Where("environment_id = ? AND environment_type = ?", id, "python").Delete(&PluginEnvironmentBinding{})
+	if result.Error != nil {
+		log.Printf("[DeleteVirtualEnvironment] Error deleting plugin bindings: %v\n", result.Error)
+	} else {
+		log.Printf("[DeleteVirtualEnvironment] Deleted %d plugin bindings\n", result.RowsAffected)
+	}
+
 	return e.db.GetDB().Delete(&VirtualEnvironment{}, id).Error
+}
+
+func (e *EnvironmentService) getActiveRPath() (string, error) {
+	cfg := e.db.GetDB()
+	var rEnv REnvironmentDB
+	if err := cfg.Where("is_active = ?", true).First(&rEnv).Error; err != nil {
+		return "", fmt.Errorf("no active R environment found")
+	}
+	return rEnv.Path, nil
+}
+
+func (e *EnvironmentService) CreateRenvEnvironment(name string, packages []string, pluginID string) error {
+	log.Printf("[CreateRenvEnvironment] Creating renv environment: %s for plugin: %s\n", name, pluginID)
+
+	rPath, err := e.getActiveRPath()
+	if err != nil {
+		return fmt.Errorf("failed to get active R path: %w", err)
+	}
+
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("failed to get user home directory: %w", err)
+	}
+
+	var appFolder string
+	switch runtime.GOOS {
+	case "windows":
+		localAppData := os.Getenv("LOCALAPPDATA")
+		if localAppData != "" {
+			appFolder = filepath.Join(localAppData, "cauldron")
+		} else {
+			appFolder = filepath.Join(homeDir, "AppData", "Local", "cauldron")
+		}
+	case "darwin":
+		appFolder = filepath.Join(homeDir, "Library", "Application Support", "cauldron")
+	case "linux":
+		xdgDataHome := os.Getenv("XDG_DATA_HOME")
+		if xdgDataHome != "" {
+			appFolder = filepath.Join(xdgDataHome, "cauldron")
+		} else {
+			appFolder = filepath.Join(homeDir, ".local", "share", "cauldron")
+		}
+	default:
+		appFolder = filepath.Join(homeDir, ".cauldron")
+	}
+
+	renvDir := filepath.Join(appFolder, "renv-projects")
+	if err := os.MkdirAll(renvDir, 0755); err != nil {
+		return fmt.Errorf("failed to create renv projects directory: %w", err)
+	}
+
+	projectPath := filepath.Join(renvDir, name)
+	if err := os.MkdirAll(projectPath, 0755); err != nil {
+		return fmt.Errorf("failed to create project directory: %w", err)
+	}
+
+	e.progressNotifier.EmitStart(ProgressTypeInstall, "renv-init", "Initializing renv...")
+
+	initCmd := fmt.Sprintf("setwd('%s'); if (!requireNamespace('renv', quietly = TRUE)) install.packages('renv', repos='https://cloud.r-project.org'); renv::init(bare = TRUE)", strings.ReplaceAll(projectPath, "\\", "/"))
+	cmd := exec.Command(rPath, "-e", initCmd)
+	hideConsoleWindow(cmd)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		e.progressNotifier.EmitError(ProgressTypeInstall, "renv-init", "Failed to initialize renv", err.Error())
+		log.Printf("[CreateRenvEnvironment] renv init failed: %v\nOutput: %s", err, string(output))
+		return fmt.Errorf("failed to initialize renv: %w\n%s", err, string(output))
+	}
+
+	e.progressNotifier.EmitComplete(ProgressTypeInstall, "renv-init", "renv initialized successfully")
+
+	// Auto-install plugin requirements if pluginID provided
+	var packagesToInstall []string
+	if pluginID != "" {
+		// Attempt to resolve numeric ID to plugin string ID (folder name)
+		resolvedPluginID := pluginID
+		if id, err := strconv.ParseUint(pluginID, 10, 64); err == nil {
+			var pluginRegistry models.PluginRegistry
+			if err := e.db.GetDB().First(&pluginRegistry, id).Error; err == nil {
+				resolvedPluginID = pluginRegistry.PluginID
+				log.Printf("[CreateRenvEnvironment] Resolved numeric ID %s to plugin ID %s", pluginID, resolvedPluginID)
+			}
+		}
+
+		// Try to load plugin definition to get inline packages
+		pluginYamlPath := filepath.Join("plugins", resolvedPluginID, "plugin.yaml")
+		var inlinePackages []string
+		var packagesFile string
+
+		if pluginDef, err := e.loadPluginDefinition(pluginYamlPath); err == nil {
+			inlinePackages = pluginDef.Execution.Requirements.Packages
+			packagesFile = pluginDef.Execution.Requirements.RPackagesFile
+		}
+
+		// Use inline packages if available
+		if len(inlinePackages) > 0 {
+			log.Printf("[CreateRenvEnvironment] Loading inline packages from plugin.yaml: %v\n", inlinePackages)
+			packagesToInstall = append(packagesToInstall, inlinePackages...)
+		} else if packagesFile != "" {
+			// Use explicit rPackagesFile from plugin.yaml
+			packagesPath := filepath.Join("plugins", resolvedPluginID, packagesFile)
+			if _, err := os.Stat(packagesPath); err == nil {
+				log.Printf("[CreateRenvEnvironment] Loading packages from %s\n", packagesPath)
+				pluginPackages, err := e.LoadRPackagesFromFile(packagesPath)
+				if err != nil {
+					log.Printf("[CreateRenvEnvironment] Warning: Failed to load plugin packages: %v\n", err)
+				} else {
+					packagesToInstall = append(packagesToInstall, pluginPackages...)
+				}
+			} else {
+				log.Printf("[CreateRenvEnvironment] Warning: Specified rPackagesFile '%s' not found\n", packagesPath)
+			}
+		} else {
+			log.Printf("[CreateRenvEnvironment] No package requirements specified for plugin %s (resolved from %s)\n", resolvedPluginID, pluginID)
+		}
+	}
+
+	if len(packages) > 0 {
+		packagesToInstall = append(packagesToInstall, packages...)
+	}
+
+	if len(packagesToInstall) > 0 {
+		if err := e.InstallRenvPackages(projectPath, rPath, packagesToInstall); err != nil {
+			return fmt.Errorf("failed to install packages: %w", err)
+		}
+	}
+
+	renvEnv := RenvEnvironment{
+		Name:        name,
+		Path:        projectPath,
+		ProjectPath: projectPath,
+		BaseRPath:   rPath,
+		CreatedAt:   time.Now().Unix(),
+	}
+
+	if err := e.db.SaveRenvEnvironment(renvEnv); err != nil {
+		log.Printf("[CreateRenvEnvironment] Warning: Failed to save to database: %v\n", err)
+	}
+
+	log.Printf("[CreateRenvEnvironment] Successfully created renv environment at %s\n", projectPath)
+	return nil
+}
+
+func (e *EnvironmentService) InstallRenvPackages(projectPath string, rPath string, packages []string) error {
+	log.Printf("[InstallRenvPackages] Installing %d packages in renv project: %s\n", len(packages), projectPath)
+
+	e.progressNotifier.EmitStart(ProgressTypeInstall, "renv-packages", "Checking BiocManager...")
+
+	biocManagerCheck := fmt.Sprintf("setwd('%s'); if (!requireNamespace('BiocManager', quietly = TRUE)) renv::install('BiocManager')", strings.ReplaceAll(projectPath, "\\", "/"))
+	cmd := exec.Command(rPath, "-e", biocManagerCheck)
+	hideConsoleWindow(cmd)
+	if err := cmd.Run(); err != nil {
+		log.Printf("[InstallRenvPackages] Warning: BiocManager check failed: %v", err)
+	}
+
+	totalPackages := len(packages)
+	for i, pkg := range packages {
+		percentage := float64(i+1) / float64(totalPackages) * 95.0
+		e.progressNotifier.EmitProgress(ProgressTypeInstall, "renv-packages",
+			fmt.Sprintf("Installing %s (%d/%d)", pkg, i+1, totalPackages), percentage)
+
+		var installCmd string
+		if strings.Contains(pkg, "/") {
+			installCmd = fmt.Sprintf("setwd('%s'); renv::install('bioc::%s')", strings.ReplaceAll(projectPath, "\\", "/"), pkg)
+		} else {
+			installCmd = fmt.Sprintf("setwd('%s'); renv::install(c('BiocManager')); BiocManager::install('%s')", strings.ReplaceAll(projectPath, "\\", "/"), pkg)
+		}
+
+		cmd := exec.Command(rPath, "-e", installCmd)
+		hideConsoleWindow(cmd)
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			e.progressNotifier.EmitError(ProgressTypeInstall, "renv-packages",
+				fmt.Sprintf("Failed to install %s", pkg), err.Error())
+			log.Printf("[InstallRenvPackages] Failed to install %s: %v\nOutput: %s", pkg, err, string(output))
+			return fmt.Errorf("failed to install package %s: %w", pkg, err)
+		}
+		log.Printf("[InstallRenvPackages] Installed %s successfully", pkg)
+	}
+
+	e.progressNotifier.EmitProgress(ProgressTypeInstall, "renv-packages", "Creating renv snapshot...", 97)
+	snapshotCmd := fmt.Sprintf("setwd('%s'); renv::snapshot()", strings.ReplaceAll(projectPath, "\\", "/"))
+	cmd = exec.Command(rPath, "-e", snapshotCmd)
+	hideConsoleWindow(cmd)
+	if err := cmd.Run(); err != nil {
+		log.Printf("[InstallRenvPackages] Warning: snapshot failed: %v", err)
+	}
+
+	e.progressNotifier.EmitComplete(ProgressTypeInstall, "renv-packages", "All packages installed successfully")
+	log.Printf("[InstallRenvPackages] Package installation complete")
+	return nil
+}
+
+func (e *EnvironmentService) GetRenvEnvironments() ([]RenvEnvironment, error) {
+	log.Println("[GetRenvEnvironments] Starting...")
+
+	detectedEnvs := e.detectRenvEnvironments()
+	for _, env := range detectedEnvs {
+		if err := e.db.SaveRenvEnvironment(env); err != nil {
+			log.Printf("[GetRenvEnvironments] Failed to save environment %s: %v\n", env.Name, err)
+		}
+	}
+
+	envs, err := e.db.GetRenvEnvironments()
+	if err != nil {
+		log.Printf("[GetRenvEnvironments] Failed to get environments from DB: %v\n", err)
+		return []RenvEnvironment{}, err
+	}
+
+	log.Printf("[GetRenvEnvironments] Complete, found %d environments\n", len(envs))
+	return envs, nil
+}
+
+func (e *EnvironmentService) DeleteRenvEnvironment(id uint) error {
+	log.Printf("[DeleteRenvEnvironment] Deleting R environment with ID: %d\n", id)
+
+	env, err := e.db.GetRenvEnvironmentByID(id)
+	if err != nil {
+		return err
+	}
+
+	var bindings []PluginEnvironmentBinding
+	if err := e.db.GetDB().Where("environment_id = ? AND environment_type = ?", id, "r").Find(&bindings).Error; err != nil {
+		log.Printf("[DeleteRenvEnvironment] Error finding bindings: %v\n", err)
+	} else {
+		log.Printf("[DeleteRenvEnvironment] Found %d bindings to delete\n", len(bindings))
+		for _, binding := range bindings {
+			log.Printf("[DeleteRenvEnvironment] Binding: ID=%d, PluginID=%s, EnvID=%d, EnvType=%s\n",
+				binding.ID, binding.PluginID, binding.EnvironmentID, binding.EnvironmentType)
+		}
+	}
+
+	result := e.db.GetDB().Where("environment_id = ? AND environment_type = ?", id, "r").Delete(&PluginEnvironmentBinding{})
+	if result.Error != nil {
+		log.Printf("[DeleteRenvEnvironment] Error deleting plugin bindings: %v\n", result.Error)
+	} else {
+		log.Printf("[DeleteRenvEnvironment] Deleted %d plugin bindings\n", result.RowsAffected)
+	}
+
+	if err := os.RemoveAll(env.ProjectPath); err != nil {
+		log.Printf("[DeleteRenvEnvironment] Warning: Failed to delete directory %s: %v", env.ProjectPath, err)
+	}
+
+	return e.db.DeleteRenvEnvironment(id)
+}
+
+func (e *EnvironmentService) GetRenvLibPath(projectPath string) string {
+	renvLibPath := filepath.Join(projectPath, "renv", "library")
+
+	dirs, err := os.ReadDir(renvLibPath)
+	if err != nil || len(dirs) == 0 {
+		return ""
+	}
+
+	platformDir := filepath.Join(renvLibPath, dirs[0].Name())
+	if _, err := os.Stat(platformDir); err == nil {
+		return platformDir
+	}
+
+	return renvLibPath
 }

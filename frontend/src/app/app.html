@@ -1,13 +1,13 @@
+<app-loading-screen></app-loading-screen>
 <div class="app-container">
-  <app-toolbar (menuToggle)="toggleSidenav()"></app-toolbar>
-
   <mat-sidenav-container class="sidenav-container">
     <mat-sidenav
       #sidenav
-      [opened]="sidenavOpened()"
+      [opened]="true"
       [mode]="'side'"
+      [disableClose]="true"
       class="sidenav">
-      <app-sidenav (navigationClose)="closeSidenav()"></app-sidenav>
+      <app-sidenav></app-sidenav>
     </mat-sidenav>
 
     <mat-sidenav-content class="main-content">

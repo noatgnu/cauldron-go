@@ -1,0 +1,114 @@
+<div class="registry-container">
+  <div class="registry-header">
+    <h1>
+      <mat-icon>cloud</mat-icon>
+      Plugin Registry
+    </h1>
+    <p class="header-description">Browse and install community plugins from the registry</p>
+  </div>
+
+  <div class="search-filters">
+    <mat-form-field appearance="outline" class="search-field">
+      <mat-label>Search plugins</mat-label>
+      <input matInput [(ngModel)]="searchQuery" (keyup.enter)="onSearch()" placeholder="Search by name or description">
+      <mat-icon matPrefix>search</mat-icon>
+      <button mat-icon-button matSuffix (click)="onSearch()" [disabled]="loading()">
+        <mat-icon>arrow_forward</mat-icon>
+      </button>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="category-filter">
+      <mat-label>Category</mat-label>
+      <mat-select [(ngModel)]="selectedCategory" (selectionChange)="onCategoryChange()">
+        <mat-option value="">All Categories</mat-option>
+        @for (category of categories(); track category.id) {
+          <mat-option [value]="category.name">{{ category.name }}</mat-option>
+        }
+      </mat-select>
+      <mat-icon matPrefix>filter_list</mat-icon>
+    </mat-form-field>
+  </div>
+
+  @if (loading()) {
+    <div class="loading-container">
+      <mat-spinner diameter="48"></mat-spinner>
+      <p>Loading plugins from registry...</p>
+    </div>
+  } @else if (plugins().length === 0) {
+    <div class="empty-state">
+      <mat-icon>cloud_off</mat-icon>
+      <h3>No plugins found</h3>
+      <p>No plugins match your search criteria. Try adjusting your filters or check your registry URL in settings.</p>
+    </div>
+  } @else {
+    <div class="plugins-grid">
+      @for (plugin of plugins(); track plugin.id) {
+        <mat-card class="plugin-card">
+          <mat-card-header>
+            <div mat-card-avatar class="plugin-icon">
+              @if (plugin.icon) {
+                <img [src]="plugin.icon" [alt]="plugin.name">
+              } @else {
+                <mat-icon>extension</mat-icon>
+              }
+            </div>
+            <mat-card-title>{{ plugin.name }}</mat-card-title>
+            <mat-card-subtitle>
+              <span class="author">by {{ plugin.author.name }}</span>
+              <span class="version">v{{ plugin.version }}</span>
+            </mat-card-subtitle>
+          </mat-card-header>
+
+          <mat-card-content>
+            <p class="description">{{ plugin.description }}</p>
+
+            <div class="metadata">
+              <mat-chip class="category-chip">
+                <mat-icon>folder</mat-icon>
+                {{ plugin.category.name }}
+              </mat-chip>
+
+              @if (plugin.tags && plugin.tags.length > 0) {
+                <div class="tags">
+                  @for (tag of plugin.tags; track tag.id) {
+                    <mat-chip class="tag-chip">{{ tag.name }}</mat-chip>
+                  }
+                </div>
+              }
+            </div>
+
+            <div class="dates">
+              <small>
+                <mat-icon>access_time</mat-icon>
+                Updated {{ formatDate(plugin.updated_at) }}
+              </small>
+            </div>
+          </mat-card-content>
+
+          <mat-card-actions>
+            <button mat-raised-button color="primary" (click)="installPlugin(plugin)" [disabled]="!plugin.repository">
+              <mat-icon>download</mat-icon>
+              Install
+            </button>
+            @if (plugin.repository) {
+              <a mat-button [href]="plugin.repository" target="_blank" rel="noopener noreferrer">
+                <mat-icon>open_in_new</mat-icon>
+                Repository
+              </a>
+            }
+          </mat-card-actions>
+        </mat-card>
+      }
+    </div>
+
+    <mat-paginator
+      [length]="totalCount()"
+      [pageSize]="pageSize"
+      [pageIndex]="pageIndex"
+      [pageSizeOptions]="[5, 10, 20, 50]"
+      (page)="onPageChange($event)"
+      showFirstLastButtons
+      class="registry-paginator">
+    </mat-paginator>
+  }
+</div>

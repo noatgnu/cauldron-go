@@ -1,16 +1,16 @@
-import { Component, output, signal, computed, OnInit } from '@angular/core';
+import { Component, output, signal, computed, OnInit, effect } from '@angular/core';
 import { MatListModule } from '@angular/material/list';
 import { MatIconModule } from '@angular/material/icon';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
-import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatDividerModule } from '@angular/material/divider';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { Router, NavigationEnd } from '@angular/router';
 import { PluginV2Service } from '../../core/services/plugin-v2';
 import { models } from '../../../wailsjs/go/models';
+import { filter } from 'rxjs';
 
 interface NavItem {
   label: string;
@@ -28,7 +28,6 @@ interface NavItem {
     MatFormFieldModule,
     MatInputModule,
     MatButtonModule,
-    MatCheckboxModule,
     MatDividerModule,
     FormsModule
   ],
@@ -38,116 +37,132 @@ interface NavItem {
 export class Sidenav implements OnInit {
   navigationClose = output<void>();
   searchQuery = signal<string>('');
-  showPlugins = signal<boolean>(false);
   plugins = signal<models.PluginV2[]>([]);
-
-  hardcodedNavItems: NavItem[] = [
-    { label: 'Home', icon: 'home', route: '/' },
-    { label: 'Plugins', icon: 'extension', route: '/plugins' },
-    { label: 'Plugin List', icon: 'list', route: '/plugin-list' },
-    {
-      label: 'Data Transformation',
-      icon: 'transform',
-      children: [
-        { label: 'Imputation', icon: 'auto_fix_high', route: '/analysis/imputation' },
-        { label: 'Normalization', icon: 'tune', route: '/analysis/normalization' },
-        { label: 'MaxLFQ Normalization', icon: 'science', route: '/analysis/maxlfq' },
-        { label: 'Batch Correction', icon: 'auto_awesome', route: '/analysis/batch-correction' }
-      ]
-    },
-    {
-      label: 'Dimensionality Reduction',
-      icon: 'compress',
-      children: [
-        { label: 'PCA', icon: 'scatter_plot', route: '/analysis/pca' },
-        { label: 'PHATE', icon: 'bubble_chart', route: '/analysis/phate' },
-        { label: 'Fuzzy Clustering', icon: 'grain', route: '/analysis/fuzzy-clustering' }
-      ]
-    },
-    {
-      label: 'Differential Analysis',
-      icon: 'analytics',
-      children: [
-        { label: 'Limma', icon: 'show_chart', route: '/analysis/limma' },
-        { label: 'QFeatures + Limma', icon: 'multiline_chart', route: '/analysis/qfeatures-limma' },
-        { label: 'AlphaStats', icon: 'insert_chart', route: '/analysis/alphastats' }
-      ]
-    },
-    {
-      label: 'Visualization',
-      icon: 'insert_chart_outlined',
-      children: [
-        { label: 'Correlation Matrix', icon: 'grid_on', route: '/analysis/correlation-matrix' },
-        { label: 'Venn Diagram', icon: 'donut_small', route: '/analysis/venn-diagram' },
-        { label: 'Violin Plot', icon: 'insights', route: '/analysis/violin-plot' }
-      ]
-    },
-    {
-      label: 'Utilities',
-      icon: 'build',
-      children: [
-        { label: 'UniProt Lookup', icon: 'search', route: '/utilities/uniprot' },
-        { label: 'Coverage Map', icon: 'map', route: '/utilities/coverage-map' },
-        { label: 'PTM Remapping', icon: 'swap_horiz', route: '/utilities/ptm-remap' },
-        { label: 'Peptide Library Check', icon: 'check_circle', route: '/utilities/peptide-check' },
-        { label: 'Format Conversion', icon: 'sync_alt', route: '/utilities/format-conversion' }
-      ]
-    }
-  ];
+  isSettingsRoute = signal<boolean>(false);
 
   categoryIcons: Record<string, string> = {
     'analysis': 'analytics',
     'visualization': 'insert_chart_outlined',
     'preprocessing': 'transform',
-    'utilities': 'build'
+    'utilities': 'build',
+    'statistics': 'functions',
+    'data-transformation': 'transform',
+    'dimensionality-reduction': 'compress',
+    'differential-analysis': 'analytics'
   };
 
   pluginNavItems = computed(() => {
-    const navItems: NavItem[] = [{ label: 'Home', icon: 'home', route: '/' }];
-    const categoryMap = new Map<string, models.PluginV2[]>();
+    const navItems: NavItem[] = [];
+    const categoryMap = new Map<string, Map<string | null, models.PluginV2[]>>();
 
     for (const plugin of this.plugins()) {
       const category = plugin.definition.plugin.category || 'uncategorized';
+      const subcategory = plugin.definition.plugin.subcategory || null;
+
       if (!categoryMap.has(category)) {
-        categoryMap.set(category, []);
+        categoryMap.set(category, new Map());
       }
-      categoryMap.get(category)!.push(plugin);
+      const subcategoryMap = categoryMap.get(category)!;
+
+      if (!subcategoryMap.has(subcategory)) {
+        subcategoryMap.set(subcategory, []);
+      }
+      subcategoryMap.get(subcategory)!.push(plugin);
     }
 
     const sortedCategories = Array.from(categoryMap.keys()).sort((a, b) => a.localeCompare(b));
 
     for (const category of sortedCategories) {
-      const pluginList = categoryMap.get(category)!;
-
-      const sortedPlugins = [...pluginList].sort((a, b) =>
-        a.definition.plugin.name.localeCompare(b.definition.plugin.name)
-      );
-
-      const children: NavItem[] = sortedPlugins.map(plugin => ({
-        label: plugin.definition.plugin.name,
-        icon: plugin.definition.plugin.icon || 'extension',
-        route: `/plugin/${plugin.id}`
-      }));
-
-      navItems.push({
-        label: this.formatCategoryLabel(category),
-        icon: this.categoryIcons[category] || 'folder',
-        children
+      const subcategoryMap = categoryMap.get(category)!;
+      const sortedSubcategories = Array.from(subcategoryMap.keys()).sort((a, b) => {
+        if (a === null) return 1;
+        if (b === null) return -1;
+        return a.localeCompare(b);
       });
+
+      if (sortedSubcategories.length === 1 && sortedSubcategories[0] === null) {
+        const pluginList = subcategoryMap.get(null)!;
+        const sortedPlugins = [...pluginList].sort((a, b) =>
+          a.definition.plugin.name.localeCompare(b.definition.plugin.name)
+        );
+
+        const children: NavItem[] = sortedPlugins.map(plugin => ({
+          label: plugin.definition.plugin.name,
+          icon: plugin.definition.plugin.icon || 'extension',
+          route: `/plugin/${plugin.id}`
+        }));
+
+        navItems.push({
+          label: this.formatCategoryLabel(category),
+          icon: this.categoryIcons[category] || 'folder',
+          children
+        });
+      } else {
+        const subcategoryChildren: NavItem[] = [];
+
+        for (const subcategory of sortedSubcategories) {
+          const pluginList = subcategoryMap.get(subcategory)!;
+          const sortedPlugins = [...pluginList].sort((a, b) =>
+            a.definition.plugin.name.localeCompare(b.definition.plugin.name)
+          );
+
+          const pluginItems: NavItem[] = sortedPlugins.map(plugin => ({
+            label: plugin.definition.plugin.name,
+            icon: plugin.definition.plugin.icon || 'extension',
+            route: `/plugin/${plugin.id}`
+          }));
+
+          if (subcategory === null) {
+            subcategoryChildren.push(...pluginItems);
+          } else {
+            subcategoryChildren.push({
+              label: this.formatCategoryLabel(subcategory),
+              icon: 'folder_open',
+              children: pluginItems
+            });
+          }
+        }
+
+        navItems.push({
+          label: this.formatCategoryLabel(category),
+          icon: this.categoryIcons[category] || 'folder',
+          children: subcategoryChildren
+        });
+      }
     }
 
     return navItems;
   });
 
-  filteredNavItems = computed(() => {
-    const query = this.searchQuery().toLowerCase().trim();
-    const sourceItems = this.showPlugins() ? this.pluginNavItems() : this.hardcodedNavItems;
+  settingsNavItems: NavItem[] = [
+    { label: 'Back to Plugins', icon: 'arrow_back', route: '/home' },
+    { label: 'General', icon: 'settings', route: '/settings/general' },
+    { label: 'Python', icon: 'language', route: '/settings/python' },
+    { label: 'R', icon: 'analytics', route: '/settings/r' },
+    { label: 'Plugin Registry', icon: 'cloud', route: '/settings/registry' }
+  ];
 
-    if (!query) {
-      return sourceItems;
+  filteredNavItems = computed(() => {
+    if (this.isSettingsRoute()) {
+      return this.settingsNavItems;
     }
 
-    return sourceItems.map(item => {
+    const query = this.searchQuery().toLowerCase().trim();
+    const staticItems: NavItem[] = [
+      { label: 'Plugin Registry', icon: 'cloud', route: '/plugin-registry' }
+    ];
+    const sourceItems = this.pluginNavItems();
+    const allItems = [...staticItems, ...sourceItems];
+
+    if (!query) {
+      return allItems;
+    }
+
+    const filteredStatic = staticItems.filter(item =>
+      item.label.toLowerCase().includes(query)
+    );
+
+    const filteredPlugins = sourceItems.map(item => {
       if (item.children) {
         const filteredChildren = item.children.filter(child =>
           child.label.toLowerCase().includes(query) ||
@@ -166,12 +181,21 @@ export class Sidenav implements OnInit {
         return null;
       }
     }).filter(item => item !== null) as NavItem[];
+
+    return [...filteredStatic, ...filteredPlugins];
   });
 
   constructor(
     private router: Router,
     private pluginService: PluginV2Service
-  ) {}
+  ) {
+    this.router.events.pipe(
+      filter(event => event instanceof NavigationEnd)
+    ).subscribe(() => {
+      this.isSettingsRoute.set(this.router.url.startsWith('/settings'));
+    });
+    this.isSettingsRoute.set(this.router.url.startsWith('/settings'));
+  }
 
   async ngOnInit() {
     await this.loadPlugins();
@@ -184,11 +208,6 @@ export class Sidenav implements OnInit {
     } catch (error) {
       console.error('Failed to load plugins:', error);
     }
-  }
-
-  togglePluginView() {
-    this.showPlugins.update(v => !v);
-    this.clearSearch();
   }
 
   formatCategoryLabel(category: string): string {
