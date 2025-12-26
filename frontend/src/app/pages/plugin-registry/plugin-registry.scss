@@ -5,29 +5,43 @@
 }
 
 .registry-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
   margin-bottom: 24px;
+  gap: 16px;
 
-  h1 {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    font-size: 24px;
-    font-weight: 500;
-    margin: 0 0 8px 0;
-    color: rgba(0, 0, 0, 0.87);
+  .header-main {
+    flex: 1;
 
-    mat-icon {
-      font-size: 28px;
-      width: 28px;
-      height: 28px;
-      color: #1976d2;
+    h1 {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 24px;
+      font-weight: 500;
+      margin: 0 0 8px 0;
+      color: rgba(0, 0, 0, 0.87);
+
+      mat-icon {
+        font-size: 28px;
+        width: 28px;
+        height: 28px;
+        color: #1976d2;
+      }
+    }
+
+    .header-description {
+      margin: 0;
+      font-size: 14px;
+      color: rgba(0, 0, 0, 0.6);
     }
   }
 
-  .header-description {
-    margin: 0;
-    font-size: 14px;
-    color: rgba(0, 0, 0, 0.6);
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
   }
 }
 

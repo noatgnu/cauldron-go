@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { BehaviorSubject, Observable } from 'rxjs';
+import { BehaviorSubject, Observable, Subscription } from 'rxjs';
 import * as WailsApp from '../../../wailsjs/go/main/App';
 import { EventsOn } from '../../../wailsjs/runtime/runtime';
 import { models, services } from '../../../wailsjs/go/models';
@@ -20,6 +20,7 @@ export type DataFilePreview = services.DataFilePreview;
 export type VirtualEnvironment = services.VirtualEnvironment;
 export type RenvEnvironment = services.RenvEnvironment;
 export type PluginEnvironmentBinding = services.PluginEnvironmentBinding;
+export type CustomEnvVar = services.CustomEnvVar;
 
 export interface ImportedFile {
   id: number;
@@ -174,6 +175,11 @@ export class Wails {
   async getJob(id: string): Promise<Job> {
     if (!this.isWails) throw new Error('Wails not available');
     return WailsApp.GetJob(id);
+  }
+
+  async getJobExecutionLog(id: string): Promise<string> {
+    if (!this.isWails) throw new Error('Wails not available');
+    return WailsApp.GetJobExecutionLog(id);
   }
 
   async getAllJobs(): Promise<Job[]> {
@@ -383,9 +389,9 @@ export class Wails {
     this.bindingsUpdatedSubject.next();
   }
 
-  async createRenvEnvironment(name: string, packages: string[], pluginID: string = ''): Promise<void> {
+  async createRenvEnvironment(name: string, packages: string[], pluginID: string, useCache: boolean = false) {
     if (!this.isWails) throw new Error('Wails not available');
-    await WailsApp.CreateRenvEnvironment(name, packages, pluginID);
+    await WailsApp.CreateRenvEnvironment(name, packages, pluginID, useCache);
     this.bindingsUpdatedSubject.next();
   }
 
@@ -450,6 +456,31 @@ export class Wails {
   async getPlugin(id: number): Promise<any> {
     if (!this.isWails) throw new Error('Wails not available');
     return WailsApp.GetPluginV2(id);
+  }
+
+  async getCustomEnvVars(pluginId: number): Promise<CustomEnvVar[]> {
+    if (!this.isWails) throw new Error('Wails not available');
+    return WailsApp.GetCustomEnvVars(pluginId);
+  }
+
+  async getGlobalCustomEnvVars(): Promise<CustomEnvVar[]> {
+    if (!this.isWails) throw new Error('Wails not available');
+    return WailsApp.GetGlobalCustomEnvVars();
+  }
+
+  async saveCustomEnvVar(envVar: CustomEnvVar): Promise<void> {
+    if (!this.isWails) throw new Error('Wails not available');
+    return WailsApp.SaveCustomEnvVar(envVar);
+  }
+
+  async deleteCustomEnvVar(id: number): Promise<void> {
+    if (!this.isWails) throw new Error('Wails not available');
+    return WailsApp.DeleteCustomEnvVar(id);
+  }
+
+  async deleteCustomEnvVarByKey(pluginId: number, key: string): Promise<void> {
+    if (!this.isWails) throw new Error('Wails not available');
+    return WailsApp.DeleteCustomEnvVarByKey(pluginId, key);
   }
 
   async reloadPlugins(): Promise<void> {
@@ -518,9 +549,9 @@ export class Wails {
     return WailsApp.DeletePlugin(pluginID);
   }
 
-  async installPluginFromRepo(repoURL: string): Promise<void> {
+  async installPluginFromRepo(repoURL: string, commitHash: string = ''): Promise<void> {
     if (!this.isWails) throw new Error('Wails not available');
-    return WailsApp.InstallPluginFromRepo(repoURL);
+    return WailsApp.InstallPluginFromRepo(repoURL, commitHash);
   }
 
   async updatePluginFromRepo(repoURL: string): Promise<void> {
@@ -546,6 +577,18 @@ export class Wails {
   async decodePluginRepoURL(encoded: string): Promise<string> {
     if (!this.isWails) throw new Error('Wails not available');
     return WailsApp.DecodePluginRepoURL(encoded);
+  }
+
+  async confirmPluginInstallation(repoURL: string, commitHash: string = ''): Promise<void> {
+    if (!this.isWails) throw new Error('Wails not available');
+    return WailsApp.ConfirmPluginInstallation(repoURL, commitHash);
+  }
+
+  listen(eventName: string, callback: (data: any) => void): Subscription {
+    if (this.isWails) {
+      EventsOn(eventName, callback);
+    }
+    return new Subscription();
   }
 
   async pauseJobQueue(): Promise<void> {
@@ -593,8 +636,8 @@ export class Wails {
     return WailsApp.ListRegistryCategories();
   }
 
-  async installPluginFromRegistry(pluginID: string): Promise<void> {
+  async installPluginFromRegistry(pluginID: string, commitHash: string = ''): Promise<void> {
     if (!this.isWails) throw new Error('Wails not available');
-    return WailsApp.InstallPluginFromRegistry(pluginID);
+    return WailsApp.InstallPluginFromRegistry(pluginID, commitHash);
   }
 }

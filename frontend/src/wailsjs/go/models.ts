@@ -22,6 +22,7 @@ export namespace models {
 	    rLibPath: string;
 	    curtainBackendUrl: string;
 	    pluginRegistryUrl: string;
+	    useRenvCache: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new Config(source);
@@ -36,6 +37,7 @@ export namespace models {
 	        this.rLibPath = source["rLibPath"];
 	        this.curtainBackendUrl = source["curtainBackendUrl"];
 	        this.pluginRegistryUrl = source["pluginRegistryUrl"];
+	        this.useRenvCache = source["useRenvCache"];
 	    }
 	}
 	export class ExampleData {
@@ -417,6 +419,7 @@ export namespace models {
 	    argsMapping: Record<string, any>;
 	    outputDir: string;
 	    requirements?: Requirements;
+	    envVariables?: PluginInputV2[];
 	
 	    static createFrom(source: any = {}) {
 	        return new PluginExecution(source);
@@ -427,6 +430,7 @@ export namespace models {
 	        this.argsMapping = source["argsMapping"];
 	        this.outputDir = source["outputDir"];
 	        this.requirements = this.convertValues(source["requirements"], Requirements);
+	        this.envVariables = this.convertValues(source["envVariables"], PluginInputV2);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -742,6 +746,8 @@ export namespace models {
 	    folderPath: string;
 	    scriptPath: string;
 	    installSource: string;
+	    commitHash: string;
+	    repository: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new PluginV2(source);
@@ -754,6 +760,8 @@ export namespace models {
 	        this.folderPath = source["folderPath"];
 	        this.scriptPath = source["scriptPath"];
 	        this.installSource = source["installSource"];
+	        this.commitHash = source["commitHash"];
+	        this.repository = source["repository"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -781,6 +789,28 @@ export namespace models {
 
 export namespace services {
 	
+	export class CustomEnvVar {
+	    ID: number;
+	    PluginID: number;
+	    Key: string;
+	    Value: string;
+	    CreatedAt: number;
+	    UpdatedAt: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new CustomEnvVar(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ID = source["ID"];
+	        this.PluginID = source["PluginID"];
+	        this.Key = source["Key"];
+	        this.Value = source["Value"];
+	        this.CreatedAt = source["CreatedAt"];
+	        this.UpdatedAt = source["UpdatedAt"];
+	    }
+	}
 	export class DataFilePreview {
 	    headers: string[];
 	    rows: string[][];
@@ -900,6 +930,7 @@ export namespace services {
 	    ProjectPath: string;
 	    BaseRPath: string;
 	    RenvVersion: string;
+	    UseGlobalCache: boolean;
 	    CreatedAt: number;
 	
 	    static createFrom(source: any = {}) {
@@ -914,6 +945,7 @@ export namespace services {
 	        this.ProjectPath = source["ProjectPath"];
 	        this.BaseRPath = source["BaseRPath"];
 	        this.RenvVersion = source["RenvVersion"];
+	        this.UseGlobalCache = source["UseGlobalCache"];
 	        this.CreatedAt = source["CreatedAt"];
 	    }
 	}

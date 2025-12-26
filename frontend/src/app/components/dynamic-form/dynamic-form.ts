@@ -465,6 +465,7 @@ export class DynamicFormComponent implements OnInit, OnChanges, OnDestroy {
       width: '90vw',
       maxWidth: '1400px',
       height: '80vh',
+      disableClose: true,
       data: {
         samples: existingAnnotation ? undefined : sampleNames,
         annotation: existingAnnotation,
@@ -572,6 +573,7 @@ export class DynamicFormComponent implements OnInit, OnChanges, OnDestroy {
       width: '90vw',
       maxWidth: '1400px',
       height: '80vh',
+      disableClose: true,
       data: {
         columns: input.tableColumns,
         data: existingData,

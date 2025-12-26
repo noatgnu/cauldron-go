@@ -1,0 +1,50 @@
+<div class="install-progress-dialog">
+  <h2 mat-dialog-title>
+    <mat-icon color="primary">download</mat-icon>
+    Installing Plugin
+  </h2>
+
+  <mat-dialog-content>
+    <div class="repo-info">
+      <strong>Source:</strong>
+      <span class="repo-url">{{ data.repoURL }}</span>
+      @if (data.commitHash) {
+        <span class="commit-ref">@{{ data.commitHash }}</span>
+      }
+    </div>
+
+    @if (error()) {
+      <div class="error-container">
+        <mat-icon color="warn">error</mat-icon>
+        <div class="error-details">
+          <p class="error-title">Installation Failed</p>
+          <p class="error-message">{{ error() }}</p>
+        </div>
+      </div>
+    } @else {
+      <div class="status-container">
+        <p class="current-status">{{ currentStatus() }}</p>
+        <mat-progress-bar
+          [mode]="completed() ? 'determinate' : 'indeterminate'"
+          [value]="progress()"
+          [color]="completed() ? 'primary' : 'accent'">
+        </mat-progress-bar>
+      </div>
+
+      <div class="stages-list">
+        @for (stage of stages(); track stage) {
+          <div class="stage-item completed">
+            <mat-icon>check_circle</mat-icon>
+            <span>{{ stage }}</span>
+          </div>
+        }
+      </div>
+    }
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end">
+    <button mat-button (click)="close()" [disabled]="!completed() && !error()">
+      {{ completed() || error() ? 'Close' : 'Installing...' }}
+    </button>
+  </mat-dialog-actions>
+</div>

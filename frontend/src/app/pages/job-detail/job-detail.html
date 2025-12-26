@@ -147,12 +147,52 @@
                   <span>Console Output</span>
                 </mat-panel-title>
                 <mat-panel-description>
-                  {{ job()!.terminalOutput.length }} lines
+                  @if (!fullLogLoaded() && totalLogLines() > displayedLogLines()) {
+                    Showing last {{ displayedLogLines() | number }} of {{ totalLogLines() | number }} lines
+                  } @else {
+                    {{ displayedLogLines() | number }} lines
+                  }
                 </mat-panel-description>
               </mat-expansion-panel-header>
+              @if (!fullLogLoaded() && totalLogLines() > displayedLogLines()) {
+                <div class="load-full-log-container">
+                  <button mat-raised-button color="primary" (click)="loadFullLog()">
+                    <mat-icon>expand_more</mat-icon>
+                    Load Full Log ({{ (totalLogLines() - displayedLogLines()) | number }} more lines)
+                  </button>
+                </div>
+              }
+              <div class="search-container">
+                <mat-form-field appearance="outline" class="search-field">
+                  <mat-label>Search console output</mat-label>
+                  <input matInput [(ngModel)]="searchTerm" (ngModelChange)="searchTerm.set($event)" placeholder="Type to search...">
+                  <button mat-icon-button matSuffix *ngIf="searchTerm()" (click)="clearSearch()" matTooltip="Clear search">
+                    <mat-icon>close</mat-icon>
+                  </button>
+                </mat-form-field>
+                <div class="search-controls">
+                  <button mat-icon-button (click)="toggleCaseSensitive()"
+                          [color]="caseSensitive() ? 'primary' : ''"
+                          matTooltip="Case sensitive">
+                    <mat-icon>match_case</mat-icon>
+                  </button>
+                  @if (searchTerm() && matchCount() > 0) {
+                    <span class="match-count">{{ matchCount() }} {{ matchCount() === 1 ? 'match' : 'matches' }}</span>
+                    <button mat-icon-button (click)="previousMatch()" matTooltip="Previous match">
+                      <mat-icon>keyboard_arrow_up</mat-icon>
+                    </button>
+                    <button mat-icon-button (click)="nextMatch()" matTooltip="Next match">
+                      <mat-icon>keyboard_arrow_down</mat-icon>
+                    </button>
+                  }
+                  @if (searchTerm() && matchCount() === 0) {
+                    <span class="no-matches">No matches found</span>
+                  }
+                </div>
+              </div>
               <div class="terminal-output" #terminalOutput>
-                @for (line of job()!.terminalOutput; track $index) {
-                  <div class="terminal-line">{{ line }}</div>
+                @for (item of filteredOutput(); track item.originalIndex) {
+                  <div class="terminal-line" [innerHTML]="item.highlighted"></div>
                 }
               </div>
             </mat-expansion-panel>

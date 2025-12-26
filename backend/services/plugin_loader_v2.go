@@ -70,6 +70,8 @@ func (l *PluginLoaderV2) LoadPlugins() error {
 
 		plugin.ID = registry.ID
 		plugin.InstallSource = registry.InstallSource
+		plugin.CommitHash = registry.CommitHash
+		plugin.Repository = registry.Repository
 		l.plugins[registry.ID] = plugin
 		loadedCount++
 		log.Printf("[PluginLoader] Loaded plugin: %s [ID:%d] (%s) from %s [%s]",

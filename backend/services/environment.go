@@ -45,15 +45,17 @@ type packageCacheEntry struct {
 type EnvironmentService struct {
 	ctx              context.Context
 	db               *DatabaseService
+	settingsService  *SettingsService
 	progressNotifier *ProgressNotifier
 	packageCache     map[string]*packageCacheEntry
 	cacheTTL         time.Duration
 }
 
-func NewEnvironmentService(ctx context.Context, db *DatabaseService, progressNotifier *ProgressNotifier) *EnvironmentService {
+func NewEnvironmentService(ctx context.Context, db *DatabaseService, settingsService *SettingsService, progressNotifier *ProgressNotifier) *EnvironmentService {
 	return &EnvironmentService{
 		ctx:              ctx,
 		db:               db,
+		settingsService:  settingsService,
 		progressNotifier: progressNotifier,
 		packageCache:     make(map[string]*packageCacheEntry),
 		cacheTTL:         5 * time.Minute,
@@ -994,12 +996,19 @@ func (e *EnvironmentService) getActiveRPath() (string, error) {
 	return rEnv.Path, nil
 }
 
-func (e *EnvironmentService) CreateRenvEnvironment(name string, packages []string, pluginID string) error {
-	log.Printf("[CreateRenvEnvironment] Creating renv environment: %s for plugin: %s\n", name, pluginID)
+func (e *EnvironmentService) CreateRenvEnvironment(name string, packages []string, pluginID string, useCache bool) error {
+	log.Printf("[CreateRenvEnvironment] Creating renv environment: %s for plugin: %s (useCache: %v)\n", name, pluginID, useCache)
 
 	rPath, err := e.getActiveRPath()
 	if err != nil {
 		return fmt.Errorf("failed to get active R path: %w", err)
+	}
+
+	cacheDir := ""
+	globalConfig := e.settingsService.GetConfig()
+	// Cache is only used if both Global and Per-Environment toggles are TRUE
+	if globalConfig.UseRenvCache && useCache {
+		cacheDir, _ = e.getRenvCachePath()
 	}
 
 	homeDir, err := os.UserHomeDir()
@@ -1041,9 +1050,41 @@ func (e *EnvironmentService) CreateRenvEnvironment(name string, packages []strin
 
 	e.progressNotifier.EmitStart(ProgressTypeInstall, "renv-init", "Initializing renv...")
 
+	// Attempt to resolve numeric ID to plugin string ID (folder name)
+	resolvedPluginID := pluginID
+	if id, err := strconv.ParseUint(pluginID, 10, 64); err == nil {
+		var pluginRegistry models.PluginRegistry
+		if err := e.db.GetDB().First(&pluginRegistry, id).Error; err == nil {
+			resolvedPluginID = pluginRegistry.PluginID
+		}
+	}
+
+	// 1. Check if the source plugin has a renv.lock we can use
+	pluginLockPath := filepath.Join("plugins", resolvedPluginID, "renv.lock")
+	targetLockPath := filepath.Join(projectPath, "renv.lock")
+	hasExistingLock := false
+	if _, err := os.Stat(pluginLockPath); err == nil {
+		log.Printf("[CreateRenvEnvironment] Found existing renv.lock for plugin %s, copying...\n", resolvedPluginID)
+		if lockData, err := os.ReadFile(pluginLockPath); err == nil {
+			if err := os.WriteFile(targetLockPath, lockData, 0644); err == nil {
+				hasExistingLock = true
+			}
+		}
+	}
+
 	initCmd := fmt.Sprintf("setwd('%s'); if (!requireNamespace('renv', quietly = TRUE)) install.packages('renv', repos='https://cloud.r-project.org'); renv::init(bare = TRUE)", strings.ReplaceAll(projectPath, "\\", "/"))
+	if hasExistingLock {
+		// If we have a lock file, we just need to activate renv
+		initCmd = fmt.Sprintf("setwd('%s'); if (!requireNamespace('renv', quietly = TRUE)) install.packages('renv', repos='https://cloud.r-project.org'); renv::activate()", strings.ReplaceAll(projectPath, "\\", "/"))
+	}
+
 	cmd := exec.Command(rPath, "-e", initCmd)
 	hideConsoleWindow(cmd)
+
+	if cacheDir != "" {
+		cmd.Env = append(os.Environ(), fmt.Sprintf("RENV_PATHS_CACHE=%s", cacheDir))
+	}
+
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		e.progressNotifier.EmitError(ProgressTypeInstall, "renv-init", "Failed to initialize renv", err.Error())
@@ -1051,21 +1092,28 @@ func (e *EnvironmentService) CreateRenvEnvironment(name string, packages []strin
 		return fmt.Errorf("failed to initialize renv: %w\n%s", err, string(output))
 	}
 
+	// 2. Use restore if lock file exists, otherwise proceed to manual install
+	if hasExistingLock {
+		e.progressNotifier.EmitProgress(ProgressTypeInstall, "renv-init", "Restoring environment from renv.lock...", 50)
+		restoreCmd := fmt.Sprintf("setwd('%s'); renv::restore(confirm = FALSE)", strings.ReplaceAll(projectPath, "\\", "/"))
+		cmdR := exec.Command(rPath, "-e", restoreCmd)
+		hideConsoleWindow(cmdR)
+		if cacheDir != "" {
+			cmdR.Env = append(os.Environ(), fmt.Sprintf("RENV_PATHS_CACHE=%s", cacheDir))
+		}
+		if out, err := cmdR.CombinedOutput(); err != nil {
+			log.Printf("[CreateRenvEnvironment] renv::restore failed: %v\nOutput: %s", err, string(out))
+			// Fallback to manual installation if restore fails
+		} else {
+			log.Printf("[CreateRenvEnvironment] renv::restore completed successfully")
+		}
+	}
+
 	e.progressNotifier.EmitComplete(ProgressTypeInstall, "renv-init", "renv initialized successfully")
 
-	// Auto-install plugin requirements if pluginID provided
+	// Auto-install plugin requirements if no lock file was used or for extra packages
 	var packagesToInstall []string
 	if pluginID != "" {
-		// Attempt to resolve numeric ID to plugin string ID (folder name)
-		resolvedPluginID := pluginID
-		if id, err := strconv.ParseUint(pluginID, 10, 64); err == nil {
-			var pluginRegistry models.PluginRegistry
-			if err := e.db.GetDB().First(&pluginRegistry, id).Error; err == nil {
-				resolvedPluginID = pluginRegistry.PluginID
-				log.Printf("[CreateRenvEnvironment] Resolved numeric ID %s to plugin ID %s", pluginID, resolvedPluginID)
-			}
-		}
-
 		// Try to load plugin definition to get inline packages
 		pluginYamlPath := filepath.Join("plugins", resolvedPluginID, "plugin.yaml")
 		var inlinePackages []string
@@ -1104,17 +1152,18 @@ func (e *EnvironmentService) CreateRenvEnvironment(name string, packages []strin
 	}
 
 	if len(packagesToInstall) > 0 {
-		if err := e.InstallRenvPackages(projectPath, rPath, packagesToInstall); err != nil {
+		if err := e.InstallRenvPackages(projectPath, rPath, packagesToInstall, useCache); err != nil {
 			return fmt.Errorf("failed to install packages: %w", err)
 		}
 	}
 
 	renvEnv := RenvEnvironment{
-		Name:        name,
-		Path:        projectPath,
-		ProjectPath: projectPath,
-		BaseRPath:   rPath,
-		CreatedAt:   time.Now().Unix(),
+		Name:           name,
+		Path:           projectPath,
+		ProjectPath:    projectPath,
+		BaseRPath:      rPath,
+		UseGlobalCache: useCache,
+		CreatedAt:      time.Now().Unix(),
 	}
 
 	if err := e.db.SaveRenvEnvironment(renvEnv); err != nil {
@@ -1125,52 +1174,87 @@ func (e *EnvironmentService) CreateRenvEnvironment(name string, packages []strin
 	return nil
 }
 
-func (e *EnvironmentService) InstallRenvPackages(projectPath string, rPath string, packages []string) error {
-	log.Printf("[InstallRenvPackages] Installing %d packages in renv project: %s\n", len(packages), projectPath)
+func (e *EnvironmentService) InstallRenvPackages(projectPath string, rPath string, packages []string, useCache bool) error {
+	log.Printf("[InstallRenvPackages] Installing %d packages in renv project: %s (useCache: %v)\n", len(packages), projectPath, useCache)
 
-	e.progressNotifier.EmitStart(ProgressTypeInstall, "renv-packages", "Checking BiocManager...")
+	cacheDir := ""
+	globalConfig := e.settingsService.GetConfig()
+	if globalConfig.UseRenvCache && useCache {
+		cacheDir, _ = e.getRenvCachePath()
+	}
 
-	biocManagerCheck := fmt.Sprintf("setwd('%s'); if (!requireNamespace('BiocManager', quietly = TRUE)) renv::install('BiocManager')", strings.ReplaceAll(projectPath, "\\", "/"))
-	cmd := exec.Command(rPath, "-e", biocManagerCheck)
-	hideConsoleWindow(cmd)
-	if err := cmd.Run(); err != nil {
-		log.Printf("[InstallRenvPackages] Warning: BiocManager check failed: %v", err)
+	e.progressNotifier.EmitStart(ProgressTypeInstall, "renv-packages", "Initializing renv library...")
+
+	// 1. Get base packages to avoid re-installing (matches original logic)
+	basePkgCmd := "cat(rownames(installed.packages(priority='base')), sep='\\n')"
+	cmdBase := exec.Command(rPath, "-e", basePkgCmd)
+	hideConsoleWindow(cmdBase)
+	baseOut, _ := cmdBase.Output()
+	basePackages := strings.Split(string(baseOut), "\n")
+	baseMap := make(map[string]bool)
+	for _, p := range basePackages {
+		baseMap[strings.TrimSpace(p)] = true
 	}
 
 	totalPackages := len(packages)
 	for i, pkg := range packages {
+		pkg = strings.TrimSpace(pkg)
+		if pkg == "" || baseMap[pkg] {
+			continue
+		}
+
 		percentage := float64(i+1) / float64(totalPackages) * 95.0
 		e.progressNotifier.EmitProgress(ProgressTypeInstall, "renv-packages",
 			fmt.Sprintf("Installing %s (%d/%d)", pkg, i+1, totalPackages), percentage)
 
 		var installCmd string
-		if strings.Contains(pkg, "/") {
-			installCmd = fmt.Sprintf("setwd('%s'); renv::install('bioc::%s')", strings.ReplaceAll(projectPath, "\\", "/"), pkg)
+		// Special case: Rmpi (from original logic)
+		if pkg == "Rmpi" {
+			installCmd = fmt.Sprintf("setwd('%s'); renv::install('Rmpi', configure.args='ORTED=prted')", strings.ReplaceAll(projectPath, "\\", "/"))
 		} else {
-			installCmd = fmt.Sprintf("setwd('%s'); renv::install(c('BiocManager')); BiocManager::install('%s')", strings.ReplaceAll(projectPath, "\\", "/"), pkg)
+			// Try standard renv::install first
+			installCmd = fmt.Sprintf("setwd('%s'); renv::install('%s')", strings.ReplaceAll(projectPath, "\\", "/"), pkg)
 		}
 
 		cmd := exec.Command(rPath, "-e", installCmd)
 		hideConsoleWindow(cmd)
+		if cacheDir != "" {
+			cmd.Env = append(os.Environ(), fmt.Sprintf("RENV_PATHS_CACHE=%s", cacheDir))
+		}
+
 		output, err := cmd.CombinedOutput()
 		if err != nil {
-			e.progressNotifier.EmitError(ProgressTypeInstall, "renv-packages",
-				fmt.Sprintf("Failed to install %s", pkg), err.Error())
-			log.Printf("[InstallRenvPackages] Failed to install %s: %v\nOutput: %s", pkg, err, string(output))
-			return fmt.Errorf("failed to install package %s: %w", pkg, err)
+			log.Printf("[InstallRenvPackages] Standard install failed for %s, trying bioc:: fallback...", pkg)
+			// Fallback: Try explicit Bioconductor prefix
+			biocCmd := fmt.Sprintf("setwd('%s'); renv::install('bioc::%s')", strings.ReplaceAll(projectPath, "\\", "/"), pkg)
+			cmdBioc := exec.Command(rPath, "-e", biocCmd)
+			hideConsoleWindow(cmdBioc)
+			if cacheDir != "" {
+				cmdBioc.Env = append(os.Environ(), fmt.Sprintf("RENV_PATHS_CACHE=%s", cacheDir))
+			}
+			output, err = cmdBioc.CombinedOutput()
+			if err != nil {
+				log.Printf("[InstallRenvPackages] Failed to install %s: %v\nOutput: %s", pkg, err, string(output))
+				// We log and continue like the original script to ensure other packages get a chance
+				e.progressNotifier.EmitProgress(ProgressTypeInstall, "renv-packages", fmt.Sprintf("Warning: Failed to install %s", pkg), percentage)
+				continue
+			}
 		}
 		log.Printf("[InstallRenvPackages] Installed %s successfully", pkg)
 	}
 
 	e.progressNotifier.EmitProgress(ProgressTypeInstall, "renv-packages", "Creating renv snapshot...", 97)
-	snapshotCmd := fmt.Sprintf("setwd('%s'); renv::snapshot()", strings.ReplaceAll(projectPath, "\\", "/"))
-	cmd = exec.Command(rPath, "-e", snapshotCmd)
+	snapshotCmd := fmt.Sprintf("setwd('%s'); renv::snapshot(confirm = FALSE)", strings.ReplaceAll(projectPath, "\\", "/"))
+	cmd := exec.Command(rPath, "-e", snapshotCmd)
 	hideConsoleWindow(cmd)
+	if cacheDir != "" {
+		cmd.Env = append(os.Environ(), fmt.Sprintf("RENV_PATHS_CACHE=%s", cacheDir))
+	}
 	if err := cmd.Run(); err != nil {
 		log.Printf("[InstallRenvPackages] Warning: snapshot failed: %v", err)
 	}
 
-	e.progressNotifier.EmitComplete(ProgressTypeInstall, "renv-packages", "All packages installed successfully")
+	e.progressNotifier.EmitComplete(ProgressTypeInstall, "renv-packages", "R packages installed successfully")
 	log.Printf("[InstallRenvPackages] Package installation complete")
 	return nil
 }
@@ -1242,4 +1326,39 @@ func (e *EnvironmentService) GetRenvLibPath(projectPath string) string {
 	}
 
 	return renvLibPath
+}
+
+func (e *EnvironmentService) getRenvCachePath() (string, error) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+
+	var appFolder string
+	switch runtime.GOOS {
+	case "windows":
+		localAppData := os.Getenv("LOCALAPPDATA")
+		if localAppData != "" {
+			appFolder = filepath.Join(localAppData, "cauldron")
+		} else {
+			appFolder = filepath.Join(homeDir, "AppData", "Local", "cauldron")
+		}
+	case "darwin":
+		appFolder = filepath.Join(homeDir, "Library", "Application Support", "cauldron")
+	case "linux":
+		xdgDataHome := os.Getenv("XDG_DATA_HOME")
+		if xdgDataHome != "" {
+			appFolder = filepath.Join(xdgDataHome, "cauldron")
+		} else {
+			appFolder = filepath.Join(homeDir, ".local", "share", "cauldron")
+		}
+	default:
+		appFolder = filepath.Join(homeDir, ".cauldron")
+	}
+
+	cacheDir := filepath.Join(appFolder, "renv-cache")
+	if err := os.MkdirAll(cacheDir, 0755); err != nil {
+		return "", err
+	}
+	return cacheDir, nil
 }

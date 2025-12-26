@@ -127,6 +127,12 @@
     }
 
     <div class="button-row">
+      <mat-slide-toggle [checked]="useGlobalCache()" (change)="useGlobalCache.set($event.checked)">
+        Use Global Package Cache
+      </mat-slide-toggle>
+    </div>
+
+    <div class="button-row">
       <button mat-raised-button color="primary" (click)="createRenvEnvironment()" [disabled]="!config().rPath || creatingRenvEnv()">
         <mat-icon>add_circle</mat-icon>
         Create Renv Environment

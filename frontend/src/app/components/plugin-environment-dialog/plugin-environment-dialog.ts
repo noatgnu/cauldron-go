@@ -8,17 +8,22 @@ import { MatCardModule } from '@angular/material/card';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatListModule } from '@angular/material/list';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatSelectModule } from '@angular/material/select';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
+import { MatTabsModule } from '@angular/material/tabs';
 import { FormsModule } from '@angular/forms';
-import { Wails, PythonEnvironment, REnvironment, PluginEnvironmentBinding, VirtualEnvironment, RenvEnvironment } from '../../core/services/wails';
+import { Wails, PythonEnvironment, REnvironment, PluginEnvironmentBinding, VirtualEnvironment, RenvEnvironment, CustomEnvVar } from '../../core/services/wails';
+import { DynamicFormComponent } from '../dynamic-form/dynamic-form';
+import { models } from '../../../wailsjs/go/models';
 
 export interface PluginEnvironmentDialogData {
   pluginId: string;
   pluginName: string;
   runtimeType: string;
+  plugin?: models.PluginV2;
 }
 
 @Component({
@@ -36,7 +41,10 @@ export interface PluginEnvironmentDialogData {
     MatSelectModule,
     MatFormFieldModule,
     MatInputModule,
-    FormsModule
+    FormsModule,
+    MatSlideToggleModule,
+    MatTabsModule,
+    DynamicFormComponent
   ],
   templateUrl: './plugin-environment-dialog.html',
   styleUrl: './plugin-environment-dialog.scss',
@@ -51,25 +59,71 @@ export class PluginEnvironmentDialog implements OnInit {
   pythonBinding = signal<PluginEnvironmentBinding | null>(null);
   rBinding = signal<PluginEnvironmentBinding | null>(null);
   pythonEnvironments = signal<PythonEnvironment[]>([]);
+  basePythonEnvironments = computed(() => this.pythonEnvironments().filter(env => !env.isVirtual));
   rEnvironments = signal<REnvironment[]>([]);
   activePythonEnv = signal<PythonEnvironment | null>(null);
   activeREnv = signal<REnvironment | null>(null);
+  customEnvVars = signal<Record<string, string>>({});
 
   showVenvCreation = signal(false);
   showRenvCreation = signal(false);
   selectedBasePython = signal<string>('');
   renvName = signal<string>('');
   renvPackages = signal<string>('');
+  useGlobalCache = signal(false);
   creatingEnvironment = signal(false);
   creationProgress = signal<string>('');
 
-  basePythonEnvironments = computed(() => {
-    return this.pythonEnvironments().filter(env => !env.isVirtual);
+  // Create a mock plugin for the dynamic form to use for ENVs
+  envVariablePlugin = computed(() => {
+    if (!this.data.plugin) return null;
+    const envVars = this.data.plugin.definition.execution?.envVariables || [];
+    if (envVars.length === 0) return null;
+
+    return {
+      ...this.data.plugin,
+      definition: {
+        ...this.data.plugin.definition,
+        inputs: envVars,
+        // Disable example data for the ENV form
+        example: { enabled: false, values: {} }
+      }
+    } as models.PluginV2;
   });
 
   async ngOnInit() {
     await this.loadData();
+    await this.loadCustomEnvVars();
     this.setupProgressListener();
+  }
+
+  async loadCustomEnvVars() {
+    if (!this.data.plugin) return;
+    try {
+      const vars = await this.wails.getCustomEnvVars(this.data.plugin.id);
+      const varMap: Record<string, string> = {};
+      vars.forEach((v: CustomEnvVar) => varMap[v.Key] = v.Value);
+      this.customEnvVars.set(varMap);
+    } catch (error) {
+      console.error('Failed to load custom env vars:', error);
+    }
+  }
+
+  async onEnvVarsSubmit(values: Record<string, any>) {
+    if (!this.data.plugin) return;
+    try {
+      for (const [key, value] of Object.entries(values)) {
+        await this.wails.saveCustomEnvVar({
+          PluginID: this.data.plugin.id,
+          Key: key,
+          Value: String(value)
+        } as CustomEnvVar);
+      }
+      this.showSuccess('Environment variables saved successfully');
+      await this.loadCustomEnvVars();
+    } catch (error) {
+      this.showError('Failed to save environment variables');
+    }
   }
 
   private setupProgressListener() {
@@ -274,7 +328,7 @@ export class PluginEnvironmentDialog implements OnInit {
     this.creationProgress.set('Creating renv environment...');
 
     try {
-      await this.wails.createRenvEnvironment(name, packages, this.data.pluginId);
+      await this.wails.createRenvEnvironment(name, packages, this.data.pluginId, this.useGlobalCache());
 
       const renvs = await this.wails.getRenvEnvironments();
       const newRenv = renvs.find(r => r.Name === name || r.ProjectPath.includes(name));

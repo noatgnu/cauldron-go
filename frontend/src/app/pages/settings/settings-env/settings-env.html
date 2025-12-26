@@ -1,0 +1,93 @@
+<div class="env-settings-container">
+  <mat-tab-group>
+    <!-- GLOBAL VARIABLES TAB -->
+    <mat-tab label="Global Variables">
+      <div class="tab-content">
+        <mat-card class="info-card">
+          <mat-card-content>
+            <mat-icon>info</mat-icon>
+            <p>Global variables are applied to <strong>all</strong> plugin executions. Use this for common paths like <code>CONDA_PATH</code> or <code>JAVA_HOME</code>.</p>
+          </mat-card-content>
+        </mat-card>
+
+        <div class="add-var-row">
+          <mat-form-field appearance="outline">
+            <mat-label>Key</mat-label>
+            <input matInput [value]="newGlobalKey()" (input)="newGlobalKey.set($any($event.target).value)" placeholder="e.g. BLAST_PATH">
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Value</mat-label>
+            <input matInput [value]="newGlobalValue()" (input)="newGlobalValue.set($any($event.target).value)" placeholder="/usr/bin/...">
+          </mat-form-field>
+          <button mat-raised-button color="primary" (click)="addGlobalVar()" [disabled]="!newGlobalKey() || !newGlobalValue()">
+            <mat-icon>add</mat-icon>
+            Add
+          </button>
+        </div>
+
+        <mat-divider></mat-divider>
+
+        <mat-list class="var-list">
+          @if (globalVars().length === 0) {
+            <div class="empty-state">No global variables configured.</div>
+          }
+          @for (v of globalVars(); track v.ID) {
+            <mat-list-item>
+              <div class="var-item">
+                <code class="key">{{ v.Key }}</code>
+                <span class="separator">=</span>
+                <span class="value">{{ v.Value }}</span>
+                <button mat-icon-button color="warn" (click)="deleteGlobalVar(v.ID)">
+                  <mat-icon>delete</mat-icon>
+                </button>
+              </div>
+            </mat-list-item>
+          }
+        </mat-list>
+      </div>
+    </mat-tab>
+
+    <!-- PLUGIN SPECIFIC TAB -->
+    <mat-tab label="Plugin-Specific Overrides">
+      <div class="tab-content">
+        <p class="section-description">Manage variables and paths for specific plugins. These values take priority over global variables.</p>
+
+        <mat-accordion class="plugin-list">
+          @for (p of filteredPlugins(); track p.id) {
+            <mat-expansion-panel>
+              <mat-expansion-panel-header>
+                <mat-panel-title>
+                  <mat-icon>{{ p.definition.plugin.icon || 'extension' }}</mat-icon>
+                  <span>{{ p.definition.plugin.name }}</span>
+                </mat-panel-title>
+                <mat-panel-description>
+                  {{ p.definition.plugin.id }}
+                  @if (getPluginFormValues(p.id); as overrides) {
+                    @if (overrides | keyvalue; as kv) {
+                      @if (kv.length > 0) {
+                        <span class="override-count">({{ kv.length }} overrides)</span>
+                      }
+                    }
+                  }
+                </mat-panel-description>
+              </mat-expansion-panel-header>
+
+              <div class="panel-content">
+                @if (getPluginEnvWrapper(p); as envPlugin) {
+                  <app-dynamic-form
+                    [plugin]="envPlugin"
+                    (formSubmit)="savePluginVars(p.id, $event)">
+                  </app-dynamic-form>
+                } @else {
+                  <div class="no-declaration">
+                    <p>This plugin has not declared any environment variables in its <code>plugin.yaml</code>.</p>
+                  </div>
+                }
+              </div>
+            </mat-expansion-panel>
+          }
+        </mat-accordion>
+      </div>
+    </mat-tab>
+  </mat-tab-group>
+</div>

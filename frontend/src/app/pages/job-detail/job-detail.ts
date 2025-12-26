@@ -1,7 +1,8 @@
 import { DataFrame } from 'data-forge';
-import { Component, OnInit, OnDestroy, AfterViewChecked, signal, ViewChild, ElementRef } from '@angular/core';
+import { Component, OnInit, OnDestroy, AfterViewChecked, signal, ViewChild, ElementRef, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
+import { FormsModule } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
@@ -10,6 +11,9 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { MatTabsModule } from '@angular/material/tabs';
+import { MatInputModule } from '@angular/material/input';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatDialog } from '@angular/material/dialog';
 import { Wails, Job } from '../../core/services/wails';
 import { models } from '../../../wailsjs/go/models';
@@ -25,6 +29,7 @@ import { Annotation, AnnotationService } from '../../core/services/annotation.se
   selector: 'app-job-detail',
   imports: [
     CommonModule,
+    FormsModule,
     MatCardModule,
     MatButtonModule,
     MatIconModule,
@@ -33,6 +38,9 @@ import { Annotation, AnnotationService } from '../../core/services/annotation.se
     MatChipsModule,
     MatExpansionModule,
     MatTabsModule,
+    MatInputModule,
+    MatFormFieldModule,
+    MatTooltipModule,
     PcaPlot,
     PhatePlot,
     FuzzyClusteringPlot,
@@ -54,6 +62,37 @@ export class JobDetail implements OnInit, OnDestroy, AfterViewChecked {
   protected defaultPluginPlotIndex = signal<number>(0);
   protected currentPlugin: any = null;
   private shouldAutoScroll = false;
+  protected fullLogLoaded = signal<boolean>(false);
+  protected totalLogLines = signal<number>(0);
+  protected displayedLogLines = signal<number>(0);
+  private fullLog: string[] = [];
+  protected searchTerm = signal<string>('');
+  protected caseSensitive = signal<boolean>(false);
+  protected currentMatchIndex = signal<number>(0);
+  protected filteredOutput = computed(() => {
+    const term = this.searchTerm();
+    const output = this.job()?.terminalOutput || [];
+
+    if (!term.trim()) {
+      return output.map((line, index) => ({ line, originalIndex: index, highlighted: line }));
+    }
+
+    const searchPattern = this.caseSensitive() ? term : term.toLowerCase();
+    const filtered = output
+      .map((line, index) => {
+        const searchLine = this.caseSensitive() ? line : line.toLowerCase();
+        if (searchLine.includes(searchPattern)) {
+          const highlighted = this.highlightMatches(line, term);
+          return { line, originalIndex: index, highlighted };
+        }
+        return null;
+      })
+      .filter((item): item is { line: string; originalIndex: number; highlighted: string } => item !== null);
+
+    return filtered;
+  });
+  protected matchCount = computed(() => this.filteredOutput().length);
+  protected showingAllLines = computed(() => !this.searchTerm().trim());
 
   @ViewChild('terminalOutput') private terminalOutput?: ElementRef;
 
@@ -75,7 +114,14 @@ export class JobDetail implements OnInit, OnDestroy, AfterViewChecked {
       window.runtime.EventsOn('job:update', async (data: Job) => {
         if (data.id === this.jobId) {
           const previousStatus = this.job()?.status;
-          this.job.set(data);
+          const currentTerminalOutput = this.job()?.terminalOutput || [];
+
+          this.job.set(new models.Job({
+            ...data,
+            terminalOutput: currentTerminalOutput.length > (data.terminalOutput?.length || 0)
+              ? currentTerminalOutput
+              : data.terminalOutput
+          }));
 
           if (previousStatus !== 'completed' && data.status === 'completed') {
             await this.detectPluginPlots();
@@ -92,6 +138,11 @@ export class JobDetail implements OnInit, OnDestroy, AfterViewChecked {
                 terminalOutput: [...(currentJob.terminalOutput || []), data.output]
               });
               this.shouldAutoScroll = true;
+
+              const newLineCount = newJob.terminalOutput?.length || 0;
+              this.displayedLogLines.set(newLineCount);
+              this.totalLogLines.set(newLineCount);
+
               return newJob;
             }
             return currentJob;
@@ -122,6 +173,35 @@ export class JobDetail implements OnInit, OnDestroy, AfterViewChecked {
     this.loading.set(true);
     try {
       const jobData = await this.wails.getJob(this.jobId);
+
+      try {
+        const executionLog = await this.wails.getJobExecutionLog(this.jobId);
+        if (executionLog && executionLog.trim()) {
+          this.fullLog = executionLog.split('\n').filter((line: string) => line.trim());
+          this.totalLogLines.set(this.fullLog.length);
+
+          const maxLines = 1000;
+          if (this.fullLog.length > maxLines) {
+            jobData.terminalOutput = this.fullLog.slice(-maxLines);
+            this.displayedLogLines.set(maxLines);
+            this.fullLogLoaded.set(false);
+          } else {
+            jobData.terminalOutput = this.fullLog;
+            this.displayedLogLines.set(this.fullLog.length);
+            this.fullLogLoaded.set(true);
+          }
+        } else {
+          this.displayedLogLines.set(jobData.terminalOutput?.length || 0);
+          this.totalLogLines.set(jobData.terminalOutput?.length || 0);
+          this.fullLogLoaded.set(true);
+        }
+      } catch (err) {
+        await this.wails.logToFile(`[Job Detail] Could not load execution log: ${err}`);
+        this.displayedLogLines.set(jobData.terminalOutput?.length || 0);
+        this.totalLogLines.set(jobData.terminalOutput?.length || 0);
+        this.fullLogLoaded.set(true);
+      }
+
       this.job.set(jobData);
 
       const pluginId = jobData.parameters?.['pluginId'];
@@ -143,6 +223,24 @@ export class JobDetail implements OnInit, OnDestroy, AfterViewChecked {
       this.error.set(err.message || 'Failed to load job');
     } finally {
       this.loading.set(false);
+    }
+  }
+
+  loadFullLog() {
+    if (this.fullLog.length > 0) {
+      this.job.update(currentJob => {
+        if (currentJob) {
+          const updatedJob = new models.Job({
+            ...currentJob,
+            terminalOutput: this.fullLog
+          });
+          this.displayedLogLines.set(this.fullLog.length);
+          this.fullLogLoaded.set(true);
+          this.shouldAutoScroll = true;
+          return updatedJob;
+        }
+        return currentJob;
+      });
     }
   }
 
@@ -194,6 +292,7 @@ export class JobDetail implements OnInit, OnDestroy, AfterViewChecked {
         width: '90vw',
         maxWidth: '1200px',
         height: '80vh',
+        disableClose: true,
         data: dialogData
       });
 
@@ -403,6 +502,42 @@ export class JobDetail implements OnInit, OnDestroy, AfterViewChecked {
       } catch (error) {
         await this.wails.logToFile(`[Job Detail] Failed to open result folder: ${error}`);
       }
+    }
+  }
+
+  highlightMatches(line: string, searchTerm: string): string {
+    if (!searchTerm.trim()) {
+      return line;
+    }
+
+    const flags = this.caseSensitive() ? 'g' : 'gi';
+    const escapedTerm = searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(escapedTerm, flags);
+
+    return line.replace(regex, (match) => `<mark>${match}</mark>`);
+  }
+
+  clearSearch() {
+    this.searchTerm.set('');
+    this.currentMatchIndex.set(0);
+  }
+
+  toggleCaseSensitive() {
+    this.caseSensitive.update(val => !val);
+    this.currentMatchIndex.set(0);
+  }
+
+  nextMatch() {
+    const count = this.matchCount();
+    if (count > 0) {
+      this.currentMatchIndex.update(val => (val + 1) % count);
+    }
+  }
+
+  previousMatch() {
+    const count = this.matchCount();
+    if (count > 0) {
+      this.currentMatchIndex.update(val => (val - 1 + count) % count);
     }
   }
 }

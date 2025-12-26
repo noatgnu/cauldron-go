@@ -203,6 +203,7 @@ export class DownloadPortableEnvDialogComponent implements OnInit, OnDestroy {
         const envName = this.environment === 'python' ? 'Python' : 'R';
         const dialogRef = this.dialog.open(ConfirmDialogComponent, {
           width: '400px',
+          disableClose: true,
           data: {
             title: `Replace Existing ${envName} Environment?`,
             message: `A portable ${envName} environment is already installed at:\n\n${existingPath}\n\nDownloading a new environment will remove the existing one. Do you want to continue?`,

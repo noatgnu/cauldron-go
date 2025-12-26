@@ -205,10 +205,12 @@ export class PluginList implements OnInit {
 
     this.dialog.open(PluginEnvironmentDialog, {
       width: '600px',
+      disableClose: true,
       data: {
         pluginId: plugin.id.toString(),
         pluginName: plugin.definition.plugin.name,
-        runtimeType: plugin.definition.runtime.type
+        runtimeType: plugin.definition.runtime.type,
+        plugin: plugin
       }
     });
   }

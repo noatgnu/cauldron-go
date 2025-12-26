@@ -1,0 +1,580 @@
+plugin:
+  id: "phosr-maxquant-tmt"
+  name: "PhosR MaxQuant TMT Analysis"
+  description: "Comprehensive phosphoproteomic data analysis including normalization, differential analysis, kinase activity prediction, pathway enrichment, PTM-SET analysis, and signaling network visualization using PhosR"
+  version: "1.0.0"
+  author: "CauldronGO Team"
+  category: "statistics"
+  subcategory: "phosr"
+  icon: "biotech"
+
+runtime:
+  type: "r"
+  script: "phosr_maxquant_tmt_modular.R"
+
+inputs:
+  - name: "input_file"
+    label: "PTM Evidence File"
+    type: "file"
+    required: true
+    accept: ".txt"
+    description: "MaxQuant evidence.txt file with PTM data (e.g., from phospho search)"
+
+  - name: "fasta_file"
+    label: "FASTA File"
+    type: "file"
+    required: false
+    accept: ".fasta,.fa"
+    description: "Protein database FASTA file for site mapping"
+
+  - name: "annotation_file"
+    label: "PTM Annotation File"
+    type: "file"
+    required: true
+    accept: ".csv,.tsv,.txt"
+    description: "Sample annotation with columns: Sample, Condition, BioReplicate"
+
+  - name: "annotation_protein_file"
+    label: "Protein Annotation File"
+    type: "file"
+    required: false
+    accept: ".csv,.tsv,.txt"
+    description: "Sample annotation for protein data (same format as PTM annotation)"
+
+  - name: "feature_id_col"
+    label: "PTM Feature ID Column"
+    type: "text"
+    required: true
+    default: "Sequence"
+    description: "Column name for feature identifiers in PTM file (stripped sequence)"
+
+  - name: "site_col"
+    label: "PTM Site Column"
+    type: "text"
+    required: true
+    default: "Modified sequence"
+    description: "Column name for PTM site information (modified sequence)"
+
+  - name: "protein_col"
+    label: "PTM Protein Column"
+    type: "text"
+    required: true
+    default: "Proteins"
+    description: "Column name for protein identifiers in PTM file"
+
+  - name: "probability_col"
+    label: "PTM Probability Column"
+    type: "text"
+    required: false
+    default: "Phospho (STY) Probabilities"
+    description: "Column name for site localization probabilities (e.g., Phospho (STY) Probabilities)"
+
+  - name: "min_probability"
+    label: "Minimum Localization Probability"
+    type: "number"
+    required: false
+    default: 0.75
+    min: 0
+    max: 1
+    step: 0.05
+    description: "Minimum probability score for valid PTM sites (0-1)"
+
+  - name: "protein_file"
+    label: "Protein Evidence File"
+    type: "file"
+    required: false
+    accept: ".txt"
+    description: "MaxQuant evidence.txt file for protein-level data (optional)"
+
+  - name: "protein_feature_id_col"
+    label: "Protein Feature ID Column"
+    type: "text"
+    required: false
+    default: "Sequence"
+    description: "Column name for peptide sequence in protein evidence file"
+
+  - name: "protein_id_col"
+    label: "Protein ID Column"
+    type: "text"
+    required: false
+    default: "Proteins"
+    description: "Column name for protein IDs in protein evidence file"
+
+  - name: "comparison_file"
+    label: "Comparison Matrix File"
+    type: "file"
+    required: false
+    accept: ".csv,.tsv,.txt"
+    description: "Pairwise comparisons (columns: comparison_label, condition_A, condition_B)"
+
+  - name: "log2_transform"
+    label: "Apply Log2 Transformation"
+    type: "boolean"
+    default: true
+    description: "Apply log2 transformation to intensities"
+
+  - name: "exclude_conditions"
+    label: "Exclude Conditions (comma-separated)"
+    type: "text"
+    required: false
+    description: "Comma-separated list of conditions to exclude from analysis (e.g., 'Norm,Empty')"
+
+  - name: "remove_norm_channel"
+    label: "Remove 'Norm' Channel"
+    type: "boolean"
+    default: true
+    description: "Automatically remove samples with condition 'Norm'"
+
+  - name: "col_filter"
+    label: "Column Completeness Threshold"
+    type: "number"
+    required: false
+    default: 0.7
+    min: 0
+    max: 1
+    step: 0.05
+    description: "Maximum proportion of missing values allowed per sample. Default 0.7 = keep samples with ≥30% valid measurements."
+
+  - name: "row_filter"
+    label: "Row Completeness Threshold"
+    type: "number"
+    required: false
+    default: 0.7
+    min: 0
+    max: 1
+    step: 0.05
+    description: "Maximum proportion of missing values allowed per feature. Default 0.7 = keep features with ≥30% valid measurements."
+
+  - name: "impute_order"
+    label: "Imputation Order"
+    type: "select"
+    default: "after"
+    options:
+      - "before"
+      - "after"
+    description: "When to impute missing values relative to normalization. 'after': normalize then impute. 'before': impute then normalize."
+
+  - name: "impute"
+    label: "Imputation Method"
+    type: "select"
+    required: false
+    default: "knn"
+    options:
+      - "none"
+      - "knn"
+      - "MinDet"
+      - "MinProb"
+      - "min"
+      - "zero"
+      - "mixed"
+      - "nbavg"
+      - "with"
+      - "QRILC"
+      - "MLE"
+      - "bpca"
+    description: "Imputation method for missing values"
+
+  - name: "normalize_method"
+    label: "Normalization Method"
+    type: "select"
+    required: false
+    default: "center.median"
+    options:
+      - "none"
+      - "center.median"
+      - "center.mean"
+      - "quantiles"
+      - "quantiles.robust"
+      - "vsn"
+    description: "Normalization method to apply"
+
+  - name: "aggregation_order"
+    label: "Aggregation Order"
+    type: "select"
+    default: "after"
+    options:
+      - "before"
+      - "after"
+    description: "When to aggregate peptides to proteins. 'after': normalize/impute peptides then aggregate. 'before': aggregate peptides then normalize proteins."
+
+  - name: "summarization_method"
+    label: "Protein Summarization Method"
+    type: "select"
+    required: false
+    default: "mean"
+    options:
+      - "mean"
+      - "median"
+      - "sum"
+    description: "Method for combining peptide intensities to protein level. 'mean': arithmetic mean. 'median': median. 'sum': sum."
+
+  - name: "adjust_method"
+    label: "P-value Adjustment Method"
+    type: "select"
+    required: false
+    default: "BH"
+    options:
+      - "BH"
+      - "bonferroni"
+      - "holm"
+      - "hochberg"
+      - "BY"
+      - "none"
+    description: "Method for multiple testing correction"
+
+  - name: "alpha"
+    label: "Significance Level"
+    type: "number"
+    required: false
+    default: 0.05
+    min: 0.001
+    max: 0.2
+    step: 0.001
+    description: "Adjusted p-value threshold for significance"
+
+  - name: "lfc_threshold"
+    label: "Log2 Fold Change Threshold"
+    type: "number"
+    required: false
+    default: 1.0
+    min: 0
+    max: 5
+    step: 0.1
+    description: "Minimum absolute log2 fold-change threshold for significance"
+
+  - name: "organism"
+    label: "Organism"
+    type: "select"
+    required: true
+    default: "human"
+    options:
+      - "human"
+      - "mouse"
+    description: "Organism for kinase-substrate database"
+
+  - name: "perform_kinase_analysis"
+    label: "Perform Kinase Activity Analysis"
+    type: "boolean"
+    default: true
+    description: "Predict kinase activities and kinase-substrate relationships"
+
+  - name: "kinase_top_substrates"
+    label: "Top Substrates for Kinase Prediction"
+    type: "number"
+    required: false
+    default: 30
+    min: 10
+    max: 100
+    step: 5
+    description: "Number of top substrates to select per kinase"
+    visibleWhen:
+      field: "perform_kinase_analysis"
+      equals: true
+
+  - name: "kinase_score_threshold"
+    label: "Kinase Score Threshold"
+    type: "number"
+    required: false
+    default: 0.8
+    min: 0
+    max: 1
+    step: 0.05
+    description: "Minimum score threshold for kinase-substrate predictions"
+    visibleWhen:
+      field: "perform_kinase_analysis"
+      equals: true
+
+  - name: "kinase_num_motifs"
+    label: "Number of Kinase Motifs"
+    type: "number"
+    required: false
+    default: 5
+    min: 1
+    max: 10
+    step: 1
+    description: "Number of motifs to consider in kinase-substrate scoring (higher values increase sensitivity but computation time)"
+    visibleWhen:
+      field: "perform_kinase_analysis"
+      equals: true
+
+  - name: "top_pathways_plot"
+    label: "Top Pathways to Plot"
+    type: "number"
+    required: false
+    default: 20
+    min: 10
+    max: 50
+    step: 5
+    description: "Number of top enriched pathways to show in plots"
+
+  - name: "top_ptmset_plot"
+    label: "Top PTM-SETs to Plot"
+    type: "number"
+    required: false
+    default: 20
+    min: 10
+    max: 50
+    step: 5
+    description: "Number of top enriched kinase substrate sets to show in plots"
+
+  - name: "top_diff_sites_heatmap"
+    label: "Top Differential Sites in Heatmap"
+    type: "number"
+    required: false
+    default: 50
+    min: 10
+    max: 100
+    step: 10
+    description: "Number of top differential phosphosites to show in heatmap"
+    visibleWhen:
+      field: "perform_kinase_analysis"
+      equals: true
+
+  - name: "top_phosphosite_heatmap"
+    label: "Top Phosphosites by Variance in Heatmap"
+    type: "number"
+    required: false
+    default: 50
+    min: 10
+    max: 100
+    step: 10
+    description: "Number of phosphosites with highest kinase score variance to show in heatmap"
+    visibleWhen:
+      field: "perform_kinase_analysis"
+      equals: true
+
+  - name: "signaling_network_top_kinases"
+    label: "Top Variable Kinases in Signaling Network"
+    type: "number"
+    required: false
+    default: 30
+    min: 10
+    max: 50
+    step: 5
+    description: "Number of top variable kinases to show in signaling network heatmap"
+    visibleWhen:
+      field: "perform_kinase_analysis"
+      equals: true
+
+  - name: "network_plot_top_interactions"
+    label: "Top Kinase-Substrate Interactions to Plot"
+    type: "number"
+    required: false
+    default: 50
+    min: 20
+    max: 100
+    step: 10
+    description: "Number of top kinase-substrate interactions to show in network plots"
+    visibleWhen:
+      field: "perform_kinase_analysis"
+      equals: true
+
+outputs:
+  - name: "dpa_results"
+    path: "dpa_results.txt"
+    type: "data"
+    description: "Differential Phosphosite Abundance (DPA) results from MSqRob2 analysis. Contains logFC, p-values, and adjusted p-values for each phosphosite across all comparisons. Rows represent phosphosites, columns include statistical measures and comparison information."
+    format: "tsv"
+
+  - name: "dpu_results_phosr_format"
+    path: "dpu_results_phosr_format.txt"
+    type: "data"
+    description: "Differential Protein Use (DPU) results in PhosR format. Contains phosphosite differential analysis normalized by protein abundance. Includes PhosR_ID (GENE;SITE; format), Gene symbols, feature IDs, and statistical results across all comparisons. Used for downstream PhosR pathway and kinase analyses."
+    format: "tsv"
+
+  - name: "phosphosite_intensities"
+    path: "phosphosite_intensities.txt"
+    type: "data"
+    description: "Normalized log2-transformed phosphosite intensities. Matrix with phosphosites in rows and samples in columns. Values represent normalized abundance levels after QC filtering, normalization, and optional imputation. Used as input for differential analysis."
+    format: "tsv"
+
+  - name: "kinase_substrate_scores"
+    path: "kinase_substrate_scores.txt"
+    type: "data"
+    description: "PhosR kinase-substrate prediction scores. Matrix with phosphosites (PhosR_ID format: GENE;SITE;) in rows and kinases in columns. Scores represent predicted kinase-substrate relationships based on sequence motif matching and PhosphoSitePlus database. Higher scores indicate stronger evidence of kinase-substrate relationship."
+    format: "tsv"
+
+  - name: "kinase_activities"
+    path: "kinase_activities.txt"
+    type: "data"
+    description: "Predicted kinase activities across experimental conditions. Contains mean kinase activity scores per condition, calculated from substrate phosphorylation levels weighted by kinase-substrate prediction scores. Rows represent kinases, columns represent conditions."
+    format: "tsv"
+
+  - name: "differential_kinase_activities"
+    path: "differential_kinase_activities.txt"
+    type: "data"
+    description: "Differential kinase activity scores between condition pairs. Shows log2 fold-changes in predicted kinase activities for each comparison. Indicates which kinases are more or less active between experimental conditions."
+    format: "tsv"
+
+  - name: "top_differential_sites_data"
+    path: "top_differential_sites.txt"
+    type: "data"
+    description: "Top differential phosphosites per comparison (default: top 50 per comparison). Filtered to include only sites with kinase scoring data. Contains logFC, adjusted p-values, PhosR_ID, Gene, feature IDs, and significance flags. Sorted by absolute logFC within each comparison."
+    format: "tsv"
+
+  - name: "pathway_enrichment_all_comparisons"
+    path: "pathway_enrichment_all_comparisons.txt"
+    type: "data"
+    description: "Combined Reactome pathway enrichment results for all comparisons. Each row represents an enriched pathway with pathway ID, name, gene counts, p-values, adjusted p-values, and comparison label. Uses Fisher's exact test for over-representation analysis of genes with significant phosphosite changes."
+    format: "tsv"
+
+  - name: "ptmset_enrichment_all_comparisons"
+    path: "ptmset_enrichment_all_comparisons.txt"
+    type: "data"
+    description: "Combined PhosR PTM-SET (kinase substrate set) enrichment results for all comparisons. Each row represents a kinase with enriched substrates, including kinase name, substrate counts, p-values, adjusted p-values, and comparison label. Identifies kinases whose known substrates are over-represented among significant phosphosites."
+    format: "tsv"
+
+  - name: "kinase_substrate_network_all_comparisons"
+    path: "kinase_substrate_network_all_comparisons.txt"
+    type: "data"
+    description: "Combined kinase-substrate interaction networks for all comparisons. Each row represents a kinase-substrate pair with prediction score, substrate PhosR_ID, gene name, and comparison label. Filtered to significant phosphosites only. Shows which kinases are predicted to regulate which phosphosites in each comparison."
+    format: "tsv"
+
+  - name: "qc_plots"
+    path: "qc_plots.pdf"
+    type: "plot"
+    description: "Quality control visualizations: sample boxplots (intensity distributions), PCA plots (sample clustering), and correlation heatmaps. Includes both DPA and DPU data if both analyses are performed. Helps assess data quality, batch effects, and sample relationships."
+    format: "pdf"
+
+  - name: "volcano_plots"
+    path: "volcano_plots.pdf"
+    type: "plot"
+    description: "Volcano plots for differential phosphorylation across all comparisons. Each plot shows -log10(p-value) vs log2(fold-change) with significance thresholds indicated. Points colored by significance status. Helps visualize magnitude and significance of phosphosite changes."
+    format: "pdf"
+
+  - name: "kinase_heatmap"
+    path: "kinase_heatmap.pdf"
+    type: "plot"
+    description: "Kinase activity heatmaps and differential activity bar plots. Main heatmap shows row-scaled kinase activities across conditions with hierarchical clustering. Bar plots show differential kinase activities for each comparison. Visualizes kinase activation patterns across experimental design."
+    format: "pdf"
+
+  - name: "phosphosite_heatmap"
+    path: "phosphosite_heatmap.pdf"
+    type: "plot"
+    description: "Heatmap of top phosphosites with highest kinase score variance. Shows phosphosites (rows) with most variable kinase predictions across kinases (columns). Identifies sites regulated by multiple kinases or showing kinase-specific patterns."
+    format: "pdf"
+
+  - name: "site_class_distribution"
+    path: "site_class_distribution.pdf"
+    type: "plot"
+    description: "Bar plots showing distribution of phosphorylated residue types (pS, pT, pY). Includes overall distribution and per-condition counts. Helps assess phosphoproteome coverage and potential biases in site detection."
+    format: "pdf"
+
+  - name: "top_differential_sites_heatmap"
+    path: "top_differential_sites.pdf"
+    type: "plot"
+    description: "Intensity heatmap of top differential phosphosites across all samples. Shows log2 intensity values (row-scaled) for top significant sites (filtered by adjusted p-value and fold-change thresholds, limited to sites with kinase data). Displays DPU values if DPU analysis performed, otherwise DPA values. Reveals clustering patterns and regulation of most significantly changing phosphosites."
+    format: "pdf"
+
+  - name: "kinase_family_analysis"
+    path: "kinase_family_analysis.pdf"
+    type: "plot"
+    description: "Kinase family-level analysis plots. Bar chart showing number of detected kinases per family and heatmap of family-grouped kinase activities across conditions. Helps identify coordinated regulation at the kinase family level."
+    format: "pdf"
+
+  - name: "pathway_enrichment_plots"
+    path: "pathway_enrichment.pdf"
+    type: "plot"
+    description: "Reactome pathway enrichment visualizations for all comparisons. Bar plots show top enriched pathways ranked by -log10(p-value), colored by adjusted p-value. Bubble plots show pathway enrichment across comparisons with bubble size representing gene count. Identifies biological processes affected by phosphorylation changes."
+    format: "pdf"
+
+  - name: "ptmset_enrichment_plots"
+    path: "ptmset_enrichment.pdf"
+    type: "plot"
+    description: "PTM-SET kinase substrate enrichment visualizations for all comparisons. Bar plots show top enriched kinase substrate sets ranked by -log10(p-value). Bubble plots show enrichment patterns across comparisons. Identifies kinases whose substrates are coordinately regulated."
+    format: "pdf"
+
+  - name: "kinase_substrate_network_plots"
+    path: "kinase_substrate_network.pdf"
+    type: "plot"
+    description: "Network visualizations of top kinase-substrate interactions for each comparison. Bar plots show top kinase-substrate pairs ranked by prediction score. Network plots display kinases (colored nodes) connected to their predicted substrates (gray nodes) with edge width representing score strength. Reveals signaling network topology for significant phosphosites."
+    format: "pdf"
+
+  - name: "signaling_network_plots"
+    path: "signaling_network.pdf"
+    type: "plot"
+    description: "Integrated signaling network heatmap showing top variable kinases across all samples. Displays kinase activities (row-scaled) with hierarchical clustering of kinases and samples. Provides overview of kinome activation state across experimental conditions."
+    format: "pdf"
+
+execution:
+  argsMapping:
+    input_file: "--input_file"
+    fasta_file: "--fasta_file"
+    annotation_file: "--annotation_file"
+    annotation_protein_file: "--annotation_protein_file"
+    feature_id_col: "--feature_id_col"
+    site_col: "--site_col"
+    protein_col: "--protein_col"
+    protein_file: "--protein_file"
+    protein_feature_id_col: "--protein_feature_id_col"
+    protein_id_col: "--protein_id_col"
+    probability_col: "--probability_col"
+    min_probability: "--min_probability"
+    comparison_file: "--comparison_file"
+    log2_transform:
+      flag: "--log2_transform"
+      when: "true"
+    exclude_conditions: "--exclude_conditions"
+    remove_norm_channel:
+      flag: "--remove_norm_channel"
+      when: "true"
+    col_filter: "--col_filter"
+    row_filter: "--row_filter"
+    impute_order: "--impute_order"
+    impute: "--impute"
+    normalize_method: "--normalize_method"
+    aggregation_order: "--aggregation_order"
+    summarization_method: "--summarization_method"
+    adjust_method: "--adjust_method"
+    alpha: "--alpha"
+    lfc_threshold: "--lfc_threshold"
+    organism: "--organism"
+    perform_kinase_analysis:
+      flag: "--perform_kinase_analysis"
+      when: "true"
+    kinase_top_substrates: "--kinase_top_substrates"
+    kinase_score_threshold: "--kinase_score_threshold"
+    kinase_num_motifs: "--kinase_num_motifs"
+    top_pathways_plot: "--top_pathways_plot"
+    top_ptmset_plot: "--top_ptmset_plot"
+    top_diff_sites_heatmap: "--top_diff_sites_heatmap"
+    top_phosphosite_heatmap: "--top_phosphosite_heatmap"
+    signaling_network_top_kinases: "--signaling_network_top_kinases"
+    network_plot_top_interactions: "--network_plot_top_interactions"
+
+  outputDir: "--output_folder"
+
+  requirements:
+    r: ">=4.2"
+    rPackagesFile: "r-packages.txt"
+
+example:
+  enabled: true
+  values:
+    input_file: "maxquant-tmt/evidence_ptm.txt"
+    fasta_file: "maxquant-tmt/uniprot_human.fasta"
+    annotation_file: "maxquant-tmt/annotation_ptm_msqrob2.txt"
+    annotation_protein_file: "maxquant-tmt/annotation_protein_msqrob2.txt"
+    feature_id_col: "Sequence"
+    site_col: "Modified sequence"
+    protein_col: "Proteins"
+    protein_file: "maxquant-tmt/evidence_protein.txt"
+    probability_col: "Phospho (STY) Probabilities"
+    min_probability: 0.75
+    log2_transform: true
+    exclude_conditions: "Norm"
+    remove_norm_channel: true
+    col_filter: 0.7
+    row_filter: 0.7
+    impute_order: "after"
+    impute: "knn"
+    normalize_method: "center.median"
+    aggregation_order: "after"
+    summarization_method: "mean"
+    adjust_method: "BH"
+    organism: "human"
+    perform_kinase_analysis: true
+    kinase_top_substrates: 30
+
+diagram:
+  enabled: true

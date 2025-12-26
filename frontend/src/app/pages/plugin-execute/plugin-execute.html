@@ -10,7 +10,10 @@
       <p>{{ error() }}</p>
     </div>
   } @else if (plugin()) {
-    <mat-card class="plugin-card">
+    <mat-tab-group>
+      <mat-tab label="Execute">
+        <div class="tab-content">
+          <mat-card class="plugin-card">
       <mat-card-header>
         <mat-icon mat-card-avatar>{{ plugin()!.definition.plugin.icon || 'extension' }}</mat-icon>
         <mat-card-title>
@@ -100,8 +103,54 @@
             <strong>Outputs:</strong>
             <span>{{ plugin()!.definition.outputs?.length || 0 }}</span>
           </div>
+          <div class="info-item">
+            <strong>Install Source:</strong>
+            <span>{{ plugin()!.installSource | titlecase }}</span>
+          </div>
+          @if (plugin()!.installSource === 'remote' && plugin()!.commitHash) {
+            <div class="info-item">
+              <strong>Commit Hash:</strong>
+              <span class="commit-hash">{{ plugin()!.commitHash }}</span>
+            </div>
+          }
+          @if (plugin()!.repository) {
+            <div class="info-item">
+              <strong>Repository:</strong>
+              <span class="repo-text">{{ plugin()!.repository }}</span>
+            </div>
+          }
         </div>
       </mat-card-content>
     </mat-card>
+        </div>
+      </mat-tab>
+
+      @if (plugin()!.definition.outputs && plugin()!.definition.outputs!.length > 0) {
+        <mat-tab label="Output Files ({{ plugin()!.definition.outputs!.length }})">
+          <div class="tab-content">
+            <div class="outputs-list">
+              @for (output of plugin()!.definition.outputs; track output.name) {
+                <div class="output-item">
+                  <div class="output-header">
+                    <mat-icon class="output-icon" [class.data-icon]="output.type === 'data'" [class.plot-icon]="output.type === 'plot'">
+                      {{ output.type === 'data' ? 'table_chart' : 'insert_chart' }}
+                    </mat-icon>
+                    <div class="output-title">
+                      <strong>{{ output.path }}</strong>
+                      <span class="output-type-badge" [class.data-badge]="output.type === 'data'" [class.plot-badge]="output.type === 'plot'">
+                        {{ output.type === 'data' ? 'Data' : 'Plot' }}
+                      </span>
+                    </div>
+                  </div>
+                  <div class="output-description">
+                    {{ output.description || 'No description available' }}
+                  </div>
+                </div>
+              }
+            </div>
+          </div>
+        </mat-tab>
+      }
+    </mat-tab-group>
   }
 </div>

@@ -41,7 +41,8 @@ export class InstallPluginDialog {
     private fb: FormBuilder
   ) {
     this.form = this.fb.group({
-      repoURL: [data.repoURL || '', [Validators.required, Validators.pattern(this.urlPattern)]]
+      repoURL: [data.repoURL || '', [Validators.required, Validators.pattern(this.urlPattern)]],
+      commitHash: ['']
     });
   }
 
@@ -58,7 +59,10 @@ export class InstallPluginDialog {
 
   install() {
     if (this.form.valid) {
-      this.dialogRef.close(this.form.value.repoURL);
+      this.dialogRef.close({
+        repoURL: this.form.value.repoURL,
+        commitHash: this.form.value.commitHash
+      });
     }
   }
 

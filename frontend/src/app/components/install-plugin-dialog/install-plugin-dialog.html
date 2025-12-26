@@ -13,6 +13,13 @@
         <mat-hint>Enter a Git repository URL (GitHub, GitLab, etc.)</mat-hint>
       </mat-form-field>
 
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Git Reference (Optional)</mat-label>
+        <input matInput formControlName="commitHash" placeholder="main, v1.0, or hash">
+        <mat-icon matSuffix matTooltip="Branch, Tag, or Commit Hash">info</mat-icon>
+        <mat-hint>Leave empty for default branch</mat-hint>
+      </mat-form-field>
+
       <div class="info-section">
         <mat-icon>info</mat-icon>
         <div class="info-text">

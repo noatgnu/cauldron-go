@@ -3,15 +3,15 @@ package services
 import (
 	"context"
 	"database/sql"
-	"github.com/noatgnu/cauldron-go/backend/models"
 	"log"
 	"os"
 	"path/filepath"
 
+	"github.com/noatgnu/cauldron-go/backend/models"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
-	_ "modernc.org/sqlite" // Pure Go SQLite driver
+	_ "modernc.org/sqlite"
 )
 
 type DatabaseService struct {
@@ -68,13 +68,14 @@ type REnvironmentDB struct {
 }
 
 type RenvEnvironment struct {
-	ID          uint   `gorm:"primaryKey"`
-	Name        string `gorm:"not null"`
-	Path        string `gorm:"not null;unique"`
-	ProjectPath string `gorm:"not null"`
-	BaseRPath   string `gorm:"not null"`
-	RenvVersion string
-	CreatedAt   int64 `gorm:"not null"`
+	ID             uint   `gorm:"primaryKey"`
+	Name           string `gorm:"not null"`
+	Path           string `gorm:"not null;unique"`
+	ProjectPath    string `gorm:"not null"`
+	BaseRPath      string `gorm:"not null"`
+	RenvVersion    string
+	UseGlobalCache bool  `gorm:"not null;default:false"`
+	CreatedAt      int64 `gorm:"not null"`
 }
 
 type PluginEnvironmentBinding struct {
@@ -85,6 +86,15 @@ type PluginEnvironmentBinding struct {
 	EnvironmentPath string `gorm:"not null"`
 	CreatedAt       int64  `gorm:"autoCreateTime"`
 	UpdatedAt       int64  `gorm:"autoUpdateTime"`
+}
+
+type CustomEnvVar struct {
+	ID        uint   `gorm:"primaryKey"`
+	PluginID  uint   `gorm:"index"` // 0 if Global
+	Key       string `gorm:"not null"`
+	Value     string `gorm:"not null"`
+	CreatedAt int64  `gorm:"autoCreateTime"`
+	UpdatedAt int64  `gorm:"autoUpdateTime"`
 }
 
 func NewDatabaseService(ctx context.Context) (*DatabaseService, error) {
@@ -150,6 +160,7 @@ func (d *DatabaseService) autoMigrate() error {
 		&PluginEnvironmentBinding{},
 		&PythonEnvironmentDB{},
 		&REnvironmentDB{},
+		&CustomEnvVar{},
 		&models.Job{},
 		&models.PluginRegistry{},
 	)
@@ -427,4 +438,33 @@ func (d *DatabaseService) GetAllPluginEnvironmentBindings() ([]PluginEnvironment
 	var bindings []PluginEnvironmentBinding
 	err := d.db.Order("created_at DESC").Find(&bindings).Error
 	return bindings, err
+}
+
+func (d *DatabaseService) SaveCustomEnvVar(envVar CustomEnvVar) error {
+	var existing CustomEnvVar
+	result := d.db.Where("plugin_id = ? AND key = ?", envVar.PluginID, envVar.Key).First(&existing)
+
+	if result.Error == nil {
+		return d.db.Model(&existing).Updates(envVar).Error
+	}
+
+	return d.db.Create(&envVar).Error
+}
+
+func (d *DatabaseService) GetCustomEnvVars(pluginID uint) ([]CustomEnvVar, error) {
+	var envVars []CustomEnvVar
+	err := d.db.Where("plugin_id = ?", pluginID).Find(&envVars).Error
+	return envVars, err
+}
+
+func (d *DatabaseService) GetGlobalCustomEnvVars() ([]CustomEnvVar, error) {
+	return d.GetCustomEnvVars(0)
+}
+
+func (d *DatabaseService) DeleteCustomEnvVar(id uint) error {
+	return d.db.Delete(&CustomEnvVar{}, id).Error
+}
+
+func (d *DatabaseService) DeleteCustomEnvVarByKey(pluginID uint, key string) error {
+	return d.db.Where("plugin_id = ? AND key = ?", pluginID, key).Delete(&CustomEnvVar{}).Error
 }

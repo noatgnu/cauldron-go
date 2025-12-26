@@ -10,6 +10,11 @@ interface Breadcrumb {
   url: string;
 }
 
+interface RouteConfig {
+  label: string;
+  listRoute?: string;
+}
+
 @Component({
   selector: 'app-breadcrumbs',
   imports: [CommonModule, MatIconModule],
@@ -19,28 +24,33 @@ interface Breadcrumb {
 export class Breadcrumbs implements OnInit {
   protected breadcrumbs = signal<Breadcrumb[]>([]);
 
-  private routeLabels: { [key: string]: string } = {
-    '': 'Home',
-    'settings': 'Settings',
-    'jobs': 'Jobs',
-    'plugin': 'Plugins',
-    'plugin-list': 'Plugin List',
-    'plugins': 'Plugin Management',
-    'analysis': 'Analysis',
-    'pca': 'PCA',
-    'imputation': 'Imputation',
-    'normalization': 'Normalization',
-    'limma': 'Limma',
-    'phate': 'PHATE',
-    'fuzzy-clustering': 'Fuzzy Clustering',
-    'alphastats': 'AlphaStats',
-    'qfeatures-limma': 'QFeatures + Limma',
-    'utilities': 'Utilities',
-    'uniprot': 'UniProt Lookup',
-    'coverage-map': 'Coverage Map',
-    'ptm-remap': 'PTM Remapping',
-    'peptide-check': 'Peptide Library Check',
-    'format-conversion': 'Format Conversion'
+  private routeConfig: { [key: string]: RouteConfig } = {
+    '': { label: 'Home' },
+    'settings': { label: 'Settings' },
+    'jobs': { label: 'Jobs' },
+    'job': { label: 'Jobs', listRoute: '/jobs' },
+    'plugin': { label: 'Plugins', listRoute: '/plugin-list' },
+    'plugin-list': { label: 'Plugin List' },
+    'plugins': { label: 'Plugin Management' },
+    'analysis': { label: 'Analysis' },
+    'pca': { label: 'PCA' },
+    'imputation': { label: 'Imputation' },
+    'normalization': { label: 'Normalization' },
+    'limma': { label: 'Limma' },
+    'phate': { label: 'PHATE' },
+    'fuzzy-clustering': { label: 'Fuzzy Clustering' },
+    'alphastats': { label: 'AlphaStats' },
+    'qfeatures-limma': { label: 'QFeatures + Limma' },
+    'batch-correction': { label: 'Batch Correction' },
+    'correlation-matrix': { label: 'Correlation Matrix' },
+    'venn-diagram': { label: 'Venn Diagram' },
+    'maxlfq': { label: 'MaxLFQ' },
+    'utilities': { label: 'Utilities' },
+    'uniprot': { label: 'UniProt Lookup' },
+    'coverage-map': { label: 'Coverage Map' },
+    'ptm-remap': { label: 'PTM Remapping' },
+    'peptide-check': { label: 'Peptide Library Check' },
+    'format-conversion': { label: 'Format Conversion' }
   };
 
   constructor(
@@ -70,29 +80,57 @@ export class Breadcrumbs implements OnInit {
     let currentUrl = '';
     for (let i = 0; i < paths.length; i++) {
       const path = paths[i];
+      const nextPath = i + 1 < paths.length ? paths[i + 1] : null;
+      const prevPath = i > 0 ? paths[i - 1] : null;
       currentUrl += `/${path}`;
 
-      let label = this.routeLabels[path] || path;
-      let breadcrumbUrl = currentUrl;
+      const config = this.routeConfig[path];
 
-      if (path === 'plugin' && i + 1 < paths.length && !isNaN(parseInt(paths[i + 1], 10))) {
-        breadcrumbUrl = '/plugin-list';
-      }
-
-      if (paths[i - 1] === 'plugin' && !isNaN(parseInt(path, 10))) {
-        try {
-          const pluginId = parseInt(path, 10);
-          const plugin = await this.pluginService.getPlugin(pluginId);
-          label = plugin.definition.plugin.name;
-        } catch (err) {
-          label = `Plugin ${path}`;
+      if (!config) {
+        if (this.isUUID(path) || this.isNumeric(path)) {
+          const label = await this.getDetailLabel(prevPath, path);
+          crumbs.push({ label, url: currentUrl });
+        } else {
+          crumbs.push({ label: path, url: currentUrl });
         }
+        continue;
       }
 
-      crumbs.push({ label, url: breadcrumbUrl });
+      if (config.listRoute && nextPath && (this.isUUID(nextPath) || this.isNumeric(nextPath))) {
+        crumbs.push({ label: config.label, url: config.listRoute });
+      } else {
+        crumbs.push({ label: config.label, url: currentUrl });
+      }
     }
 
     this.breadcrumbs.set(crumbs);
+  }
+
+  private isUUID(str: string): boolean {
+    const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    return uuidPattern.test(str);
+  }
+
+  private isNumeric(str: string): boolean {
+    return !isNaN(parseInt(str, 10)) && isFinite(Number(str));
+  }
+
+  private async getDetailLabel(parentRoute: string | null, id: string): Promise<string> {
+    if (parentRoute === 'plugin' && this.isNumeric(id)) {
+      try {
+        const pluginId = parseInt(id, 10);
+        const plugin = await this.pluginService.getPlugin(pluginId);
+        return plugin.definition.plugin.name;
+      } catch (err) {
+        return `Plugin ${id}`;
+      }
+    }
+
+    if (parentRoute === 'job' && this.isUUID(id)) {
+      return `Job ${id.substring(0, 8)}...`;
+    }
+
+    return id;
   }
 
   navigate(url: string) {

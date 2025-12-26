@@ -130,11 +130,21 @@
         },
         "requirements": {
           "$ref": "#/definitions/requirements"
+        },
+        "envVariables": {
+          "type": "array",
+          "description": "Environment variables required by the plugin",
+          "items": {
+            "$ref": "#/definitions/input"
+          }
         }
       }
     },
     "example": {
       "$ref": "#/definitions/example"
+    },
+    "diagram": {
+      "$ref": "#/definitions/diagram"
     }
   },
   "definitions": {
@@ -583,6 +593,17 @@
           "type": "object",
           "description": "Example values for inputs",
           "additionalProperties": true
+        }
+      }
+    },
+    "diagram": {
+      "type": "object",
+      "required": ["enabled"],
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Whether to automatically generate workflow diagram from script",
+          "default": false
         }
       }
     }

@@ -2,3 +2,5 @@ QFeatures
 msqrob2
 limma
 MsCoreUtils
+ggplot2
+reshape2

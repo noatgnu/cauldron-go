@@ -26,6 +26,22 @@ inputs:
     required: true
     accept: ".csv,.tsv,.txt"
     description: "Sample annotation with columns: Sample (matching sample column names in data), Condition, BioReplicate"
+    tableColumns:
+      - name: "Sample"
+        label: "Sample"
+        type: "text"
+        required: true
+        description: "Sample identifier matching column names in data"
+      - name: "Condition"
+        label: "Condition"
+        type: "text"
+        required: true
+        description: "Experimental condition/group name"
+      - name: "BioReplicate"
+        label: "BioReplicate"
+        type: "text"
+        required: true
+        description: "Biological replicate number"
 
   - name: "comparison_file"
     label: "Comparison Matrix File"
@@ -63,6 +79,18 @@ inputs:
     default: 2
     description: "Minimum number of identified samples required per feature"
 
+  - name: "exclude_conditions"
+    label: "Exclude Conditions (comma-separated)"
+    type: "text"
+    required: false
+    description: "Comma-separated list of conditions to exclude from analysis (e.g., 'Norm,Empty'). These channels will be filtered out before statistical testing."
+
+  - name: "remove_norm_channel"
+    label: "Remove 'Norm' Channel"
+    type: "boolean"
+    default: true
+    description: "Automatically remove samples with condition 'Norm'"
+
   - name: "col_filter"
     label: "Column Completeness Threshold"
     type: "number"
@@ -71,7 +99,7 @@ inputs:
     min: 0
     max: 1
     step: 0.05
-    description: "Maximum proportion of missing values allowed in columns (samples). Default 0.7 means keep columns with <70% missing (≥30% data present). Lower values are more stringent."
+    description: "Maximum proportion of missing values allowed in columns (samples). Default 0.7 = keep samples with ≥30% valid measurements. Lower values are more stringent."
 
   - name: "row_filter"
     label: "Row Completeness Threshold"
@@ -81,13 +109,13 @@ inputs:
     min: 0
     max: 1
     step: 0.05
-    description: "Maximum proportion of missing values allowed in rows (features). Default 0.7 means keep rows with <70% missing (≥30% data present). Lower values are more stringent."
+    description: "Maximum proportion of missing values allowed in rows (features). Default 0.7 = keep features with ≥30% valid measurements. Lower values are more stringent."
 
   - name: "impute_order"
     label: "Imputation Order"
     type: "select"
     required: false
-    default: "before"
+    default: "after"
     options:
       - "before"
       - "after"
@@ -115,7 +143,7 @@ inputs:
 
   - name: "normalize_method"
     label: "Normalization"
-    type: select
+    type: "select"
     required: false
     default: "center.median"
     options:
@@ -126,6 +154,15 @@ inputs:
       - "quantiles.robust"
       - "vsn"
     description: "Normalization method to apply"
+
+  - name: "aggregation_order"
+    label: "Aggregation Order"
+    type: "select"
+    default: "after"
+    options:
+      - "before"
+      - "after"
+    description: "When to aggregate peptides to proteins. 'after': normalize/impute peptides then aggregate. 'before': aggregate peptides then normalize proteins."
 
   - name: "aggregation_method"
     label: "Protein Aggregation Method"
@@ -202,33 +239,27 @@ inputs:
 
 outputs:
   - name: "differential_results"
-    path: "msqrob2_results.txt"
+    path: "protein_results.txt"
     type: "data"
     description: "Differential expression analysis results"
     format: "tsv"
 
-  - name: "protein_intensities"
-    path: "protein_intensities.txt"
+  - name: "protein_intensity"
+    path: "protein_intensity.txt"
     type: "data"
     description: "Aggregated protein-level intensities"
     format: "tsv"
 
-  - name: "normalized_peptides"
-    path: "normalized_peptides.txt"
-    type: "data"
-    description: "Normalized peptide-level intensities"
-    format: "tsv"
-
-  - name: "imputed_peptides"
-    path: "imputed_peptides.txt"
-    type: "data"
-    description: "Imputed peptide-level intensities"
-    format: "tsv"
-
-  - name: "qc_plot"
-    path: "qc_plot.pdf"
+  - name: "protein_qc_plots"
+    path: "protein_qc_plots.pdf"
     type: "plot"
-    description: "Quality control plots (PCA, intensity distributions)"
+    description: "Quality control plots (PCA, boxplots)"
+    format: "pdf"
+
+  - name: "protein_volcano_plots"
+    path: "protein_volcano_plots.pdf"
+    type: "plot"
+    description: "Volcano plots for each comparison"
     format: "pdf"
 
 execution:
@@ -242,11 +273,16 @@ execution:
       flag: "--log2_transform"
       when: "true"
     filter_min_identified: "--filter_min_identified"
+    exclude_conditions: "--exclude_conditions"
+    remove_norm_channel:
+      flag: "--remove_norm_channel"
+      when: "true"
     col_filter: "--col_filter"
     row_filter: "--row_filter"
     impute_order: "--impute_order"
     impute: "--impute"
     normalize_method: "--normalize_method"
+    aggregation_order: "--aggregation_order"
     aggregation_method: "--aggregation_method"
     ridge_penalty: "--ridge_penalty"
     robust_regression:
@@ -271,8 +307,11 @@ example:
     feature_id_col: "Precursor.Id"
     protein_col: "Protein.Group"
     log2_transform: true
+    remove_norm_channel: true
+    exclude_conditions: "Norm"
     impute: "knn"
-    impute_order: "before"
+    impute_order: "after"
     normalize_method: "center.median"
+    aggregation_order: "after"
     aggregation_method: "robust"
     robust_regression: true

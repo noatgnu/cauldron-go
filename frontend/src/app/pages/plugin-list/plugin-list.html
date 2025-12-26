@@ -68,7 +68,14 @@
                       <mat-icon class="binding-indicator" [matTooltip]="getBindingTooltip(plugin.id)" color="accent">link</mat-icon>
                     }
                   </mat-card-title>
-                  <mat-card-subtitle>v{{ plugin.definition.plugin.version }}</mat-card-subtitle>
+                  <mat-card-subtitle>
+                    v{{ plugin.definition.plugin.version }}
+                    @if (plugin.installSource === 'remote' && plugin.commitHash) {
+                      <span class="commit-hash" [matTooltip]="'Installed from: ' + plugin.repository">
+                        #{{ plugin.commitHash.substring(0, 7) }}
+                      </span>
+                    }
+                  </mat-card-subtitle>
                 </mat-card-header>
 
                 <mat-card-content>

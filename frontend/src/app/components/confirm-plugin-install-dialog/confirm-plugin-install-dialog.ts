@@ -7,6 +7,7 @@ import { MatDividerModule } from '@angular/material/divider';
 
 export interface PluginInstallConfirmData {
   repo: string;
+  ref?: string;
   name: string;
   id: string;
   version: string;

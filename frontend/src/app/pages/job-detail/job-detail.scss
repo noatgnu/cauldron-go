@@ -149,6 +149,70 @@
   }
 }
 
+.load-full-log-container {
+  display: flex;
+  justify-content: center;
+  padding: 12px 16px;
+  background-color: #f5f5f5;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+
+  button {
+    font-size: 13px;
+
+    mat-icon {
+      margin-right: 4px;
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+    }
+  }
+}
+
+.search-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background-color: #f5f5f5;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+
+  .search-field {
+    flex: 1;
+    margin: 0;
+    font-size: 13px;
+
+    ::ng-deep .mat-mdc-form-field-subscript-wrapper {
+      display: none;
+    }
+  }
+
+  .search-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    .match-count {
+      font-size: 12px;
+      color: rgba(0, 0, 0, 0.6);
+      white-space: nowrap;
+    }
+
+    .no-matches {
+      font-size: 12px;
+      color: #d32f2f;
+      white-space: nowrap;
+    }
+
+    button {
+      mat-icon {
+        font-size: 20px;
+        width: 20px;
+        height: 20px;
+      }
+    }
+  }
+}
+
 .terminal-output {
   background: #1e1e1e;
   color: #d4d4d4;
@@ -162,6 +226,14 @@
   .terminal-line {
     white-space: pre-wrap;
     margin-bottom: 4px;
+
+    ::ng-deep mark {
+      background-color: #ff9800;
+      color: #000000;
+      padding: 2px 4px;
+      border-radius: 2px;
+      font-weight: 500;
+    }
   }
 }
 

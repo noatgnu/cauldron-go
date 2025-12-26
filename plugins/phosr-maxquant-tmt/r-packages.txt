@@ -1,0 +1,12 @@
+PhosR
+limma
+ggplot2
+pheatmap
+RColorBrewer
+reshape2
+S4Vectors
+Biostrings
+SummarizedExperiment
+reactome.db
+org.Hs.eg.db
+org.Mm.eg.db

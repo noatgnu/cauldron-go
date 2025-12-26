@@ -46,7 +46,6 @@ func (a *App) startup(ctx context.Context) {
 	log.Println("[App.startup] OnBeforeClose handler will handle window close events")
 	a.ctx = ctx
 
-	// Only set menu if running in Wails runtime (not in tests)
 	if ctx.Value("wails-test") == nil {
 		log.Println("[App.startup] Setting up menu...")
 		menu := services.BuildApplicationMenu(ctx, a)
@@ -69,7 +68,7 @@ func (a *App) startup(ctx context.Context) {
 	a.pythonRunner = services.NewPythonRunner(a.settings)
 	a.rRunner = services.NewRRunner(a.settings)
 	directRunner := services.NewDirectRunner()
-	a.envService = services.NewEnvironmentService(ctx, db, services.NewProgressNotifier(ctx))
+	a.envService = services.NewEnvironmentService(ctx, db, a.settings, services.NewProgressNotifier(ctx))
 	a.portableEnvService = services.NewPortableEnvService(ctx, a.fileService)
 
 	log.Println("[App.startup] Initializing job queue...")
@@ -117,6 +116,11 @@ func (a *App) startup(ctx context.Context) {
 		}
 
 		job.TerminalOutput = append(job.TerminalOutput, line)
+		maxLines := 100
+		if len(job.TerminalOutput) > maxLines {
+			job.TerminalOutput = job.TerminalOutput[len(job.TerminalOutput)-maxLines:]
+		}
+
 		if err := a.db.GetDB().Save(job).Error; err != nil {
 			log.Printf("[App] Failed to save job output %s: %v", jobID, err)
 		}
@@ -233,6 +237,32 @@ func (a *App) ReadJobOutputFile(jobID string, filename string) (string, error) {
 	filePath := filepath.Join(job.OutputPath, filename)
 	data, err := os.ReadFile(filePath)
 	if err != nil {
+		return "", err
+	}
+
+	content := string(data)
+	content = strings.ReplaceAll(content, "\r\n", "\n")
+	content = strings.ReplaceAll(content, "\r", "\n")
+
+	return content, nil
+}
+
+func (a *App) GetJobExecutionLog(jobID string) (string, error) {
+	job, err := a.jobQueue.GetJob(jobID)
+	if err != nil {
+		return "", err
+	}
+
+	if job.OutputPath == "" {
+		return "", fmt.Errorf("job has no output directory")
+	}
+
+	logFilePath := filepath.Join(job.OutputPath, "execution.log")
+	data, err := os.ReadFile(logFilePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", nil
+		}
 		return "", err
 	}
 
@@ -1091,9 +1121,9 @@ func (a *App) DeleteVirtualEnvironment(id uint) error {
 	return a.envService.DeleteVirtualEnvironment(id)
 }
 
-func (a *App) CreateRenvEnvironment(name string, packages []string, pluginID string) error {
-	log.Printf("[App] Creating renv environment: %s with %d packages for plugin: %s", name, len(packages), pluginID)
-	return a.envService.CreateRenvEnvironment(name, packages, pluginID)
+func (a *App) CreateRenvEnvironment(name string, packages []string, pluginID string, useCache bool) error {
+	log.Printf("[App] Creating renv environment: %s with %d packages for plugin: %s (useCache: %v)", name, len(packages), pluginID, useCache)
+	return a.envService.CreateRenvEnvironment(name, packages, pluginID, useCache)
 }
 
 func (a *App) GetRenvEnvironments() ([]services.RenvEnvironment, error) {
@@ -1125,6 +1155,26 @@ func (a *App) DeletePluginEnvironmentBinding(pluginID string, envType string) er
 
 func (a *App) GetAllPluginEnvironmentBindings() ([]services.PluginEnvironmentBinding, error) {
 	return a.db.GetAllPluginEnvironmentBindings()
+}
+
+func (a *App) SaveCustomEnvVar(envVar services.CustomEnvVar) error {
+	return a.db.SaveCustomEnvVar(envVar)
+}
+
+func (a *App) GetCustomEnvVars(pluginID uint) ([]services.CustomEnvVar, error) {
+	return a.db.GetCustomEnvVars(pluginID)
+}
+
+func (a *App) GetGlobalCustomEnvVars() ([]services.CustomEnvVar, error) {
+	return a.db.GetGlobalCustomEnvVars()
+}
+
+func (a *App) DeleteCustomEnvVar(id uint) error {
+	return a.db.DeleteCustomEnvVar(id)
+}
+
+func (a *App) DeleteCustomEnvVarByKey(pluginID uint, key string) error {
+	return a.db.DeleteCustomEnvVarByKey(pluginID, key)
 }
 
 func (a *App) GetBundledRequirementsPath(requirementType string) (string, error) {
@@ -1605,22 +1655,28 @@ func (a *App) ExecutePluginV2(req models.PluginExecutionRequestV2) (string, erro
 
 		var execErr error
 		log.Printf("[ExecutePluginV2] Plugin runtime type: %s", plugin.Definition.Runtime.Type)
+		log.Printf("[ExecutePluginV2] Plugin folder path: %s", plugin.FolderPath)
+
 		switch plugin.Definition.Runtime.Type {
 		case "python", "pythonWithR":
 			log.Printf("[ExecutePluginV2] Calling ExecutePythonScript with RuntimeType: %s", plugin.Definition.Runtime.Type)
 			execErr = a.scriptExecutor.ExecutePythonScript(jobCtx, jobID, services.ScriptConfig{
+				PluginID:    plugin.ID,
 				Type:        plugin.Definition.Plugin.ID,
 				RuntimeType: plugin.Definition.Runtime.Type,
 				ScriptName:  filepath.Base(plugin.ScriptPath),
 				Args:        args[1:],
 				OutputDir:   outputDir,
+				FolderPath:  plugin.FolderPath,
 			})
 		case "r":
 			execErr = a.scriptExecutor.ExecuteRScript(jobCtx, jobID, services.ScriptConfig{
+				PluginID:   plugin.ID,
 				Type:       plugin.Definition.Plugin.ID,
 				ScriptName: filepath.Base(plugin.ScriptPath),
 				Args:       args[1:],
 				OutputDir:  outputDir,
+				FolderPath: plugin.FolderPath,
 			})
 		}
 
@@ -1986,9 +2042,14 @@ func (a *App) beforeClose(ctx context.Context) bool {
 	return false
 }
 
-func (a *App) InstallPluginFromRepo(repoURL string) error {
-	log.Printf("[App] Installing plugin from repository: %s", repoURL)
-	return a.pluginInstaller.InstallPlugin(repoURL)
+func (a *App) InstallPluginFromRepo(repoURL string, commitHash string) error {
+	log.Printf("[App] Installing plugin from repository: %s (ref: %s)", repoURL, commitHash)
+	return a.pluginInstaller.InstallPlugin(repoURL, commitHash, func(status string) {
+		runtime.EventsEmit(a.ctx, "plugin:install:progress", map[string]string{
+			"repo":   repoURL,
+			"status": status,
+		})
+	})
 }
 
 func (a *App) UpdatePluginFromRepo(repoURL string) error {
@@ -2013,15 +2074,21 @@ func (a *App) DecodePluginRepoURL(encoded string) (string, error) {
 	return services.DecodeRepoURL(encoded)
 }
 
-func (a *App) ConfirmPluginInstallation(repoURL string) error {
-	log.Printf("[App] User confirmed plugin installation from: %s", repoURL)
+func (a *App) ConfirmPluginInstallation(repoURL string, commitHash string) error {
+	log.Printf("[App] User confirmed plugin installation from: %s (ref: %s)", repoURL, commitHash)
 
 	runtime.EventsEmit(a.ctx, "plugin:install:start", map[string]interface{}{
 		"repo": repoURL,
+		"ref":  commitHash,
 	})
 
 	go func() {
-		if err := a.pluginInstaller.InstallPlugin(repoURL); err != nil {
+		if err := a.pluginInstaller.InstallPlugin(repoURL, commitHash, func(status string) {
+			runtime.EventsEmit(a.ctx, "plugin:install:progress", map[string]string{
+				"repo":   repoURL,
+				"status": status,
+			})
+		}); err != nil {
 			log.Printf("[App] Plugin installation failed: %v", err)
 			runtime.EventsEmit(a.ctx, "plugin:install:error", map[string]interface{}{
 				"repo":  repoURL,
@@ -2095,17 +2162,17 @@ func (a *App) ListRegistryCategories() (interface{}, error) {
 	return a.pluginRegistryService.ListCategories()
 }
 
-func (a *App) InstallPluginFromRegistry(pluginID string) error {
-	log.Printf("[App] Installing plugin from registry: %s", pluginID)
+func (a *App) InstallPluginFromRegistry(pluginID string, commitHash string) error {
+	log.Printf("[App] Installing plugin from registry: %s (ref: %s)", pluginID, commitHash)
 
 	plugin, err := a.pluginRegistryService.GetPlugin(pluginID)
 	if err != nil {
-		return fmt.Errorf("failed to get plugin details: %w", err)
+		return err
 	}
 
 	if plugin.Repository == "" {
-		return fmt.Errorf("plugin does not have a repository URL")
+		return fmt.Errorf("plugin %s does not have a repository URL", pluginID)
 	}
 
-	return a.ConfirmPluginInstallation(plugin.Repository)
+	return a.ConfirmPluginInstallation(plugin.Repository, commitHash)
 }

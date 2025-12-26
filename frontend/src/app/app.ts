@@ -81,7 +81,7 @@ export class App implements OnInit {
 
       dialogRef.afterClosed().subscribe(confirmed => {
         if (confirmed) {
-          ConfirmPluginInstallation(data.repo).then(() => {
+          ConfirmPluginInstallation(data.repo, data.ref || '').then(() => {
             this.snackBar.open('Installing plugin...', 'Close', { duration: 3000 });
           }).catch(err => {
             this.snackBar.open(`Installation failed: ${err}`, 'Close', { duration: 5000 });

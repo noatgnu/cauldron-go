@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/yuin/goldmark"
@@ -147,6 +148,10 @@ type AnnotationConfig struct {
 	AnnotationFile string `yaml:"annotationFile,omitempty"`
 }
 
+type DiagramConfig struct {
+	Enabled bool `yaml:"enabled"`
+}
+
 type PluginConfig struct {
 	Plugin     PluginMetadata    `yaml:"plugin"`
 	Runtime    PluginRuntime     `yaml:"runtime"`
@@ -156,6 +161,7 @@ type PluginConfig struct {
 	Annotation *AnnotationConfig `yaml:"annotation,omitempty"`
 	Execution  PluginExecution   `yaml:"execution"`
 	Example    *ExampleData      `yaml:"example,omitempty"`
+	Diagram    *DiagramConfig    `yaml:"diagram,omitempty"`
 }
 
 func formatType(input PluginInput) string {
@@ -436,12 +442,20 @@ func generateHTMLWrapper(markdownContent string) string {
 		return markdownContent
 	}
 
+	htmlContent := buf.String()
+	mermaidRegex := regexp.MustCompile(`<pre><code class="language-mermaid">([\s\S]*?)</code></pre>`)
+	htmlContent = mermaidRegex.ReplaceAllString(htmlContent, `<pre class="mermaid">$1</pre>`)
+
 	htmlTemplate := `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Plugin Documentation</title>
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        mermaid.initialize({ startOnLoad: true, theme: 'default' });
+    </script>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -531,14 +545,268 @@ func generateHTMLWrapper(markdownContent string) string {
             font-weight: 600;
             color: #1976d2;
         }
+        .mermaid {
+            text-align: center;
+            margin: 20px 0;
+            background: #f9f9f9;
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+        }
     </style>
 </head>
 <body>
-%s
+{{CONTENT}}
 </body>
 </html>`
 
-	return fmt.Sprintf(htmlTemplate, buf.String())
+	return strings.ReplaceAll(htmlTemplate, "{{CONTENT}}", htmlContent)
+}
+
+type WorkflowStep struct {
+	ID          string
+	Label       string
+	Type        string
+	Conditional bool
+	SubSteps    []WorkflowStep
+}
+
+func parseRScript(scriptPath string, pluginDir string, seenFiles map[string]bool) ([]WorkflowStep, error) {
+	absPath, err := filepath.Abs(scriptPath)
+	if err != nil {
+		return nil, err
+	}
+	if seenFiles[absPath] {
+		return nil, nil
+	}
+	seenFiles[absPath] = true
+
+	data, err := os.ReadFile(scriptPath)
+	if err != nil {
+		return nil, err
+	}
+
+	content := string(data)
+	lines := strings.Split(content, "\n")
+	steps := []WorkflowStep{}
+	stepID := len(seenFiles) * 100 // Prevent ID collisions across files
+
+	stepPattern := regexp.MustCompile(`message\(.*\[(\d+)/(\d+)\]\s*(.+?)["')]`)
+	sourcePattern := regexp.MustCompile(`source\s*\(\s*["'](.+?)["']\s*\)`)
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+
+		// 1. Look for sourced files
+		sourceMatches := sourcePattern.FindStringSubmatch(line)
+		if len(sourceMatches) >= 2 {
+			sourcedFile := sourceMatches[1]
+			// Resolve relative to the current script's directory
+			sourcedPath := filepath.Join(filepath.Dir(scriptPath), sourcedFile)
+			if _, err := os.Stat(sourcedPath); err == nil {
+				subSteps, _ := parseRScript(sourcedPath, pluginDir, seenFiles)
+				steps = append(steps, subSteps...)
+			}
+			continue
+		}
+
+		// 2. Look for steps
+		matches := stepPattern.FindStringSubmatch(line)
+		if len(matches) >= 4 {
+			stepLabel := matches[3]
+			stepLabel = strings.TrimSpace(stepLabel)
+
+			if stepLabel != "" && !strings.HasPrefix(stepLabel, "=") {
+				stepID++
+				steps = append(steps, WorkflowStep{
+					ID:    fmt.Sprintf("step%d", stepID),
+					Label: stepLabel,
+					Type:  "process",
+				})
+			}
+		}
+	}
+
+	return steps, nil
+}
+
+func parsePythonScript(scriptPath string, pluginDir string, seenFiles map[string]bool) ([]WorkflowStep, error) {
+	absPath, err := filepath.Abs(scriptPath)
+	if err != nil {
+		return nil, err
+	}
+	if seenFiles[absPath] {
+		return nil, nil
+	}
+	seenFiles[absPath] = true
+
+	data, err := os.ReadFile(scriptPath)
+	if err != nil {
+		return nil, err
+	}
+
+	content := string(data)
+	lines := strings.Split(content, "\n")
+	steps := []WorkflowStep{}
+	stepID := len(seenFiles) * 100
+
+	stepPattern := regexp.MustCompile(`(?:print|logger\.info)\(.*\[(\d+)/(\d+)\]\s*(.+?)["')]`)
+	// Basic support for local imports like 'from .src import module' or similar patterns
+	importPattern := regexp.MustCompile(`(?:import|from)\s+([\w\.]+)`)
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+
+		// Try to follow imports if they look like local module paths (simplified logic)
+		importMatches := importPattern.FindStringSubmatch(line)
+		if len(importMatches) >= 2 {
+			modulePath := strings.ReplaceAll(importMatches[1], ".", "/")
+			potentialPaths := []string{
+				filepath.Join(filepath.Dir(scriptPath), modulePath+".py"),
+				filepath.Join(filepath.Dir(scriptPath), modulePath, "__init__.py"),
+			}
+			for _, p := range potentialPaths {
+				if _, err := os.Stat(p); err == nil {
+					subSteps, _ := parsePythonScript(p, pluginDir, seenFiles)
+					steps = append(steps, subSteps...)
+					break
+				}
+			}
+		}
+
+		matches := stepPattern.FindStringSubmatch(line)
+		if len(matches) >= 4 {
+			stepLabel := matches[3]
+			stepLabel = strings.TrimSpace(stepLabel)
+
+			if stepLabel != "" && !strings.HasPrefix(stepLabel, "=") {
+				stepID++
+				steps = append(steps, WorkflowStep{
+					ID:    fmt.Sprintf("step%d", stepID),
+					Label: stepLabel,
+					Type:  "process",
+				})
+			}
+		}
+	}
+
+	return steps, nil
+}
+
+func extractMessageContent(line string) string {
+	line = strings.TrimSpace(line)
+
+	startQuote := strings.Index(line, "\"")
+	if startQuote == -1 {
+		startQuote = strings.Index(line, "'")
+	}
+	if startQuote == -1 {
+		return "Processing step"
+	}
+
+	endQuote := strings.LastIndex(line, "\"")
+	if endQuote == -1 {
+		endQuote = strings.LastIndex(line, "'")
+	}
+	if endQuote <= startQuote {
+		return "Processing step"
+	}
+
+	content := line[startQuote+1 : endQuote]
+	content = strings.TrimSpace(content)
+
+	if strings.Contains(content, "[") && strings.Contains(content, "]") {
+		start := strings.Index(content, "[")
+		end := strings.Index(content, "]")
+		if end > start {
+			content = content[end+1:]
+			content = strings.TrimSpace(content)
+		}
+	}
+
+	return content
+}
+
+func generateMermaidDiagram(steps []WorkflowStep) string {
+	if len(steps) == 0 {
+		return ""
+	}
+
+	lines := []string{
+		"```mermaid",
+		"flowchart TD",
+		"    Start([Start]) --> step1",
+	}
+
+	uniqueSteps := []WorkflowStep{}
+	seenLabels := make(map[string]bool)
+
+	for _, step := range steps {
+		if !seenLabels[step.Label] {
+			seenLabels[step.Label] = true
+			uniqueSteps = append(uniqueSteps, step)
+		}
+	}
+
+	for i, step := range uniqueSteps {
+		step.ID = fmt.Sprintf("step%d", i+1)
+		nodeShape := ""
+		switch step.Type {
+		case "decision":
+			nodeShape = fmt.Sprintf("{%s}", step.Label)
+		case "process":
+			nodeShape = fmt.Sprintf("[%s]", step.Label)
+		default:
+			nodeShape = fmt.Sprintf("[%s]", step.Label)
+		}
+
+		lines = append(lines, fmt.Sprintf("    %s%s", step.ID, nodeShape))
+
+		if i < len(uniqueSteps)-1 {
+			lines = append(lines, fmt.Sprintf("    %s --> step%d", step.ID, i+2))
+		}
+	}
+
+	lastStep := fmt.Sprintf("step%d", len(uniqueSteps))
+	lines = append(lines, fmt.Sprintf("    %s --> End([End])", lastStep))
+	lines = append(lines, "```")
+
+	return strings.Join(lines, "\n")
+}
+
+func generateDiagramSection(plugin PluginConfig, pluginDir string) string {
+	if plugin.Diagram == nil || !plugin.Diagram.Enabled {
+		return ""
+	}
+
+	scriptPath := filepath.Join(pluginDir, plugin.Runtime.Script)
+	if _, err := os.Stat(scriptPath); os.IsNotExist(err) {
+		return ""
+	}
+
+	var steps []WorkflowStep
+	var err error
+	seenFiles := make(map[string]bool)
+
+	switch plugin.Runtime.Type {
+	case "r":
+		steps, err = parseRScript(scriptPath, pluginDir, seenFiles)
+	case "python":
+		steps, err = parsePythonScript(scriptPath, pluginDir, seenFiles)
+	default:
+		return ""
+	}
+
+	if err != nil || len(steps) == 0 {
+		return ""
+	}
+
+	mermaidDiagram := generateMermaidDiagram(steps)
+	if mermaidDiagram == "" {
+		return ""
+	}
+
+	return "\n## Workflow Diagram\n\n" + mermaidDiagram + "\n"
 }
 
 func generateExampleSection(example *ExampleData) string {
@@ -607,6 +875,14 @@ func generatePluginDoc(plugin PluginConfig, pluginDir string, useHTTPProtocol bo
 		fmt.Sprintf("**Author**: %s\n", plugin.Plugin.Author),
 		"## Description\n",
 		fmt.Sprintf("%s\n", plugin.Plugin.Description),
+	)
+
+	diagramSection := generateDiagramSection(plugin, pluginDir)
+	if diagramSection != "" {
+		lines = append(lines, diagramSection)
+	}
+
+	lines = append(lines,
 		"## Runtime\n",
 		fmt.Sprintf("- **Type**: `%s`", plugin.Runtime.Type),
 		fmt.Sprintf("- **Script**: `%s`\n", plugin.Runtime.Script),

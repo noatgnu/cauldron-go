@@ -11,196 +11,226 @@
         <p>Loading environments...</p>
       </div>
     } @else {
-      <div class="current-bindings">
-        <h3>Current Environment Bindings</h3>
+      <mat-tab-group>
+        <mat-tab label="Execution Environments">
+          <div class="tab-content">
+            <div class="current-bindings">
+              <h3>Current Environment Bindings</h3>
 
-        @if (pythonBinding() || rBinding()) {
-          <div class="bindings-list">
-            @if (pythonBinding()) {
-              <mat-card class="binding-card">
-                <mat-card-content>
-                  <div class="binding-info">
-                    <mat-icon color="primary">code</mat-icon>
-                    <div>
-                      <strong>Python Environment</strong>
-                      <p class="env-path">{{ pythonBinding()?.EnvironmentPath }}</p>
-                    </div>
+              @if (pythonBinding() || rBinding()) {
+                <div class="bindings-list">
+                  @if (pythonBinding()) {
+                    <mat-card class="binding-card">
+                      <mat-card-content>
+                        <div class="binding-info">
+                          <mat-icon color="primary">code</mat-icon>
+                          <div>
+                            <strong>Python Environment</strong>
+                            <p class="env-path">{{ pythonBinding()?.EnvironmentPath }}</p>
+                          </div>
+                        </div>
+                        <button mat-icon-button color="warn" (click)="unbindEnvironment('python')" matTooltip="Unbind">
+                          <mat-icon>link_off</mat-icon>
+                        </button>
+                      </mat-card-content>
+                    </mat-card>
+                  }
+
+                  @if (rBinding()) {
+                    <mat-card class="binding-card">
+                      <mat-card-content>
+                        <div class="binding-info">
+                          <mat-icon color="accent">analytics</mat-icon>
+                          <div>
+                            <strong>R Environment</strong>
+                            <p class="env-path">{{ rBinding()?.EnvironmentPath }}</p>
+                          </div>
+                        </div>
+                        <button mat-icon-button color="warn" (click)="unbindEnvironment('r')" matTooltip="Unbind">
+                          <mat-icon>link_off</mat-icon>
+                        </button>
+                      </mat-card-content>
+                    </mat-card>
+                  }
+                </div>
+              } @else {
+                <p class="no-bindings">No custom environments bound. Using system defaults.</p>
+              }
+            </div>
+
+            <mat-divider></mat-divider>
+
+            @if (needsPython()) {
+              <div class="environment-section">
+                <h3>
+                  <mat-icon>code</mat-icon>
+                  Python Environments
+                </h3>
+
+                @if (pythonEnvironments().length > 0) {
+                  <mat-selection-list [multiple]="false" (selectionChange)="onPythonEnvSelected($event)">
+                    @for (env of pythonEnvironments(); track env.path) {
+                      <mat-list-option [value]="env.path" [selected]="env.path === pythonBinding()?.EnvironmentPath">
+                        <div class="env-option">
+                          <div>
+                            <strong>{{ env.name }}</strong>
+                            <span class="env-type">{{ getEnvTypeLabel(env.type) }}</span>
+                            @if (env.path === activePythonEnv()?.path) {
+                              <span class="env-type">Active</span>
+                            }
+                          </div>
+                          <small>{{ env.version }}</small>
+                        </div>
+                      </mat-list-option>
+                    }
+                  </mat-selection-list>
+                } @else {
+                  <p class="no-envs">No Python environments detected. Please configure Python in Settings.</p>
+                }
+
+                @if (!showVenvCreation()) {
+                  <div class="action-buttons">
+                    <button mat-stroked-button (click)="startVenvCreation()">
+                      <mat-icon>add_circle</mat-icon>
+                      Create Virtual Environment
+                    </button>
                   </div>
-                  <button mat-icon-button color="warn" (click)="unbindEnvironment('python')" matTooltip="Unbind">
-                    <mat-icon>link_off</mat-icon>
-                  </button>
-                </mat-card-content>
-              </mat-card>
+                } @else {
+                  <mat-card class="creation-form">
+                    <mat-card-content>
+                      <h4>Create Virtual Environment</h4>
+                      <mat-form-field appearance="outline" class="full-width">
+                        <mat-label>Base Python</mat-label>
+                        <mat-select [(ngModel)]="selectedBasePython">
+                          @for (env of basePythonEnvironments(); track env.path) {
+                            <mat-option [value]="env.path">
+                              {{ env.name }} ({{ env.version }}) - {{ getEnvTypeLabel(env.type) }}
+                              @if (env.path === activePythonEnv()?.path) {
+                                [Active]
+                              }
+                            </mat-option>
+                          }
+                        </mat-select>
+                        <mat-hint>Select the Python environment to use as base</mat-hint>
+                      </mat-form-field>
+                      <p class="info-text">After clicking Create, you'll be prompted to select a directory location.</p>
+                      @if (creatingEnvironment()) {
+                        <div class="creation-progress">
+                          <mat-spinner diameter="24"></mat-spinner>
+                          <span>{{ creationProgress() }}</span>
+                        </div>
+                      }
+                      <div class="form-actions">
+                        <button mat-button (click)="cancelVenvCreation()" [disabled]="creatingEnvironment()">Cancel</button>
+                        <button mat-raised-button color="primary" (click)="confirmVenvCreation()" [disabled]="creatingEnvironment()">
+                          <mat-icon>create_new_folder</mat-icon>
+                          Create
+                        </button>
+                      </div>
+                    </mat-card-content>
+                  </mat-card>
+                }
+              </div>
+
+              <mat-divider></mat-divider>
             }
 
-            @if (rBinding()) {
-              <mat-card class="binding-card">
-                <mat-card-content>
-                  <div class="binding-info">
-                    <mat-icon color="accent">analytics</mat-icon>
-                    <div>
-                      <strong>R Environment</strong>
-                      <p class="env-path">{{ rBinding()?.EnvironmentPath }}</p>
-                    </div>
+            @if (needsR()) {
+              <div class="environment-section">
+                <h3>
+                  <mat-icon>analytics</mat-icon>
+                  R Environments
+                </h3>
+
+                @if (rEnvironments().length > 0) {
+                  <mat-selection-list [multiple]="false" (selectionChange)="onREnvSelected($event)">
+                    @for (env of rEnvironments(); track env.path) {
+                      <mat-list-option [value]="env.path" [selected]="env.path === rBinding()?.EnvironmentPath">
+                        <div class="env-option">
+                          <div>
+                            <strong>{{ env.name }}</strong>
+                            @if (env.isDefault) {
+                              <span class="env-type">Default</span>
+                            }
+                            @if (env.path === activeREnv()?.path) {
+                              <span class="env-type">Active</span>
+                            }
+                          </div>
+                          <small>{{ env.version }}</small>
+                        </div>
+                      </mat-list-option>
+                    }
+                  </mat-selection-list>
+                } @else {
+                  <p class="no-envs">No R environments detected. Please configure R in Settings.</p>
+                }
+
+                @if (!showRenvCreation()) {
+                  <div class="action-buttons">
+                    <button mat-stroked-button (click)="startRenvCreation()">
+                      <mat-icon>add_circle</mat-icon>
+                      Create Renv Environment
+                    </button>
                   </div>
-                  <button mat-icon-button color="warn" (click)="unbindEnvironment('r')" matTooltip="Unbind">
-                    <mat-icon>link_off</mat-icon>
-                  </button>
-                </mat-card-content>
-              </mat-card>
+                } @else {
+                  <mat-card class="creation-form">
+                    <mat-card-content>
+                      <h4>Create Renv Environment</h4>
+                      <mat-form-field appearance="outline" class="full-width">
+                        <mat-label>Environment Name</mat-label>
+                        <input matInput [(ngModel)]="renvName" placeholder="my-renv" required>
+                        <mat-hint>Name for the renv environment</mat-hint>
+                      </mat-form-field>
+                      <mat-form-field appearance="outline" class="full-width">
+                        <mat-label>Packages (Optional)</mat-label>
+                        <input matInput [(ngModel)]="renvPackages" placeholder="ggplot2, dplyr, tidyr">
+                        <mat-hint>Comma-separated list of R packages to install</mat-hint>
+                      </mat-form-field>
+                      <div class="toggle-row">
+                        <mat-slide-toggle [(ngModel)]="useGlobalCache">
+                          Use Global Package Cache
+                        </mat-slide-toggle>
+                      </div>
+                      @if (creatingEnvironment()) {
+                        <div class="creation-progress">
+                          <mat-spinner diameter="24"></mat-spinner>
+                          <span>{{ creationProgress() }}</span>
+                        </div>
+                      }
+                      <div class="form-actions">
+                        <button mat-button (click)="cancelRenvCreation()" [disabled]="creatingEnvironment()">Cancel</button>
+                        <button mat-raised-button color="primary" (click)="confirmRenvCreation()" [disabled]="creatingEnvironment()">
+                          <mat-icon>create_new_folder</mat-icon>
+                          Create
+                        </button>
+                      </div>
+                    </mat-card-content>
+                  </mat-card>
+                }
+              </div>
             }
           </div>
-        } @else {
-          <p class="no-bindings">No custom environments bound. Using system defaults.</p>
+        </mat-tab>
+
+        @if (envVariablePlugin()) {
+          <mat-tab label="Custom Variables & Paths">
+            <div class="tab-content">
+              <div class="variable-section">
+                <h3>
+                  <mat-icon>tune</mat-icon>
+                  Custom Environment Variables
+                </h3>
+                <p class="section-description">Set plugin-specific paths or configuration variables required by the script.</p>
+                
+                <app-dynamic-form
+                  [plugin]="envVariablePlugin()!"
+                  (formSubmit)="onEnvVarsSubmit($event)">
+                </app-dynamic-form>
+              </div>
+            </div>
+          </mat-tab>
         }
-      </div>
-
-      <mat-divider></mat-divider>
-
-      @if (needsPython()) {
-        <div class="environment-section">
-          <h3>
-            <mat-icon>code</mat-icon>
-            Python Environments
-          </h3>
-
-          @if (pythonEnvironments().length > 0) {
-            <mat-selection-list [multiple]="false" (selectionChange)="onPythonEnvSelected($event)">
-              @for (env of pythonEnvironments(); track env.path) {
-                <mat-list-option [value]="env.path" [selected]="env.path === pythonBinding()?.EnvironmentPath">
-                  <div class="env-option">
-                    <div>
-                      <strong>{{ env.name }}</strong>
-                      <span class="env-type">{{ getEnvTypeLabel(env.type) }}</span>
-                      @if (env.path === activePythonEnv()?.path) {
-                        <span class="env-type">Active</span>
-                      }
-                    </div>
-                    <small>{{ env.version }}</small>
-                  </div>
-                </mat-list-option>
-              }
-            </mat-selection-list>
-          } @else {
-            <p class="no-envs">No Python environments detected. Please configure Python in Settings.</p>
-          }
-
-          @if (!showVenvCreation()) {
-            <div class="action-buttons">
-              <button mat-stroked-button (click)="startVenvCreation()">
-                <mat-icon>add_circle</mat-icon>
-                Create Virtual Environment
-              </button>
-            </div>
-          } @else {
-            <mat-card class="creation-form">
-              <mat-card-content>
-                <h4>Create Virtual Environment</h4>
-                <mat-form-field appearance="outline" class="full-width">
-                  <mat-label>Base Python</mat-label>
-                  <mat-select [(ngModel)]="selectedBasePython">
-                    @for (env of basePythonEnvironments(); track env.path) {
-                      <mat-option [value]="env.path">
-                        {{ env.name }} ({{ env.version }}) - {{ getEnvTypeLabel(env.type) }}
-                        @if (env.path === activePythonEnv()?.path) {
-                          [Active]
-                        }
-                      </mat-option>
-                    }
-                  </mat-select>
-                  <mat-hint>Select the Python environment to use as base</mat-hint>
-                </mat-form-field>
-                <p class="info-text">After clicking Create, you'll be prompted to select a directory location.</p>
-                @if (creatingEnvironment()) {
-                  <div class="creation-progress">
-                    <mat-spinner diameter="24"></mat-spinner>
-                    <span>{{ creationProgress() }}</span>
-                  </div>
-                }
-                <div class="form-actions">
-                  <button mat-button (click)="cancelVenvCreation()" [disabled]="creatingEnvironment()">Cancel</button>
-                  <button mat-raised-button color="primary" (click)="confirmVenvCreation()" [disabled]="creatingEnvironment()">
-                    <mat-icon>create_new_folder</mat-icon>
-                    Create
-                  </button>
-                </div>
-              </mat-card-content>
-            </mat-card>
-          }
-        </div>
-
-        <mat-divider></mat-divider>
-      }
-
-      @if (needsR()) {
-        <div class="environment-section">
-          <h3>
-            <mat-icon>analytics</mat-icon>
-            R Environments
-          </h3>
-
-          @if (rEnvironments().length > 0) {
-            <mat-selection-list [multiple]="false" (selectionChange)="onREnvSelected($event)">
-              @for (env of rEnvironments(); track env.path) {
-                <mat-list-option [value]="env.path" [selected]="env.path === rBinding()?.EnvironmentPath">
-                  <div class="env-option">
-                    <div>
-                      <strong>{{ env.name }}</strong>
-                      @if (env.isDefault) {
-                        <span class="env-type">Default</span>
-                      }
-                      @if (env.path === activeREnv()?.path) {
-                        <span class="env-type">Active</span>
-                      }
-                    </div>
-                    <small>{{ env.version }}</small>
-                  </div>
-                </mat-list-option>
-              }
-            </mat-selection-list>
-          } @else {
-            <p class="no-envs">No R environments detected. Please configure R in Settings.</p>
-          }
-
-          @if (!showRenvCreation()) {
-            <div class="action-buttons">
-              <button mat-stroked-button (click)="startRenvCreation()">
-                <mat-icon>add_circle</mat-icon>
-                Create Renv Environment
-              </button>
-            </div>
-          } @else {
-            <mat-card class="creation-form">
-              <mat-card-content>
-                <h4>Create Renv Environment</h4>
-                <mat-form-field appearance="outline" class="full-width">
-                  <mat-label>Environment Name</mat-label>
-                  <input matInput [(ngModel)]="renvName" placeholder="my-renv" required>
-                  <mat-hint>Name for the renv environment</mat-hint>
-                </mat-form-field>
-                <mat-form-field appearance="outline" class="full-width">
-                  <mat-label>Packages (Optional)</mat-label>
-                  <input matInput [(ngModel)]="renvPackages" placeholder="ggplot2, dplyr, tidyr">
-                  <mat-hint>Comma-separated list of R packages to install</mat-hint>
-                </mat-form-field>
-                @if (creatingEnvironment()) {
-                  <div class="creation-progress">
-                    <mat-spinner diameter="24"></mat-spinner>
-                    <span>{{ creationProgress() }}</span>
-                  </div>
-                }
-                <div class="form-actions">
-                  <button mat-button (click)="cancelRenvCreation()" [disabled]="creatingEnvironment()">Cancel</button>
-                  <button mat-raised-button color="primary" (click)="confirmRenvCreation()" [disabled]="creatingEnvironment()">
-                    <mat-icon>create_new_folder</mat-icon>
-                    Create
-                  </button>
-                </div>
-              </mat-card-content>
-            </mat-card>
-          }
-        </div>
-      }
+      </mat-tab-group>
     }
   </mat-dialog-content>
 

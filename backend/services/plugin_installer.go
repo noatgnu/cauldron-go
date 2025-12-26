@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/noatgnu/cauldron-go/backend/models"
 	"gopkg.in/yaml.v3"
 )
@@ -60,8 +61,11 @@ func (pi *PluginInstaller) FetchPluginInfo(repoURL string) (*models.PluginDefini
 	return pluginDef, nil
 }
 
-func (pi *PluginInstaller) InstallPlugin(repoURL string) error {
-	log.Printf("[PluginInstaller] Installing plugin from: %s", repoURL)
+func (pi *PluginInstaller) InstallPlugin(repoURL string, commitHash string, progressCallback func(string)) error {
+	log.Printf("[PluginInstaller] Installing plugin from: %s (ref: %s)", repoURL, commitHash)
+	if progressCallback != nil {
+		progressCallback("Checking existing installation...")
+	}
 
 	var existing models.PluginRegistry
 	if err := pi.db.GetDB().Where("repository = ?", repoURL).First(&existing).Error; err == nil {
@@ -71,12 +75,53 @@ func (pi *PluginInstaller) InstallPlugin(repoURL string) error {
 	tempDir := filepath.Join(pi.pluginsDir, ".temp-"+fmt.Sprintf("%d", time.Now().Unix()))
 	defer os.RemoveAll(tempDir)
 
-	_, err := git.PlainClone(tempDir, false, &git.CloneOptions{
+	if progressCallback != nil {
+		progressCallback("Cloning repository...")
+	}
+
+	cloneOptions := &git.CloneOptions{
 		URL:      repoURL,
 		Progress: io.Discard,
-	})
+	}
+
+	repo, err := git.PlainClone(tempDir, false, cloneOptions)
 	if err != nil {
 		return fmt.Errorf("failed to clone repository: %w", err)
+	}
+
+	if commitHash != "" {
+		if progressCallback != nil {
+			progressCallback(fmt.Sprintf("Checking out reference: %s...", commitHash))
+		}
+		w, err := repo.Worktree()
+		if err != nil {
+			return fmt.Errorf("failed to get worktree: %w", err)
+		}
+
+		err = w.Checkout(&git.CheckoutOptions{
+			Hash:   plumbing.NewHash(commitHash),
+			Create: false,
+			Force:  true,
+		})
+		if err != nil {
+			err = w.Checkout(&git.CheckoutOptions{
+				Branch: plumbing.NewBranchReferenceName(commitHash),
+				Force:  true,
+			})
+			if err != nil {
+				return fmt.Errorf("failed to checkout ref '%s': %w", commitHash, err)
+			}
+		}
+	}
+
+	ref, err := repo.Head()
+	actualHash := ""
+	if err == nil {
+		actualHash = ref.Hash().String()
+	}
+
+	if progressCallback != nil {
+		progressCallback("Reading plugin configuration...")
 	}
 
 	pluginDef, err := pi.readPluginDefinition(tempDir)
@@ -84,11 +129,16 @@ func (pi *PluginInstaller) InstallPlugin(repoURL string) error {
 		return fmt.Errorf("failed to read plugin definition: %w", err)
 	}
 
+	if progressCallback != nil {
+		progressCallback("Registering plugin...")
+	}
+
 	registry := models.PluginRegistry{
 		PluginID:      pluginDef.Plugin.ID,
 		Name:          pluginDef.Plugin.Name,
 		Version:       pluginDef.Plugin.Version,
 		Repository:    repoURL,
+		CommitHash:    actualHash,
 		InstallSource: "remote",
 		InstalledAt:   time.Now(),
 		UpdatedAt:     time.Now(),
@@ -101,6 +151,10 @@ func (pi *PluginInstaller) InstallPlugin(repoURL string) error {
 	finalDir := filepath.Join(pi.pluginsDir, fmt.Sprintf("%s-%d", pluginDef.Plugin.ID, registry.ID))
 	registry.FolderPath = finalDir
 
+	if progressCallback != nil {
+		progressCallback("Finalizing installation...")
+	}
+
 	if err := os.Rename(tempDir, finalDir); err != nil {
 		pi.db.GetDB().Delete(&registry)
 		return fmt.Errorf("failed to move plugin to final location: %w", err)
@@ -111,6 +165,10 @@ func (pi *PluginInstaller) InstallPlugin(repoURL string) error {
 	}
 
 	log.Printf("[PluginInstaller] Successfully installed plugin [ID:%d] to: %s", registry.ID, finalDir)
+
+	if progressCallback != nil {
+		progressCallback("Reloading plugins...")
+	}
 
 	if err := pi.pluginLoader.ReloadPlugins(); err != nil {
 		log.Printf("[PluginInstaller] Warning: failed to reload plugins: %v", err)

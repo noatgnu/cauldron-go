@@ -1,4 +1,6 @@
 library(MSstatsPTM)
+library(ggplot2)
+library(reshape2)
 
 args <- commandArgs(trailingOnly = TRUE)
 
@@ -24,12 +26,12 @@ parse_args <- function(args) {
   return(parsed)
 }
 
-write_table_safe <- function(obj, name) {
+write_table_safe <- function(obj, name, filename) {
   if (is.null(obj)) {
     warning(paste(name, "is NULL; skipping write"))
     return(invisible(NULL))
   }
-  fname <- file.path(output_folder, paste0("group_comparison_", tolower(name), ".txt"))
+  fname <- file.path(output_folder, filename)
   tryCatch({
     write.table(obj, file = fname, sep = "\t", row.names = FALSE, quote = FALSE)
   }, error = function(e) {
@@ -322,17 +324,17 @@ if (is.null(output_folder) || output_folder == "") output_folder <- "."
 dir.create(output_folder, recursive = TRUE, showWarnings = FALSE)
 
 if (!is.null(peptide_intensity_wide)) {
-    fname <- file.path(output_folder, "peptide_intensities_wide.txt")
+    fname <- file.path(output_folder, "peptidoform_intensities.txt")
     tryCatch({
         write.table(peptide_intensity_wide, file = fname, sep = "\t", row.names = FALSE, quote = FALSE)
-        cat(paste("Saved peptide intensity table to:", fname, "\n"))
+        cat(paste("Saved peptidoform intensity table to:", fname, "\n"))
     }, error = function(e) {
-        warning(paste("Failed to write peptide intensity table:", e$message))
+        warning(paste("Failed to write peptidoform intensity table:", e$message))
     })
 }
 
 if (!is.null(protein_intensity_wide)) {
-    fname <- file.path(output_folder, "protein_intensities_wide.txt")
+    fname <- file.path(output_folder, "protein_intensities.txt")
     tryCatch({
         write.table(protein_intensity_wide, file = fname, sep = "\t", row.names = FALSE, quote = FALSE)
         cat(paste("Saved protein intensity table to:", fname, "\n"))
@@ -388,9 +390,137 @@ group_comparison <- groupComparisonPTM(
     log_file_path = NULL
 )
 
-write_table_safe(group_comparison$PTM.Model, "PTM")
-write_table_safe(group_comparison$PROTEIN.Model, "PROTEIN")
-write_table_safe(group_comparison$ADJUSTED.Model, "ADJUSTED")
+write_table_safe(group_comparison$PTM.Model, "PTM", "group_comparison_ptm.txt")
+write_table_safe(group_comparison$PROTEIN.Model, "Protein", "group_comparison_protein.txt")
+write_table_safe(group_comparison$ADJUSTED.Model, "Adjusted", "group_comparison_adjusted.txt")
+
+plot_boxplot_ggplot <- function(data_long, title) {
+  p <- ggplot(data_long, aes(x = Sample, y = Intensity, fill = Condition)) +
+    geom_boxplot(outlier.size = 0.5) + theme_minimal() +
+    labs(title = title, x = "", y = "Log2 Intensity") +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = "bottom")
+  return(p)
+}
+
+plot_volcano <- function(df, title, comparison) {
+  df$significant <- ifelse(abs(df$log2FC) > 1 & df$adj.pvalue < 0.05, "Significant", "Not Significant")
+  p <- ggplot(df, aes(x = log2FC, y = -log10(adj.pvalue), color = significant)) +
+    geom_point(alpha = 0.6, size = 1.5) +
+    scale_color_manual(values = c("Significant" = "red", "Not Significant" = "gray")) +
+    labs(title = paste(title, "-", comparison), x = "Log2 Fold Change", y = "-Log10 Adjusted P-value") +
+    theme_minimal() + geom_hline(yintercept = -log10(0.05), linetype = "dashed", color = "blue") +
+    geom_vline(xintercept = c(-1, 1), linetype = "dashed", color = "blue")
+  return(p)
+}
+
+cat("Generating quality control and volcano plots...\n")
+
+if (!is.null(protein_quant_msstats) && nrow(protein_quant_msstats) > 0) {
+  pdf(file.path(output_folder, "protein_qc_plots.pdf"), width = 14, height = 10)
+
+  protein_long <- protein_quant_msstats[, c("Protein", "Run", "Channel", "Condition", "Abundance")]
+  protein_long$Sample <- paste(protein_long$Run, protein_long$Channel, sep = "_")
+
+  if (nrow(protein_long) > 0) {
+    p <- plot_boxplot_ggplot(protein_long, "Protein Intensities")
+    print(p)
+
+    protein_wide_pca <- dcast(protein_long, Protein ~ Sample, value.var = "Abundance")
+    rownames(protein_wide_pca) <- protein_wide_pca$Protein
+    protein_wide_pca$Protein <- NULL
+    protein_wide_pca <- protein_wide_pca[complete.cases(protein_wide_pca), ]
+
+    if (nrow(protein_wide_pca) > 2 && ncol(protein_wide_pca) > 2) {
+      pca_result <- prcomp(t(protein_wide_pca), scale. = TRUE)
+      df_pca <- data.frame(
+        Sample = rownames(pca_result$x),
+        PC1 = pca_result$x[, 1],
+        PC2 = pca_result$x[, 2]
+      )
+
+      df_pca$Condition <- sapply(df_pca$Sample, function(s) {
+        idx <- which(paste(protein_long$Run, protein_long$Channel, sep = "_") == s)[1]
+        if (length(idx) > 0) protein_long$Condition[idx] else NA
+      })
+
+      var_explained <- summary(pca_result)$importance[2, 1:2] * 100
+      p_pca <- ggplot(df_pca, aes(x = PC1, y = PC2, color = Condition, label = Sample)) +
+        geom_point(size = 3) +
+        labs(title = "PCA - Protein Level",
+             x = sprintf("PC1 (%.1f%%)", var_explained[1]),
+             y = sprintf("PC2 (%.1f%%)", var_explained[2])) +
+        theme_minimal()
+      print(p_pca)
+    }
+  }
+
+  dev.off()
+}
+
+if (!is.null(group_comparison$PROTEIN.Model)) {
+  pdf(file.path(output_folder, "protein_volcano_plots.pdf"), width = 14, height = 10)
+  comparisons <- unique(group_comparison$PROTEIN.Model$Label)
+  for (comp in comparisons) {
+    comp_data <- group_comparison$PROTEIN.Model[group_comparison$PROTEIN.Model$Label == comp, ]
+    print(plot_volcano(comp_data, "Volcano Plot - Protein Level", comp))
+  }
+  dev.off()
+}
+
+if (!is.null(ptm_quant_msstats) && nrow(ptm_quant_msstats) > 0) {
+  pdf(file.path(output_folder, "ptm_qc_plots.pdf"), width = 14, height = 10)
+
+  ptm_long <- ptm_quant_msstats[, c("PTM_id", "Run", "Channel", "Condition", "Abundance")]
+  ptm_long$Sample <- paste(ptm_long$Run, ptm_long$Channel, sep = "_")
+
+  if (nrow(ptm_long) > 0) {
+    p <- plot_boxplot_ggplot(ptm_long, "PTM/Peptidoform Intensities")
+    print(p)
+
+    ptm_wide_pca <- dcast(ptm_long, PTM_id ~ Sample, value.var = "Abundance")
+    rownames(ptm_wide_pca) <- ptm_wide_pca$PTM_id
+    ptm_wide_pca$PTM_id <- NULL
+    ptm_wide_pca <- ptm_wide_pca[complete.cases(ptm_wide_pca), ]
+
+    if (nrow(ptm_wide_pca) > 2 && ncol(ptm_wide_pca) > 2) {
+      pca_result <- prcomp(t(ptm_wide_pca), scale. = TRUE)
+      df_pca <- data.frame(
+        Sample = rownames(pca_result$x),
+        PC1 = pca_result$x[, 1],
+        PC2 = pca_result$x[, 2]
+      )
+
+      df_pca$Condition <- sapply(df_pca$Sample, function(s) {
+        idx <- which(paste(ptm_long$Run, ptm_long$Channel, sep = "_") == s)[1]
+        if (length(idx) > 0) ptm_long$Condition[idx] else NA
+      })
+
+      var_explained <- summary(pca_result)$importance[2, 1:2] * 100
+      p_pca <- ggplot(df_pca, aes(x = PC1, y = PC2, color = Condition, label = Sample)) +
+        geom_point(size = 3) +
+        labs(title = "PCA - PTM/Peptidoform Level",
+             x = sprintf("PC1 (%.1f%%)", var_explained[1]),
+             y = sprintf("PC2 (%.1f%%)", var_explained[2])) +
+        theme_minimal()
+      print(p_pca)
+    }
+  }
+
+  dev.off()
+}
+
+if (!is.null(group_comparison$PTM.Model) && !is.null(group_comparison$ADJUSTED.Model)) {
+  pdf(file.path(output_folder, "ptm_volcano_plots.pdf"), width = 14, height = 10)
+  comparisons <- unique(group_comparison$PTM.Model$Label)
+  for (comp in comparisons) {
+    dpa_data <- group_comparison$PTM.Model[group_comparison$PTM.Model$Label == comp, ]
+    print(plot_volcano(dpa_data, "Volcano Plot - DPA (PTM Abundance)", comp))
+
+    dpu_data <- group_comparison$ADJUSTED.Model[group_comparison$ADJUSTED.Model$Label == comp, ]
+    print(plot_volcano(dpu_data, "Volcano Plot - DPU (PTM Usage)", comp))
+  }
+  dev.off()
+}
 
 cat("MSstatsPTM TMT analysis completed successfully\n")
 cat(paste("Results saved to:", output_folder, "\n"))

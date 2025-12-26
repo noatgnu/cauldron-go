@@ -12,6 +12,8 @@ import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { Wails } from '../../core/services/wails';
+import { InstallPluginDialog } from '../../components/install-plugin-dialog/install-plugin-dialog';
+import { PluginInstallProgress } from '../../components/plugin-install-progress/plugin-install-progress';
 
 interface RegistryPlugin {
   id: string;
@@ -149,6 +151,26 @@ export class PluginRegistry implements OnInit {
     this.pageIndex = event.pageIndex;
     this.pageSize = event.pageSize;
     await this.loadPlugins();
+  }
+
+  openManualInstallDialog(): void {
+    const dialogRef = this.dialog.open(InstallPluginDialog, {
+      width: '600px',
+      disableClose: true
+    });
+
+    dialogRef.afterClosed().subscribe((result: { repoURL: string, commitHash?: string }) => {
+      if (result && result.repoURL) {
+        this.dialog.open(PluginInstallProgress, {
+          data: {
+            repoURL: result.repoURL,
+            commitHash: result.commitHash
+          },
+          disableClose: true,
+          width: '500px'
+        });
+      }
+    });
   }
 
   async installPlugin(plugin: RegistryPlugin): Promise<void> {

@@ -1,0 +1,80 @@
+name: Validate Plugins
+
+on:
+  push:
+    branches: [ master, main, develop ]
+    paths:
+      - 'plugins/**'
+      - 'cmd/plugin-validator/**'
+      - '.github/workflows/test-plugins.yml'
+  pull_request:
+    branches: [ master, main, develop ]
+    paths:
+      - 'plugins/**'
+      - 'cmd/plugin-validator/**'
+      - '.github/workflows/test-plugins.yml'
+  workflow_dispatch:
+
+jobs:
+  validate-all-plugins:
+    name: Validate All Plugins
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+
+      - name: Build plugin validator
+        run: |
+          go build -o bin/plugin-validator cmd/plugin-validator/main.go
+          chmod +x bin/plugin-validator
+
+      - name: Validate all plugins
+        run: |
+          ./bin/plugin-validator plugins/
+
+  validate-changed-plugins:
+    name: Validate Changed Plugins
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+
+      - name: Build plugin validator
+        run: |
+          go build -o bin/plugin-validator cmd/plugin-validator/main.go
+          chmod +x bin/plugin-validator
+
+      - name: Get changed plugins
+        id: changed-plugins
+        run: |
+          changed_files=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.sha }})
+          changed_plugins=$(echo "$changed_files" | grep '^plugins/' | cut -d'/' -f2 | sort -u)
+
+          echo "Changed plugins:"
+          echo "$changed_plugins"
+
+          if [ -z "$changed_plugins" ]; then
+            echo "No plugin changes detected"
+            exit 0
+          fi
+
+          for plugin in $changed_plugins; do
+            if [ -f "plugins/$plugin/plugin.yaml" ]; then
+              ./bin/plugin-validator "plugins/$plugin/plugin.yaml"
+            fi
+          done

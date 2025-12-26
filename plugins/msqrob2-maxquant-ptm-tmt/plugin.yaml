@@ -10,7 +10,7 @@ plugin:
 
 runtime:
   type: "r"
-  script: "msqrob2_maxquant_ptm_tmt.R"
+  script: "msqrob2_maxquant_ptm_tmt_modular.R"
 
 inputs:
   - name: "input_file"
@@ -33,7 +33,47 @@ inputs:
     required: true
     accept: ".csv,.tsv,.txt"
     disableAnnotationManagement: true
-    description: "TMT annotation file for PTM data (columns: Run, Channel, Condition, Mixture, TechRepMixture, Fraction, BioReplicate)"
+    description: "Annotation file for PTM data (columns: Sample, Condition, BioReplicate)"
+    tableColumns:
+      - name: "Sample"
+        label: "Sample"
+        type: "text"
+        required: true
+        description: "Sample identifier matching column names in data (e.g. Reporter intensity corrected 1)"
+      - name: "Condition"
+        label: "Condition"
+        type: "text"
+        required: true
+        description: "Experimental condition/group name"
+      - name: "BioReplicate"
+        label: "BioReplicate"
+        type: "text"
+        required: true
+        description: "Biological replicate number"
+
+  - name: "annotation_protein_file"
+    label: "Protein Annotation File"
+    type: "file"
+    required: false
+    accept: ".csv,.tsv,.txt"
+    disableAnnotationManagement: true
+    description: "Annotation file for Protein data (columns: Sample, Condition, BioReplicate)"
+    tableColumns:
+      - name: "Sample"
+        label: "Sample"
+        type: "text"
+        required: true
+        description: "Sample identifier matching column names in protein file"
+      - name: "Condition"
+        label: "Condition"
+        type: "text"
+        required: true
+        description: "Experimental condition/group name"
+      - name: "BioReplicate"
+        label: "BioReplicate"
+        type: "text"
+        required: true
+        description: "Biological replicate number"
 
   - name: "feature_id_col"
     label: "PTM Feature ID Column"
@@ -333,10 +373,28 @@ outputs:
     description: "Normalized peptide-level intensities"
     format: "tsv"
 
-  - name: "qc_plots"
-    path: "qc_plots.pdf"
+  - name: "protein_qc_plots"
+    path: "protein_qc_plots.pdf"
     type: "plot"
-    description: "Quality control plots (PCA, boxplots, volcano plots)"
+    description: "Quality control plots for global protein data (boxplots, PCA)"
+    format: "pdf"
+
+  - name: "protein_volcano_plots"
+    path: "protein_volcano_plots.pdf"
+    type: "plot"
+    description: "Volcano plots for global protein data"
+    format: "pdf"
+
+  - name: "ptm_qc_plots"
+    path: "ptm_qc_plots.pdf"
+    type: "plot"
+    description: "Quality control plots for PTM data (boxplots, PCA)"
+    format: "pdf"
+
+  - name: "ptm_volcano_plots"
+    path: "ptm_volcano_plots.pdf"
+    type: "plot"
+    description: "Volcano plots for PTM data (DPA and DPU)"
     format: "pdf"
 
 execution:
@@ -344,6 +402,7 @@ execution:
     input_file: "--input_file"
     fasta_file: "--fasta_file"
     annotation_file: "--annotation_file"
+    annotation_protein_file: "--annotation_protein_file"
     feature_id_col: "--feature_id_col"
     site_col: "--site_col"
     protein_col: "--protein_col"
@@ -397,6 +456,7 @@ example:
     input_file: "maxquant-tmt/evidence_ptm.txt"
     fasta_file: "maxquant-tmt/uniprot_human.fasta"
     annotation_file: "maxquant-tmt/annotation_ptm_msqrob2.txt"
+    annotation_protein_file: "maxquant-tmt/annotation_protein_msqrob2.txt"
     feature_id_col: "Sequence"
     site_col: "Modified sequence"
     protein_col: "Proteins"
@@ -407,6 +467,7 @@ example:
     min_probability: 0.75
     log2_transform: true
     analysis_type: "both"
+    exclude_conditions: "Norm"
     remove_norm_channel: true
     filter_min_peptides: 2
     remove_shared_peptides: true
@@ -418,3 +479,6 @@ example:
     summarization_method: "robust"
     model_run_effect: false
     robust_regression: false
+
+diagram:
+  enabled: true

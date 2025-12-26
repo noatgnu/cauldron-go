@@ -234,33 +234,27 @@ inputs:
 
 outputs:
   - name: "differential_results"
-    path: "tmt_results.txt"
+    path: "protein_results.txt"
     type: "data"
     description: "Differential expression analysis results"
     format: "tsv"
 
-  - name: "protein_intensities"
-    path: "protein_intensities.txt"
+  - name: "protein_intensity"
+    path: "protein_intensity.txt"
     type: "data"
     description: "Summarized protein-level intensities"
     format: "tsv"
 
-  - name: "normalized_peptides"
-    path: "normalized_peptides.txt"
-    type: "data"
-    description: "Normalized peptide-level intensities"
-    format: "tsv"
-
-  - name: "imputed_peptides"
-    path: "imputed_peptides.txt"
-    type: "data"
-    description: "Imputed peptide intensities"
-    format: "tsv"
-
-  - name: "qc_plots"
-    path: "qc_plots.pdf"
+  - name: "protein_qc_plots"
+    path: "protein_qc_plots.pdf"
     type: "plot"
-    description: "Quality control plots (PCA, boxplots, volcano plots)"
+    description: "Quality control plots (PCA, boxplots)"
+    format: "pdf"
+
+  - name: "protein_volcano_plots"
+    path: "protein_volcano_plots.pdf"
+    type: "plot"
+    description: "Volcano plots for each comparison"
     format: "pdf"
 
 execution:
@@ -324,3 +318,6 @@ example:
     summarization_method: "robust"
     model_run_effect: false
     robust_regression: true
+
+diagram:
+  enabled: true

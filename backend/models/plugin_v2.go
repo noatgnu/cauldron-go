@@ -125,6 +125,7 @@ type PluginExecution struct {
 	ArgsMapping  map[string]interface{} `yaml:"argsMapping" json:"argsMapping"`
 	OutputDir    string                 `yaml:"outputDir" json:"outputDir"`
 	Requirements Requirements           `yaml:"requirements,omitempty" json:"requirements,omitempty"`
+	EnvVariables []PluginInputV2        `yaml:"envVariables,omitempty" json:"envVariables,omitempty"`
 }
 
 type PluginRuntimeV2 struct {
@@ -171,6 +172,8 @@ type PluginV2 struct {
 	FolderPath    string           `json:"folderPath"`
 	ScriptPath    string           `json:"scriptPath"`
 	InstallSource string           `json:"installSource"`
+	CommitHash    string           `json:"commitHash"`
+	Repository    string           `json:"repository"`
 }
 
 type PluginExecutionRequestV2 struct {

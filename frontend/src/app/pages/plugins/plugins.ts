@@ -17,6 +17,7 @@ import { Wails, PluginEnvironmentBinding } from '../../core/services/wails';
 import { Plugin, PluginInput, PluginExecutionRequest } from '../../core/models/plugin';
 import { EnvironmentIndicator } from '../../components/environment-indicator/environment-indicator';
 import { InstallPluginDialog } from '../../components/install-plugin-dialog/install-plugin-dialog';
+import { PluginInstallProgress } from '../../components/plugin-install-progress/plugin-install-progress';
 
 @Component({
   selector: 'app-plugins',
@@ -242,21 +243,25 @@ export class Plugins implements OnInit {
   async openInstallDialog() {
     const dialogRef = this.dialog.open(InstallPluginDialog, {
       width: '600px',
-      disableClose: false
+      disableClose: true
     });
 
-    dialogRef.afterClosed().subscribe(async (repoURL: string) => {
-      if (repoURL) {
-        this.loading.set(true);
-        try {
-          await this.wails.installPluginFromRepo(repoURL);
-          await this.wails.logToFile(`[Plugins] Successfully installed plugin from: ${repoURL}`);
-          await this.loadPlugins();
-        } catch (error) {
-          await this.wails.logToFile(`[Plugins] Failed to install plugin: ${error}`);
-        } finally {
-          this.loading.set(false);
-        }
+    dialogRef.afterClosed().subscribe((result: { repoURL: string, commitHash?: string }) => {
+      if (result && result.repoURL) {
+        const progressRef = this.dialog.open(PluginInstallProgress, {
+          data: {
+            repoURL: result.repoURL,
+            commitHash: result.commitHash
+          },
+          disableClose: true,
+          width: '500px'
+        });
+
+        progressRef.afterClosed().subscribe(completed => {
+          if (completed) {
+            this.loadPlugins();
+          }
+        });
       }
     });
   }

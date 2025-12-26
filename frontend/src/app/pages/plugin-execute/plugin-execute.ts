@@ -7,6 +7,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatTabsModule } from '@angular/material/tabs';
 import { DynamicFormComponent } from '../../components/dynamic-form/dynamic-form';
 import { PluginV2Service } from '../../core/services/plugin-v2';
 import { models } from '../../../wailsjs/go/models';
@@ -23,6 +24,7 @@ import { Wails } from '../../core/services/wails';
     MatProgressSpinnerModule,
     MatSnackBarModule,
     MatTooltipModule,
+    MatTabsModule,
     DynamicFormComponent,
     EnvironmentIndicator
   ],

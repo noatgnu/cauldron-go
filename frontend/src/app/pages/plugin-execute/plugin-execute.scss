@@ -60,6 +60,86 @@
   }
 }
 
+.tab-content {
+  padding: 1.5rem 0;
+}
+
+.outputs-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+
+  .output-item {
+    padding: 12px;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    border-radius: 4px;
+    background-color: #fafafa;
+
+    &:hover {
+      background-color: #f5f5f5;
+    }
+
+    .output-header {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 8px;
+
+      .output-icon {
+        font-size: 24px;
+        width: 24px;
+        height: 24px;
+        flex-shrink: 0;
+
+        &.data-icon {
+          color: #1976d2;
+        }
+
+        &.plot-icon {
+          color: #388e3c;
+        }
+      }
+
+      .output-title {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+
+        strong {
+          font-size: 13px;
+          color: rgba(0, 0, 0, 0.87);
+        }
+
+        .output-type-badge {
+          font-size: 11px;
+          padding: 2px 8px;
+          border-radius: 12px;
+          font-weight: 500;
+
+          &.data-badge {
+            background-color: #e3f2fd;
+            color: #1976d2;
+          }
+
+          &.plot-badge {
+            background-color: #e8f5e9;
+            color: #388e3c;
+          }
+        }
+      }
+    }
+
+    .output-description {
+      font-size: 12px;
+      color: rgba(0, 0, 0, 0.6);
+      line-height: 1.5;
+      margin-left: 36px;
+    }
+  }
+}
+
 .info-card {
   .info-grid {
     display: grid;

@@ -223,6 +223,7 @@ export class SettingsPython implements OnInit {
   async viewPythonPackages(env: PythonEnvironment): Promise<void> {
     const dialogRef = this.dialog.open(PackagesModal, {
       width: '600px',
+      disableClose: true,
       data: {
         environmentName: env.name,
         packages: [],
@@ -417,7 +418,8 @@ export class SettingsPython implements OnInit {
         envName: envName,
         plugins: boundPlugins
       },
-      width: '500px'
+      width: '500px',
+      disableClose: true
     });
   }
 }

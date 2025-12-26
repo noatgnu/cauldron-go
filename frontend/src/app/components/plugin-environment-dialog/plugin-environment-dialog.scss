@@ -46,9 +46,21 @@
 }
 
 mat-dialog-content {
-  padding: 24px;
+  padding: 0; // Remove padding to allow tabs to hit the edge
   max-height: 70vh;
   overflow-y: auto;
+}
+
+.tab-content {
+  padding: 24px;
+}
+
+.variable-section {
+  .section-description {
+    margin: -8px 0 24px 0;
+    font-size: 13px;
+    color: rgba(0, 0, 0, 0.6);
+  }
 }
 
 mat-dialog-actions {
@@ -255,6 +267,10 @@ mat-selection-list {
     font-size: 13px;
     line-height: 1.5;
     color: rgba(0, 0, 0, 0.7);
+  }
+
+  .toggle-row {
+    margin-bottom: 24px;
   }
 
   .creation-progress {

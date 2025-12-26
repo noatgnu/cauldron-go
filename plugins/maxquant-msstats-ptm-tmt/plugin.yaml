@@ -364,17 +364,41 @@ outputs:
     description: "PTM results adjusted for protein abundance changes (recommended for interpretation)"
     format: "tsv"
 
-  - name: "peptide_intensities_wide"
-    path: "peptide_intensities_wide.txt"
+  - name: "peptide_intensities"
+    path: "peptidoform_intensities.txt"
     type: "data"
-    description: "Peptide-level summarized intensities in wide format (can be joined with PTM and adjusted results)"
+    description: "Peptidoform-level summarized intensities"
     format: "tsv"
 
-  - name: "protein_intensities_wide"
-    path: "protein_intensities_wide.txt"
+  - name: "protein_intensities"
+    path: "protein_intensities.txt"
     type: "data"
-    description: "Protein-level summarized intensities in wide format (can be joined with protein results)"
+    description: "Protein-level summarized intensities"
     format: "tsv"
+
+  - name: "protein_qc_plots"
+    path: "protein_qc_plots.pdf"
+    type: "plot"
+    description: "Quality control plots for global protein data (boxplots, PCA)"
+    format: "pdf"
+
+  - name: "protein_volcano_plots"
+    path: "protein_volcano_plots.pdf"
+    type: "plot"
+    description: "Volcano plots for global protein data"
+    format: "pdf"
+
+  - name: "ptm_qc_plots"
+    path: "ptm_qc_plots.pdf"
+    type: "plot"
+    description: "Quality control plots for PTM data (boxplots, PCA)"
+    format: "pdf"
+
+  - name: "ptm_volcano_plots"
+    path: "ptm_volcano_plots.pdf"
+    type: "plot"
+    description: "Volcano plots for PTM data (PTM and Adjusted)"
+    format: "pdf"
 
 execution:
   argsMapping:

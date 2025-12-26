@@ -11,6 +11,7 @@ import { MatChipsModule } from '@angular/material/chips';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatListModule } from '@angular/material/list';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { firstValueFrom } from 'rxjs';
@@ -35,7 +36,8 @@ import { BoundPluginsDialogComponent, BoundPlugin } from '../../../components/bo
     MatChipsModule,
     MatDividerModule,
     MatListModule,
-    MatTooltipModule
+    MatTooltipModule,
+    MatSlideToggleModule
   ],
   templateUrl: './settings-r.html',
   styleUrl: './settings-r.scss',
@@ -53,6 +55,7 @@ export class SettingsR implements OnInit {
   protected renvCreationProgress = signal<{message: string, percentage: number} | null>(null);
   protected bindings = signal<PluginEnvironmentBinding[]>([]);
   protected plugins = signal<any[]>([]);
+  protected useGlobalCache = signal(false);
 
   constructor(
     private wails: Wails,
@@ -217,6 +220,7 @@ export class SettingsR implements OnInit {
   async viewRPackages(env: REnvironment): Promise<void> {
     const dialogRef = this.dialog.open(PackagesModal, {
       width: '600px',
+      disableClose: true,
       data: {
         environmentName: env.name,
         packages: [],
@@ -293,6 +297,7 @@ export class SettingsR implements OnInit {
 
   async createRenvEnvironment(): Promise<void> {
     const nameDialog = this.dialog.open(PromptDialogComponent, {
+      disableClose: true,
       data: {
         title: 'Create Renv Environment',
         label: 'Environment Name',
@@ -305,6 +310,7 @@ export class SettingsR implements OnInit {
     if (!name) return;
 
     const packagesDialog = this.dialog.open(PromptDialogComponent, {
+      disableClose: true,
       data: {
         title: 'Install R Packages',
         label: 'Packages',
@@ -321,7 +327,7 @@ export class SettingsR implements OnInit {
 
     try {
       this.creatingRenvEnv.set(true);
-      await this.wails.createRenvEnvironment(name, packages);
+      await this.wails.createRenvEnvironment(name, packages, '', this.useGlobalCache());
       await this.loadRenvEnvironments();
     } catch (error) {
       await this.wails.logToFile(`[SettingsR] Failed to create renv environment: ${error}`);
@@ -333,6 +339,7 @@ export class SettingsR implements OnInit {
 
   async deleteRenvEnvironment(id: number): Promise<void> {
     const dialogRef = this.dialog.open(ConfirmDialogComponent, {
+      disableClose: true,
       data: {
         title: 'Delete Environment',
         message: 'Are you sure you want to delete this renv environment?',
@@ -398,7 +405,8 @@ export class SettingsR implements OnInit {
         envName: envName,
         plugins: boundPlugins
       },
-      width: '500px'
+      width: '500px',
+      disableClose: true
     });
   }
 }

@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -56,6 +57,9 @@ func (s *SettingsService) Load() error {
 	if val, ok := settings["curtainBackendUrl"]; ok {
 		s.config.CurtainBackendURL = val
 	}
+	if val, ok := settings["useRenvCache"]; ok {
+		s.config.UseRenvCache = val == "true"
+	}
 
 	return nil
 }
@@ -67,6 +71,7 @@ func (s *SettingsService) Save() error {
 	s.db.SaveSetting("rPath", s.config.RPath)
 	s.db.SaveSetting("rLibPath", s.config.RLibPath)
 	s.db.SaveSetting("curtainBackendUrl", s.config.CurtainBackendURL)
+	s.db.SaveSetting("useRenvCache", fmt.Sprintf("%v", s.config.UseRenvCache))
 	return nil
 }
 
@@ -84,6 +89,8 @@ func (s *SettingsService) Get(key string) interface{} {
 		return s.config.RLibPath
 	case "curtainBackendUrl":
 		return s.config.CurtainBackendURL
+	case "useRenvCache":
+		return s.config.UseRenvCache
 	}
 	return nil
 }
@@ -103,6 +110,8 @@ func (s *SettingsService) Set(key string, value interface{}) error {
 		s.config.RLibPath = value.(string)
 	case "curtainBackendUrl":
 		s.config.CurtainBackendURL = value.(string)
+	case "useRenvCache":
+		s.config.UseRenvCache = value.(bool)
 	}
 	return s.Save()
 }
@@ -135,6 +144,9 @@ func (s *SettingsService) initializeDefaults() {
 	if s.config.CurtainBackendURL == "" {
 		s.config.CurtainBackendURL = "https://celsus.muttsu.xyz"
 	}
+
+	// Default to false for total isolation
+	s.config.UseRenvCache = false
 }
 
 func (s *SettingsService) DetectPythonPath() (string, error) {

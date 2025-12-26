@@ -5,7 +5,7 @@ import {services} from '../models';
 
 export function BindPluginToEnvironment(arg1:string,arg2:string,arg3:number,arg4:string):Promise<void>;
 
-export function ConfirmPluginInstallation(arg1:string):Promise<void>;
+export function ConfirmPluginInstallation(arg1:string,arg2:string):Promise<void>;
 
 export function ConvertPluginToYAML(arg1:models.PluginDefinition):Promise<string>;
 
@@ -13,11 +13,15 @@ export function CreateJob(arg1:models.JobRequest):Promise<string>;
 
 export function CreatePythonVirtualEnv(arg1:string,arg2:string,arg3:string):Promise<void>;
 
-export function CreateRenvEnvironment(arg1:string,arg2:Array<string>,arg3:string):Promise<void>;
+export function CreateRenvEnvironment(arg1:string,arg2:Array<string>,arg3:string,arg4:boolean):Promise<void>;
 
 export function CreateSamplePlugin():Promise<void>;
 
 export function DecodePluginRepoURL(arg1:string):Promise<string>;
+
+export function DeleteCustomEnvVar(arg1:number):Promise<void>;
+
+export function DeleteCustomEnvVarByKey(arg1:number,arg2:string):Promise<void>;
 
 export function DeleteImportedFile(arg1:number):Promise<void>;
 
@@ -59,11 +63,17 @@ export function GetAllPluginEnvironmentBindings():Promise<Array<services.PluginE
 
 export function GetBundledRequirementsPath(arg1:string):Promise<string>;
 
+export function GetCustomEnvVars(arg1:number):Promise<Array<services.CustomEnvVar>>;
+
 export function GetExampleFilePath(arg1:string,arg2:string):Promise<string>;
+
+export function GetGlobalCustomEnvVars():Promise<Array<services.CustomEnvVar>>;
 
 export function GetImportedFiles():Promise<Array<services.ImportedFile>>;
 
 export function GetJob(arg1:string):Promise<models.Job>;
+
+export function GetJobExecutionLog(arg1:string):Promise<string>;
 
 export function GetJobQueueStatus():Promise<Record<string, any>>;
 
@@ -111,9 +121,9 @@ export function HasInProgressJobs():Promise<boolean>;
 
 export function ImportDataFile(arg1:string):Promise<number>;
 
-export function InstallPluginFromRegistry(arg1:string):Promise<void>;
+export function InstallPluginFromRegistry(arg1:string,arg2:string):Promise<void>;
 
-export function InstallPluginFromRepo(arg1:string):Promise<void>;
+export function InstallPluginFromRepo(arg1:string,arg2:string):Promise<void>;
 
 export function InstallPythonPackages(arg1:string,arg2:Array<string>):Promise<void>;
 
@@ -178,6 +188,8 @@ export function RunNormalization(arg1:string,arg2:string,arg3:Array<string>,arg4
 export function RunPCAAnalysis(arg1:string,arg2:string,arg3:Array<string>,arg4:number,arg5:boolean):Promise<string>;
 
 export function RunPHATEAnalysis(arg1:string,arg2:string,arg3:Array<string>,arg4:number,arg5:boolean):Promise<string>;
+
+export function SaveCustomEnvVar(arg1:services.CustomEnvVar):Promise<void>;
 
 export function SaveFile(arg1:string,arg2:string):Promise<string>;
 

@@ -4,6 +4,19 @@ library(limma)
 library(MsCoreUtils)
 library(SummarizedExperiment)
 library(Biostrings)
+library(ggplot2)
+library(reshape2)
+library(PhosR)
+
+source("src/utils.R")
+source("src/ptm_processing.R")
+source("src/data_loading.R")
+source("src/normalization.R")
+source("src/statistical_analysis.R")
+source("src/kinase_analysis.R")
+source("src/pathway_analysis.R")
+source("src/signaling_analysis.R")
+source("src/visualization.R")
 
 detect_delimiter <- function(filepath) {
   ext <- tolower(tools::file_ext(filepath))
@@ -21,31 +34,31 @@ process_ptm_with_fasta <- function(data, fasta_path, seq_col, protein_col, prob_
   fasta <- readAAStringSet(fasta_path)
   # Clean names: "sp|P12345|NAME" -> "P12345" (Uniprot style)
   names(fasta) <- sapply(strsplit(names(fasta), "|", fixed = TRUE), function(x) if(length(x)>1) x[2] else x[1])
-  
+
   new_sites <- character(nrow(data))
-  
+
   for (i in 1:nrow(data)) {
     prot_ids <- strsplit(as.character(data[[protein_col]][i]), ";")[[1]]
     prot_id <- prot_ids[1] # Use leading protein
-    
+
     seq <- data[[seq_col]][i]
     prob_str <- as.character(data[[prob_col]][i])
-    
+
     if (is.na(prot_id) || !prot_id %in% names(fasta)) {
       new_sites[i] <- NA
       next
     }
-    
+
     prot_seq <- as.character(fasta[[prot_id]])
     start_pos <- regexpr(seq, prot_seq, fixed = TRUE)[1]
-    
+
     if (start_pos == -1) {
       new_sites[i] <- NA
       next
     }
-    
+
     found_sites <- c()
-    
+
     if (is.na(prob_str) || prob_str == "") {
         new_sites[i] <- "Unmodified"
         next
@@ -74,7 +87,7 @@ process_ptm_with_fasta <- function(data, fasta_path, seq_col, protein_col, prob_
         j <- j + 1
       }
     }
-    
+
     if (length(found_sites) > 0) {
       # Format: Protein_Site1_Site2
       new_sites[i] <- paste(c(prot_id, found_sites), collapse="_")
@@ -84,8 +97,6 @@ process_ptm_with_fasta <- function(data, fasta_path, seq_col, protein_col, prob_
   }
   return(new_sites)
 }
-
-args <- commandArgs(trailingOnly = TRUE)
 
 parse_args <- function(args) {
   parsed <- list()
@@ -109,12 +120,14 @@ parse_args <- function(args) {
   return(parsed)
 }
 
+args <- commandArgs(trailingOnly = TRUE)
 params <- parse_args(args)
 
 input_file <- params$input_file
 fasta_file <- params$fasta_file
 output_folder <- params$output_folder
 annotation_file <- params$annotation_file
+annotation_protein_file <- params$annotation_protein_file
 comparison_file <- params$comparison_file
 feature_id_col <- params$feature_id_col
 protein_col <- params$protein_col
@@ -147,6 +160,11 @@ alpha <- ifelse(is.null(params$alpha), 0.05, as.numeric(params$alpha))
 lfc_threshold <- ifelse(is.null(params$lfc_threshold), 0, as.numeric(params$lfc_threshold))
 exclude_conditions <- params$exclude_conditions
 remove_norm_channel <- !is.null(params$remove_norm_channel) && params$remove_norm_channel != FALSE
+
+organism <- ifelse(is.null(params$organism), "human", params$organism)
+kinase_num_motifs <- ifelse(is.null(params$kinase_num_motifs), 5, as.numeric(params$kinase_num_motifs))
+top_diff_sites_heatmap <- ifelse(is.null(params$top_diff_sites_heatmap), 50, as.numeric(params$top_diff_sites_heatmap))
+top_phosphosite_heatmap <- ifelse(is.null(params$top_phosphosite_heatmap), 50, as.numeric(params$top_phosphosite_heatmap))
 
 if (remove_norm_channel) {
   if (is.null(exclude_conditions) || exclude_conditions == "") {
@@ -296,7 +314,7 @@ do_normalization <- function(assayName) {
     pe <<- normalize(pe, i = assayName, name = paste0(assayName, "Norm"), method = normalize_method)
     return(paste0(assayName, "Norm"))
   } else {
-    pe <<- addAssay(pe, assay(pe[[assayName]]), name = paste0(assayName, "Norm"))
+    pe <<- addAssay(pe, pe[[assayName]], name = paste0(assayName, "Norm"))
     return(paste0(assayName, "Norm"))
   }
 }
@@ -309,10 +327,7 @@ do_aggregation <- function(assayName) {
     stop("Protein column '", protein_col, "' not found in rowData. Available columns: ", paste(available_cols, collapse=", "))
   }
 
-  # DEBUG: Check protein column values
   protein_values <- rowData(pe[[assayName]])[[protein_col]]
-  message("  - DEBUG: First 5 protein values: ", paste(head(protein_values, 5), collapse=", "))
-  message("  - DEBUG: Sample of unique proteins: ", paste(head(unique(protein_values), 10), collapse=", "))
 
   # Check if protein column has numeric suffixes (like P00918.42)
   if (any(grepl("\\.[0-9]+$", protein_values))) {
@@ -351,9 +366,7 @@ do_aggregation <- function(assayName) {
 
   message("  - Result: ", nrow(pe[["protein"]]), " proteins")
 
-  # DEBUG: Check resulting protein rownames
   prot_rownames <- rownames(pe[["protein"]])
-  message("  - DEBUG: First 5 protein rownames after aggregation: ", paste(head(prot_rownames, 5), collapse=", "))
   if (any(grepl("\\.[0-9]+$", prot_rownames))) {
     message("  - WARNING: Protein rownames still have numeric suffixes after aggregation!")
   }
@@ -368,6 +381,9 @@ message("[5/8] Processing PTM peptidoform data...")
 
 # Process peptidoforms: normalize, impute, log transform
 currentAssayName <- "peptidoform"
+
+# Save raw for plot
+pe <- addAssay(pe, pe[[currentAssayName]], name = "peptidoform_raw")
 
 if (impute_order == "before") {
   message("  - Imputation (method: ", ifelse(is.null(impute_method) || impute_method == "none", "none", impute_method), ")...")
@@ -400,121 +416,182 @@ message("[6/8] Processing global protein data...")
 
 use_external_protein <- !is.null(protein_file) && file.exists(protein_file)
 
+# Refined helper functions matching non-PTM logic
+process_impute <- function(pe_obj, i, name, method) {
+  if (!is.null(method) && method != "none") {
+    pe_obj <- impute(pe_obj, method = method, i = i, name = name)
+  } else {
+    pe_obj <- addAssay(pe_obj, pe_obj[[i]], name = name)
+  }
+  return(pe_obj)
+}
+
+process_norm <- function(pe_obj, i, name, method) {
+  if (method != "none") {
+    pe_obj <- normalize(pe_obj, i = i, name = name, method = method)
+  } else {
+    pe_obj <- addAssay(pe_obj, pe_obj[[i]], name = name)
+  }
+  return(pe_obj)
+}
+
+process_agg <- function(pe_obj, i, fcol, name, method, min_pep) {
+  peptide_counts <- table(rowData(pe_obj[[i]])[[fcol]])
+  proteins_to_keep <- names(peptide_counts)[peptide_counts >= min_pep]
+  pe_obj <- pe_obj[rowData(pe_obj[[i]])[[fcol]] %in% proteins_to_keep, , ]
+  
+  if (nrow(pe_obj[[i]]) == 0) stop("No features remaining after filtering in global protein data")
+
+  summ_fun <- switch(method, 
+    "robust" = MsCoreUtils::robustSummary, 
+    "sum" = colSums, "mean" = colMeans, "median" = matrixStats::colMedians, 
+    MsCoreUtils::robustSummary
+  )
+  
+  pe_obj <- pe_obj[, colnames(pe_obj[[i]])]
+  pe_obj <- aggregateFeatures(pe_obj, i = i, fcol = fcol, name = name, fun = summ_fun)
+  return(pe_obj)
+}
+
 if (use_external_protein) {
-  # Option A: Use external protein file - process exactly like non-PTM workflow
-  message("  - Loading external protein file (global proteome from separate experiment)...")
+  message("  - Loading external protein file...")
   protein_sep <- detect_delimiter(protein_file)
-  protein_data <- read.table(protein_file, sep = protein_sep, header = TRUE, check.names = FALSE)
+  protein_data <- read.table(protein_file, sep = protein_sep, header = TRUE, 
+                             na.strings = c("NA", "NaN", "N/A", "#VALUE!", ""), 
+                             check.names = FALSE, stringsAsFactors = FALSE)
+  
   colnames(protein_data) <- make.names(colnames(protein_data))
   safe_prot_id <- make.names(protein_id_col)
   safe_prot_feature_id <- make.names(protein_feature_id_col)
 
-  # Create unique peptide IDs (same as non-PTM workflow line 141-142)
-  protein_unique_ids <- paste(protein_data[[safe_prot_feature_id]], protein_data[[safe_prot_id]], sep = "_")
-  rownames(protein_data) <- make.unique(as.character(protein_unique_ids))
-
-  common_samples <- intersect(colnames(pe[[peptidoformAssayName]]), colnames(protein_data))
-  quant_cols_prot <- which(colnames(protein_data) %in% common_samples)
-
-  # Create QFeatures object (same as non-PTM workflow line 145-149)
-  pe_prot <- readQFeatures(
-    protein_data,
-    quantCols = quant_cols_prot,
-    name = "peptideRaw"
-  )
-  colData(pe_prot) <- colData(pe)
-
-  # Filter (same as non-PTM workflow line 175-192)
-  message("  - Filtering external protein data...")
-  pe_prot <- zeroIsNA(pe_prot, i = "peptideRaw")
-  pe_prot <- filterNA(pe_prot, i = "peptideRaw", pNA = row_filter)
-
-  keep_protein_prot <- !is.na(rowData(pe_prot[["peptideRaw"]])[[safe_prot_id]]) & (rowData(pe_prot[["peptideRaw"]])[[safe_prot_id]] != "")
-  pe_prot <- pe_prot[keep_protein_prot, , ]
-
-  if (remove_shared_peptides) {
-    protein_counts_prot <- rowData(pe_prot[["peptideRaw"]])[[safe_prot_id]]
-    shared_peptides_prot <- grepl(";", protein_counts_prot) | grepl(",", protein_counts_prot)
-    pe_prot <- pe_prot[!shared_peptides_prot, , ]
-  }
-
-  currentAssayName_prot <- "peptideRaw"
-
-  # Log transform FIRST (same as non-PTM workflow line 213-221)
-  message("  - Log2 transformation of external protein data...")
-  if (log2_transform) {
-    pe_prot <- logTransform(pe_prot, base = 2, i = currentAssayName_prot, name = "peptideLog")
-    currentAssayName_prot <- "peptideLog"
+  if (!is.null(annotation_protein_file) && file.exists(annotation_protein_file)) {
+     message("  - Loading protein annotation file...")
+     annot_prot_sep <- detect_delimiter(annotation_protein_file)
+     annotation_prot <- read.table(annotation_protein_file, sep = annot_prot_sep, header = TRUE, 
+                                   stringsAsFactors = FALSE, check.names = FALSE)
+     annotation_prot$Sample <- make.names(annotation_prot$Sample)
+     annotation_prot$Condition <- make.names(annotation_prot$Condition)
+     if ("BioReplicate" %in% colnames(annotation_prot)) annotation_prot$BioReplicate <- make.names(annotation_prot$BioReplicate)
   } else {
-    pe_prot <- addAssay(pe_prot, assay(pe_prot[[currentAssayName_prot]]), name = "peptideLog")
-    currentAssayName_prot <- "peptideLog"
+     message("  - No protein annotation provided, assuming same sample names as PTM...")
+     annotation_prot <- annotation
   }
 
-  # Aggregate to proteins (same as non-PTM workflow line 245-278)
-  message("  - Aggregating external peptides to proteins...")
-  peptide_counts_prot <- table(rowData(pe_prot[[currentAssayName_prot]])[[safe_prot_id]])
-  proteins_to_keep_prot <- names(peptide_counts_prot)[peptide_counts_prot >= filter_min_peptides]
-  keep_min_pep_prot <- rowData(pe_prot[[currentAssayName_prot]])[[safe_prot_id]] %in% proteins_to_keep_prot
-  pe_prot <- pe_prot[keep_min_pep_prot, , ]
+  ptm_annot <- as.data.frame(colData(pe))
+  ptm_annot$sample <- rownames(ptm_annot)
+  if (!"biorep" %in% colnames(ptm_annot)) ptm_annot$biorep <- ptm_annot$sample
+  if (!"BioReplicate" %in% colnames(annotation_prot)) annotation_prot$BioReplicate <- annotation_prot$Sample
 
-  if (nrow(pe_prot[[currentAssayName_prot]]) == 0) {
-    stop("No features remaining in external protein data after filtering")
+  ptm_keys <- paste(ptm_annot$condition, ptm_annot$biorep, sep = "_")
+  prot_keys <- paste(annotation_prot$Condition, annotation_prot$BioReplicate, sep = "_")
+  
+  common_keys <- intersect(ptm_keys, prot_keys)
+  if (length(common_keys) == 0) stop("No matching samples between PTM and Protein annotation")
+
+  final_ptm_samples <- ptm_annot$sample[match(common_keys, ptm_keys)]
+  final_prot_samples <- annotation_prot$Sample[match(common_keys, prot_keys)]
+  
+  valid_indices <- final_prot_samples %in% colnames(protein_data)
+  final_ptm_samples <- final_ptm_samples[valid_indices]
+  final_prot_samples <- final_prot_samples[valid_indices]
+
+  message("  - Matched ", length(final_ptm_samples), " samples between experiments")
+
+  protein_data_subset <- protein_data[, c(safe_prot_id, safe_prot_feature_id, final_prot_samples)]
+  colnames(protein_data_subset)[match(final_prot_samples, colnames(protein_data_subset))] <- final_ptm_samples
+
+  protein_unique_ids <- paste(protein_data_subset[[safe_prot_feature_id]], protein_data_subset[[safe_prot_id]], sep = "_")
+  rownames(protein_data_subset) <- make.unique(as.character(protein_unique_ids))
+
+  pe_prot <- readQFeatures(protein_data_subset, quantCols = final_ptm_samples, name = "peptideRaw")
+  colData(pe_prot) <- colData(pe[, final_ptm_samples])
+  
+  pe_prot <- zeroIsNA(pe_prot, i = "peptideRaw")
+  
+  na_prop <- colMeans(is.na(assay(pe_prot[["peptideRaw"]])))
+  keep_samples_prot <- na_prop < col_filter
+  if (sum(!keep_samples_prot) > 0) {
+    message("  - Removing ", sum(!keep_samples_prot), " samples with high NA")
+    pe_prot <- pe_prot[, keep_samples_prot]
+  }
+  pe_prot <- filterNA(pe_prot, i = "peptideRaw", pNA = row_filter)
+  
+  if (remove_shared_peptides) {
+    shared_prot <- grepl(";", rowData(pe_prot[["peptideRaw"]])[[safe_prot_id]]) | grepl(",", rowData(pe_prot[["peptideRaw"]])[[safe_prot_id]])
+    pe_prot <- pe_prot[!shared_prot, , ]
   }
 
-  message("  - ", nrow(pe_prot[[currentAssayName_prot]]), " peptides for ", length(proteins_to_keep_prot), " proteins")
-
-  summ_fun <- switch(summarization_method,
-    "robust" = MsCoreUtils::robustSummary,
-    "sum" = colSums,
-    "mean" = colMeans,
-    "median" = matrixStats::colMedians,
-    MsCoreUtils::robustSummary
-  )
-
-  pe_prot <- pe_prot[, colnames(pe_prot[[currentAssayName_prot]])]
-  pe_prot <- aggregateFeatures(pe_prot, i = currentAssayName_prot, fcol = safe_prot_id, name = "protein", fun = summ_fun)
-
-  message("  - Result: ", nrow(pe_prot[["protein"]]), " proteins")
-
-  # Add to main pe object
-  pe <- addAssay(pe, pe_prot[["protein"]], name = "protein_external")
-  proteinAssayName <- "protein_external"
-
-  message("  - External global proteome loaded: ", nrow(pe[[proteinAssayName]]), " proteins")
-
-} else {
-  # Option B: Aggregate from PTM experiment (global proteome limited to proteins with PTM sites)
-  message("  - No external protein file provided")
-  message("  - Estimating global proteome from PTM experiment data...")
+  current_prot <- "peptideRaw"
+  if (log2_transform) {
+    pe_prot <- logTransform(pe_prot, base = 2, i = current_prot, name = "peptideLog")
+    current_prot <- "peptideLog"
+  }
 
   if (aggregation_order == "before") {
-    # Aggregate raw peptidoforms, then process proteins
-    message("  - Strategy: Aggregate PTM peptidoforms first, then process")
-    proteinAssayName <- do_aggregation("peptidoform")
-
-    if (impute_order == "before") {
-      message("  - Imputation of proteins...")
-      proteinAssayName <- do_imputation(proteinAssayName)
-      message("  - Normalization of proteins...")
-      proteinAssayName <- do_normalization(proteinAssayName)
-    } else {
-      message("  - Normalization of proteins...")
-      proteinAssayName <- do_normalization(proteinAssayName)
-      message("  - Imputation of proteins...")
-      proteinAssayName <- do_imputation(proteinAssayName)
-    }
-
-    message("  - Log2 transformation of proteins...")
-    pe <- logTransform(pe, base = 2, i = proteinAssayName, name = "proteinLog")
-    proteinAssayName <- "proteinLog"
-
+    if (impute_order == "before") pe_prot <- process_impute(pe_prot, current_prot, "psmImp", impute_method)
+    pe_prot <- process_agg(pe_prot, current_prot, safe_prot_id, "protein", summarization_method, filter_min_peptides)
+    current_prot <- "protein"
+    
+    # Save raw for plot
+    pe <- addAssay(pe, pe_prot[[current_prot]], name = "protein_raw")
+    
+    pe_prot <- process_norm(pe_prot, current_prot, "proteinNorm", normalize_method)
+    current_prot <- "proteinNorm"
+    if (impute_order == "after") pe_prot <- process_impute(pe_prot, current_prot, "proteinImp", impute_method)
   } else {
-    # Aggregate processed peptidoforms (default)
-    message("  - Strategy: Process PTM peptidoforms first, then aggregate")
-    proteinAssayName <- do_aggregation(peptidoformAssayName)
+    if (impute_order == "before") pe_prot <- process_impute(pe_prot, current_prot, "psmImp", impute_method)
+    pe_prot <- process_norm(pe_prot, current_prot, "psmNorm", normalize_method)
+    current_prot <- "psmNorm"
+    if (impute_order == "after") pe_prot <- process_impute(pe_prot, current_prot, "psmImpAfter", impute_method)
+    current_prot <- "psmImpAfter"
+    pe_prot <- process_agg(pe_prot, current_prot, safe_prot_id, "protein", summarization_method, filter_min_peptides)
+    current_prot <- "protein"
+    
+    # Save raw for plot
+    pe <- addAssay(pe, pe_prot[[current_prot]], name = "protein_raw")
   }
 
-  message("  - Global proteome estimated from PTM data: ", nrow(pe[[proteinAssayName]]), " proteins")
+  pe <- pe[, colnames(pe_prot)]
+  pe <- addAssay(pe, pe_prot[["protein"]], name = "protein_processed")
+  proteinAssayName <- "protein_processed"
+
+} else {
+  message("  - Aggregating global protein abundance from PTM PSMs...")
+  pe_prot <- QFeatures(list(peptideRaw = pe[["peptideRaw"]]))
+  colData(pe_prot) <- colData(pe)
+  
+  current_prot <- "peptideRaw"
+  if (log2_transform) {
+    pe_prot <- logTransform(pe_prot, base = 2, i = current_prot, name = "peptideLog")
+    current_prot <- "peptideLog"
+  }
+
+  if (aggregation_order == "before") {
+    if (impute_order == "before") pe_prot <- process_impute(pe_prot, current_prot, "psmImp", impute_method)
+    pe_prot <- process_agg(pe_prot, current_prot, protein_col, "protein", summarization_method, filter_min_peptides)
+    current_prot <- "protein"
+    
+    # Save raw for plot
+    pe <- addAssay(pe, pe_prot[[current_prot]], name = "protein_raw")
+    
+    pe_prot <- process_norm(pe_prot, current_prot, "proteinNorm", normalize_method)
+    current_prot <- "proteinNorm"
+    if (impute_order == "after") pe_prot <- process_impute(pe_prot, current_prot, "proteinImp", impute_method)
+  } else {
+    if (impute_order == "before") pe_prot <- process_impute(pe_prot, current_prot, "psmImp", impute_method)
+    pe_prot <- process_norm(pe_prot, current_prot, "psmNorm", normalize_method)
+    current_prot <- "psmNorm"
+    if (impute_order == "after") pe_prot <- process_impute(pe_prot, current_prot, "psmImpAfter", impute_method)
+    current_prot <- "psmImpAfter"
+    pe_prot <- process_agg(pe_prot, current_prot, protein_col, "protein", summarization_method, filter_min_peptides)
+    current_prot <- "protein"
+    
+    # Save raw for plot
+    pe <- addAssay(pe, pe_prot[[current_prot]], name = "protein_raw")
+  }
+
+  pe <- addAssay(pe, pe_prot[["protein"]], name = "protein_processed")
+  proteinAssayName <- "protein_processed"
 }
 
 message("  - Saving global protein intensities...")
@@ -536,8 +613,6 @@ if (use_external_protein) {
 # [7/8] Statistical Model Fitting
 # ============================================================================
 message("[7/8] Fitting statistical models...")
-# Fit protein model
-# Check if run effect is possible (need >1 run)
 use_run_effect <- FALSE
 if (model_run_effect && "run" %in% colnames(colData(pe))) {
   n_runs <- length(unique(colData(pe)$run))
@@ -559,53 +634,42 @@ tryCatch({
   stop("Protein model fitting failed with error: ", e$message)
 })
 
-# Check if protein model fitting succeeded
 if (!"msqrobModels" %in% colnames(rowData(pe[[proteinAssayName]]))) {
   stop("Protein model fitting failed. Check if there are enough observations per condition.")
 }
 
-# Check for NULL models in protein data
 protein_models <- rowData(pe[[proteinAssayName]])$msqrobModels
 n_null_models <- sum(sapply(protein_models, is.null))
 if (n_null_models > 0) {
   message("  - Warning: ", n_null_models, " proteins failed to fit. They will be excluded from testing.")
 }
 
-# Fit PTM model
 tryCatch({
   pe <- msqrob(object = pe, i = peptidoformAssayName, formula = formula, ridge = ridge_penalty, robust = robust_regression, maxitRob = max_iterations)
 }, error = function(e) {
   stop("PTM model fitting failed with error: ", e$message)
 })
 
-# Check if PTM model fitting succeeded
 if (!"msqrobModels" %in% colnames(rowData(pe[[peptidoformAssayName]]))) {
   stop("PTM model fitting failed. Check if there are enough observations per condition.")
 }
 
-# Check for NULL models in PTM data
 ptm_models <- rowData(pe[[peptidoformAssayName]])$msqrobModels
 n_null_models_ptm <- sum(sapply(ptm_models, is.null))
 if (n_null_models_ptm > 0) {
   message("  - Warning: ", n_null_models_ptm, " PTM features failed to fit. They will be excluded from testing.")
 }
 
-# Fit DPU model (PTM - Protein)
 if (analysis_type %in% c("DPU", "both")) {
-  # Link PTM to Protein
-  # We need to map rows of peptidoform to rows of protein
   ptm_prot_ids <- rowData(pe[[peptidoformAssayName]])[[protein_col]]
-  
-  # For DPU, we subtract Protein expression from PTM expression
-  # This requires matching samples and proteins.
-  # Creating a DPU assay manually
+
   ptm_mat <- assay(pe[[peptidoformAssayName]])
   prot_mat <- assay(pe[[proteinAssayName]])
-  
+
   # Match proteins
   m <- match(ptm_prot_ids, rownames(pe[[proteinAssayName]]))
   valid_dpu <- !is.na(m)
-  
+
   if (sum(valid_dpu) > 0) {
     dpu_mat <- ptm_mat[valid_dpu, ] - prot_mat[m[valid_dpu], ]
 
@@ -621,14 +685,6 @@ if (analysis_type %in% c("DPU", "both")) {
     pe <- msqrob(object = pe, i = "peptideDPU", formula = formula, ridge = ridge_penalty, robust = robust_regression, maxitRob = max_iterations)
   }
 }
-
-protein_intensities <- cbind(
-  as.data.frame(rowData(pe[[proteinAssayName]])),
-  as.data.frame(assay(pe[[proteinAssayName]]))
-)
-list_cols <- sapply(protein_intensities, is.list)
-if (any(list_cols)) { protein_intensities <- protein_intensities[, !list_cols, drop = FALSE] }
-write.table(protein_intensities, file = file.path(output_folder, "protein_intensities.txt"), sep = "\t", row.names = FALSE, quote = FALSE)
 
 message("[7/8] Hypothesis testing...")
 
@@ -788,109 +844,115 @@ if (length(all_protein) > 0) {
   message("  - Protein: Found ", sig_count, " significant proteins (adj. p-value < ", alpha, ")")
 }
 
-message("[8/8] Generating quality control plots...")
-pdf(file.path(output_folder, "qc_plots.pdf"), width = 14, height = 10)
-par(mar=c(12, 4, 4, 2))
+message("[8/8] Generating quality control and volcano plots...")
 
-# Peptidoform/PTM level plots
-peptidoform_matrix <- assay(pe[[peptidoformAssayName]])
-if (ncol(peptidoform_matrix) > 0 && any(!is.na(peptidoform_matrix))) {
-  boxplot(peptidoform_matrix, las = 2, main = "PTM/Peptidoform Intensities (Normalized)",
-          ylab = "Log2 Intensity", col = rainbow(ncol(peptidoform_matrix)), cex.axis = 0.6)
+# Helper for ggplot boxplots
+plot_boxplot_ggplot <- function(pe_obj, i, title) {
+  mat <- assay(pe_obj[[i]])
+  if (ncol(mat) == 0) return(NULL)
+  df_long <- reshape2::melt(mat)
+  colnames(df_long) <- c("Feature", "Sample", "Intensity")
+  cd <- as.data.frame(colData(pe_obj))
+  cd$Sample <- rownames(cd)
+  df_long <- merge(df_long, cd, by = "Sample")
+  p <- ggplot(df_long, aes(x = Sample, y = Intensity, fill = condition)) +
+    geom_boxplot(outlier.size = 0.5) + theme_minimal() +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+    labs(title = title, y = "Log2 Intensity")
+  return(p)
 }
 
-# PCA at peptidoform level
-pca_data <- t(na.omit(peptidoform_matrix))
-if (nrow(pca_data) > 2 && ncol(pca_data) > 2) {
-  # Remove constant/zero variance columns
-  col_vars <- apply(pca_data, 2, var, na.rm = TRUE)
-  pca_data <- pca_data[, col_vars > 0 & !is.na(col_vars), drop = FALSE]
-
-  if (ncol(pca_data) > 2) {
-    pca_result <- prcomp(pca_data, scale. = TRUE)
-    pca_variance <- summary(pca_result)$importance[2, 1:2] * 100
-    plot(pca_result$x[, 1], pca_result$x[, 2],
-         col = as.numeric(colData(pe)$condition), pch = 19, cex = 2,
-         xlab = paste0("PC1 (", round(pca_variance[1], 1), "%)"),
-         ylab = paste0("PC2 (", round(pca_variance[2], 1), "%)"),
-         main = "PCA - PTM/Peptidoform Level")
-    legend("topright", legend = levels(colData(pe)$condition),
-           col = 1:nlevels(colData(pe)$condition), pch = 19, cex = 0.7)
-  }
+# Helper for volcano plots
+plot_volcano <- function(df, title, comparison) {
+  if (is.null(df) || nrow(df) == 0) return(NULL)
+  v_data <- df[!is.na(df$logFC) & !is.na(df$adjPval), ]
+  if (nrow(v_data) == 0) return(NULL)
+  p <- ggplot(v_data, aes(x = logFC, y = -log10(adjPval), color = significant)) +
+    geom_point(alpha = 0.5, size = 0.8) +
+    scale_color_manual(values = c("gray", "red")) +
+    theme_minimal() +
+    geom_hline(yintercept = -log10(alpha), linetype = "dashed", color = "blue") +
+    {if(lfc_threshold > 0) geom_vline(xintercept = c(-lfc_threshold, lfc_threshold), linetype = "dashed", color = "blue")} +
+    labs(title = paste(title, ":", comparison))
+  return(p)
 }
 
-# Protein level plots
+# --- 1. GLOBAL PROTEIN QC PLOTS ---
+pdf(file.path(output_folder, "protein_qc_plots.pdf"), width = 14, height = 10)
+if ("protein_raw" %in% names(pe)) {
+  p <- plot_boxplot_ggplot(pe, "protein_raw", "Protein Intensities (Before Norm)")
+  if (!is.null(p)) print(p)
+}
+p <- plot_boxplot_ggplot(pe, proteinAssayName, "Protein Intensities (Global Normalized)")
+if (!is.null(p)) print(p)
+
+# Protein PCA
 protein_matrix <- assay(pe[[proteinAssayName]])
-if (ncol(protein_matrix) > 0 && any(!is.na(protein_matrix))) {
-  boxplot(protein_matrix, las = 2, main = "Protein Intensities (Global)",
-          ylab = "Log2 Intensity", col = rainbow(ncol(protein_matrix)), cex.axis = 0.6)
-}
-
-# PCA at protein level
 pca_data_prot <- t(na.omit(protein_matrix))
 if (nrow(pca_data_prot) > 2 && ncol(pca_data_prot) > 2) {
-  # Remove constant/zero variance columns
   col_vars_prot <- apply(pca_data_prot, 2, var, na.rm = TRUE)
   pca_data_prot <- pca_data_prot[, col_vars_prot > 0 & !is.na(col_vars_prot), drop = FALSE]
-
   if (ncol(pca_data_prot) > 2) {
     pca_result_prot <- prcomp(pca_data_prot, scale. = TRUE)
-    pca_variance_prot <- summary(pca_result_prot)$importance[2, 1:2] * 100
-    plot(pca_result_prot$x[, 1], pca_result_prot$x[, 2],
-         col = as.numeric(colData(pe)$condition), pch = 19, cex = 2,
-         xlab = paste0("PC1 (", round(pca_variance_prot[1], 1), "%)"),
-         ylab = paste0("PC2 (", round(pca_variance_prot[2], 1), "%)"),
-         main = "PCA - Protein Level")
-    legend("topright", legend = levels(colData(pe)$condition),
-           col = 1:nlevels(colData(pe)$condition), pch = 19, cex = 0.7)
+    df_pca_prot <- as.data.frame(pca_result_prot$x)
+    df_pca_prot$Sample <- rownames(df_pca_prot)
+    cd <- as.data.frame(colData(pe))
+    cd$Sample <- rownames(cd)
+    df_pca_prot <- merge(df_pca_prot, cd, by = "Sample")
+    p_pca_prot <- ggplot(df_pca_prot, aes(x = PC1, y = PC2, color = condition, label = Sample)) +
+      geom_point(size = 3) + geom_text(vjust = 1.5, size = 3) + theme_minimal() +
+      labs(title = "PCA - Protein Level")
+    print(p_pca_prot)
   }
 }
+dev.off()
 
-# Volcano plot - DPA
-if (exists("dpa_final") && !is.null(dpa_final) && nrow(dpa_final) > 0) {
-  volcano_data <- dpa_final[!is.na(dpa_final$logFC) & !is.na(dpa_final$adjPval), ]
-  if (nrow(volcano_data) > 0) {
-    plot(volcano_data$logFC, -log10(volcano_data$adjPval),
-         pch = 20, cex = 0.5, col = ifelse(volcano_data$adjPval < alpha, "red", "gray"),
-         xlab = "Log2 Fold Change", ylab = "-Log10 Adjusted P-value",
-         main = "Volcano Plot - DPA (PTM Abundance)")
-    abline(h = -log10(alpha), lty = 2, col = "blue")
-    if (lfc_threshold > 0) {
-      abline(v = c(-lfc_threshold, lfc_threshold), lty = 2, col = "blue")
-    }
+# --- 2. GLOBAL PROTEIN VOLCANO PLOTS ---
+pdf(file.path(output_folder, "protein_volcano_plots.pdf"), width = 14, height = 10)
+for (comp in names(all_protein)) {
+  print(plot_volcano(all_protein[[comp]], "Volcano Plot - Protein Level", comp))
+}
+dev.off()
+
+# --- 3. PTM QC PLOTS ---
+pdf(file.path(output_folder, "ptm_qc_plots.pdf"), width = 14, height = 10)
+if ("peptidoform_raw" %in% names(pe)) {
+  p <- plot_boxplot_ggplot(pe, "peptidoform_raw", "PTM/Peptidoform Intensities (Before Norm)")
+  if (!is.null(p)) print(p)
+}
+p <- plot_boxplot_ggplot(pe, peptidoformAssayName, "PTM/Peptidoform Intensities (Normalized)")
+if (!is.null(p)) print(p)
+
+# Peptidoform PCA
+peptidoform_matrix <- assay(pe[[peptidoformAssayName]])
+pca_data <- t(na.omit(peptidoform_matrix))
+if (nrow(pca_data) > 2 && ncol(pca_data) > 2) {
+  col_vars <- apply(pca_data, 2, var, na.rm = TRUE)
+  pca_data <- pca_data[, col_vars > 0 & !is.na(col_vars), drop = FALSE]
+  if (ncol(pca_data) > 2) {
+    pca_result <- prcomp(pca_data, scale. = TRUE)
+    df_pca <- as.data.frame(pca_result$x)
+    df_pca$Sample <- rownames(df_pca)
+    cd <- as.data.frame(colData(pe))
+    cd$Sample <- rownames(cd)
+    df_pca <- merge(df_pca, cd, by = "Sample")
+    p_pca <- ggplot(df_pca, aes(x = PC1, y = PC2, color = condition, label = Sample)) +
+      geom_point(size = 3) + geom_text(vjust = 1.5, size = 3) + theme_minimal() +
+      labs(title = "PCA - PTM/Peptidoform Level")
+    print(p_pca)
   }
 }
+dev.off()
 
-# Volcano plot - DPU
-if (exists("dpu_final") && !is.null(dpu_final) && nrow(dpu_final) > 0) {
-  volcano_data <- dpu_final[!is.na(dpu_final$logFC) & !is.na(dpu_final$adjPval), ]
-  if (nrow(volcano_data) > 0) {
-    plot(volcano_data$logFC, -log10(volcano_data$adjPval),
-         pch = 20, cex = 0.5, col = ifelse(volcano_data$adjPval < alpha, "red", "gray"),
-         xlab = "Log2 Fold Change", ylab = "-Log10 Adjusted P-value",
-         main = "Volcano Plot - DPU (PTM Usage)")
-    abline(h = -log10(alpha), lty = 2, col = "blue")
-    if (lfc_threshold > 0) {
-      abline(v = c(-lfc_threshold, lfc_threshold), lty = 2, col = "blue")
-    }
+# --- 4. PTM VOLCANO PLOTS (DPA/DPU) ---
+pdf(file.path(output_folder, "ptm_volcano_plots.pdf"), width = 14, height = 10)
+comp_names <- names(all_protein)
+if (length(comp_names) > 0) {
+  for (comp in comp_names) {
+    if (exists("all_dpa") && comp %in% names(all_dpa)) print(plot_volcano(all_dpa[[comp]], "Volcano Plot - DPA (PTM Abundance)", comp))
+    if (exists("all_dpu") && comp %in% names(all_dpu)) print(plot_volcano(all_dpu[[comp]], "Volcano Plot - DPU (PTM Usage)", comp))
   }
 }
-
-# Volcano plot - Protein
-if (exists("protein_final") && !is.null(protein_final) && nrow(protein_final) > 0) {
-  volcano_data <- protein_final[!is.na(protein_final$logFC) & !is.na(protein_final$adjPval), ]
-  if (nrow(volcano_data) > 0) {
-    plot(volcano_data$logFC, -log10(volcano_data$adjPval),
-         pch = 20, cex = 0.5, col = ifelse(volcano_data$adjPval < alpha, "red", "gray"),
-         xlab = "Log2 Fold Change", ylab = "-Log10 Adjusted P-value",
-         main = "Volcano Plot - Protein Level")
-    abline(h = -log10(alpha), lty = 2, col = "blue")
-    if (lfc_threshold > 0) {
-      abline(v = c(-lfc_threshold, lfc_threshold), lty = 2, col = "blue")
-    }
-  }
-}
-
 dev.off()
 
 message("\n=== Analysis Complete ===")
@@ -907,3 +969,386 @@ if (file.exists(file.path(output_folder, "protein_results.txt"))) {
 message("  - peptidoform_intensities.txt: Normalized peptidoform/PTM intensities")
 message("  - protein_intensities.txt: Summarized protein-level intensities")
 message("  - qc_plots.pdf: Quality control plots")
+
+message("\n=== PhosR-Specific Analysis ===")
+library(PhosR)
+library(Biostrings)
+
+source("src/kinase_analysis.R")
+source("src/pathway_analysis.R")
+source("src/signaling_analysis.R")
+source("src/visualization.R")
+
+message("\nExtracting data from MSqRob2 results...")
+
+phosr_assay_name <- NULL
+if (analysis_type %in% c("DPU", "both") && "peptideDPU" %in% names(pe)) {
+  phosr_assay_name <- "peptideDPU"
+  message("  - Using DPU-normalized assay for PhosR analysis")
+} else {
+  phosr_assay_name <- peptidoformAssayName
+  message("  - Using DPA assay for PhosR analysis")
+}
+
+ptm_assay <- assay(pe[[phosr_assay_name]])
+ptm_rowdata_original <- rowData(pe[[phosr_assay_name]])
+ptm_coldata <- colData(pe)
+
+message("  - Extracted from assay '", phosr_assay_name, "': ", nrow(ptm_assay), " sites x ", ncol(ptm_assay), " samples")
+
+fasta_parsed <- NULL
+accession_to_gene <- NULL
+
+if (!is.null(fasta_file) && file.exists(fasta_file)) {
+  message("  - Reading and parsing FASTA file...")
+  fasta_parsed <- readAAStringSet(fasta_file)
+
+  fasta_headers <- names(fasta_parsed)
+  accession_to_gene <- list()
+
+  for (header in fasta_headers) {
+    parts <- strsplit(header, "\\|", fixed = FALSE)[[1]]
+    if (length(parts) >= 3) {
+      accession <- parts[2]
+      gene_info <- parts[3]
+      gene_symbol <- strsplit(gene_info, "_")[[1]][1]
+      accession_to_gene[[accession]] <- toupper(gene_symbol)
+    } else if (length(parts) == 2) {
+      accession <- parts[2]
+      accession_to_gene[[accession]] <- toupper(accession)
+    }
+  }
+
+  names(fasta_parsed) <- sapply(strsplit(fasta_headers, "|", fixed = TRUE), function(x) if(length(x)>1) x[2] else x[1])
+  message("  - Extracted ", length(accession_to_gene), " gene symbol mappings from FASTA")
+  message("  - Sample mappings (first 3): ")
+  for (i in 1:min(3, length(accession_to_gene))) {
+    acc <- names(accession_to_gene)[i]
+    gene <- accession_to_gene[[acc]]
+    message("    ", acc, " -> ", gene)
+  }
+}
+
+phosr_protein <- character(nrow(ptm_rowdata_original))
+phosr_sequence <- character(nrow(ptm_rowdata_original))
+phosr_site_id <- character(nrow(ptm_rowdata_original))
+phosr_gene <- character(nrow(ptm_rowdata_original))
+
+for (i in seq_len(nrow(ptm_rowdata_original))) {
+  protein_raw <- as.character(ptm_rowdata_original[[protein_col]][i])
+
+  if (!is.na(protein_raw) && protein_raw != "") {
+    protein_list <- strsplit(protein_raw, ";")[[1]]
+    main_protein <- protein_list[1]
+    main_protein <- gsub("^sp\\||^tr\\|", "", main_protein)
+    main_protein <- sub("\\|.*", "", main_protein)
+    phosr_protein[i] <- main_protein
+
+    if (!is.null(accession_to_gene) && !is.null(accession_to_gene[[main_protein]])) {
+      phosr_gene[i] <- accession_to_gene[[main_protein]]
+    } else {
+      phosr_gene[i] <- toupper(main_protein)
+    }
+  } else {
+    phosr_protein[i] <- NA_character_
+    phosr_gene[i] <- NA_character_
+  }
+
+  if (feature_id_col %in% names(ptm_rowdata_original)) {
+    phosr_sequence[i] <- as.character(ptm_rowdata_original[[feature_id_col]][i])
+  } else {
+    phosr_sequence[i] <- NA_character_
+  }
+
+  site_info <- NA_character_
+  rowname <- rownames(ptm_rowdata_original)[i]
+
+  site_match <- regmatches(rowname, regexpr("_[STY][0-9]+", rowname))
+  if (length(site_match) > 0) {
+    site_str <- gsub("^_", "", site_match)
+    site_info <- site_str
+  }
+
+  if (!is.na(phosr_gene[i]) && phosr_gene[i] != "" && !is.na(site_info)) {
+    phosr_site_id[i] <- paste0(phosr_gene[i], ";", site_info, ";")
+  } else if (!is.na(phosr_protein[i]) && !is.na(site_info)) {
+    phosr_site_id[i] <- paste0(phosr_protein[i], ";", site_info, ";")
+  } else {
+    phosr_site_id[i] <- rowname
+  }
+}
+
+ptm_rowdata_clean <- DataFrame(
+  Protein = phosr_protein,
+  Gene = phosr_gene,
+  Sequence = phosr_sequence,
+  Site_ID = phosr_site_id
+)
+
+valid_genes <- sum(!is.na(phosr_gene) & phosr_gene != "")
+genes_from_fasta <- if (!is.null(accession_to_gene)) {
+  sum(sapply(seq_along(phosr_protein), function(i) {
+    !is.na(phosr_protein[i]) && !is.null(accession_to_gene[[phosr_protein[i]]])
+  }))
+} else {
+  0
+}
+message("  - Gene symbol stats: ", valid_genes, " total, ", genes_from_fasta, " from FASTA, ",
+        valid_genes - genes_from_fasta, " using protein accession as fallback")
+
+rownames(ptm_rowdata_clean) <- rownames(ptm_rowdata_original)
+
+if ("condition" %in% colnames(ptm_coldata) && !"Condition" %in% colnames(ptm_coldata)) {
+  ptm_coldata$Condition <- ptm_coldata$condition
+}
+
+se_ptm <- SummarizedExperiment(
+  assays = list(log2intensity = ptm_assay),
+  rowData = ptm_rowdata_clean,
+  colData = ptm_coldata
+)
+
+message("  - Created SummarizedExperiment with ", nrow(se_ptm), " phosphosites and ", ncol(se_ptm), " samples")
+
+create_phosr_ids_for_assay <- function(pe_assay, accession_to_gene_map, protein_col = "Proteins") {
+  rowdata <- rowData(pe_assay)
+  rowname_vec <- rownames(rowdata)
+
+  phosr_ids <- character(length(rowname_vec))
+  genes <- character(length(rowname_vec))
+
+  for (i in seq_along(rowname_vec)) {
+    rn <- rowname_vec[i]
+
+    protein_raw <- as.character(rowdata[[protein_col]][i])
+    if (is.na(protein_raw) || protein_raw == "") {
+      phosr_ids[i] <- NA_character_
+      genes[i] <- NA_character_
+      next
+    }
+
+    protein_list <- strsplit(protein_raw, ";")[[1]]
+    main_protein <- protein_list[1]
+    main_protein <- gsub("^sp\\||^tr\\|", "", main_protein)
+    main_protein <- sub("\\|.*", "", main_protein)
+
+    gene_symbol <- if (!is.null(accession_to_gene_map) && !is.null(accession_to_gene_map[[main_protein]])) {
+      accession_to_gene_map[[main_protein]]
+    } else {
+      toupper(main_protein)
+    }
+
+    genes[i] <- gene_symbol
+
+    site_match <- regmatches(rn, regexpr("_[STY][0-9]+", rn))
+    if (length(site_match) > 0) {
+      site_str <- gsub("^_", "", site_match)
+      phosr_ids[i] <- paste0(gene_symbol, ";", site_str, ";")
+    } else {
+      if (i <= 5) {
+        message("    [WARNING] Row ", i, ": No site match in rowname '", rn, "'")
+      }
+      phosr_ids[i] <- NA_character_
+    }
+  }
+
+  list(
+    phosr_ids = setNames(phosr_ids, rowname_vec),
+    genes = setNames(genes, rowname_vec)
+  )
+}
+
+message("\nCreating MSqRob2 to PhosR ID mappings...")
+
+dpa_mapping <- NULL
+dpa_gene_mapping <- NULL
+dpu_mapping <- NULL
+dpu_gene_mapping <- NULL
+
+if (exists("all_dpa") && length(all_dpa) > 0 && peptidoformAssayName %in% names(pe)) {
+  message("  - Creating DPA mappings from assay: ", peptidoformAssayName)
+  dpa_maps <- create_phosr_ids_for_assay(pe[[peptidoformAssayName]], accession_to_gene, protein_col)
+  dpa_mapping <- dpa_maps$phosr_ids
+  dpa_gene_mapping <- dpa_maps$genes
+
+  message("    Created ", sum(!is.na(dpa_mapping)), " valid PhosR IDs from ", length(dpa_mapping), " features")
+  message("    Sample DPA mappings (first 3):")
+  for (i in 1:min(3, length(dpa_mapping))) {
+    message("      ", names(dpa_mapping)[i], " -> ", dpa_mapping[i], " (", dpa_gene_mapping[i], ")")
+  }
+}
+
+if (exists("all_dpu") && length(all_dpu) > 0 && "peptideDPU" %in% names(pe)) {
+  message("  - Creating DPU mappings from assay: peptideDPU")
+  dpu_maps <- create_phosr_ids_for_assay(pe[["peptideDPU"]], accession_to_gene, protein_col)
+  dpu_mapping <- dpu_maps$phosr_ids
+  dpu_gene_mapping <- dpu_maps$genes
+
+  message("    Created ", sum(!is.na(dpu_mapping)), " valid PhosR IDs from ", length(dpu_mapping), " features")
+  message("    Sample DPU mappings (first 3):")
+  for (i in 1:min(3, length(dpu_mapping))) {
+    message("      ", names(dpu_mapping)[i], " -> ", dpu_mapping[i], " (", dpu_gene_mapping[i], ")")
+  }
+}
+
+message("\nTransforming differential results to PhosR format...")
+
+if (exists("all_dpa") && length(all_dpa) > 0 && !is.null(dpa_mapping)) {
+  all_dpa_phosr <- list()
+  for (comp_name in names(all_dpa)) {
+    diff_df <- all_dpa[[comp_name]]
+    diff_df$PhosR_ID <- dpa_mapping[diff_df$feature]
+    diff_df$Gene <- dpa_gene_mapping[diff_df$feature]
+
+    na_count <- sum(is.na(diff_df$PhosR_ID))
+    if (na_count > 0) {
+      message("  - DPA ", comp_name, ": ", na_count, " of ", nrow(diff_df), " features unmapped (", round(100*na_count/nrow(diff_df), 1), "%)")
+      message("    First 3 unmapped features: ", paste(head(diff_df$feature[is.na(diff_df$PhosR_ID)], 3), collapse = ", "))
+    }
+
+    diff_df_valid <- diff_df[!is.na(diff_df$PhosR_ID), ]
+    all_dpa_phosr[[comp_name]] <- diff_df_valid
+    message("  - Transformed DPA for ", comp_name, ": ", nrow(diff_df_valid), " phosphosites")
+    message("    First 3 PhosR_IDs: ", paste(head(diff_df_valid$PhosR_ID, 3), collapse = ", "))
+  }
+  dpa_phosr_combined <- do.call(rbind, all_dpa_phosr)
+  write.table(dpa_phosr_combined, file.path(output_folder, "dpa_results_phosr_format.txt"),
+              sep = "\t", row.names = FALSE, quote = FALSE)
+}
+
+if (exists("all_dpu") && length(all_dpu) > 0 && !is.null(dpu_mapping)) {
+  all_dpu_phosr <- list()
+  for (comp_name in names(all_dpu)) {
+    diff_df <- all_dpu[[comp_name]]
+    diff_df$PhosR_ID <- dpu_mapping[diff_df$feature]
+    diff_df$Gene <- dpu_gene_mapping[diff_df$feature]
+
+    na_count <- sum(is.na(diff_df$PhosR_ID))
+    if (na_count > 0) {
+      message("  - DPU ", comp_name, ": ", na_count, " of ", nrow(diff_df), " features unmapped (", round(100*na_count/nrow(diff_df), 1), "%)")
+      message("    First 3 unmapped features: ", paste(head(diff_df$feature[is.na(diff_df$PhosR_ID)], 3), collapse = ", "))
+    }
+
+    diff_df_valid <- diff_df[!is.na(diff_df$PhosR_ID), ]
+    all_dpu_phosr[[comp_name]] <- diff_df_valid
+    message("  - Transformed DPU for ", comp_name, ": ", nrow(diff_df_valid), " phosphosites")
+    message("    First 3 PhosR_IDs: ", paste(head(diff_df_valid$PhosR_ID, 3), collapse = ", "))
+  }
+  dpu_phosr_combined <- do.call(rbind, all_dpu_phosr)
+  write.table(dpu_phosr_combined, file.path(output_folder, "dpu_results_phosr_format.txt"),
+              sep = "\t", row.names = FALSE, quote = FALSE)
+}
+
+kinase_result <- perform_kinase_analysis(
+  se_ptm = se_ptm,
+  fasta_parsed = fasta_parsed,
+  organism = organism,
+  comparisons = comparisons,
+  output_folder = output_folder,
+  mat_for_kinase = NULL,
+  alpha = alpha,
+  lfc_threshold = lfc_threshold,
+  kinase_num_motifs = kinase_num_motifs,
+  top_diff_sites_heatmap = top_diff_sites_heatmap,
+  top_phosphosite_heatmap = top_phosphosite_heatmap
+)
+
+if (!is.null(kinase_result)) {
+  message("\nPhosR pathway and network analysis...")
+
+  diff_results_list <- NULL
+  if (exists("all_dpu_phosr") && length(all_dpu_phosr) > 0) {
+    diff_results_list <- all_dpu_phosr
+    message("  - Using DPU results for PhosR analysis")
+  } else if (exists("all_dpa_phosr") && length(all_dpa_phosr) > 0) {
+    diff_results_list <- all_dpa_phosr
+    message("  - Using DPA results for PhosR analysis")
+  }
+
+  if (!is.null(diff_results_list)) {
+    all_pathway_results <- list()
+    all_ptmset_results <- list()
+    all_network_results <- list()
+
+    for (comp_name in names(diff_results_list)) {
+      message("\n  - Processing comparison: ", comp_name)
+
+      diff_sites <- diff_results_list[[comp_name]]
+
+      pathway_df <- perform_pathway_enrichment(
+        differential_sites = diff_sites,
+        organism = organism,
+        output_folder = output_folder,
+        comparison_name = comp_name,
+        alpha = alpha,
+        lfc_threshold = lfc_threshold
+      )
+
+      if (!is.null(pathway_df)) {
+        all_pathway_results[[comp_name]] <- pathway_df
+      }
+
+      ptmset_df <- perform_ptmset_enrichment(
+        differential_sites = diff_sites,
+        organism = organism,
+        output_folder = output_folder,
+        comparison_name = comp_name,
+        alpha = alpha,
+        lfc_threshold = lfc_threshold
+      )
+
+      if (!is.null(ptmset_df)) {
+        all_ptmset_results[[comp_name]] <- ptmset_df
+      }
+
+      network_df <- analyze_kinase_substrate_network(
+        ks_scores = kinase_result$kssMat$combinedScoreMatrix,
+        differential_sites = diff_sites,
+        output_folder = output_folder,
+        comparison_name = comp_name,
+        alpha = alpha,
+        lfc_threshold = lfc_threshold,
+        top_n = 50
+      )
+
+      if (!is.null(network_df)) {
+        all_network_results[[comp_name]] <- network_df
+      }
+    }
+
+    if (length(all_pathway_results) > 0) {
+      pathway_combined <- do.call(rbind, all_pathway_results)
+      write.table(pathway_combined, file.path(output_folder, "pathway_enrichment_all_comparisons.txt"),
+                  sep = "\t", row.names = FALSE, quote = FALSE)
+      message("  - Saved combined pathway enrichment results: ", nrow(pathway_combined), " pathways across ", length(all_pathway_results), " comparisons")
+
+      generate_pathway_plots(all_pathway_results, output_folder, top_n = 20)
+    }
+
+    if (length(all_ptmset_results) > 0) {
+      ptmset_combined <- do.call(rbind, all_ptmset_results)
+      write.table(ptmset_combined, file.path(output_folder, "ptmset_enrichment_all_comparisons.txt"),
+                  sep = "\t", row.names = FALSE, quote = FALSE)
+      message("  - Saved combined PTM-SET enrichment results: ", nrow(ptmset_combined), " kinase sets across ", length(all_ptmset_results), " comparisons")
+
+      generate_ptmset_plots(all_ptmset_results, output_folder, top_n = 20)
+    }
+
+    if (length(all_network_results) > 0) {
+      network_combined <- do.call(rbind, all_network_results)
+      write.table(network_combined, file.path(output_folder, "kinase_substrate_network_all_comparisons.txt"),
+                  sep = "\t", row.names = FALSE, quote = FALSE)
+      message("  - Saved combined kinase-substrate network: ", nrow(network_combined), " interactions across ", length(all_network_results), " comparisons")
+
+      generate_network_plot(all_network_results, output_folder, top_n = 50)
+    }
+
+    generate_signaling_network(
+      kinase_activities = kinase_result$kinase_activities,
+      output_folder = output_folder,
+      top_kinases = 30
+    )
+  }
+}
+
+message("\n=== PhosR Analysis Complete ===")

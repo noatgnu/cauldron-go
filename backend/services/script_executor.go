@@ -42,12 +42,38 @@ func (s *ScriptExecutor) SetOutputCallback(callback func(string, string)) {
 	s.outputCallback = callback
 }
 
+func (s *ScriptExecutor) prepareEnv(pluginID uint) []string {
+	env := os.Environ()
+
+	// 1. Load global custom env vars (pluginID 0)
+	globals, err := s.db.GetGlobalCustomEnvVars()
+	if err == nil {
+		for _, v := range globals {
+			env = append(env, fmt.Sprintf("%s=%s", v.Key, v.Value))
+		}
+	}
+
+	// 2. Load plugin-specific custom env vars (overrides global)
+	if pluginID != 0 {
+		locals, err := s.db.GetCustomEnvVars(pluginID)
+		if err == nil {
+			for _, v := range locals {
+				env = append(env, fmt.Sprintf("%s=%s", v.Key, v.Value))
+			}
+		}
+	}
+
+	return env
+}
+
 type ScriptConfig struct {
+	PluginID    uint
 	Type        string
 	RuntimeType string
 	ScriptName  string
 	Args        []string
 	OutputDir   string
+	FolderPath  string
 }
 
 func (s *ScriptExecutor) ExecutePythonScript(ctx context.Context, jobID string, config ScriptConfig) error {
@@ -59,16 +85,28 @@ func (s *ScriptExecutor) ExecutePythonScript(ctx context.Context, jobID string, 
 
 	pythonPath := cfg.PythonPath
 
-	scriptPath := filepath.Join("plugins", config.Type, config.ScriptName)
-	args := append([]string{scriptPath}, config.Args...)
+	var pluginDir string
+	if config.FolderPath != "" {
+		pluginDir = config.FolderPath
+	} else {
+		exePath, err := os.Executable()
+		if err != nil {
+			return fmt.Errorf("failed to get executable path: %w", err)
+		}
+		exeDir := filepath.Dir(exePath)
+		pluginDir = filepath.Join(exeDir, "plugins", config.Type)
+	}
+
+	args := append([]string{config.ScriptName}, config.Args...)
 
 	cmd := exec.CommandContext(ctx, pythonPath, args...)
 	hideConsoleWindow(cmd)
 
-	exePath, err := os.Executable()
-	if err == nil {
-		cmd.Dir = filepath.Dir(exePath)
-	}
+	cmd.Dir = pluginDir
+	log.Printf("[ExecutePythonScript] Working directory: %s", cmd.Dir)
+	log.Printf("[ExecutePythonScript] Script name: %s", config.ScriptName)
+
+	env := s.prepareEnv(config.PluginID)
 
 	if config.RuntimeType == "pythonWithR" {
 		if cfg.RPath == "" {
@@ -83,7 +121,6 @@ func (s *ScriptExecutor) ExecutePythonScript(ctx context.Context, jobID string, 
 
 		rHomePath := filepath.Dir(rBinPath)
 
-		env := os.Environ()
 		rhomeSet := false
 		for i, e := range env {
 			if len(e) > 7 && e[:7] == "R_HOME=" {
@@ -95,8 +132,8 @@ func (s *ScriptExecutor) ExecutePythonScript(ctx context.Context, jobID string, 
 		if !rhomeSet {
 			env = append(env, fmt.Sprintf("R_HOME=%s", rHomePath))
 		}
-		cmd.Env = env
 	}
+	cmd.Env = env
 
 	return s.executeCommand(ctx, jobID, cmd, config.OutputDir)
 }
@@ -128,19 +165,31 @@ func (s *ScriptExecutor) ExecuteRScript(ctx context.Context, jobID string, confi
 		}
 	}
 
-	scriptPath := filepath.Join("plugins", config.Type, config.ScriptName)
-	scriptPath = strings.ReplaceAll(scriptPath, "\\", "/")
-	log.Printf("[ExecuteRScript] Script path: %s", scriptPath)
-	log.Printf("[ExecuteRScript] R path: %s", rPath)
+	var pluginDir string
+	if config.FolderPath != "" {
+		pluginDir = config.FolderPath
+	} else {
+		exePath, err := os.Executable()
+		if err != nil {
+			return fmt.Errorf("failed to get executable path: %w", err)
+		}
+		exeDir := filepath.Dir(exePath)
+		pluginDir = filepath.Join(exeDir, "plugins", config.Type)
+	}
 
-	args := []string{"--vanilla", "--slave", scriptPath, "--args"}
+	scriptName := strings.ReplaceAll(config.ScriptName, "\\", "/")
+	log.Printf("[ExecuteRScript] Script name: %s", scriptName)
+	log.Printf("[ExecuteRScript] R path: %s", rPath)
+	log.Printf("[ExecuteRScript] Working directory: %s", pluginDir)
+
+	args := []string{"--vanilla", "--slave", scriptName, "--args"}
 	args = append(args, config.Args...)
 	log.Printf("[ExecuteRScript] Full command: %s %v", rPath, args)
 
 	cmd := exec.CommandContext(ctx, rPath, args...)
 	hideConsoleWindow(cmd)
 
-	env := os.Environ()
+	env := s.prepareEnv(config.PluginID)
 	env = append(env, "R_DEFAULT_DEVICE=null")
 
 	if rLibPath != "" {
@@ -152,11 +201,8 @@ func (s *ScriptExecutor) ExecuteRScript(ctx context.Context, jobID string, confi
 
 	cmd.Env = env
 
-	exePath, err := os.Executable()
-	if err == nil {
-		cmd.Dir = filepath.Dir(exePath)
-		log.Printf("[ExecuteRScript] Working directory: %s", cmd.Dir)
-	}
+	cmd.Dir = pluginDir
+	log.Printf("[ExecuteRScript] Working directory: %s", cmd.Dir)
 
 	return s.executeCommand(ctx, jobID, cmd, config.OutputDir)
 }
@@ -170,6 +216,18 @@ func (s *ScriptExecutor) executeCommand(ctx context.Context, jobID string, cmd *
 		s.mu.Lock()
 		delete(s.runningJobs, jobID)
 		s.mu.Unlock()
+	}()
+
+	logFilePath := filepath.Join(outputDir, "execution.log")
+	logFile, err := os.Create(logFilePath)
+	if err != nil {
+		log.Printf("[ScriptExecutor] Warning: Failed to create log file: %v", err)
+		logFile = nil
+	}
+	defer func() {
+		if logFile != nil {
+			logFile.Close()
+		}
 	}()
 
 	stdout, err := cmd.StdoutPipe()
@@ -194,8 +252,8 @@ func (s *ScriptExecutor) executeCommand(ctx context.Context, jobID string, cmd *
 	var wg sync.WaitGroup
 	wg.Add(2)
 
-	go s.streamOutput(jobID, stdout, &wg, false)
-	go s.streamOutput(jobID, stderr, &wg, true)
+	go s.streamOutput(jobID, stdout, &wg, false, logFile)
+	go s.streamOutput(jobID, stderr, &wg, true, logFile)
 
 	select {
 	case <-ctx.Done():
@@ -238,16 +296,21 @@ func (s *ScriptExecutor) executeCommand(ctx context.Context, jobID string, cmd *
 	}
 }
 
-func (s *ScriptExecutor) streamOutput(jobID string, reader io.Reader, wg *sync.WaitGroup, isError bool) {
+func (s *ScriptExecutor) streamOutput(jobID string, reader io.Reader, wg *sync.WaitGroup, isError bool, logFile *os.File) {
 	defer wg.Done()
 
 	scanner := bufio.NewScanner(reader)
+
 	for scanner.Scan() {
 		line := scanner.Text()
 		if isError {
 			log.Printf("[ScriptExecutor][STDERR][%s] %s", jobID, line)
 		} else {
 			log.Printf("[ScriptExecutor][STDOUT][%s] %s", jobID, line)
+		}
+
+		if logFile != nil {
+			logFile.WriteString(line + "\n")
 		}
 
 		if s.outputCallback != nil {

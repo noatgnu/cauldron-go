@@ -12,6 +12,7 @@ type PluginRegistry struct {
 	Name          string         `gorm:"not null" json:"name"`
 	Version       string         `json:"version"`
 	Repository    string         `json:"repository"`
+	CommitHash    string         `json:"commitHash"`
 	FolderPath    string         `gorm:"uniqueIndex;not null" json:"folderPath"`
 	InstallSource string         `gorm:"default:'builtin'" json:"installSource"`
 	InstalledAt   time.Time      `json:"installedAt"`

@@ -6,8 +6,8 @@ export function BindPluginToEnvironment(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['BindPluginToEnvironment'](arg1, arg2, arg3, arg4);
 }
 
-export function ConfirmPluginInstallation(arg1) {
-  return window['go']['main']['App']['ConfirmPluginInstallation'](arg1);
+export function ConfirmPluginInstallation(arg1, arg2) {
+  return window['go']['main']['App']['ConfirmPluginInstallation'](arg1, arg2);
 }
 
 export function ConvertPluginToYAML(arg1) {
@@ -22,8 +22,8 @@ export function CreatePythonVirtualEnv(arg1, arg2, arg3) {
   return window['go']['main']['App']['CreatePythonVirtualEnv'](arg1, arg2, arg3);
 }
 
-export function CreateRenvEnvironment(arg1, arg2, arg3) {
-  return window['go']['main']['App']['CreateRenvEnvironment'](arg1, arg2, arg3);
+export function CreateRenvEnvironment(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['CreateRenvEnvironment'](arg1, arg2, arg3, arg4);
 }
 
 export function CreateSamplePlugin() {
@@ -32,6 +32,14 @@ export function CreateSamplePlugin() {
 
 export function DecodePluginRepoURL(arg1) {
   return window['go']['main']['App']['DecodePluginRepoURL'](arg1);
+}
+
+export function DeleteCustomEnvVar(arg1) {
+  return window['go']['main']['App']['DeleteCustomEnvVar'](arg1);
+}
+
+export function DeleteCustomEnvVarByKey(arg1, arg2) {
+  return window['go']['main']['App']['DeleteCustomEnvVarByKey'](arg1, arg2);
 }
 
 export function DeleteImportedFile(arg1) {
@@ -114,8 +122,16 @@ export function GetBundledRequirementsPath(arg1) {
   return window['go']['main']['App']['GetBundledRequirementsPath'](arg1);
 }
 
+export function GetCustomEnvVars(arg1) {
+  return window['go']['main']['App']['GetCustomEnvVars'](arg1);
+}
+
 export function GetExampleFilePath(arg1, arg2) {
   return window['go']['main']['App']['GetExampleFilePath'](arg1, arg2);
+}
+
+export function GetGlobalCustomEnvVars() {
+  return window['go']['main']['App']['GetGlobalCustomEnvVars']();
 }
 
 export function GetImportedFiles() {
@@ -124,6 +140,10 @@ export function GetImportedFiles() {
 
 export function GetJob(arg1) {
   return window['go']['main']['App']['GetJob'](arg1);
+}
+
+export function GetJobExecutionLog(arg1) {
+  return window['go']['main']['App']['GetJobExecutionLog'](arg1);
 }
 
 export function GetJobQueueStatus() {
@@ -218,12 +238,12 @@ export function ImportDataFile(arg1) {
   return window['go']['main']['App']['ImportDataFile'](arg1);
 }
 
-export function InstallPluginFromRegistry(arg1) {
-  return window['go']['main']['App']['InstallPluginFromRegistry'](arg1);
+export function InstallPluginFromRegistry(arg1, arg2) {
+  return window['go']['main']['App']['InstallPluginFromRegistry'](arg1, arg2);
 }
 
-export function InstallPluginFromRepo(arg1) {
-  return window['go']['main']['App']['InstallPluginFromRepo'](arg1);
+export function InstallPluginFromRepo(arg1, arg2) {
+  return window['go']['main']['App']['InstallPluginFromRepo'](arg1, arg2);
 }
 
 export function InstallPythonPackages(arg1, arg2) {
@@ -352,6 +372,10 @@ export function RunPCAAnalysis(arg1, arg2, arg3, arg4, arg5) {
 
 export function RunPHATEAnalysis(arg1, arg2, arg3, arg4, arg5) {
   return window['go']['main']['App']['RunPHATEAnalysis'](arg1, arg2, arg3, arg4, arg5);
+}
+
+export function SaveCustomEnvVar(arg1) {
+  return window['go']['main']['App']['SaveCustomEnvVar'](arg1);
 }
 
 export function SaveFile(arg1, arg2) {
