@@ -6,8 +6,8 @@ import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { MatSnackBar } from '@angular/material/snack-bar';
 import { Wails, Config } from '../../../core/services/wails';
+import { NotificationService } from '../../../core/services/notification.service';
 
 @Component({
   selector: 'app-settings-registry',
@@ -30,7 +30,7 @@ export class SettingsRegistry implements OnInit {
 
   constructor(
     private wails: Wails,
-    private snackBar: MatSnackBar
+    private notification: NotificationService
   ) {}
 
   async ngOnInit(): Promise<void> {
@@ -52,9 +52,9 @@ export class SettingsRegistry implements OnInit {
       this.saving.set(true);
       await this.saveSetting('pluginRegistryUrl', this.pluginRegistryURL);
       this.config.update(c => ({ ...c, pluginRegistryUrl: this.pluginRegistryURL }));
-      this.snackBar.open('Registry URL saved successfully', 'Close', { duration: 3000 });
+      this.notification.showSuccess('Registry URL saved successfully');
     } catch (error) {
-      this.showError(`Failed to save registry URL: ${error}`);
+      this.notification.showError(`Failed to save registry URL: ${error}`);
     } finally {
       this.saving.set(false);
     }
@@ -69,12 +69,4 @@ export class SettingsRegistry implements OnInit {
     }
   }
 
-  private showError(message: string): void {
-    this.snackBar.open(message, 'Close', {
-      duration: 5000,
-      horizontalPosition: 'center',
-      verticalPosition: 'top',
-      panelClass: ['error-snackbar']
-    });
-  }
 }

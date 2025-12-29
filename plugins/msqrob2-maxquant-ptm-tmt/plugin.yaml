@@ -9,7 +9,7 @@ plugin:
   icon: "biotech"
 
 runtime:
-  type: "r"
+  environments: ["r"]
   script: "msqrob2_maxquant_ptm_tmt_modular.R"
 
 inputs:

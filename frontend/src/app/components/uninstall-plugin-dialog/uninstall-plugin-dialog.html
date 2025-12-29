@@ -1,0 +1,91 @@
+<h2 mat-dialog-title>
+  <mat-icon>delete</mat-icon>
+  Confirm Plugin Uninstallation
+</h2>
+
+<mat-dialog-content>
+  <div class="warning-box">
+    <mat-icon>warning</mat-icon>
+    <div>
+      <p>Are you sure you want to uninstall <strong>{{ data.pluginName }}</strong>?</p>
+      <p class="plugin-id">Plugin ID: {{ data.pluginId }}</p>
+    </div>
+  </div>
+
+  <div class="cleanup-section">
+    <h3>The following will be removed:</h3>
+    <ul class="cleanup-list">
+      <li>
+        <mat-icon>check</mat-icon>
+        Plugin files and directory
+      </li>
+      <li>
+        <mat-icon>check</mat-icon>
+        Environment bindings
+      </li>
+      <li>
+        <mat-icon>check</mat-icon>
+        Plugin-specific environment variables
+      </li>
+    </ul>
+  </div>
+
+  @if (!loading()) {
+    <form [formGroup]="form">
+      <div class="options-section">
+        <h3>Additional cleanup options:</h3>
+
+        <mat-checkbox formControlName="removeGitAuth" color="primary">
+          <div class="checkbox-content">
+            <span class="checkbox-label">Remove Git authentication for this repository</span>
+            <span class="checkbox-hint">SSH key configuration will be deleted</span>
+          </div>
+        </mat-checkbox>
+
+        <mat-checkbox formControlName="deleteJobHistory" color="primary">
+          <div class="checkbox-content">
+            <span class="checkbox-label">
+              Delete all job history and outputs
+              @if (jobCount() > 0) {
+                <span class="job-count">({{ jobCount() }} jobs)</span>
+              }
+            </span>
+            <span class="checkbox-hint">All execution history and output files will be permanently deleted</span>
+          </div>
+        </mat-checkbox>
+
+        <mat-checkbox formControlName="deleteEnvironments" color="primary">
+          <div class="checkbox-content">
+            <span class="checkbox-label">
+              Delete bound virtual environments
+              @if (envCount() > 0) {
+                <span class="job-count">({{ envCount() }} environments)</span>
+              }
+            </span>
+            <span class="checkbox-hint">Python venv and R renv directories created for this plugin will be permanently deleted</span>
+          </div>
+        </mat-checkbox>
+      </div>
+    </form>
+  } @else {
+    <div class="loading-section">
+      <mat-spinner diameter="24"></mat-spinner>
+      <span>Loading plugin information...</span>
+    </div>
+  }
+
+  <div class="info-box">
+    <mat-icon>info</mat-icon>
+    <p>Note: Imported data files will be preserved</p>
+  </div>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button (click)="cancel()">
+    Cancel
+  </button>
+  <button mat-raised-button color="warn" (click)="confirm()" [disabled]="loading()">
+    <mat-icon>delete</mat-icon>
+    Uninstall Plugin
+  </button>
+</mat-dialog-actions>

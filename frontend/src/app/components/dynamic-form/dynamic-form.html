@@ -34,6 +34,9 @@
               <button mat-raised-button color="primary" type="button" (click)="openFile(input.name)" [disabled]="disabled">
                 Browse
               </button>
+              <button mat-raised-button type="button" (click)="openImportedFileSelector(input.name)" [disabled]="disabled">
+                Select from Imported
+              </button>
               @if (hasTableColumns(input)) {
                 <button mat-raised-button color="accent" type="button" (click)="openTableEditor(input.name)" [disabled]="disabled" matTooltip="Create or edit table file">
                   <mat-icon>table_chart</mat-icon>

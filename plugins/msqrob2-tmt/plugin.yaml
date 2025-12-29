@@ -9,7 +9,7 @@ plugin:
   icon: "analytics"
 
 runtime:
-  type: "r"
+  environments: ["r"]
   script: "msqrob2_tmt.R"
 
 inputs:

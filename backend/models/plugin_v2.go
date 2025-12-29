@@ -129,8 +129,32 @@ type PluginExecution struct {
 }
 
 type PluginRuntimeV2 struct {
-	Type   string `yaml:"type" json:"type"`
-	Script string `yaml:"script" json:"script"`
+	Environments []string `yaml:"environments" json:"environments"`
+	Script       string   `yaml:"script" json:"script"`
+}
+
+func (r *PluginRuntimeV2) HasEnvironment(env string) bool {
+	for _, e := range r.Environments {
+		if e == env {
+			return true
+		}
+	}
+	return false
+}
+
+func (r *PluginRuntimeV2) GetEnvironments() []string {
+	if r.Environments != nil {
+		return r.Environments
+	}
+	return []string{}
+}
+
+func (r *PluginRuntimeV2) GetPrimaryEnvironment() string {
+	envs := r.GetEnvironments()
+	if len(envs) > 0 {
+		return envs[0]
+	}
+	return ""
 }
 
 type PluginMetadata struct {

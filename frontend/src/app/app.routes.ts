@@ -29,6 +29,7 @@ import { PluginList } from './pages/plugin-list/plugin-list';
 import { PluginExecute } from './pages/plugin-execute/plugin-execute';
 import { PluginEditor } from './pages/plugin-editor/plugin-editor';
 import { PluginRegistry } from './pages/plugin-registry/plugin-registry';
+import { PluginRegistryDetail } from './pages/plugin-registry-detail/plugin-registry-detail';
 
 export const routes: Routes = [
   { path: '', redirectTo: 'home', pathMatch: 'full' },
@@ -41,6 +42,7 @@ export const routes: Routes = [
   { path: 'plugins', component: Plugins },
   { path: 'plugin-list', component: PluginList },
   { path: 'plugin-registry', component: PluginRegistry },
+  { path: 'plugin-registry/:id', component: PluginRegistryDetail },
   { path: 'plugin/:id', component: PluginExecute },
   { path: 'plugin-editor', component: PluginEditor },
   { path: 'plugin-editor/new', component: PluginEditor },

@@ -9,7 +9,7 @@ plugin:
   icon: "science"
 
 runtime:
-  type: "r"
+  environments: ["r"]
   script: "msstatsptm.R"
 
 inputs:

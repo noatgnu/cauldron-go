@@ -33,10 +33,21 @@
                 "glob": "**/*",
                 "input": "src/wailsjs",
                 "output": "/wailsjs"
+              },
+              {
+                "glob": "**/*",
+                "input": "node_modules/material-icons/iconfont",
+                "output": "/assets/material-icons"
+              },
+              {
+                "glob": "**/*",
+                "input": "node_modules/typeface-roboto/files",
+                "output": "/assets/typeface-roboto"
               }
             ],
             "styles": [
               "@angular/material/prebuilt-themes/indigo-pink.css",
+              "src/fonts.css",
               "src/styles.scss"
             ]
           },

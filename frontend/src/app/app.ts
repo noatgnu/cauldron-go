@@ -2,14 +2,15 @@ import { Component, OnInit, signal } from '@angular/core';
 import { RouterOutlet, Router } from '@angular/router';
 import { MatSidenavModule } from '@angular/material/sidenav';
 import { MatDialog } from '@angular/material/dialog';
-import { MatSnackBar } from '@angular/material/snack-bar';
 import { Sidenav } from './layout/sidenav/sidenav';
 import { Breadcrumbs } from './layout/breadcrumbs/breadcrumbs';
 import { ProtocolHandlerService } from './core/services/protocol-handler.service';
 import { LoadingScreenComponent } from './components/loading-screen/loading-screen';
 import { LoadingService } from './services/loading';
-import { ConfirmPluginInstallDialog, PluginInstallConfirmData } from './components/confirm-plugin-install-dialog/confirm-plugin-install-dialog';
-import { ConfirmPluginInstallation } from '../wailsjs/go/main/App';
+import { ThemeService } from './core/services/theme.service';
+import { NotificationService } from './core/services/notification.service';
+import { ConfirmPluginInstallDialog, PluginInstallConfirmData, PluginInstallConfirmResult } from './components/confirm-plugin-install-dialog/confirm-plugin-install-dialog';
+import { ConfirmPluginInstallation, SaveGitAuthConfig } from '../wailsjs/go/main/App';
 
 @Component({
   selector: 'app-root',
@@ -25,7 +26,8 @@ export class App implements OnInit {
     private protocolHandler: ProtocolHandlerService,
     private loadingService: LoadingService,
     private dialog: MatDialog,
-    private snackBar: MatSnackBar
+    private notification: NotificationService,
+    private themeService: ThemeService
   ) {}
 
   ngOnInit(): void {
@@ -79,27 +81,41 @@ export class App implements OnInit {
         disableClose: true
       });
 
-      dialogRef.afterClosed().subscribe(confirmed => {
-        if (confirmed) {
-          ConfirmPluginInstallation(data.repo, data.ref || '').then(() => {
-            this.snackBar.open('Installing plugin...', 'Close', { duration: 3000 });
-          }).catch(err => {
-            this.snackBar.open(`Installation failed: ${err}`, 'Close', { duration: 5000 });
-          });
+      dialogRef.afterClosed().subscribe(async (result: PluginInstallConfirmResult) => {
+        if (result && result.confirmed) {
+          try {
+            if (result.sshKeyPath) {
+              await SaveGitAuthConfig(data.repo, result.sshKeyPath, result.passphrase || '');
+            }
+
+            if (data.registry) {
+              await window.go.main.App.ConfirmPluginInstallationWithRegistry(
+                data.repo,
+                data.ref || '',
+                data.registry
+              );
+              this.notification.showInfo('Installing plugin...');
+            } else {
+              await ConfirmPluginInstallation(data.repo, data.ref || '');
+              this.notification.showInfo('Installing plugin...');
+            }
+          } catch (err: any) {
+            this.notification.showError(`Installation failed: ${err}`);
+          }
         }
       });
     });
 
     window.runtime.EventsOn('plugin:install:start', (data: { repo: string }) => {
-      this.snackBar.open('Installing plugin...', 'Close', { duration: 3000 });
+      this.notification.showInfo('Installing plugin...');
     });
 
     window.runtime.EventsOn('plugin:install:success', (data: { repo: string }) => {
-      this.snackBar.open('Plugin installed successfully!', 'Close', { duration: 5000 });
+      this.notification.showSuccess('Plugin installed successfully!');
     });
 
     window.runtime.EventsOn('plugin:install:error', (data: { repo: string; error: string }) => {
-      this.snackBar.open(`Installation failed: ${data.error}`, 'Close', { duration: 5000 });
+      this.notification.showError(`Installation failed: ${data.error}`);
     });
   }
 }

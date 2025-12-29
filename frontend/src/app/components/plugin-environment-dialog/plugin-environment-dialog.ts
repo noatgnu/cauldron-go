@@ -9,8 +9,8 @@ import { MatDividerModule } from '@angular/material/divider';
 import { MatListModule } from '@angular/material/list';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
-import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatSelectModule } from '@angular/material/select';
+import { NotificationService } from '../../core/services/notification.service';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatTabsModule } from '@angular/material/tabs';
@@ -22,7 +22,7 @@ import { models } from '../../../wailsjs/go/models';
 export interface PluginEnvironmentDialogData {
   pluginId: string;
   pluginName: string;
-  runtimeType: string;
+  runtimeEnvironments: string[];
   plugin?: models.PluginV2;
 }
 
@@ -53,7 +53,7 @@ export class PluginEnvironmentDialog implements OnInit {
   data = inject<PluginEnvironmentDialogData>(MAT_DIALOG_DATA);
   dialogRef = inject(MatDialogRef<PluginEnvironmentDialog>);
   wails = inject(Wails);
-  snackBar = inject(MatSnackBar);
+  notification = inject(NotificationService);
 
   loading = signal(true);
   pythonBinding = signal<PluginEnvironmentBinding | null>(null);
@@ -119,10 +119,10 @@ export class PluginEnvironmentDialog implements OnInit {
           Value: String(value)
         } as CustomEnvVar);
       }
-      this.showSuccess('Environment variables saved successfully');
+      this.notification.showSuccess('Environment variables saved successfully');
       await this.loadCustomEnvVars();
     } catch (error) {
-      this.showError('Failed to save environment variables');
+      this.notification.showError('Failed to save environment variables');
     }
   }
 
@@ -170,18 +170,18 @@ export class PluginEnvironmentDialog implements OnInit {
       this.activeREnv.set(activeR);
     } catch (error) {
       console.error('Failed to load environment data:', error);
-      this.showError('Failed to load environment data');
+      this.notification.showError('Failed to load environment data');
     } finally {
       this.loading.set(false);
     }
   }
 
   needsPython(): boolean {
-    return this.data.runtimeType === 'python' || this.data.runtimeType === 'pythonWithR';
+    return this.data.runtimeEnvironments.includes('python');
   }
 
   needsR(): boolean {
-    return this.data.runtimeType === 'r' || this.data.runtimeType === 'pythonWithR';
+    return this.data.runtimeEnvironments.includes('r');
   }
 
   getEnvTypeLabel(type: string): string {
@@ -202,10 +202,10 @@ export class PluginEnvironmentDialog implements OnInit {
     try {
       await this.wails.bindPluginToEnvironment(this.data.pluginId, 'python', 0, envPath);
       await this.loadData();
-      this.showSuccess('Python environment bound successfully');
+      this.notification.showSuccess('Python environment bound successfully');
     } catch (error) {
       console.error('Failed to bind Python environment:', error);
-      this.showError('Failed to bind Python environment');
+      this.notification.showError('Failed to bind Python environment');
     }
   }
 
@@ -217,10 +217,10 @@ export class PluginEnvironmentDialog implements OnInit {
     try {
       await this.wails.bindPluginToEnvironment(this.data.pluginId, 'r', 0, envPath);
       await this.loadData();
-      this.showSuccess('R environment bound successfully');
+      this.notification.showSuccess('R environment bound successfully');
     } catch (error) {
       console.error('Failed to bind R environment:', error);
-      this.showError('Failed to bind R environment');
+      this.notification.showError('Failed to bind R environment');
     }
   }
 
@@ -232,17 +232,17 @@ export class PluginEnvironmentDialog implements OnInit {
       } else {
         this.rBinding.set(null);
       }
-      this.showSuccess(`${envType === 'python' ? 'Python' : 'R'} environment unbound`);
+      this.notification.showSuccess(`${envType === 'python' ? 'Python' : 'R'} environment unbound`);
     } catch (error) {
       console.error('Failed to unbind environment:', error);
-      this.showError('Failed to unbind environment');
+      this.notification.showError('Failed to unbind environment');
     }
   }
 
   startVenvCreation() {
     const baseEnvs = this.basePythonEnvironments();
     if (baseEnvs.length === 0) {
-      this.showError('No base Python environments detected. Please configure Python in Settings first.');
+      this.notification.showError('No base Python environments detected. Please configure Python in Settings first.');
       return;
     }
 
@@ -263,7 +263,7 @@ export class PluginEnvironmentDialog implements OnInit {
   async confirmVenvCreation() {
     const basePython = this.selectedBasePython();
     if (!basePython) {
-      this.showError('Please select a base Python environment');
+      this.notification.showError('Please select a base Python environment');
       return;
     }
 
@@ -285,11 +285,11 @@ export class PluginEnvironmentDialog implements OnInit {
       }
 
       await this.loadData();
-      this.showSuccess(`Virtual environment created and bound to ${this.data.pluginName}`);
+      this.notification.showSuccess(`Virtual environment created and bound to ${this.data.pluginName}`);
       this.cancelVenvCreation();
     } catch (error) {
       console.error('Failed to create virtual environment:', error);
-      this.showError(`Failed to create virtual environment: ${error}`);
+      this.notification.showError(`Failed to create virtual environment: ${error}`);
     } finally {
       this.creatingEnvironment.set(false);
       this.creationProgress.set('');
@@ -299,7 +299,7 @@ export class PluginEnvironmentDialog implements OnInit {
   startRenvCreation() {
     const rEnvs = this.rEnvironments();
     if (rEnvs.length === 0) {
-      this.showError('No R environments detected. Please configure R in Settings first.');
+      this.notification.showError('No R environments detected. Please configure R in Settings first.');
       return;
     }
 
@@ -317,7 +317,7 @@ export class PluginEnvironmentDialog implements OnInit {
   async confirmRenvCreation() {
     const name = this.renvName().trim();
     if (!name) {
-      this.showError('Please enter a name for the renv environment');
+      this.notification.showError('Please enter a name for the renv environment');
       return;
     }
 
@@ -339,32 +339,15 @@ export class PluginEnvironmentDialog implements OnInit {
       }
 
       await this.loadData();
-      this.showSuccess(`Renv environment created and bound to ${this.data.pluginName}`);
+      this.notification.showSuccess(`Renv environment created and bound to ${this.data.pluginName}`);
       this.cancelRenvCreation();
     } catch (error) {
       console.error('Failed to create renv environment:', error);
-      this.showError(`Failed to create renv environment: ${error}`);
+      this.notification.showError(`Failed to create renv environment: ${error}`);
     } finally {
       this.creatingEnvironment.set(false);
       this.creationProgress.set('');
     }
   }
 
-  private showSuccess(message: string) {
-    this.snackBar.open(message, 'Close', {
-      duration: 3000,
-      horizontalPosition: 'center',
-      verticalPosition: 'top',
-      panelClass: ['success-snackbar']
-    });
-  }
-
-  private showError(message: string) {
-    this.snackBar.open(message, 'Close', {
-      duration: 5000,
-      horizontalPosition: 'center',
-      verticalPosition: 'top',
-      panelClass: ['error-snackbar']
-    });
-  }
 }

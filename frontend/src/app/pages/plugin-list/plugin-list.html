@@ -1,38 +1,41 @@
 <div class="plugin-list-container">
-  <div class="header">
-    <h1>
-      <mat-icon>extension</mat-icon>
-      Available Plugins
-    </h1>
+  <mat-toolbar class="plugin-toolbar">
+    <mat-button-toggle-group [(ngModel)]="sourceFilter" (change)="onSourceFilterChange()" class="source-filter">
+      <mat-button-toggle value="all">
+        <mat-icon>all_inclusive</mat-icon>
+        All
+      </mat-button-toggle>
+      <mat-button-toggle value="builtin">
+        <mat-icon>inventory_2</mat-icon>
+        Built-in
+      </mat-button-toggle>
+      <mat-button-toggle value="remote">
+        <mat-icon>cloud_download</mat-icon>
+        External
+      </mat-button-toggle>
+    </mat-button-toggle-group>
 
-    <div class="header-actions">
-      <mat-button-toggle-group [(ngModel)]="sourceFilter" (change)="onSourceFilterChange()" class="source-filter">
-        <mat-button-toggle value="all">
-          <mat-icon>all_inclusive</mat-icon>
-          All
-        </mat-button-toggle>
-        <mat-button-toggle value="builtin">
-          <mat-icon>inventory_2</mat-icon>
-          Built-in
-        </mat-button-toggle>
-        <mat-button-toggle value="remote">
-          <mat-icon>cloud_download</mat-icon>
-          External
-        </mat-button-toggle>
-      </mat-button-toggle-group>
+    <mat-form-field appearance="outline" class="search-field">
+      <input matInput [(ngModel)]="searchQuery" (input)="onSearch()" placeholder="Search...">
+      <mat-icon matPrefix>search</mat-icon>
+    </mat-form-field>
 
-      <mat-form-field appearance="outline" class="search-field">
-        <mat-label>Search plugins</mat-label>
-        <input matInput [(ngModel)]="searchQuery" (input)="onSearch()" placeholder="Search by name, description, or ID">
-        <mat-icon matPrefix>search</mat-icon>
-      </mat-form-field>
+    <span class="spacer"></span>
 
-      <button mat-raised-button color="primary" (click)="reloadPlugins()" [disabled]="loading()">
-        <mat-icon>refresh</mat-icon>
-        Reload & Rescan
-      </button>
-    </div>
-  </div>
+    <button mat-raised-button color="primary" (click)="reloadPlugins()" [disabled]="loading()">
+      <mat-icon>refresh</mat-icon>
+      Reload
+    </button>
+
+    <button mat-raised-button color="accent" (click)="updateAllRemotePlugins()" [disabled]="loading() || updatingAll()">
+      <mat-icon>cloud_sync</mat-icon>
+      @if (updatingAll()) {
+        Updating...
+      } @else {
+        Update All
+      }
+    </button>
+  </mat-toolbar>
 
   @if (loading()) {
     <div class="loading">
@@ -64,9 +67,6 @@
                   <mat-icon mat-card-avatar>{{ plugin.definition.plugin.icon || 'extension' }}</mat-icon>
                   <mat-card-title>
                     {{ plugin.definition.plugin.name }}
-                    @if (hasCustomBinding(plugin.id)) {
-                      <mat-icon class="binding-indicator" [matTooltip]="getBindingTooltip(plugin.id)" color="accent">link</mat-icon>
-                    }
                   </mat-card-title>
                   <mat-card-subtitle>
                     v{{ plugin.definition.plugin.version }}
@@ -83,8 +83,8 @@
 
                   <div class="metadata">
                     <mat-chip class="runtime-chip">
-                      <mat-icon>{{ getRuntimeIcon(plugin.definition.runtime.type) }}</mat-icon>
-                      {{ getRuntimeLabel(plugin.definition.runtime.type) }}
+                      <mat-icon>{{ getRuntimeIconFromPlugin(plugin) }}</mat-icon>
+                      {{ getRuntimeLabelFromPlugin(plugin) }}
                     </mat-chip>
 
                     <div class="counts">
@@ -105,9 +105,41 @@
                 </mat-card-content>
 
                 <mat-card-actions align="end">
+                  @if (hasCustomBinding(plugin.id)) {
+                    <button mat-icon-button (click)="openEnvironmentDialog($event, plugin)" [matTooltip]="getBindingTooltip(plugin.id)" color="accent">
+                      <mat-icon>link</mat-icon>
+                    </button>
+                  }
                   <button mat-icon-button (click)="openEnvironmentDialog($event, plugin)" matTooltip="Environment Settings">
                     <mat-icon>settings</mat-icon>
                   </button>
+                  @if (plugin.installSource === 'remote' && plugin.repository) {
+                    @if (hasAvailableUpdate(plugin.id)) {
+                      <button mat-raised-button
+                              color="accent"
+                              (click)="installUpdate($event, plugin)">
+                        <mat-icon>download</mat-icon>
+                        Install Update
+                      </button>
+                    } @else {
+                      <button mat-icon-button
+                              (click)="checkForUpdate($event, plugin)"
+                              [disabled]="isCheckingUpdate(plugin.id)"
+                              [matTooltip]="'Check for updates'">
+                        @if (isCheckingUpdate(plugin.id)) {
+                          <mat-icon class="spin-animation">sync</mat-icon>
+                        } @else {
+                          <mat-icon>update</mat-icon>
+                        }
+                      </button>
+                    }
+                    <button mat-icon-button
+                            (click)="uninstallPlugin($event, plugin)"
+                            matTooltip="Uninstall plugin"
+                            color="warn">
+                      <mat-icon>delete</mat-icon>
+                    </button>
+                  }
                   <button mat-button color="primary">
                     <mat-icon>play_arrow</mat-icon>
                     Run

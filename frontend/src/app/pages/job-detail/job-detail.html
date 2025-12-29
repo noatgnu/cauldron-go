@@ -165,7 +165,7 @@
               <div class="search-container">
                 <mat-form-field appearance="outline" class="search-field">
                   <mat-label>Search console output</mat-label>
-                  <input matInput [(ngModel)]="searchTerm" (ngModelChange)="searchTerm.set($event)" placeholder="Type to search...">
+                  <input matInput [(ngModel)]="searchTerm" (ngModelChange)="searchTerm.set($event)">
                   <button mat-icon-button matSuffix *ngIf="searchTerm()" (click)="clearSearch()" matTooltip="Clear search">
                     <mat-icon>close</mat-icon>
                   </button>

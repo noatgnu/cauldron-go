@@ -8,7 +8,7 @@ plugin:
   icon: "bar_chart"
 
 runtime:
-  type: "python"
+  environments: ["python"]
   script: "fold_change_violin_plot.py"
 
 inputs:

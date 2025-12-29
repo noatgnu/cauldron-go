@@ -178,12 +178,12 @@
                       <h4>Create Renv Environment</h4>
                       <mat-form-field appearance="outline" class="full-width">
                         <mat-label>Environment Name</mat-label>
-                        <input matInput [(ngModel)]="renvName" placeholder="my-renv" required>
+                        <input matInput [(ngModel)]="renvName" required>
                         <mat-hint>Name for the renv environment</mat-hint>
                       </mat-form-field>
                       <mat-form-field appearance="outline" class="full-width">
                         <mat-label>Packages (Optional)</mat-label>
-                        <input matInput [(ngModel)]="renvPackages" placeholder="ggplot2, dplyr, tidyr">
+                        <input matInput [(ngModel)]="renvPackages">
                         <mat-hint>Comma-separated list of R packages to install</mat-hint>
                       </mat-form-field>
                       <div class="toggle-row">

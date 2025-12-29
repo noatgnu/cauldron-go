@@ -5,7 +5,7 @@
     <form [formGroup]="form">
       <mat-form-field appearance="outline" class="full-width">
         <mat-label>Repository URL</mat-label>
-        <input matInput formControlName="repoURL" placeholder="https://github.com/username/plugin-name">
+        <input matInput formControlName="repoURL">
         <mat-icon matPrefix>link</mat-icon>
         @if (form.get('repoURL')?.invalid && form.get('repoURL')?.touched) {
           <mat-error>{{ getErrorMessage() }}</mat-error>
@@ -15,10 +15,67 @@
 
       <mat-form-field appearance="outline" class="full-width">
         <mat-label>Git Reference (Optional)</mat-label>
-        <input matInput formControlName="commitHash" placeholder="main, v1.0, or hash">
+        <input matInput formControlName="commitHash">
         <mat-icon matSuffix matTooltip="Branch, Tag, or Commit Hash">info</mat-icon>
         <mat-hint>Leave empty for default branch</mat-hint>
       </mat-form-field>
+
+      <mat-expansion-panel class="auth-panel">
+        <mat-expansion-panel-header>
+          <mat-panel-title>
+            <mat-icon>vpn_key</mat-icon>
+            <span>Advanced: Git Authentication</span>
+          </mat-panel-title>
+          <mat-panel-description>
+            Configure SSH key for private repositories
+          </mat-panel-description>
+        </mat-expansion-panel-header>
+
+        <div class="auth-content">
+          <div class="ssh-key-row">
+            <mat-form-field appearance="outline" class="flex-grow">
+              <mat-label>SSH Private Key Path</mat-label>
+              <input matInput formControlName="sshKeyPath" readonly>
+              <mat-icon matPrefix>key</mat-icon>
+              <mat-hint>Select your SSH private key file</mat-hint>
+            </mat-form-field>
+            <button mat-raised-button type="button" (click)="browseSSHKey()" class="browse-btn">
+              <mat-icon>folder_open</mat-icon>
+              Browse
+            </button>
+          </div>
+
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Passphrase (Optional)</mat-label>
+            <input matInput formControlName="passphrase" [type]="showPassphrase() ? 'text' : 'password'">
+            <mat-icon matPrefix>lock</mat-icon>
+            <button mat-icon-button matSuffix type="button" (click)="togglePassphraseVisibility()" [attr.aria-label]="'Toggle passphrase visibility'">
+              <mat-icon>{{ showPassphrase() ? 'visibility_off' : 'visibility' }}</mat-icon>
+            </button>
+            <mat-hint>Leave empty if key is not encrypted</mat-hint>
+          </mat-form-field>
+
+          <div class="validate-row">
+            <button mat-stroked-button type="button" (click)="validateKey()" [disabled]="!form.value.sshKeyPath || validatingKey()">
+              @if (validatingKey()) {
+                <mat-spinner diameter="16"></mat-spinner>
+                <span>Validating...</span>
+              } @else {
+                <mat-icon>verified</mat-icon>
+                <span>Validate Key</span>
+              }
+            </button>
+            <span class="validate-hint">Optional: Test SSH key before installation</span>
+          </div>
+
+          <div class="info-section">
+            <mat-icon>info</mat-icon>
+            <div class="info-text">
+              <strong>Note:</strong> SSH authentication is only required for private repositories. Public repositories can be installed without authentication.
+            </div>
+          </div>
+        </div>
+      </mat-expansion-panel>
 
       <div class="info-section">
         <mat-icon>info</mat-icon>

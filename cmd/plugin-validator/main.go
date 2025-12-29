@@ -111,8 +111,17 @@ type PluginMetadata struct {
 }
 
 type PluginRuntime struct {
-	Type   string `yaml:"type"`
-	Script string `yaml:"script"`
+	Environments []string `yaml:"environments"`
+	Script       string   `yaml:"script"`
+}
+
+func (r *PluginRuntime) HasEnvironment(env string) bool {
+	for _, e := range r.Environments {
+		if e == env {
+			return true
+		}
+	}
+	return false
 }
 
 type Requirements struct {
@@ -192,12 +201,14 @@ func validatePlugin(pluginPath string) (bool, []string) {
 	}
 
 	// Validate runtime
-	if plugin.Runtime.Type == "" {
-		errors = append(errors, "runtime.type is required")
+	if plugin.Runtime.Environments == nil || len(plugin.Runtime.Environments) == 0 {
+		errors = append(errors, "runtime.environments is required")
 	} else {
-		validRuntimes := map[string]bool{"python": true, "r": true, "pythonWithR": true, "direct": true}
-		if !validRuntimes[plugin.Runtime.Type] {
-			errors = append(errors, fmt.Sprintf("Invalid runtime.type: %s", plugin.Runtime.Type))
+		validEnvironments := map[string]bool{"python": true, "r": true, "direct": true, "julia": true, "node": true}
+		for _, env := range plugin.Runtime.Environments {
+			if !validEnvironments[env] {
+				errors = append(errors, fmt.Sprintf("Invalid runtime environment: %s", env))
+			}
 		}
 	}
 
@@ -205,7 +216,7 @@ func validatePlugin(pluginPath string) (bool, []string) {
 		errors = append(errors, "runtime.script is required")
 	} else {
 		// Check if script exists (for direct runtime, script is the executable name)
-		if plugin.Runtime.Type != "direct" {
+		if !plugin.Runtime.HasEnvironment("direct") {
 			pluginDir := filepath.Dir(pluginPath)
 			scriptPath := filepath.Join(pluginDir, plugin.Runtime.Script)
 			if _, err := os.Stat(scriptPath); os.IsNotExist(err) {

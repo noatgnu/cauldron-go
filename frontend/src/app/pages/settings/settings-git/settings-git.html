@@ -1,0 +1,131 @@
+<div class="git-settings-container">
+  <mat-card class="info-card">
+    <mat-card-content>
+      <mat-icon>info</mat-icon>
+      <p>Configure SSH private keys for accessing private Git repositories. Each repository URL can have its own SSH key authentication.</p>
+    </mat-card-content>
+  </mat-card>
+
+  <div class="add-config-section">
+    <h3>Add Git Authentication</h3>
+
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>Repository URL</mat-label>
+      <input
+        matInput
+        [value]="newRepoURL()"
+        (input)="newRepoURL.set($any($event.target).value)">
+      <mat-icon matPrefix>link</mat-icon>
+    </mat-form-field>
+
+    <div class="ssh-key-row">
+      <mat-form-field appearance="outline" class="flex-grow">
+        <mat-label>SSH Private Key Path</mat-label>
+        <input
+          matInput
+          [value]="newSSHKeyPath()"
+          (input)="newSSHKeyPath.set($any($event.target).value)">
+        <mat-icon matPrefix>vpn_key</mat-icon>
+      </mat-form-field>
+      <button mat-raised-button (click)="browseSSHKey()">
+        <mat-icon>folder_open</mat-icon>
+        Browse
+      </button>
+    </div>
+
+    <div class="passphrase-row">
+      <mat-form-field appearance="outline" class="flex-grow">
+        <mat-label>Passphrase (optional)</mat-label>
+        <input
+          matInput
+          [type]="showPassphrase() ? 'text' : 'password'"
+          [value]="newPassphrase()"
+          (input)="newPassphrase.set($any($event.target).value)">
+        <mat-icon matPrefix>lock</mat-icon>
+        <button mat-icon-button matSuffix (click)="togglePassphraseVisibility()" type="button">
+          <mat-icon>{{ showPassphrase() ? 'visibility_off' : 'visibility' }}</mat-icon>
+        </button>
+      </mat-form-field>
+    </div>
+
+    <div class="action-buttons">
+      <button
+        mat-raised-button
+        (click)="validateKey()"
+        [disabled]="!newSSHKeyPath() || validatingKey()">
+        <mat-icon>{{ validatingKey() ? 'hourglass_empty' : 'check_circle' }}</mat-icon>
+        {{ validatingKey() ? 'Validating...' : 'Validate Key' }}
+      </button>
+      <button
+        mat-raised-button
+        color="primary"
+        (click)="saveConfig()"
+        [disabled]="!newRepoURL() || !newSSHKeyPath()">
+        <mat-icon>save</mat-icon>
+        Save Configuration
+      </button>
+    </div>
+  </div>
+
+  <mat-divider></mat-divider>
+
+  <div class="configs-list-section">
+    <h3>Configured Repositories</h3>
+
+    @if (loading()) {
+      <div class="loading-state">
+        <mat-spinner diameter="40"></mat-spinner>
+        <p>Loading configurations...</p>
+      </div>
+    } @else if (configs().length === 0) {
+      <div class="empty-state">
+        <mat-icon>cloud_off</mat-icon>
+        <p>No Git authentication configurations yet.</p>
+        <p class="hint">Add your first configuration above to access private repositories.</p>
+      </div>
+    } @else {
+      <mat-list class="config-list">
+        @for (config of configs(); track config.id) {
+          <mat-list-item>
+            <div class="config-item">
+              <div class="config-header">
+                <mat-icon>source</mat-icon>
+                <div class="repo-info">
+                  <span class="repo-name" [matTooltip]="config.repositoryURL">{{ getRepoDisplayName(config.repositoryURL) }}</span>
+                  <span class="repo-url">{{ config.repositoryURL }}</span>
+                </div>
+              </div>
+              <div class="config-details">
+                <div class="detail-row">
+                  <mat-icon class="detail-icon">vpn_key</mat-icon>
+                  <span class="detail-label">SSH Key:</span>
+                  <code class="detail-value">{{ config.sshKeyPath }}</code>
+                </div>
+                <div class="detail-row">
+                  <mat-icon class="detail-icon">lock</mat-icon>
+                  <span class="detail-label">Passphrase:</span>
+                  <span class="detail-value">{{ config.hasPassphrase ? 'Protected' : 'None' }}</span>
+                </div>
+                <div class="detail-row">
+                  <mat-icon class="detail-icon">schedule</mat-icon>
+                  <span class="detail-label">Updated:</span>
+                  <span class="detail-value">{{ formatTimestamp(config.updatedAt) }}</span>
+                </div>
+              </div>
+              <div class="config-actions">
+                <button
+                  mat-icon-button
+                  color="warn"
+                  (click)="deleteConfig(config.repositoryURL)"
+                  matTooltip="Delete configuration">
+                  <mat-icon>delete</mat-icon>
+                </button>
+              </div>
+            </div>
+          </mat-list-item>
+          <mat-divider></mat-divider>
+        }
+      </mat-list>
+    }
+  </div>
+</div>

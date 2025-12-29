@@ -8,7 +8,7 @@ plugin:
   icon: "schema"
 
 runtime:
-  type: "r"
+  environments: ["r"]
   script: "venn_diagram.R"
 
 inputs:

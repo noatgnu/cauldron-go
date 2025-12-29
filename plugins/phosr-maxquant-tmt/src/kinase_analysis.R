@@ -111,7 +111,37 @@ perform_kinase_analysis <- function(se_ptm, fasta_parsed, organism, comparisons,
 
   mat_for_kinase <- as.matrix(mat_for_kinase)
   storage.mode(mat_for_kinase) <- "numeric"
-  rownames(mat_for_kinase) <- phosr_ids_filtered
+
+  duplicates <- duplicated(phosr_ids_filtered) | duplicated(phosr_ids_filtered, fromLast = TRUE)
+  if (any(duplicates)) {
+    n_dup <- sum(duplicated(phosr_ids_filtered))
+    message("  - Aggregating ", n_dup, " duplicate phosphosites (multiple peptidoforms per site)")
+
+    unique_ids <- unique(phosr_ids_filtered)
+    mat_aggregated <- matrix(NA_real_, nrow = length(unique_ids), ncol = ncol(mat_for_kinase))
+    rownames(mat_aggregated) <- unique_ids
+    colnames(mat_aggregated) <- colnames(mat_for_kinase)
+    seq_aggregated <- character(length(unique_ids))
+    names(seq_aggregated) <- unique_ids
+
+    for (i in seq_along(unique_ids)) {
+      id <- unique_ids[i]
+      rows_with_id <- which(phosr_ids_filtered == id)
+      if (length(rows_with_id) == 1) {
+        mat_aggregated[i, ] <- mat_for_kinase[rows_with_id, ]
+        seq_aggregated[i] <- sequence_windows_filtered[rows_with_id]
+      } else {
+        mat_aggregated[i, ] <- colMeans(mat_for_kinase[rows_with_id, , drop = FALSE], na.rm = TRUE)
+        seq_aggregated[i] <- sequence_windows_filtered[rows_with_id[1]]
+      }
+    }
+
+    mat_for_kinase <- mat_aggregated
+    sequence_windows_filtered <- seq_aggregated
+  } else {
+    rownames(mat_for_kinase) <- phosr_ids_filtered
+    names(sequence_windows_filtered) <- phosr_ids_filtered
+  }
 
   message("  - Prepared ", nrow(mat_for_kinase), " phosphosites for kinase analysis")
   message("  - Calculating kinase-substrate scores...")
@@ -133,6 +163,13 @@ perform_kinase_analysis <- function(se_ptm, fasta_parsed, organism, comparisons,
   pdf(NULL)
   dev.control('enable')
 
+  message("  - Debug: About to call kinaseSubstrateScore")
+  message("    ks_db class: ", paste(class(ks_db), collapse = ", "))
+  message("    mat_for_kinase - is.matrix: ", is.matrix(mat_for_kinase), ", class: ", paste(class(mat_for_kinase), collapse = ", "))
+  message("    seqs - class: ", paste(class(sequence_windows_filtered), collapse = ", "), ", length: ", length(sequence_windows_filtered))
+  message("    seqs has names: ", !is.null(names(sequence_windows_filtered)))
+  message("    numMotif: ", kinase_num_motifs, ", numSub: 1")
+
   kssMat <- tryCatch({
     kinaseSubstrateScore(
       ks_db,
@@ -143,10 +180,7 @@ perform_kinase_analysis <- function(se_ptm, fasta_parsed, organism, comparisons,
     )
   }, error = function(e) {
     message("Error in kinaseSubstrateScore: ", e$message)
-    message("Matrix info - is.matrix: ", is.matrix(mat_for_kinase),
-            ", class: ", paste(class(mat_for_kinase), collapse = ", "),
-            ", nrow: ", nrow(mat_for_kinase),
-            ", ncol: ", ncol(mat_for_kinase))
+    message("Full error: ", conditionMessage(e))
     return(NULL)
   }, finally = {
     if (dev.cur() != 1) dev.off()
@@ -164,18 +198,34 @@ perform_kinase_analysis <- function(se_ptm, fasta_parsed, organism, comparisons,
     write.table(ks_scores, file = file.path(output_folder, "kinase_substrate_scores.txt"),
                 sep = "\t", row.names = TRUE, quote = FALSE)
     message("  - Saved kinase-substrate scores: ", nrow(ks_scores), " phosphosites x ", ncol(ks_scores), " kinases")
+  } else {
+    ks_scores <- NULL
   }
+
+  message("  - Generating kinase-substrate predictions for signalome construction...")
+  ks_pred <- tryCatch({
+    result <- kinaseSubstratePred(kssMat, ensembleSize = 10, top = 50)
+    if (!is.null(result)) {
+      message("  - Kinase-substrate predictions generated successfully")
+    } else {
+      message("  - Warning: kinaseSubstratePred returned NULL")
+    }
+    result
+  }, error = function(e) {
+    message("  - Warning: Kinase-substrate prediction failed: ", e$message)
+    return(NULL)
+  })
 
   if (is.null(kssMat$ksActivityMatrix)) {
     message("  - ksActivityMatrix not available in kinaseSubstrateScore output")
-    return(list(kssMat = kssMat, mat_for_kinase = mat_for_kinase))
+    return(list(kssMat = kssMat, ks_scores = ks_scores, ks_pred = ks_pred, mat_for_kinase = mat_for_kinase, se_ptm = se_ptm))
   }
 
   ks_activity <- kssMat$ksActivityMatrix
 
   if (nrow(ks_activity) == 0 || ncol(ks_activity) == 0) {
     message("  - No kinases detected in the dataset")
-    return(list(kssMat = kssMat, mat_for_kinase = mat_for_kinase))
+    return(list(kssMat = kssMat, ks_scores = ks_scores, ks_pred = ks_pred, mat_for_kinase = mat_for_kinase, se_ptm = se_ptm))
   }
 
   kinase_activities <- data.frame(Kinase = rownames(ks_activity))
@@ -199,6 +249,7 @@ perform_kinase_analysis <- function(se_ptm, fasta_parsed, organism, comparisons,
   message("  - Saved kinase activities")
 
   kinase_diff <- list()
+
   for (i in seq_len(nrow(comparisons))) {
     comp_label <- comparisons$comparison_label[i]
     cond_A <- comparisons$condition_A[i]
@@ -216,6 +267,7 @@ perform_kinase_analysis <- function(se_ptm, fasta_parsed, organism, comparisons,
     }
   }
 
+
   if (length(kinase_diff) > 0) {
     kinase_diff_all <- do.call(rbind, kinase_diff)
     write.table(kinase_diff_all, file = file.path(output_folder, "differential_kinase_activities.txt"),
@@ -231,9 +283,12 @@ perform_kinase_analysis <- function(se_ptm, fasta_parsed, organism, comparisons,
 
   return(list(
     kssMat = kssMat,
+    ks_scores = ks_scores,
+    ks_pred = ks_pred,
     ks_activity = ks_activity,
     kinase_activities = kinase_activities,
     kinase_diff = kinase_diff,
-    mat_for_kinase = mat_for_kinase
+    mat_for_kinase = mat_for_kinase,
+    se_ptm = se_ptm
   ))
 }

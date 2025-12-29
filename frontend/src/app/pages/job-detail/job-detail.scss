@@ -14,7 +14,7 @@
 
   p {
     font-size: 13px;
-    color: rgba(0, 0, 0, 0.6);
+    color: var(--on-surface-variant);
   }
 }
 
@@ -72,11 +72,12 @@
       font-weight: 500;
       font-size: 13px;
       min-width: 100px;
-      color: rgba(0, 0, 0, 0.6);
+      color: var(--on-surface-variant);
     }
 
     .value {
       font-size: 13px;
+      color: var(--on-surface);
     }
   }
 }
@@ -86,10 +87,11 @@
   align-items: center;
   gap: 12px;
   padding: 16px;
-  background-color: rgba(244, 67, 54, 0.1);
+  background-color: var(--error-subtle);
   border-radius: 8px;
   margin: 16px 0;
   font-size: 13px;
+  color: var(--error);
 
   mat-icon {
     font-size: 24px;
@@ -101,17 +103,18 @@
 .plot-section {
   margin-top: 24px;
   padding: 16px;
-  background-color: #fafafa;
+  background-color: var(--surface-container);
   border-radius: 8px;
 
   h3 {
     font-size: 14px;
     font-weight: 500;
     margin-bottom: 16px;
+    color: var(--on-surface);
   }
 
   mat-tab-group {
-    background-color: #ffffff;
+    background-color: var(--surface);
     border-radius: 4px;
   }
 
@@ -126,7 +129,7 @@
 
   mat-expansion-panel {
     box-shadow: none;
-    border: 1px solid rgba(0, 0, 0, 0.12);
+    border: 1px solid var(--border);
   }
 
   mat-panel-title {
@@ -145,7 +148,7 @@
 
   mat-panel-description {
     font-size: 12px;
-    color: rgba(0, 0, 0, 0.6);
+    color: var(--on-surface-variant);
   }
 }
 
@@ -153,8 +156,8 @@
   display: flex;
   justify-content: center;
   padding: 12px 16px;
-  background-color: #f5f5f5;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+  background-color: var(--surface-variant);
+  border-bottom: 1px solid var(--border);
 
   button {
     font-size: 13px;
@@ -173,8 +176,8 @@
   align-items: center;
   gap: 12px;
   padding: 12px 16px;
-  background-color: #f5f5f5;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+  background-color: var(--surface-variant);
+  border-bottom: 1px solid var(--border);
 
   .search-field {
     flex: 1;
@@ -193,13 +196,13 @@
 
     .match-count {
       font-size: 12px;
-      color: rgba(0, 0, 0, 0.6);
+      color: var(--on-surface-variant);
       white-space: nowrap;
     }
 
     .no-matches {
       font-size: 12px;
-      color: #d32f2f;
+      color: var(--error);
       white-space: nowrap;
     }
 
@@ -214,8 +217,8 @@
 }
 
 .terminal-output {
-  background: #1e1e1e;
-  color: #d4d4d4;
+  background: var(--console-background);
+  color: var(--console-text);
   font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
   font-size: 12px;
   padding: 16px;
@@ -228,8 +231,8 @@
     margin-bottom: 4px;
 
     ::ng-deep mark {
-      background-color: #ff9800;
-      color: #000000;
+      background-color: var(--warning);
+      color: var(--on-warning);
       padding: 2px 4px;
       border-radius: 2px;
       font-weight: 500;

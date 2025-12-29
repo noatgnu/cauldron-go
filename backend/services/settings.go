@@ -23,6 +23,7 @@ func NewSettingsService(ctx context.Context, db *DatabaseService) *SettingsServi
 		db:  db,
 		config: &models.Config{
 			CurtainBackendURL: "https://celsus.muttsu.xyz",
+			PluginRegistryURL: "https://cauldron.proteo.info",
 		},
 	}
 

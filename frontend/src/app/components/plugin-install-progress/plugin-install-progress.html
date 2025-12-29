@@ -1,21 +1,17 @@
 <div class="install-progress-dialog">
-  <h2 mat-dialog-title>
-    <mat-icon color="primary">download</mat-icon>
-    Installing Plugin
-  </h2>
+  <h2 mat-dialog-title>Installing Plugin</h2>
 
   <mat-dialog-content>
     <div class="repo-info">
-      <strong>Source:</strong>
+      <strong>Source</strong>
       <span class="repo-url">{{ data.repoURL }}</span>
       @if (data.commitHash) {
-        <span class="commit-ref">@{{ data.commitHash }}</span>
+        <span class="commit-ref">{{ data.commitHash }}</span>
       }
     </div>
 
     @if (error()) {
       <div class="error-container">
-        <mat-icon color="warn">error</mat-icon>
         <div class="error-details">
           <p class="error-title">Installation Failed</p>
           <p class="error-message">{{ error() }}</p>
@@ -33,8 +29,8 @@
 
       <div class="stages-list">
         @for (stage of stages(); track stage) {
-          <div class="stage-item completed">
-            <mat-icon>check_circle</mat-icon>
+          <div class="stage-item">
+            <span class="check-mark">✓</span>
             <span>{{ stage }}</span>
           </div>
         }

@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plugin Documentation</title>
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        mermaid.initialize({ startOnLoad: true, theme: 'default' });
+    </script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            max-width: 900px;
+            margin: 50px auto;
+            padding: 20px;
+            line-height: 1.6;
+            color: #333;
+        }
+        h1 {
+            border-bottom: 2px solid #2196f3;
+            padding-bottom: 10px;
+            color: #1976d2;
+        }
+        h2 {
+            margin-top: 30px;
+            color: #1976d2;
+            border-bottom: 1px solid #e0e0e0;
+            padding-bottom: 5px;
+        }
+        h3 {
+            margin-top: 20px;
+            color: #424242;
+        }
+        h4 {
+            color: #616161;
+        }
+        a {
+            color: #2196f3;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        code {
+            background: #f5f5f5;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+        pre {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        pre code {
+            background: none;
+            padding: 0;
+        }
+        blockquote {
+            border-left: 4px solid #2196f3;
+            margin: 0;
+            padding-left: 15px;
+            color: #666;
+            background: #f5f9fc;
+            padding: 10px 15px;
+            border-radius: 4px;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 15px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #2196f3;
+            color: white;
+            font-weight: 600;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        ul, ol {
+            padding-left: 25px;
+        }
+        li {
+            margin: 5px 0;
+        }
+        strong {
+            font-weight: 600;
+            color: #1976d2;
+        }
+        .mermaid {
+            text-align: center;
+            margin: 20px 0;
+            background: #f9f9f9;
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+        }
+    </style>
+</head>
+<body>
+<h1 id="alphastats-analysis">AlphaStats Analysis</h1>
+<p><strong>ID</strong>: <code>alphastats</code><br>
+<strong>Version</strong>: 1.0.0<br>
+<strong>Category</strong>: analysis<br>
+<strong>Author</strong>: CauldronGO Team</p>
+<h2 id="description">Description</h2>
+<p>Comprehensive proteomics analysis with preprocessing and differential expression</p>
+<h2 id="runtime">Runtime</h2>
+<ul>
+<li>
+<p><strong>Environments</strong>: <code>python, r</code></p>
+</li>
+<li>
+<p><strong>Script</strong>: <code>alphapept_process.py</code></p>
+</li>
+</ul>
+<h2 id="inputs">Inputs</h2>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Label</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Visibility</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>input_file</code></td>
+<td>Input Data File</td>
+<td>file</td>
+<td>Yes</td>
+<td>-</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>metadata_file</code></td>
+<td>Metadata File</td>
+<td>file</td>
+<td>Yes</td>
+<td>-</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>engine</code></td>
+<td>Data Engine</td>
+<td>select (generic, spectronaut, maxquant, fragpipe, diann)</td>
+<td>Yes</td>
+<td>generic</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>index_col</code></td>
+<td>Index Column</td>
+<td>text</td>
+<td>No</td>
+<td>-</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>merge_columns_list</code></td>
+<td>Merge Columns</td>
+<td>column-selector (multiple)</td>
+<td>No</td>
+<td>-</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>method</code></td>
+<td>Differential Analysis Method</td>
+<td>select (ttest, welch-ttest, paired-ttest, wald, sam)</td>
+<td>No</td>
+<td>ttest</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>imputation</code></td>
+<td>Imputation Method</td>
+<td>select (mean, median, knn, randomforest)</td>
+<td>No</td>
+<td>-</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>normalization</code></td>
+<td>Normalization Method</td>
+<td>select (zscore, quantile, linear, vst)</td>
+<td>No</td>
+<td>-</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>data_completeness</code></td>
+<td>Data Completeness Threshold</td>
+<td>number (min: 0, max: 1, step: 0)</td>
+<td>No</td>
+<td>0.3</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>log2</code></td>
+<td>Apply Log2 Transformation</td>
+<td>boolean</td>
+<td>No</td>
+<td>false</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>batch_correction</code></td>
+<td>Batch Correction</td>
+<td>boolean</td>
+<td>No</td>
+<td>false</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>evidence_file</code></td>
+<td>Evidence File (MaxQuant)</td>
+<td>file</td>
+<td>No</td>
+<td>-</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>comparisons</code></td>
+<td>Comparison Matrix</td>
+<td>file</td>
+<td>No</td>
+<td>-</td>
+<td>Always visible</td>
+</tr>
+</tbody>
+</table>
+<h3 id="input-details">Input Details</h3>
+<h4 id="input-data-file-input-file">Input Data File (<code>input_file</code>)</h4>
+<p>Proteomics data file</p>
+<h4 id="metadata-file-metadata-file">Metadata File (<code>metadata_file</code>)</h4>
+<p>Sample metadata/annotation file</p>
+<h4 id="data-engine-engine">Data Engine (<code>engine</code>)</h4>
+<p>The data processing engine used to generate the input file</p>
+<ul>
+<li><strong>Options</strong>: <code>generic</code>, <code>spectronaut</code>, <code>maxquant</code>, <code>fragpipe</code>, <code>diann</code></li>
+</ul>
+<h4 id="index-column-index-col">Index Column (<code>index_col</code>)</h4>
+<p>Column name to use as index (e.g., Protein ID, Precursor ID)</p>
+<h4 id="merge-columns-merge-columns-list">Merge Columns (<code>merge_columns_list</code>)</h4>
+<p>Additional columns to merge from the original file</p>
+<ul>
+<li><strong>Column Source</strong>: <code>input_file</code></li>
+</ul>
+<h4 id="differential-analysis-method-method">Differential Analysis Method (<code>method</code>)</h4>
+<p>Statistical method for differential analysis</p>
+<ul>
+<li><strong>Options</strong>: <code>ttest</code>, <code>welch-ttest</code>, <code>paired-ttest</code>, <code>wald</code>, <code>sam</code></li>
+</ul>
+<h4 id="imputation-method-imputation">Imputation Method (<code>imputation</code>)</h4>
+<p>Method to impute missing values</p>
+<ul>
+<li><strong>Options</strong>: <code>mean</code>, <code>median</code>, <code>knn</code>, <code>randomforest</code></li>
+</ul>
+<h4 id="normalization-method-normalization">Normalization Method (<code>normalization</code>)</h4>
+<p>Method to normalize the data</p>
+<ul>
+<li><strong>Options</strong>: <code>zscore</code>, <code>quantile</code>, <code>linear</code>, <code>vst</code></li>
+</ul>
+<h4 id="data-completeness-threshold-data-completeness">Data Completeness Threshold (<code>data_completeness</code>)</h4>
+<p>Minimum fraction of non-missing values required</p>
+<h4 id="apply-log2-transformation-log2">Apply Log2 Transformation (<code>log2</code>)</h4>
+<p>Apply log2 transformation to intensities</p>
+<h4 id="batch-correction-batch-correction">Batch Correction (<code>batch_correction</code>)</h4>
+<p>Perform batch effect correction</p>
+<h4 id="evidence-file-maxquant-evidence-file">Evidence File (MaxQuant) (<code>evidence_file</code>)</h4>
+<p>MaxQuant evidence file (optional)</p>
+<h4 id="comparison-matrix-comparisons">Comparison Matrix (<code>comparisons</code>)</h4>
+<p>Comparison matrix file for differential analysis</p>
+<h2 id="outputs">Outputs</h2>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>File</th>
+<th>Type</th>
+<th>Format</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>preprocessed</code></td>
+<td><code>preprocessed.txt</code></td>
+<td>data</td>
+<td>tsv</td>
+<td>Preprocessed data matrix</td>
+</tr>
+<tr>
+<td><code>result</code></td>
+<td><code>result.txt</code></td>
+<td>data</td>
+<td>tsv</td>
+<td>Differential expression analysis results</td>
+</tr>
+</tbody>
+</table>
+<h2 id="requirements">Requirements</h2>
+<ul>
+<li><strong>Python Version</strong>: &gt;=3.11</li>
+<li><strong>R Version</strong>: &gt;=4.0</li>
+</ul>
+<h3 id="python-dependencies-external-file">Python Dependencies (External File)</h3>
+<p>Dependencies are defined in: <code>requirements.txt</code></p>
+<ul>
+<li><code>click</code></li>
+<li><code>pandas&gt;=2.0.0</code></li>
+<li><code>numpy&gt;=1.24.0</code></li>
+<li><code>statsmodels</code></li>
+<li><code>alphastats</code></li>
+</ul>
+<blockquote>
+<p><strong>Note</strong>: When you create a custom environment for this plugin, these dependencies will be automatically installed.</p>
+</blockquote>
+<h2 id="example-data">Example Data</h2>
+<p>This plugin includes example data for testing:</p>
+<pre><code class="language-yaml">  index_col: Precursor.Id
+  merge_columns_list: [Protein.Ids Genes]
+  normalization: quantile
+  data_completeness: 0.3
+  comparisons: differential_analysis/comparison.bca.txt
+  metadata_file: differential_analysis/annotation.txt
+  merge_columns_list_source: diann/imputed.data.txt
+  method: welch-ttest
+  imputation: knn
+  log2: true
+  batch_correction: false
+  input_file: diann/imputed.data.txt
+  engine: generic
+</code></pre>
+<p>Load example data by clicking the <strong>Load Example</strong> button in the UI.</p>
+<h2 id="usage">Usage</h2>
+<h3 id="via-ui">Via UI</h3>
+<ol>
+<li>Navigate to <strong>analysis</strong> → <strong>AlphaStats Analysis</strong></li>
+<li>Fill in the required inputs</li>
+<li>Click <strong>Run Analysis</strong></li>
+</ol>
+<h3 id="via-plugin-system">Via Plugin System</h3>
+<pre><code class="language-typescript">const jobId = await pluginService.executePlugin('alphastats', {
+  // Add parameters here
+});
+</code></pre>
+
+</body>
+</html>

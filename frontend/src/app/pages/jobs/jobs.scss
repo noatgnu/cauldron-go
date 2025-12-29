@@ -17,7 +17,7 @@
   justify-content: center;
   align-items: center;
   padding: 48px;
-  color: rgba(0, 0, 0, 0.6);
+  color: var(--on-surface-variant);
 
   mat-icon {
     font-size: 64px;
@@ -45,7 +45,7 @@
   th {
     font-weight: 500;
     font-size: 12px;
-    color: rgba(0, 0, 0, 0.6);
+    color: var(--on-surface-variant);
   }
 
   td, th {
@@ -53,11 +53,11 @@
   }
 
   tr.mat-mdc-row:hover {
-    background-color: #f5f5f5;
+    background-color: var(--hover);
   }
 
   tr.in-progress {
-    background-color: rgba(25, 118, 210, 0.05);
+    background-color: var(--primary-container);
   }
 
   .status-icon {
@@ -93,7 +93,30 @@
 
   .environment-label {
     font-size: 12px;
-    color: rgba(0, 0, 0, 0.7);
+    color: var(--on-surface-variant);
+  }
+
+  .plugin-info {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-top: 4px;
+    font-size: 11px;
+
+    .plugin-version {
+      color: var(--primary);
+      font-weight: 500;
+      font-family: 'JetBrains Mono', 'Courier New', monospace;
+    }
+
+    .plugin-commit {
+      color: var(--on-surface-variant);
+      font-family: 'JetBrains Mono', 'Courier New', monospace;
+      background: var(--surface-variant);
+      padding: 2px 6px;
+      border-radius: 4px;
+      cursor: help;
+    }
   }
 
   .created-cell {
@@ -103,7 +126,7 @@
 
     .completed-text {
       font-size: 11px;
-      color: rgba(0, 0, 0, 0.6);
+      color: var(--on-surface-variant);
     }
   }
 
@@ -139,7 +162,7 @@
     small {
       display: block;
       font-size: 11px;
-      color: rgba(0, 0, 0, 0.6);
+      color: var(--on-surface-variant);
       margin-bottom: 4px;
     }
 
@@ -171,7 +194,7 @@
     gap: 32px;
     margin-bottom: 16px;
     padding: 12px;
-    background-color: #f5f5f5;
+    background-color: var(--surface-variant);
     border-radius: 4px;
 
     .status-item {
@@ -183,15 +206,15 @@
         font-size: 20px;
         width: 20px;
         height: 20px;
-        color: rgba(0, 0, 0, 0.6);
+        color: var(--on-surface-variant);
       }
 
       span {
         font-size: 13px;
-        color: rgba(0, 0, 0, 0.7);
+        color: var(--on-surface-variant);
 
         strong {
-          color: rgba(0, 0, 0, 0.87);
+          color: var(--on-surface);
         }
       }
     }

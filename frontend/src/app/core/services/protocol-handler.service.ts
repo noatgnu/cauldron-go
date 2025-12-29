@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { MatSnackBar } from '@angular/material/snack-bar';
+import { NotificationService } from './notification.service';
 import { HandleProtocolURL } from '../../../wailsjs/go/main/App';
 import { EventsOn } from '../../../wailsjs/runtime/runtime';
 
@@ -7,7 +7,7 @@ import { EventsOn } from '../../../wailsjs/runtime/runtime';
   providedIn: 'root'
 })
 export class ProtocolHandlerService {
-  constructor(private snackBar: MatSnackBar) {
+  constructor(private notification: NotificationService) {
     this.setupListeners();
   }
 
@@ -19,12 +19,7 @@ export class ProtocolHandlerService {
 
       EventsOn('protocol:error', (data: { url: string; error: string }) => {
         console.error('[ProtocolHandler] Protocol URL handling failed:', data.url, data.error);
-        this.snackBar.open(`Failed to handle protocol URL: ${data.error}`, 'Close', {
-          duration: 5000,
-          horizontalPosition: 'center',
-          verticalPosition: 'top',
-          panelClass: ['error-snackbar']
-        });
+        this.notification.showError(`Failed to handle protocol URL: ${data.error}`);
       });
 
       EventsOn('plugin:installed', () => {

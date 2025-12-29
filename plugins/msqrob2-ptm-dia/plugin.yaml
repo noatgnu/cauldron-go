@@ -9,7 +9,7 @@ plugin:
   icon: "biotech"
 
 runtime:
-  type: "r"
+  environments: ["r"]
   script: "msqrob2ptm_dia.R"
 
 inputs:

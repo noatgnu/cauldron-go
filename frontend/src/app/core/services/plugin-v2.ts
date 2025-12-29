@@ -66,7 +66,9 @@ export class PluginV2Service {
   }
 
   filterPluginsByRuntime(plugins: models.PluginV2[], runtime: string): models.PluginV2[] {
-    return plugins.filter(p => p.definition.runtime.type === runtime);
+    return plugins.filter(p => {
+      return p.definition.runtime.environments?.includes(runtime) || false;
+    });
   }
 
   searchPlugins(plugins: models.PluginV2[], query: string): models.PluginV2[] {

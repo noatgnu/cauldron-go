@@ -5,8 +5,7 @@
         <mat-label>Search plugins</mat-label>
         <input matInput
                [value]="searchQuery()"
-               (input)="updateSearch($any($event.target).value)"
-               placeholder="Type to search...">
+               (input)="updateSearch($any($event.target).value)">
         <mat-icon matPrefix>search</mat-icon>
         @if (searchQuery()) {
           <button matSuffix mat-icon-button (click)="clearSearch()" type="button">

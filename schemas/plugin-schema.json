@@ -67,20 +67,52 @@
     "runtime": {
       "type": "object",
       "description": "Runtime configuration",
-      "required": ["type", "script"],
+      "required": ["script"],
       "properties": {
         "type": {
-          "type": "string",
-          "description": "Runtime environment",
-          "enum": ["python", "r", "pythonWithR", "direct"]
+          "description": "DEPRECATED: Use 'environments' instead. Runtime environment(s). Can be a single string for backwards compatibility or an array for multiple environments.",
+          "deprecated": true,
+          "oneOf": [
+            {
+              "type": "string",
+              "enum": ["python", "r", "pythonWithR", "direct"],
+              "description": "Single runtime environment (DEPRECATED: Use environments array instead. pythonWithR is deprecated in favor of [\"python\", \"r\"])"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": ["python", "r", "julia", "node", "direct"]
+              },
+              "minItems": 1,
+              "uniqueItems": true,
+              "description": "DEPRECATED: Use top-level 'environments' field instead",
+              "examples": [["python"], ["r"], ["python", "r"], ["python", "julia"]]
+            }
+          ]
+        },
+        "environments": {
+          "type": "array",
+          "description": "List of runtime environments required by the plugin. This is the preferred way to specify runtime environments.",
+          "items": {
+            "type": "string",
+            "enum": ["python", "r", "julia", "node", "direct"]
+          },
+          "minItems": 1,
+          "uniqueItems": true,
+          "examples": [["python"], ["r"], ["python", "r"]]
         },
         "script": {
           "type": "string",
           "description": "Script filename or executable to run",
-          "pattern": "^[a-zA-Z0-9_-]+(\\.(py|R|exe))?$",
+          "pattern": "^[a-zA-Z0-9_-]+(\\.(py|R|jl|js|exe))?$",
           "examples": ["analysis.py", "process.R", "uniprot-fetcher", "uniprot-fetcher.exe"]
         }
-      }
+      },
+      "oneOf": [
+        { "required": ["type", "script"] },
+        { "required": ["environments", "script"] }
+      ]
     },
     "inputs": {
       "type": "array",

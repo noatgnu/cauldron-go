@@ -13,9 +13,9 @@ import { MatListModule } from '@angular/material/list';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatDialog } from '@angular/material/dialog';
-import { MatSnackBar } from '@angular/material/snack-bar';
 import { firstValueFrom } from 'rxjs';
 import { Wails, REnvironment, RenvEnvironment, Config, PluginEnvironmentBinding } from '../../../core/services/wails';
+import { NotificationService } from '../../../core/services/notification.service';
 import { PackagesModal } from '../../../components/packages-modal/packages-modal';
 import { DownloadPortableEnvDialogComponent } from '../../../components/download-portable-env-dialog/download-portable-env-dialog';
 import { ConfirmDialogComponent } from '../../../components/confirm-dialog/confirm-dialog';
@@ -60,17 +60,9 @@ export class SettingsR implements OnInit {
   constructor(
     private wails: Wails,
     private dialog: MatDialog,
-    private snackBar: MatSnackBar
+    private notification: NotificationService
   ) {}
 
-  private showError(message: string): void {
-    this.snackBar.open(message, 'Close', {
-      duration: 5000,
-      horizontalPosition: 'center',
-      verticalPosition: 'top',
-      panelClass: ['error-snackbar']
-    });
-  }
 
   async ngOnInit(): Promise<void> {
     await this.loadSettings();
@@ -211,7 +203,7 @@ export class SettingsR implements OnInit {
       const packages = await this.wails.loadRPackagesFromFile(requirementsPath);
       await this.wails.installRPackages(rPath, packages);
     } catch (error) {
-      this.showError('Failed to install R packages');
+      this.notification.showError('Failed to install R packages');
     } finally {
       this.installingRPackages.set(false);
     }
@@ -234,11 +226,7 @@ export class SettingsR implements OnInit {
       dialogRef.componentInstance.setLoading(false);
     } catch (error) {
       dialogRef.componentInstance.setLoading(false);
-      this.snackBar.open('Failed to load R packages', 'Close', {
-        duration: 3000,
-        horizontalPosition: 'center',
-        verticalPosition: 'top'
-      });
+      this.notification.showError('Failed to load R packages', 3000);
     }
   }
 
@@ -246,11 +234,7 @@ export class SettingsR implements OnInit {
     const selectedPath = this.selectedREnv();
 
     if (!selectedPath) {
-      this.snackBar.open('No R environment selected', 'Close', {
-        duration: 3000,
-        horizontalPosition: 'center',
-        verticalPosition: 'top'
-      });
+      this.notification.showError('No R environment selected', 3000);
       return;
     }
 
@@ -259,11 +243,7 @@ export class SettingsR implements OnInit {
     if (env) {
       this.viewRPackages(env);
     } else {
-      this.snackBar.open('R environment not found', 'Close', {
-        duration: 3000,
-        horizontalPosition: 'center',
-        verticalPosition: 'top'
-      });
+      this.notification.showError('R environment not found', 3000);
     }
   }
 
@@ -331,7 +311,7 @@ export class SettingsR implements OnInit {
       await this.loadRenvEnvironments();
     } catch (error) {
       await this.wails.logToFile(`[SettingsR] Failed to create renv environment: ${error}`);
-      this.showError('Failed to create renv environment');
+      this.notification.showError('Failed to create renv environment');
       this.creatingRenvEnv.set(false);
       this.renvCreationProgress.set(null);
     }
@@ -359,7 +339,7 @@ export class SettingsR implements OnInit {
       await this.loadRenvEnvironments();
     } catch (error) {
       await this.wails.logToFile(`[SettingsR] Failed to delete renv environment: ${error}`);
-      this.showError('Failed to delete renv environment');
+      this.notification.showError('Failed to delete renv environment');
     }
   }
 

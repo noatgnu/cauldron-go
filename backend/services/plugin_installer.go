@@ -19,13 +19,15 @@ type PluginInstaller struct {
 	pluginsDir   string
 	db           *DatabaseService
 	pluginLoader *PluginLoaderV2
+	gitAuth      *GitAuthService
 }
 
-func NewPluginInstaller(pluginsDir string, db *DatabaseService, loader *PluginLoaderV2) *PluginInstaller {
+func NewPluginInstaller(pluginsDir string, db *DatabaseService, loader *PluginLoaderV2, gitAuth *GitAuthService) *PluginInstaller {
 	return &PluginInstaller{
 		pluginsDir:   pluginsDir,
 		db:           db,
 		pluginLoader: loader,
+		gitAuth:      gitAuth,
 	}
 }
 
@@ -44,10 +46,16 @@ func (pi *PluginInstaller) FetchPluginInfo(repoURL string) (*models.PluginDefini
 	tempDir := filepath.Join(pi.pluginsDir, ".temp-info-"+fmt.Sprintf("%d", time.Now().Unix()))
 	defer os.RemoveAll(tempDir)
 
-	_, err := git.PlainClone(tempDir, false, &git.CloneOptions{
+	auth, err := pi.gitAuth.GetAuthMethod(repoURL)
+	if err != nil {
+		log.Printf("[PluginInstaller] Warning: failed to get auth method: %v", err)
+	}
+
+	_, err = git.PlainClone(tempDir, false, &git.CloneOptions{
 		URL:      repoURL,
 		Progress: io.Discard,
 		Depth:    1,
+		Auth:     auth,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to clone repository: %w", err)
@@ -61,15 +69,18 @@ func (pi *PluginInstaller) FetchPluginInfo(repoURL string) (*models.PluginDefini
 	return pluginDef, nil
 }
 
-func (pi *PluginInstaller) InstallPlugin(repoURL string, commitHash string, progressCallback func(string)) error {
+func (pi *PluginInstaller) InstallPlugin(repoURL string, commitHash string, registrySource *string, progressCallback func(string)) (string, error) {
 	log.Printf("[PluginInstaller] Installing plugin from: %s (ref: %s)", repoURL, commitHash)
+	if registrySource != nil {
+		log.Printf("[PluginInstaller] Registry source: %s", *registrySource)
+	}
 	if progressCallback != nil {
 		progressCallback("Checking existing installation...")
 	}
 
 	var existing models.PluginRegistry
 	if err := pi.db.GetDB().Where("repository = ?", repoURL).First(&existing).Error; err == nil {
-		return fmt.Errorf("plugin from this repository already installed [ID:%d]", existing.ID)
+		return "", fmt.Errorf("plugin from this repository already installed [ID:%d]", existing.ID)
 	}
 
 	tempDir := filepath.Join(pi.pluginsDir, ".temp-"+fmt.Sprintf("%d", time.Now().Unix()))
@@ -79,14 +90,20 @@ func (pi *PluginInstaller) InstallPlugin(repoURL string, commitHash string, prog
 		progressCallback("Cloning repository...")
 	}
 
+	auth, err := pi.gitAuth.GetAuthMethod(repoURL)
+	if err != nil {
+		log.Printf("[PluginInstaller] Warning: failed to get auth method: %v", err)
+	}
+
 	cloneOptions := &git.CloneOptions{
 		URL:      repoURL,
 		Progress: io.Discard,
+		Auth:     auth,
 	}
 
 	repo, err := git.PlainClone(tempDir, false, cloneOptions)
 	if err != nil {
-		return fmt.Errorf("failed to clone repository: %w", err)
+		return "", fmt.Errorf("failed to clone repository: %w", err)
 	}
 
 	if commitHash != "" {
@@ -95,7 +112,7 @@ func (pi *PluginInstaller) InstallPlugin(repoURL string, commitHash string, prog
 		}
 		w, err := repo.Worktree()
 		if err != nil {
-			return fmt.Errorf("failed to get worktree: %w", err)
+			return "", fmt.Errorf("failed to get worktree: %w", err)
 		}
 
 		err = w.Checkout(&git.CheckoutOptions{
@@ -109,7 +126,7 @@ func (pi *PluginInstaller) InstallPlugin(repoURL string, commitHash string, prog
 				Force:  true,
 			})
 			if err != nil {
-				return fmt.Errorf("failed to checkout ref '%s': %w", commitHash, err)
+				return "", fmt.Errorf("failed to checkout ref '%s': %w", commitHash, err)
 			}
 		}
 	}
@@ -126,7 +143,7 @@ func (pi *PluginInstaller) InstallPlugin(repoURL string, commitHash string, prog
 
 	pluginDef, err := pi.readPluginDefinition(tempDir)
 	if err != nil {
-		return fmt.Errorf("failed to read plugin definition: %w", err)
+		return "", fmt.Errorf("failed to read plugin definition: %w", err)
 	}
 
 	if progressCallback != nil {
@@ -134,18 +151,19 @@ func (pi *PluginInstaller) InstallPlugin(repoURL string, commitHash string, prog
 	}
 
 	registry := models.PluginRegistry{
-		PluginID:      pluginDef.Plugin.ID,
-		Name:          pluginDef.Plugin.Name,
-		Version:       pluginDef.Plugin.Version,
-		Repository:    repoURL,
-		CommitHash:    actualHash,
-		InstallSource: "remote",
-		InstalledAt:   time.Now(),
-		UpdatedAt:     time.Now(),
+		PluginID:       pluginDef.Plugin.ID,
+		Name:           pluginDef.Plugin.Name,
+		Version:        pluginDef.Plugin.Version,
+		Repository:     repoURL,
+		CommitHash:     actualHash,
+		InstallSource:  "remote",
+		RegistrySource: registrySource,
+		InstalledAt:    time.Now(),
+		UpdatedAt:      time.Now(),
 	}
 
 	if err := pi.db.GetDB().Create(&registry).Error; err != nil {
-		return fmt.Errorf("failed to create registry entry: %w", err)
+		return "", fmt.Errorf("failed to create registry entry: %w", err)
 	}
 
 	finalDir := filepath.Join(pi.pluginsDir, fmt.Sprintf("%s-%d", pluginDef.Plugin.ID, registry.ID))
@@ -157,7 +175,7 @@ func (pi *PluginInstaller) InstallPlugin(repoURL string, commitHash string, prog
 
 	if err := os.Rename(tempDir, finalDir); err != nil {
 		pi.db.GetDB().Delete(&registry)
-		return fmt.Errorf("failed to move plugin to final location: %w", err)
+		return "", fmt.Errorf("failed to move plugin to final location: %w", err)
 	}
 
 	if err := pi.db.GetDB().Save(&registry).Error; err != nil {
@@ -174,7 +192,7 @@ func (pi *PluginInstaller) InstallPlugin(repoURL string, commitHash string, prog
 		log.Printf("[PluginInstaller] Warning: failed to reload plugins: %v", err)
 	}
 
-	return nil
+	return pluginDef.Plugin.ID, nil
 }
 
 func (pi *PluginInstaller) readPluginDefinition(pluginDir string) (*models.PluginDefinition, error) {
@@ -214,9 +232,15 @@ func (pi *PluginInstaller) UpdatePlugin(repoURL string) error {
 		return fmt.Errorf("failed to get worktree: %w", err)
 	}
 
+	auth, err := pi.gitAuth.GetAuthMethod(repoURL)
+	if err != nil {
+		log.Printf("[PluginInstaller] Warning: failed to get auth method: %v", err)
+	}
+
 	err = w.Pull(&git.PullOptions{
 		RemoteName: "origin",
 		Progress:   io.Discard,
+		Auth:       auth,
 	})
 	if err != nil && err != git.NoErrAlreadyUpToDate {
 		return fmt.Errorf("failed to pull updates: %w", err)
@@ -225,6 +249,10 @@ func (pi *PluginInstaller) UpdatePlugin(repoURL string) error {
 	if err == git.NoErrAlreadyUpToDate {
 		log.Printf("[PluginInstaller] Plugin already up to date")
 	} else {
+		ref, err := repo.Head()
+		if err == nil {
+			registry.CommitHash = ref.Hash().String()
+		}
 		registry.UpdatedAt = time.Now()
 		pi.db.GetDB().Save(&registry)
 		log.Printf("[PluginInstaller] Successfully updated plugin")
@@ -237,12 +265,118 @@ func (pi *PluginInstaller) UpdatePlugin(repoURL string) error {
 	return nil
 }
 
-func (pi *PluginInstaller) UninstallPlugin(repoURL string) error {
+func (pi *PluginInstaller) UpdatePluginToCommit(repoURL string, commitHash string) error {
+	log.Printf("[PluginInstaller] Updating plugin from %s to commit: %s", repoURL, commitHash)
+
+	var registry models.PluginRegistry
+	if err := pi.db.GetDB().Where("repository = ?", repoURL).First(&registry).Error; err != nil {
+		return fmt.Errorf("plugin not installed: %w", err)
+	}
+
+	if registry.CommitHash == commitHash {
+		log.Printf("[PluginInstaller] Plugin already at target commit: %s", commitHash)
+		return nil
+	}
+
+	repo, err := git.PlainOpen(registry.FolderPath)
+	if err != nil {
+		return fmt.Errorf("failed to open repository: %w", err)
+	}
+
+	auth, err := pi.gitAuth.GetAuthMethod(repoURL)
+	if err != nil {
+		log.Printf("[PluginInstaller] Warning: failed to get auth method: %v", err)
+	}
+
+	err = repo.Fetch(&git.FetchOptions{
+		RemoteName: "origin",
+		Progress:   io.Discard,
+		Auth:       auth,
+	})
+	if err != nil && err != git.NoErrAlreadyUpToDate {
+		log.Printf("[PluginInstaller] Warning: fetch failed: %v", err)
+	}
+
+	w, err := repo.Worktree()
+	if err != nil {
+		return fmt.Errorf("failed to get worktree: %w", err)
+	}
+
+	err = w.Checkout(&git.CheckoutOptions{
+		Hash:  plumbing.NewHash(commitHash),
+		Force: true,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to checkout commit %s: %w", commitHash, err)
+	}
+
+	registry.CommitHash = commitHash
+	registry.UpdatedAt = time.Now()
+	if err := pi.db.GetDB().Save(&registry).Error; err != nil {
+		return fmt.Errorf("failed to update registry: %w", err)
+	}
+
+	log.Printf("[PluginInstaller] Successfully updated plugin to commit: %s", commitHash)
+
+	if err := pi.pluginLoader.ReloadPlugins(); err != nil {
+		log.Printf("[PluginInstaller] Warning: failed to reload plugins: %v", err)
+	}
+
+	return nil
+}
+
+type UninstallOptions struct {
+	RemoveGitAuth      bool
+	DeleteJobHistory   bool
+	DeleteEnvironments bool
+}
+
+func (pi *PluginInstaller) UninstallPlugin(repoURL string, options UninstallOptions) error {
 	log.Printf("[PluginInstaller] Uninstalling plugin from: %s", repoURL)
 
 	var registry models.PluginRegistry
 	if err := pi.db.GetDB().Where("repository = ?", repoURL).First(&registry).Error; err != nil {
 		return fmt.Errorf("plugin not installed: %w", err)
+	}
+
+	pluginID := registry.PluginID
+
+	log.Printf("[PluginInstaller] Cleaning up plugin data for: %s", pluginID)
+
+	if err := pi.db.GetDB().Where("plugin_id = ?", pluginID).Delete(&PluginEnvironmentBinding{}).Error; err != nil {
+		log.Printf("[PluginInstaller] Warning: failed to delete environment bindings: %v", err)
+	} else {
+		log.Printf("[PluginInstaller] Deleted environment bindings for plugin: %s", pluginID)
+	}
+
+	if err := pi.db.GetDB().Where("plugin_id = ?", registry.ID).Delete(&CustomEnvVar{}).Error; err != nil {
+		log.Printf("[PluginInstaller] Warning: failed to delete custom env vars: %v", err)
+	} else {
+		log.Printf("[PluginInstaller] Deleted custom env vars for plugin registry ID: %d", registry.ID)
+	}
+
+	if options.RemoveGitAuth {
+		if err := pi.gitAuth.DeleteGitAuthConfig(repoURL); err != nil {
+			log.Printf("[PluginInstaller] Warning: failed to delete Git auth config: %v", err)
+		} else {
+			log.Printf("[PluginInstaller] Deleted Git authentication config for: %s", repoURL)
+		}
+	}
+
+	if options.DeleteJobHistory {
+		if err := pi.deletePluginJobs(pluginID); err != nil {
+			log.Printf("[PluginInstaller] Warning: failed to delete job history: %v", err)
+		} else {
+			log.Printf("[PluginInstaller] Deleted job history for plugin: %s", pluginID)
+		}
+	}
+
+	if options.DeleteEnvironments {
+		if err := pi.deletePluginEnvironments(pluginID); err != nil {
+			log.Printf("[PluginInstaller] Warning: failed to delete environments: %v", err)
+		} else {
+			log.Printf("[PluginInstaller] Deleted bound environments for plugin: %s", pluginID)
+		}
 	}
 
 	if err := os.RemoveAll(registry.FolderPath); err != nil {
@@ -262,6 +396,81 @@ func (pi *PluginInstaller) UninstallPlugin(repoURL string) error {
 	return nil
 }
 
+func (pi *PluginInstaller) deletePluginJobs(pluginID string) error {
+	var jobs []models.Job
+	if err := pi.db.GetDB().Where("type = ?", pluginID).Find(&jobs).Error; err != nil {
+		return fmt.Errorf("failed to query jobs: %w", err)
+	}
+
+	for _, job := range jobs {
+		if job.OutputPath != "" {
+			if err := os.RemoveAll(job.OutputPath); err != nil {
+				log.Printf("[PluginInstaller] Warning: failed to delete job output directory %s: %v", job.OutputPath, err)
+			}
+		}
+	}
+
+	if err := pi.db.GetDB().Where("type = ?", pluginID).Delete(&models.Job{}).Error; err != nil {
+		return fmt.Errorf("failed to delete jobs: %w", err)
+	}
+
+	return nil
+}
+
+func (pi *PluginInstaller) GetPluginJobCount(pluginID string) (int64, error) {
+	var count int64
+	if err := pi.db.GetDB().Model(&models.Job{}).Where("type = ?", pluginID).Count(&count).Error; err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
+func (pi *PluginInstaller) deletePluginEnvironments(pluginID string) error {
+	var bindings []PluginEnvironmentBinding
+	if err := pi.db.GetDB().Where("plugin_id = ?", pluginID).Find(&bindings).Error; err != nil {
+		return fmt.Errorf("failed to query plugin bindings: %w", err)
+	}
+
+	for _, binding := range bindings {
+		switch binding.EnvironmentType {
+		case "python":
+			var venv VirtualEnvironment
+			if err := pi.db.GetDB().Where("id = ?", binding.EnvironmentID).First(&venv).Error; err == nil {
+				if err := os.RemoveAll(venv.Path); err != nil {
+					log.Printf("[PluginInstaller] Warning: failed to delete Python venv directory %s: %v", venv.Path, err)
+				}
+				if err := pi.db.GetDB().Delete(&venv).Error; err != nil {
+					log.Printf("[PluginInstaller] Warning: failed to delete Python venv DB entry: %v", err)
+				} else {
+					log.Printf("[PluginInstaller] Deleted Python venv: %s", venv.Name)
+				}
+			}
+		case "r":
+			var renv RenvEnvironment
+			if err := pi.db.GetDB().Where("id = ?", binding.EnvironmentID).First(&renv).Error; err == nil {
+				if err := os.RemoveAll(renv.Path); err != nil {
+					log.Printf("[PluginInstaller] Warning: failed to delete R renv directory %s: %v", renv.Path, err)
+				}
+				if err := pi.db.GetDB().Delete(&renv).Error; err != nil {
+					log.Printf("[PluginInstaller] Warning: failed to delete R renv DB entry: %v", err)
+				} else {
+					log.Printf("[PluginInstaller] Deleted R renv: %s", renv.Name)
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+func (pi *PluginInstaller) GetPluginEnvironmentCount(pluginID string) (int64, error) {
+	var count int64
+	if err := pi.db.GetDB().Model(&PluginEnvironmentBinding{}).Where("plugin_id = ?", pluginID).Count(&count).Error; err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
 func (pi *PluginInstaller) GetInstalledVersion(repoURL string) (string, error) {
 	var registry models.PluginRegistry
 	if err := pi.db.GetDB().Where("repository = ?", repoURL).First(&registry).Error; err != nil {
@@ -279,6 +488,71 @@ func (pi *PluginInstaller) GetInstalledVersion(repoURL string) (string, error) {
 	}
 
 	return ref.Hash().String()[:7], nil
+}
+
+type RepositoryUpdateInfo struct {
+	PluginID          string  `json:"plugin_id"`
+	CurrentCommit     string  `json:"current_commit"`
+	LatestCommit      string  `json:"latest_commit"`
+	RecommendedCommit string  `json:"recommended_commit"`
+	HasUpdate         bool    `json:"has_update"`
+	ChangelogURL      *string `json:"changelog_url"`
+}
+
+func (pi *PluginInstaller) CheckRepositoryUpdate(repoURL string, currentCommit string) (*RepositoryUpdateInfo, error) {
+	log.Printf("[PluginInstaller] Checking repository update: %s (current: %s)", repoURL, currentCommit)
+
+	tempDir := filepath.Join(pi.pluginsDir, ".temp-update-check-"+fmt.Sprintf("%d", time.Now().Unix()))
+	defer os.RemoveAll(tempDir)
+
+	auth, err := pi.gitAuth.GetAuthMethod(repoURL)
+	if err != nil {
+		log.Printf("[PluginInstaller] Warning: failed to get auth method: %v", err)
+	}
+
+	repo, err := git.PlainClone(tempDir, false, &git.CloneOptions{
+		URL:      repoURL,
+		Progress: io.Discard,
+		Depth:    1,
+		Auth:     auth,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to clone repository: %w", err)
+	}
+
+	ref, err := repo.Head()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get HEAD: %w", err)
+	}
+
+	latestCommit := ref.Hash().String()
+	hasUpdate := latestCommit != currentCommit
+
+	var changelogURL *string
+	if hasUpdate {
+		changelog := fmt.Sprintf("%s/compare/%s...%s", repoURL, currentCommit, latestCommit)
+		changelogURL = &changelog
+	}
+
+	var registryEntry models.PluginRegistry
+	var pluginID string
+	if err := pi.db.GetDB().Where("repository = ?", repoURL).First(&registryEntry).Error; err == nil {
+		pluginID = registryEntry.PluginID
+	} else {
+		pluginID = repoURL
+	}
+
+	updateInfo := &RepositoryUpdateInfo{
+		PluginID:          pluginID,
+		CurrentCommit:     currentCommit,
+		LatestCommit:      latestCommit,
+		RecommendedCommit: latestCommit,
+		HasUpdate:         hasUpdate,
+		ChangelogURL:      changelogURL,
+	}
+
+	log.Printf("[PluginInstaller] Update check result: has_update=%v", hasUpdate)
+	return updateInfo, nil
 }
 
 func EncodeRepoURL(repoURL string) string {

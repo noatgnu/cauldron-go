@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plugin Documentation</title>
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        mermaid.initialize({ startOnLoad: true, theme: 'default' });
+    </script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            max-width: 900px;
+            margin: 50px auto;
+            padding: 20px;
+            line-height: 1.6;
+            color: #333;
+        }
+        h1 {
+            border-bottom: 2px solid #2196f3;
+            padding-bottom: 10px;
+            color: #1976d2;
+        }
+        h2 {
+            margin-top: 30px;
+            color: #1976d2;
+            border-bottom: 1px solid #e0e0e0;
+            padding-bottom: 5px;
+        }
+        h3 {
+            margin-top: 20px;
+            color: #424242;
+        }
+        h4 {
+            color: #616161;
+        }
+        a {
+            color: #2196f3;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        code {
+            background: #f5f5f5;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+        pre {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        pre code {
+            background: none;
+            padding: 0;
+        }
+        blockquote {
+            border-left: 4px solid #2196f3;
+            margin: 0;
+            padding-left: 15px;
+            color: #666;
+            background: #f5f9fc;
+            padding: 10px 15px;
+            border-radius: 4px;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 15px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #2196f3;
+            color: white;
+            font-weight: 600;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        ul, ol {
+            padding-left: 25px;
+        }
+        li {
+            margin: 5px 0;
+        }
+        strong {
+            font-weight: 600;
+            color: #1976d2;
+        }
+        .mermaid {
+            text-align: center;
+            margin: 20px 0;
+            background: #f9f9f9;
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+        }
+    </style>
+</head>
+<body>
+<h1 id="uniprot-data-retrieval">UniProt Data Retrieval</h1>
+<p><strong>ID</strong>: <code>uniprot-fetcher</code><br>
+<strong>Version</strong>: 1.0.0<br>
+<strong>Category</strong>: utilities<br>
+<strong>Author</strong>: CauldronGO Team</p>
+<h2 id="description">Description</h2>
+<p>Fetch protein annotations from UniProt database using REST API</p>
+<h2 id="runtime">Runtime</h2>
+<ul>
+<li>
+<p><strong>Environments</strong>: <code>direct</code></p>
+</li>
+<li>
+<p><strong>Script</strong>: <code>uniprot-fetcher</code></p>
+</li>
+</ul>
+<h2 id="inputs">Inputs</h2>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Label</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Visibility</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>input_mode</code></td>
+<td>Input Mode</td>
+<td>select (file, text)</td>
+<td>Yes</td>
+<td>file</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>input_file</code></td>
+<td>Input File</td>
+<td>file</td>
+<td>No</td>
+<td>-</td>
+<td>Visible when <code>input_mode</code> = <code>file</code></td>
+</tr>
+<tr>
+<td><code>column</code></td>
+<td>ID Column</td>
+<td>column-selector (single)</td>
+<td>No</td>
+<td>-</td>
+<td>Visible when <code>input_mode</code> = <code>file</code></td>
+</tr>
+<tr>
+<td><code>delimiter</code></td>
+<td>Input File Delimiter</td>
+<td>select (tab, comma, semicolon)</td>
+<td>No</td>
+<td>tab</td>
+<td>Visible when <code>input_mode</code> = <code>file</code></td>
+</tr>
+<tr>
+<td><code>id_list</code></td>
+<td>Protein ID List</td>
+<td>text</td>
+<td>No</td>
+<td>-</td>
+<td>Visible when <code>input_mode</code> = <code>text</code></td>
+</tr>
+<tr>
+<td><code>from_database</code></td>
+<td>From Database</td>
+<td>select (from from_databases.txt)</td>
+<td>Yes</td>
+<td>UniProtKB_AC-ID</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>fields</code></td>
+<td>UniProt Fields</td>
+<td>multiselect-grouped (from fields.json)</td>
+<td>Yes</td>
+<td>accession, id, gene_names, organism_name, protein_name</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>output_format</code></td>
+<td>Output Format</td>
+<td>select (tsv, json)</td>
+<td>Yes</td>
+<td>tsv</td>
+<td>Always visible</td>
+</tr>
+</tbody>
+</table>
+<h3 id="input-details">Input Details</h3>
+<h4 id="input-mode-input-mode">Input Mode (<code>input_mode</code>)</h4>
+<p>Choose input method: file with column selection or direct text list</p>
+<ul>
+<li><strong>Options</strong>: <code>file</code>, <code>text</code></li>
+</ul>
+<h4 id="input-file-input-file">Input File (<code>input_file</code>)</h4>
+<p>File containing protein identifiers</p>
+<h4 id="id-column-column">ID Column (<code>column</code>)</h4>
+<p>Column containing protein IDs (e.g., UniProt accessions)</p>
+<ul>
+<li><strong>Column Source</strong>: <code>input_file</code></li>
+</ul>
+<h4 id="input-file-delimiter-delimiter">Input File Delimiter (<code>delimiter</code>)</h4>
+<p>Delimiter used in input file</p>
+<ul>
+<li><strong>Options</strong>: <code>tab</code>, <code>comma</code>, <code>semicolon</code></li>
+</ul>
+<h4 id="protein-id-list-id-list">Protein ID List (<code>id_list</code>)</h4>
+<p>List of protein IDs (comma, space, semicolon, or newline separated)</p>
+<ul>
+<li><strong>Placeholder</strong>: <code>Enter protein IDs separated by commas, spaces, or newlines (e.g., P12345, Q9Y6K9, O15111)</code></li>
+</ul>
+<h4 id="from-database-from-database">From Database (<code>from_database</code>)</h4>
+<p>Source database of the input IDs</p>
+<ul>
+<li><strong>Options From File</strong>: <code>from_databases.txt</code></li>
+</ul>
+<h4 id="uniprot-fields-fields">UniProt Fields (<code>fields</code>)</h4>
+<p>UniProt fields to retrieve (organized by categories)</p>
+<ul>
+<li><strong>Groups From File</strong>: <code>fields.json</code></li>
+</ul>
+<h4 id="output-format-output-format">Output Format (<code>output_format</code>)</h4>
+<p>Output file format</p>
+<ul>
+<li><strong>Options</strong>: <code>tsv</code>, <code>json</code></li>
+</ul>
+<h2 id="outputs">Outputs</h2>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>File</th>
+<th>Type</th>
+<th>Format</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>uniprot_results</code></td>
+<td><code>uniprot_results.tsv</code></td>
+<td>data</td>
+<td>tsv</td>
+<td>UniProt annotation data</td>
+</tr>
+</tbody>
+</table>
+<h2 id="example-data">Example Data</h2>
+<p>This plugin includes example data for testing:</p>
+<pre><code class="language-yaml">  delimiter: tab
+  from_database: UniProtKB_AC-ID
+  fields: [accession id gene_names organism_name protein_name cc_function go keyword]
+  output_format: tsv
+  input_mode: file
+  input_file: diann/imputed.data.txt
+  column: Protein.Ids
+</code></pre>
+<p>Load example data by clicking the <strong>Load Example</strong> button in the UI.</p>
+<h2 id="usage">Usage</h2>
+<h3 id="via-ui">Via UI</h3>
+<ol>
+<li>Navigate to <strong>utilities</strong> → <strong>UniProt Data Retrieval</strong></li>
+<li>Fill in the required inputs</li>
+<li>Click <strong>Run Analysis</strong></li>
+</ol>
+<h3 id="via-plugin-system">Via Plugin System</h3>
+<pre><code class="language-typescript">const jobId = await pluginService.executePlugin('uniprot-fetcher', {
+  // Add parameters here
+});
+</code></pre>
+
+</body>
+</html>

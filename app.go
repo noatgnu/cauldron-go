@@ -35,6 +35,7 @@ type App struct {
 	protocolHandler       *services.ProtocolHandler
 	httpInstallServer     *services.HTTPInstallServer
 	pluginRegistryService *services.PluginRegistryService
+	gitAuthService        *services.GitAuthService
 }
 
 func NewApp() *App {
@@ -141,13 +142,17 @@ func (a *App) startup(ctx context.Context) {
 	}
 	a.pluginExecutor = services.NewPluginExecutor()
 
+	log.Println("[App.startup] Initializing Git authentication service...")
+	a.gitAuthService = services.NewGitAuthService(a.db)
+	log.Println("[App.startup] Git authentication service initialized")
+
 	exePath, _ := os.Executable()
 	pluginsDir := filepath.Join(filepath.Dir(exePath), "plugins")
-	a.pluginInstaller = services.NewPluginInstaller(pluginsDir, a.db, a.pluginLoaderV2)
+	a.pluginInstaller = services.NewPluginInstaller(pluginsDir, a.db, a.pluginLoaderV2, a.gitAuthService)
 	log.Println("[App.startup] Plugin installer initialized")
 
 	log.Println("[App.startup] Initializing plugin registry service...")
-	a.pluginRegistryService = services.NewPluginRegistryService(ctx, a.settings)
+	a.pluginRegistryService = services.NewPluginRegistryService(ctx, a.settings, a.gitAuthService)
 	log.Println("[App.startup] Plugin registry service initialized")
 
 	log.Println("[App.startup] Initializing protocol handler...")
@@ -1177,6 +1182,64 @@ func (a *App) DeleteCustomEnvVarByKey(pluginID uint, key string) error {
 	return a.db.DeleteCustomEnvVarByKey(pluginID, key)
 }
 
+type GitAuthConfigResponse struct {
+	ID            uint   `json:"id"`
+	RepositoryURL string `json:"repositoryURL"`
+	SSHKeyPath    string `json:"sshKeyPath"`
+	HasPassphrase bool   `json:"hasPassphrase"`
+	CreatedAt     int64  `json:"createdAt"`
+	UpdatedAt     int64  `json:"updatedAt"`
+}
+
+func (a *App) SaveGitAuthConfig(repoURL string, sshKeyPath string, passphrase string) error {
+	return a.gitAuthService.SaveGitAuthConfig(repoURL, sshKeyPath, passphrase)
+}
+
+func (a *App) GetGitAuthConfig(repoURL string) (*GitAuthConfigResponse, error) {
+	config, err := a.gitAuthService.GetGitAuthConfig(repoURL)
+	if err != nil {
+		return nil, err
+	}
+
+	return &GitAuthConfigResponse{
+		ID:            config.ID,
+		RepositoryURL: config.RepositoryURL,
+		SSHKeyPath:    config.SSHKeyPath,
+		HasPassphrase: config.SSHKeyPassphrase != "",
+		CreatedAt:     config.CreatedAt,
+		UpdatedAt:     config.UpdatedAt,
+	}, nil
+}
+
+func (a *App) GetAllGitAuthConfigs() ([]GitAuthConfigResponse, error) {
+	configs, err := a.gitAuthService.GetAllGitAuthConfigs()
+	if err != nil {
+		return nil, err
+	}
+
+	responses := make([]GitAuthConfigResponse, len(configs))
+	for i, config := range configs {
+		responses[i] = GitAuthConfigResponse{
+			ID:            config.ID,
+			RepositoryURL: config.RepositoryURL,
+			SSHKeyPath:    config.SSHKeyPath,
+			HasPassphrase: config.SSHKeyPassphrase != "",
+			CreatedAt:     config.CreatedAt,
+			UpdatedAt:     config.UpdatedAt,
+		}
+	}
+
+	return responses, nil
+}
+
+func (a *App) DeleteGitAuthConfig(repoURL string) error {
+	return a.gitAuthService.DeleteGitAuthConfig(repoURL)
+}
+
+func (a *App) ValidateSSHKey(keyPath string, passphrase string) error {
+	return a.gitAuthService.ValidateSSHKey(keyPath, passphrase)
+}
+
 func (a *App) GetBundledRequirementsPath(requirementType string) (string, error) {
 	return a.envService.GetBundledRequirementsPath(requirementType)
 }
@@ -1590,8 +1653,8 @@ func (a *App) ExecutePluginV2(req models.PluginExecutionRequestV2) (string, erro
 		log.Printf("[ExecutePluginV2] Failed to get plugin: %v", err)
 		return "", err
 	}
-	log.Printf("[ExecutePluginV2] Plugin loaded: %s [ID:%d] (%s), Runtime type: %s",
-		plugin.Definition.Plugin.Name, plugin.ID, plugin.Definition.Plugin.ID, plugin.Definition.Runtime.Type)
+	log.Printf("[ExecutePluginV2] Plugin loaded: %s [ID:%d] (%s), Environments: %v",
+		plugin.Definition.Plugin.Name, plugin.ID, plugin.Definition.Plugin.ID, plugin.Definition.Runtime.GetEnvironments())
 
 	if err := a.pluginExecutor.ValidateParameters(plugin, req.Parameters); err != nil {
 		return "", fmt.Errorf("parameter validation failed: %w", err)
@@ -1626,12 +1689,22 @@ func (a *App) ExecutePluginV2(req models.PluginExecutionRequestV2) (string, erro
 	parameters["outputDir"] = outputDir
 	parameters["pluginId"] = plugin.ID
 
+	envs := plugin.Definition.Runtime.GetEnvironments()
+	runtimeTypeForJob := ""
+	if len(envs) > 1 && plugin.Definition.Runtime.HasEnvironment("python") && plugin.Definition.Runtime.HasEnvironment("r") {
+		runtimeTypeForJob = "python+r"
+	} else if len(envs) > 0 {
+		runtimeTypeForJob = envs[0]
+	}
+
 	jobID, err := a.jobQueue.CreateJobWithParameters(
 		plugin.Definition.Plugin.ID,
 		plugin.Definition.Plugin.Name,
-		plugin.Definition.Runtime.Type,
+		runtimeTypeForJob,
 		args,
 		parameters,
+		plugin.Definition.Plugin.Version,
+		plugin.CommitHash,
 	)
 	if err != nil {
 		return "", err
@@ -1654,30 +1727,48 @@ func (a *App) ExecutePluginV2(req models.PluginExecutionRequestV2) (string, erro
 		}
 
 		var execErr error
-		log.Printf("[ExecutePluginV2] Plugin runtime type: %s", plugin.Definition.Runtime.Type)
+		envs := plugin.Definition.Runtime.GetEnvironments()
+		log.Printf("[ExecutePluginV2] Plugin environments: %v", envs)
 		log.Printf("[ExecutePluginV2] Plugin folder path: %s", plugin.FolderPath)
 
-		switch plugin.Definition.Runtime.Type {
-		case "python", "pythonWithR":
-			log.Printf("[ExecutePluginV2] Calling ExecutePythonScript with RuntimeType: %s", plugin.Definition.Runtime.Type)
-			execErr = a.scriptExecutor.ExecutePythonScript(jobCtx, jobID, services.ScriptConfig{
-				PluginID:    plugin.ID,
-				Type:        plugin.Definition.Plugin.ID,
-				RuntimeType: plugin.Definition.Runtime.Type,
-				ScriptName:  filepath.Base(plugin.ScriptPath),
-				Args:        args[1:],
-				OutputDir:   outputDir,
-				FolderPath:  plugin.FolderPath,
-			})
-		case "r":
-			execErr = a.scriptExecutor.ExecuteRScript(jobCtx, jobID, services.ScriptConfig{
-				PluginID:   plugin.ID,
-				Type:       plugin.Definition.Plugin.ID,
-				ScriptName: filepath.Base(plugin.ScriptPath),
-				Args:       args[1:],
-				OutputDir:  outputDir,
-				FolderPath: plugin.FolderPath,
-			})
+		if len(envs) == 0 {
+			execErr = fmt.Errorf("no runtime environments specified")
+		} else {
+			primaryEnv := envs[0]
+			log.Printf("[ExecutePluginV2] Primary environment: %s", primaryEnv)
+
+			switch primaryEnv {
+			case "python":
+				log.Printf("[ExecutePluginV2] Executing as Python script")
+				execErr = a.scriptExecutor.ExecutePythonScript(jobCtx, jobID, services.ScriptConfig{
+					PluginID:     plugin.ID,
+					Type:         plugin.Definition.Plugin.ID,
+					Environments: envs,
+					ScriptName:   filepath.Base(plugin.ScriptPath),
+					Args:         args[1:],
+					OutputDir:    outputDir,
+					FolderPath:   plugin.FolderPath,
+				})
+			case "r":
+				log.Printf("[ExecutePluginV2] Executing as R script")
+				execErr = a.scriptExecutor.ExecuteRScript(jobCtx, jobID, services.ScriptConfig{
+					PluginID:     plugin.ID,
+					Type:         plugin.Definition.Plugin.ID,
+					Environments: envs,
+					ScriptName:   filepath.Base(plugin.ScriptPath),
+					Args:         args[1:],
+					OutputDir:    outputDir,
+					FolderPath:   plugin.FolderPath,
+				})
+			case "julia":
+				execErr = fmt.Errorf("julia runtime not yet implemented")
+			case "node":
+				execErr = fmt.Errorf("node runtime not yet implemented")
+			case "direct":
+				execErr = fmt.Errorf("direct runtime not yet implemented")
+			default:
+				execErr = fmt.Errorf("unsupported primary environment: %s", primaryEnv)
+			}
 		}
 
 		if execErr != nil {
@@ -2042,14 +2133,22 @@ func (a *App) beforeClose(ctx context.Context) bool {
 	return false
 }
 
-func (a *App) InstallPluginFromRepo(repoURL string, commitHash string) error {
+type PluginInstallResult struct {
+	PluginID string `json:"pluginId"`
+}
+
+func (a *App) InstallPluginFromRepo(repoURL string, commitHash string) (*PluginInstallResult, error) {
 	log.Printf("[App] Installing plugin from repository: %s (ref: %s)", repoURL, commitHash)
-	return a.pluginInstaller.InstallPlugin(repoURL, commitHash, func(status string) {
+	pluginID, err := a.pluginInstaller.InstallPlugin(repoURL, commitHash, nil, func(status string) {
 		runtime.EventsEmit(a.ctx, "plugin:install:progress", map[string]string{
 			"repo":   repoURL,
 			"status": status,
 		})
 	})
+	if err != nil {
+		return nil, err
+	}
+	return &PluginInstallResult{PluginID: pluginID}, nil
 }
 
 func (a *App) UpdatePluginFromRepo(repoURL string) error {
@@ -2057,9 +2156,71 @@ func (a *App) UpdatePluginFromRepo(repoURL string) error {
 	return a.pluginInstaller.UpdatePlugin(repoURL)
 }
 
-func (a *App) UninstallPluginFromRepo(repoURL string) error {
-	log.Printf("[App] Uninstalling plugin from repository: %s", repoURL)
-	return a.pluginInstaller.UninstallPlugin(repoURL)
+func (a *App) UpdatePluginToCommit(repoURL string, commitHash string) error {
+	log.Printf("[App] Updating plugin from repository %s to commit: %s", repoURL, commitHash)
+	return a.pluginInstaller.UpdatePluginToCommit(repoURL, commitHash)
+}
+
+func (a *App) UpdateAllRemotePlugins() error {
+	log.Printf("[App] Updating all remote plugins")
+
+	var registries []models.PluginRegistry
+	if err := a.db.GetDB().Where("install_source = ?", "remote").Find(&registries).Error; err != nil {
+		return fmt.Errorf("failed to fetch remote plugins: %w", err)
+	}
+
+	if len(registries) == 0 {
+		log.Printf("[App] No remote plugins found to update")
+		return fmt.Errorf("no external plugins installed")
+	}
+
+	log.Printf("[App] Found %d remote plugin(s) to update", len(registries))
+
+	var errors []string
+	successCount := 0
+
+	for _, registry := range registries {
+		if registry.Repository == "" {
+			log.Printf("[App] Skipping plugin %s: no repository URL", registry.PluginID)
+			continue
+		}
+
+		log.Printf("[App] Updating plugin %s from %s", registry.PluginID, registry.Repository)
+		if err := a.pluginInstaller.UpdatePlugin(registry.Repository); err != nil {
+			errMsg := fmt.Sprintf("Failed to update %s: %v", registry.PluginID, err)
+			log.Printf("[App] %s", errMsg)
+			errors = append(errors, errMsg)
+		} else {
+			successCount++
+			log.Printf("[App] Successfully updated %s", registry.PluginID)
+		}
+	}
+
+	log.Printf("[App] Updated %d/%d remote plugins", successCount, len(registries))
+
+	if len(errors) > 0 {
+		return fmt.Errorf("some plugins failed to update: %s", strings.Join(errors, "; "))
+	}
+
+	return nil
+}
+
+func (a *App) UninstallPluginFromRepo(repoURL string, removeGitAuth bool, deleteJobHistory bool, deleteEnvironments bool) error {
+	log.Printf("[App] Uninstalling plugin from repository: %s (removeGitAuth=%v, deleteJobHistory=%v, deleteEnvironments=%v)", repoURL, removeGitAuth, deleteJobHistory, deleteEnvironments)
+	options := services.UninstallOptions{
+		RemoveGitAuth:      removeGitAuth,
+		DeleteJobHistory:   deleteJobHistory,
+		DeleteEnvironments: deleteEnvironments,
+	}
+	return a.pluginInstaller.UninstallPlugin(repoURL, options)
+}
+
+func (a *App) GetPluginJobCount(pluginID string) (int64, error) {
+	return a.pluginInstaller.GetPluginJobCount(pluginID)
+}
+
+func (a *App) GetPluginEnvironmentCount(pluginID string) (int64, error) {
+	return a.pluginInstaller.GetPluginEnvironmentCount(pluginID)
 }
 
 func (a *App) IsPluginInstalled(repoURL string) (bool, error) {
@@ -2075,7 +2236,14 @@ func (a *App) DecodePluginRepoURL(encoded string) (string, error) {
 }
 
 func (a *App) ConfirmPluginInstallation(repoURL string, commitHash string) error {
+	return a.ConfirmPluginInstallationWithRegistry(repoURL, commitHash, nil)
+}
+
+func (a *App) ConfirmPluginInstallationWithRegistry(repoURL string, commitHash string, registrySource *string) error {
 	log.Printf("[App] User confirmed plugin installation from: %s (ref: %s)", repoURL, commitHash)
+	if registrySource != nil {
+		log.Printf("[App] Registry source: %s", *registrySource)
+	}
 
 	runtime.EventsEmit(a.ctx, "plugin:install:start", map[string]interface{}{
 		"repo": repoURL,
@@ -2083,12 +2251,13 @@ func (a *App) ConfirmPluginInstallation(repoURL string, commitHash string) error
 	})
 
 	go func() {
-		if err := a.pluginInstaller.InstallPlugin(repoURL, commitHash, func(status string) {
+		_, err := a.pluginInstaller.InstallPlugin(repoURL, commitHash, registrySource, func(status string) {
 			runtime.EventsEmit(a.ctx, "plugin:install:progress", map[string]string{
 				"repo":   repoURL,
 				"status": status,
 			})
-		}); err != nil {
+		})
+		if err != nil {
 			log.Printf("[App] Plugin installation failed: %v", err)
 			runtime.EventsEmit(a.ctx, "plugin:install:error", map[string]interface{}{
 				"repo":  repoURL,
@@ -2174,5 +2343,211 @@ func (a *App) InstallPluginFromRegistry(pluginID string, commitHash string) erro
 		return fmt.Errorf("plugin %s does not have a repository URL", pluginID)
 	}
 
-	return a.ConfirmPluginInstallation(plugin.Repository, commitHash)
+	config := a.settings.GetConfig()
+	var registrySource *string
+	if config.PluginRegistryURL != "" {
+		registrySource = &config.PluginRegistryURL
+	}
+
+	return a.ConfirmPluginInstallationWithRegistry(plugin.Repository, commitHash, registrySource)
+}
+
+func (a *App) CheckPluginUpdate(repoURL string, currentCommit string, registrySource *string) (interface{}, error) {
+	log.Printf("[App] Checking update for plugin: %s (current: %s)", repoURL, currentCommit)
+
+	var pluginRegistry models.PluginRegistry
+	if err := a.db.GetDB().Where("repository = ?", repoURL).First(&pluginRegistry).Error; err != nil {
+		return nil, fmt.Errorf("plugin not found in registry")
+	}
+
+	if pluginRegistry.UpdatePolicy == "manual" {
+		log.Printf("[App] Plugin %s has manual update policy, skipping check", pluginRegistry.Name)
+		return map[string]interface{}{
+			"has_update":     false,
+			"update_policy":  "manual",
+			"current_commit": currentCommit,
+		}, nil
+	}
+
+	if pluginRegistry.PinnedVersion != nil {
+		log.Printf("[App] Plugin %s is pinned to version %s", pluginRegistry.Name, *pluginRegistry.PinnedVersion)
+		return map[string]interface{}{
+			"has_update":     false,
+			"update_policy":  pluginRegistry.UpdatePolicy,
+			"current_commit": currentCommit,
+			"pinned_version": *pluginRegistry.PinnedVersion,
+		}, nil
+	}
+
+	if pluginRegistry.RegistrySource != nil && *pluginRegistry.RegistrySource != "" {
+		log.Printf("[App] Checking update from registry: %s", *pluginRegistry.RegistrySource)
+		updateInfo, err := a.pluginRegistryService.CheckUpdate(pluginRegistry.PluginID)
+		if err != nil {
+			log.Printf("[App] Failed to check update from registry: %v", err)
+			return nil, err
+		}
+		return updateInfo, nil
+	}
+
+	log.Printf("[App] Direct repository update check for: %s", repoURL)
+	updateInfo, err := a.pluginInstaller.CheckRepositoryUpdate(repoURL, currentCommit)
+	if err != nil {
+		log.Printf("[App] Failed to check repository update: %v", err)
+		return nil, err
+	}
+
+	return updateInfo, nil
+}
+
+func (a *App) SetPluginUpdatePolicy(repoURL string, policy string) error {
+	log.Printf("[App] Setting update policy for %s to %s", repoURL, policy)
+
+	var pluginRegistry models.PluginRegistry
+	if err := a.db.GetDB().Where("repository = ?", repoURL).First(&pluginRegistry).Error; err != nil {
+		return fmt.Errorf("plugin not found in registry")
+	}
+
+	pluginRegistry.UpdatePolicy = policy
+	return a.db.GetDB().Save(&pluginRegistry).Error
+}
+
+func (a *App) PinPluginVersion(repoURL string, version string) error {
+	log.Printf("[App] Pinning plugin %s to version %s", repoURL, version)
+
+	var pluginRegistry models.PluginRegistry
+	if err := a.db.GetDB().Where("repository = ?", repoURL).First(&pluginRegistry).Error; err != nil {
+		return fmt.Errorf("plugin not found in registry")
+	}
+
+	pluginRegistry.PinnedVersion = &version
+	return a.db.GetDB().Save(&pluginRegistry).Error
+}
+
+func (a *App) UnpinPluginVersion(repoURL string) error {
+	log.Printf("[App] Unpinning plugin version for %s", repoURL)
+
+	var pluginRegistry models.PluginRegistry
+	if err := a.db.GetDB().Where("repository = ?", repoURL).First(&pluginRegistry).Error; err != nil {
+		return fmt.Errorf("plugin not found in registry")
+	}
+
+	pluginRegistry.PinnedVersion = nil
+	return a.db.GetDB().Save(&pluginRegistry).Error
+}
+
+type PluginRequirementsInfo struct {
+	PluginID               string   `json:"pluginId"`
+	PluginName             string   `json:"pluginName"`
+	RuntimeEnvironments    []string `json:"runtimeEnvironments"`
+	PythonRequirementsFile string   `json:"pythonRequirementsFile,omitempty"`
+	RPackagesFile          string   `json:"rPackagesFile,omitempty"`
+	PythonPackages         []string `json:"pythonPackages,omitempty"`
+	RPackages              []string `json:"rPackages,omitempty"`
+	RequirementsExist      bool     `json:"requirementsExist"`
+}
+
+func (a *App) GetPluginRequirements(pluginID string) (*PluginRequirementsInfo, error) {
+	log.Printf("[App] Getting requirements for plugin: %s", pluginID)
+
+	plugin, err := a.pluginLoaderV2.GetPluginByStringID(pluginID)
+	if err != nil {
+		return nil, fmt.Errorf("plugin not found: %w", err)
+	}
+
+	info := &PluginRequirementsInfo{
+		PluginID:            plugin.Definition.Plugin.ID,
+		PluginName:          plugin.Definition.Plugin.Name,
+		RuntimeEnvironments: plugin.Definition.Runtime.GetEnvironments(),
+	}
+
+	if plugin.Definition.Execution.Requirements.PythonRequirementsFile != "" {
+		info.PythonRequirementsFile = plugin.Definition.Execution.Requirements.PythonRequirementsFile
+		reqPath := filepath.Join(plugin.FolderPath, info.PythonRequirementsFile)
+		if content, err := os.ReadFile(reqPath); err == nil {
+			lines := strings.Split(string(content), "\n")
+			for _, line := range lines {
+				line = strings.TrimSpace(line)
+				if line != "" && !strings.HasPrefix(line, "#") {
+					info.PythonPackages = append(info.PythonPackages, line)
+				}
+			}
+		}
+	}
+
+	if plugin.Definition.Execution.Requirements.RPackagesFile != "" {
+		info.RPackagesFile = plugin.Definition.Execution.Requirements.RPackagesFile
+		reqPath := filepath.Join(plugin.FolderPath, info.RPackagesFile)
+		if content, err := os.ReadFile(reqPath); err == nil {
+			lines := strings.Split(string(content), "\n")
+			for _, line := range lines {
+				line = strings.TrimSpace(line)
+				if line != "" && !strings.HasPrefix(line, "#") {
+					info.RPackages = append(info.RPackages, line)
+				}
+			}
+		}
+	}
+
+	info.RequirementsExist = len(info.PythonPackages) > 0 || len(info.RPackages) > 0
+
+	return info, nil
+}
+
+func (a *App) InstallPluginRequirements(pluginID string) error {
+	log.Printf("[App] Installing requirements for plugin: %s", pluginID)
+
+	plugin, err := a.pluginLoaderV2.GetPluginByStringID(pluginID)
+	if err != nil {
+		return fmt.Errorf("plugin not found: %w", err)
+	}
+
+	config := a.settings.GetConfig()
+
+	if plugin.Definition.Execution.Requirements.PythonRequirementsFile != "" && plugin.Definition.Runtime.HasEnvironment("python") {
+		reqPath := filepath.Join(plugin.FolderPath, plugin.Definition.Execution.Requirements.PythonRequirementsFile)
+		if _, err := os.Stat(reqPath); err == nil {
+			pythonPath := config.PythonPath
+			if pythonPath == "" {
+				return fmt.Errorf("Python path not configured")
+			}
+
+			log.Printf("[App] Installing Python requirements from: %s", reqPath)
+			if err := a.envService.InstallPythonRequirements(pythonPath, reqPath); err != nil {
+				return fmt.Errorf("failed to install Python requirements: %w", err)
+			}
+		}
+	}
+
+	if plugin.Definition.Execution.Requirements.RPackagesFile != "" && plugin.Definition.Runtime.HasEnvironment("r") {
+		reqPath := filepath.Join(plugin.FolderPath, plugin.Definition.Execution.Requirements.RPackagesFile)
+		if _, err := os.Stat(reqPath); err == nil {
+			rPath := config.RPath
+			if rPath == "" {
+				return fmt.Errorf("R path not configured")
+			}
+
+			content, err := os.ReadFile(reqPath)
+			if err != nil {
+				return fmt.Errorf("failed to read R packages file: %w", err)
+			}
+
+			var packages []string
+			lines := strings.Split(string(content), "\n")
+			for _, line := range lines {
+				line = strings.TrimSpace(line)
+				if line != "" && !strings.HasPrefix(line, "#") {
+					packages = append(packages, line)
+				}
+			}
+
+			if len(packages) > 0 {
+				log.Printf("[App] Installing R packages: %v", packages)
+				if err := a.envService.InstallRPackages(rPath, packages); err != nil {
+					return fmt.Errorf("failed to install R packages: %w", err)
+				}
+			}
+		}
+	}
+
+	return nil
 }

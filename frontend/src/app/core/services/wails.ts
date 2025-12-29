@@ -22,6 +22,15 @@ export type RenvEnvironment = services.RenvEnvironment;
 export type PluginEnvironmentBinding = services.PluginEnvironmentBinding;
 export type CustomEnvVar = services.CustomEnvVar;
 
+export interface GitAuthConfig {
+  id: number;
+  repositoryURL: string;
+  sshKeyPath: string;
+  hasPassphrase: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface ImportedFile {
   id: number;
   name: string;
@@ -483,6 +492,31 @@ export class Wails {
     return WailsApp.DeleteCustomEnvVarByKey(pluginId, key);
   }
 
+  async saveGitAuthConfig(repoURL: string, sshKeyPath: string, passphrase: string): Promise<void> {
+    if (!this.isWails) throw new Error('Wails not available');
+    return WailsApp.SaveGitAuthConfig(repoURL, sshKeyPath, passphrase);
+  }
+
+  async getGitAuthConfig(repoURL: string): Promise<GitAuthConfig> {
+    if (!this.isWails) throw new Error('Wails not available');
+    return WailsApp.GetGitAuthConfig(repoURL);
+  }
+
+  async getAllGitAuthConfigs(): Promise<GitAuthConfig[]> {
+    if (!this.isWails) throw new Error('Wails not available');
+    return WailsApp.GetAllGitAuthConfigs();
+  }
+
+  async deleteGitAuthConfig(repoURL: string): Promise<void> {
+    if (!this.isWails) throw new Error('Wails not available');
+    return WailsApp.DeleteGitAuthConfig(repoURL);
+  }
+
+  async validateSSHKey(keyPath: string, passphrase: string): Promise<void> {
+    if (!this.isWails) throw new Error('Wails not available');
+    return WailsApp.ValidateSSHKey(keyPath, passphrase);
+  }
+
   async reloadPlugins(): Promise<void> {
     if (!this.isWails) throw new Error('Wails not available');
     return WailsApp.ReloadPlugins();
@@ -549,7 +583,7 @@ export class Wails {
     return WailsApp.DeletePlugin(pluginID);
   }
 
-  async installPluginFromRepo(repoURL: string, commitHash: string = ''): Promise<void> {
+  async installPluginFromRepo(repoURL: string, commitHash: string = ''): Promise<any> {
     if (!this.isWails) throw new Error('Wails not available');
     return WailsApp.InstallPluginFromRepo(repoURL, commitHash);
   }
@@ -559,9 +593,29 @@ export class Wails {
     return WailsApp.UpdatePluginFromRepo(repoURL);
   }
 
-  async uninstallPluginFromRepo(repoURL: string): Promise<void> {
+  async updatePluginToCommit(repoURL: string, commitHash: string): Promise<void> {
     if (!this.isWails) throw new Error('Wails not available');
-    return WailsApp.UninstallPluginFromRepo(repoURL);
+    return WailsApp.UpdatePluginToCommit(repoURL, commitHash);
+  }
+
+  async updateAllRemotePlugins(): Promise<void> {
+    if (!this.isWails) throw new Error('Wails not available');
+    return WailsApp.UpdateAllRemotePlugins();
+  }
+
+  async uninstallPluginFromRepo(repoURL: string, removeGitAuth: boolean, deleteJobHistory: boolean, deleteEnvironments: boolean): Promise<void> {
+    if (!this.isWails) throw new Error('Wails not available');
+    return WailsApp.UninstallPluginFromRepo(repoURL, removeGitAuth, deleteJobHistory, deleteEnvironments);
+  }
+
+  async getPluginJobCount(pluginID: string): Promise<number> {
+    if (!this.isWails) throw new Error('Wails not available');
+    return WailsApp.GetPluginJobCount(pluginID);
+  }
+
+  async getPluginEnvironmentCount(pluginID: string): Promise<number> {
+    if (!this.isWails) throw new Error('Wails not available');
+    return WailsApp.GetPluginEnvironmentCount(pluginID);
   }
 
   async isPluginInstalled(repoURL: string): Promise<boolean> {
@@ -631,6 +685,11 @@ export class Wails {
     return WailsApp.ListRegistryPlugins(searchQuery, categoryName, authorName, limit, offset);
   }
 
+  async getRegistryPlugin(id: string): Promise<any> {
+    if (!this.isWails) throw new Error('Wails not available');
+    return WailsApp.GetRegistryPlugin(id);
+  }
+
   async listRegistryCategories(): Promise<any> {
     if (!this.isWails) throw new Error('Wails not available');
     return WailsApp.ListRegistryCategories();
@@ -639,5 +698,35 @@ export class Wails {
   async installPluginFromRegistry(pluginID: string, commitHash: string = ''): Promise<void> {
     if (!this.isWails) throw new Error('Wails not available');
     return WailsApp.InstallPluginFromRegistry(pluginID, commitHash);
+  }
+
+  async checkPluginUpdate(repoURL: string, currentCommit: string, registrySource: string | null): Promise<any> {
+    if (!this.isWails) throw new Error('Wails not available');
+    return WailsApp.CheckPluginUpdate(repoURL, currentCommit, registrySource);
+  }
+
+  async setPluginUpdatePolicy(repoURL: string, policy: string): Promise<void> {
+    if (!this.isWails) throw new Error('Wails not available');
+    return WailsApp.SetPluginUpdatePolicy(repoURL, policy);
+  }
+
+  async pinPluginVersion(repoURL: string, version: string): Promise<void> {
+    if (!this.isWails) throw new Error('Wails not available');
+    return WailsApp.PinPluginVersion(repoURL, version);
+  }
+
+  async unpinPluginVersion(repoURL: string): Promise<void> {
+    if (!this.isWails) throw new Error('Wails not available');
+    return WailsApp.UnpinPluginVersion(repoURL);
+  }
+
+  async getPluginRequirements(pluginId: string): Promise<any> {
+    if (!this.isWails) throw new Error('Wails not available');
+    return WailsApp.GetPluginRequirements(pluginId);
+  }
+
+  async installPluginRequirements(pluginId: string): Promise<void> {
+    if (!this.isWails) throw new Error('Wails not available');
+    return WailsApp.InstallPluginRequirements(pluginId);
   }
 }

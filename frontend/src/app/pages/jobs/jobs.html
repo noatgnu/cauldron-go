@@ -77,6 +77,18 @@
               <mat-icon color="warn" class="warning-icon" matTooltip="Environment no longer exists">warning</mat-icon>
             }
           </div>
+          @if (job.pluginVersion || job.pluginCommitHash) {
+            <div class="plugin-info">
+              @if (job.pluginVersion) {
+                <span class="plugin-version">v{{ job.pluginVersion }}</span>
+              }
+              @if (job.pluginCommitHash) {
+                <span class="plugin-commit" [matTooltip]="'Commit: ' + job.pluginCommitHash">
+                  #{{ job.pluginCommitHash.substring(0, 7) }}
+                </span>
+              }
+            </div>
+          }
           @if (job.status === 'in_progress') {
             @if (hasProgress(job.id)) {
               <div class="progress-info">

@@ -4,6 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Plugin Documentation</title>
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        mermaid.initialize({ startOnLoad: true, theme: 'default' });
+    </script>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -67,7 +71,44 @@
         }
         table {
             border-collapse: collapse;
-            width: 100%!;(string=<h1 id="limma-differential-expression">Limma Differential Expression</h1>
+            width: 100%;
+            margin: 15px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #2196f3;
+            color: white;
+            font-weight: 600;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        ul, ol {
+            padding-left: 25px;
+        }
+        li {
+            margin: 5px 0;
+        }
+        strong {
+            font-weight: 600;
+            color: #1976d2;
+        }
+        .mermaid {
+            text-align: center;
+            margin: 20px 0;
+            background: #f9f9f9;
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+        }
+    </style>
+</head>
+<body>
+<h1 id="limma-differential-expression">Limma Differential Expression</h1>
 <p><strong>ID</strong>: <code>limma</code><br>
 <strong>Version</strong>: 1.0.0<br>
 <strong>Category</strong>: analysis<br>
@@ -76,8 +117,12 @@
 <p>Linear models for differential expression analysis using limma</p>
 <h2 id="runtime">Runtime</h2>
 <ul>
-<li><strong>Type</strong>: <code>r</code></li>
-<li><strong>Script</strong>: <code>limma.R</code></li>
+<li>
+<p><strong>Environments</strong>: <code>r</code></p>
+</li>
+<li>
+<p><strong>Script</strong>: <code>limma.R</code></p>
+</li>
 </ul>
 <h2 id="inputs">Inputs</h2>
 <table>
@@ -234,15 +279,25 @@
 </table>
 <h2 id="requirements">Requirements</h2>
 <ul>
-<li><strong>R</strong>: &gt;=4.0</li>
+<li><strong>R Version</strong>: &gt;=4.0</li>
 </ul>
+<h3 id="r-dependencies-external-file">R Dependencies (External File)</h3>
+<p>Dependencies are defined in: <code>r-packages.txt</code></p>
+<ul>
+<li><code>QFeatures</code></li>
+<li><code>limma</code></li>
+<li><code>MsCoreUtils</code></li>
+</ul>
+<blockquote>
+<p><strong>Note</strong>: When you create a custom environment for this plugin, these dependencies will be automatically installed.</p>
+</blockquote>
 <h2 id="example-data">Example Data</h2>
 <p>This plugin includes example data for testing:</p>
-<pre><code class="language-yaml">  input_file: diann/imputed.data.txt
+<pre><code class="language-yaml">  index_col: Protein.Ids
+  log2: true
+  input_file: diann/imputed.data.txt
   annotation_file: differential_analysis/annotation.txt
   comparisons: differential_analysis/comparison.bca.txt
-  index_col: Protein.Ids
-  log2: true
 </code></pre>
 <p>Load example data by clicking the <strong>Load Example</strong> button in the UI.</p>
 <h2 id="usage">Usage</h2>
@@ -257,35 +312,6 @@
   // Add parameters here
 });
 </code></pre>
-)
-            margin: 15px 0;
-        }
-        th, td {
-            border: 1px solid #ddd;
-            padding: 12px;
-            text-align: left;
-        }
-        th {
-            background-color: #2196f3;
-            color: white;
-            font-weight: 600;
-        }
-        tr:nth-child(even) {
-            background-color: #f9f9f9;
-        }
-        ul, ol {
-            padding-left: 25px;
-        }
-        li {
-            margin: 5px 0;
-        }
-        strong {
-            font-weight: 600;
-            color: #1976d2;
-        }
-    </style>
-</head>
-<body>
-%!s(MISSING)
+
 </body>
 </html>

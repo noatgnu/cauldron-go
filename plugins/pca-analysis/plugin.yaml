@@ -8,7 +8,7 @@ plugin:
   icon: "scatter_plot"
 
 runtime:
-  type: "python"
+  environments: ["python"]
   script: "pca.py"
 
 inputs:

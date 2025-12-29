@@ -8,7 +8,7 @@ plugin:
   icon: "grid_on"
 
 runtime:
-  type: "r"
+  environments: ["r"]
   script: "correlation_matrix.R"
 
 inputs:

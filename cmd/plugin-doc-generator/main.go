@@ -83,8 +83,15 @@ type PluginMetadata struct {
 }
 
 type PluginRuntime struct {
-	Type   string `yaml:"type"`
-	Script string `yaml:"script"`
+	Environments []string `yaml:"environments"`
+	Script       string   `yaml:"script"`
+}
+
+func (r *PluginRuntime) GetEnvironments() []string {
+	if r.Environments != nil {
+		return r.Environments
+	}
+	return []string{}
 }
 
 type Requirements struct {
@@ -788,7 +795,13 @@ func generateDiagramSection(plugin PluginConfig, pluginDir string) string {
 	var err error
 	seenFiles := make(map[string]bool)
 
-	switch plugin.Runtime.Type {
+	envs := plugin.Runtime.GetEnvironments()
+	if len(envs) == 0 {
+		return ""
+	}
+
+	primaryEnv := envs[0]
+	switch primaryEnv {
 	case "r":
 		steps, err = parseRScript(scriptPath, pluginDir, seenFiles)
 	case "python":
@@ -882,9 +895,15 @@ func generatePluginDoc(plugin PluginConfig, pluginDir string, useHTTPProtocol bo
 		lines = append(lines, diagramSection)
 	}
 
+	runtimeEnvs := plugin.Runtime.GetEnvironments()
+	runtimeInfo := ""
+	if len(runtimeEnvs) > 0 {
+		runtimeInfo = fmt.Sprintf("- **Environments**: `%s`\n", strings.Join(runtimeEnvs, ", "))
+	}
+
 	lines = append(lines,
 		"## Runtime\n",
-		fmt.Sprintf("- **Type**: `%s`", plugin.Runtime.Type),
+		runtimeInfo,
 		fmt.Sprintf("- **Script**: `%s`\n", plugin.Runtime.Script),
 		"## Inputs\n",
 		generateInputTable(plugin.Inputs),

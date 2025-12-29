@@ -6,8 +6,16 @@ export function BindPluginToEnvironment(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['BindPluginToEnvironment'](arg1, arg2, arg3, arg4);
 }
 
+export function CheckPluginUpdate(arg1, arg2, arg3) {
+  return window['go']['main']['App']['CheckPluginUpdate'](arg1, arg2, arg3);
+}
+
 export function ConfirmPluginInstallation(arg1, arg2) {
   return window['go']['main']['App']['ConfirmPluginInstallation'](arg1, arg2);
+}
+
+export function ConfirmPluginInstallationWithRegistry(arg1, arg2, arg3) {
+  return window['go']['main']['App']['ConfirmPluginInstallationWithRegistry'](arg1, arg2, arg3);
 }
 
 export function ConvertPluginToYAML(arg1) {
@@ -40,6 +48,10 @@ export function DeleteCustomEnvVar(arg1) {
 
 export function DeleteCustomEnvVarByKey(arg1, arg2) {
   return window['go']['main']['App']['DeleteCustomEnvVarByKey'](arg1, arg2);
+}
+
+export function DeleteGitAuthConfig(arg1) {
+  return window['go']['main']['App']['DeleteGitAuthConfig'](arg1);
 }
 
 export function DeleteImportedFile(arg1) {
@@ -110,6 +122,10 @@ export function GetActiveREnvironment() {
   return window['go']['main']['App']['GetActiveREnvironment']();
 }
 
+export function GetAllGitAuthConfigs() {
+  return window['go']['main']['App']['GetAllGitAuthConfigs']();
+}
+
 export function GetAllJobs() {
   return window['go']['main']['App']['GetAllJobs']();
 }
@@ -128,6 +144,10 @@ export function GetCustomEnvVars(arg1) {
 
 export function GetExampleFilePath(arg1, arg2) {
   return window['go']['main']['App']['GetExampleFilePath'](arg1, arg2);
+}
+
+export function GetGitAuthConfig(arg1) {
+  return window['go']['main']['App']['GetGitAuthConfig'](arg1);
 }
 
 export function GetGlobalCustomEnvVars() {
@@ -160,6 +180,18 @@ export function GetPlugin(arg1) {
 
 export function GetPluginEnvironmentBinding(arg1, arg2) {
   return window['go']['main']['App']['GetPluginEnvironmentBinding'](arg1, arg2);
+}
+
+export function GetPluginEnvironmentCount(arg1) {
+  return window['go']['main']['App']['GetPluginEnvironmentCount'](arg1);
+}
+
+export function GetPluginJobCount(arg1) {
+  return window['go']['main']['App']['GetPluginJobCount'](arg1);
+}
+
+export function GetPluginRequirements(arg1) {
+  return window['go']['main']['App']['GetPluginRequirements'](arg1);
 }
 
 export function GetPluginTemplates() {
@@ -246,6 +278,10 @@ export function InstallPluginFromRepo(arg1, arg2) {
   return window['go']['main']['App']['InstallPluginFromRepo'](arg1, arg2);
 }
 
+export function InstallPluginRequirements(arg1) {
+  return window['go']['main']['App']['InstallPluginRequirements'](arg1);
+}
+
 export function InstallPythonPackages(arg1, arg2) {
   return window['go']['main']['App']['InstallPythonPackages'](arg1, arg2);
 }
@@ -330,6 +366,10 @@ export function PauseJobQueue() {
   return window['go']['main']['App']['PauseJobQueue']();
 }
 
+export function PinPluginVersion(arg1, arg2) {
+  return window['go']['main']['App']['PinPluginVersion'](arg1, arg2);
+}
+
 export function ReExecuteJob(arg1) {
   return window['go']['main']['App']['ReExecuteJob'](arg1);
 }
@@ -382,6 +422,10 @@ export function SaveFile(arg1, arg2) {
   return window['go']['main']['App']['SaveFile'](arg1, arg2);
 }
 
+export function SaveGitAuthConfig(arg1, arg2, arg3) {
+  return window['go']['main']['App']['SaveGitAuthConfig'](arg1, arg2, arg3);
+}
+
 export function SavePluginYAML(arg1, arg2) {
   return window['go']['main']['App']['SavePluginYAML'](arg1, arg2);
 }
@@ -398,6 +442,10 @@ export function SetActiveREnvironment(arg1) {
   return window['go']['main']['App']['SetActiveREnvironment'](arg1);
 }
 
+export function SetPluginUpdatePolicy(arg1, arg2) {
+  return window['go']['main']['App']['SetPluginUpdatePolicy'](arg1, arg2);
+}
+
 export function SetSetting(arg1, arg2) {
   return window['go']['main']['App']['SetSetting'](arg1, arg2);
 }
@@ -406,16 +454,32 @@ export function StopJobQueueImmediate() {
   return window['go']['main']['App']['StopJobQueueImmediate']();
 }
 
-export function UninstallPluginFromRepo(arg1) {
-  return window['go']['main']['App']['UninstallPluginFromRepo'](arg1);
+export function UninstallPluginFromRepo(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['UninstallPluginFromRepo'](arg1, arg2, arg3, arg4);
+}
+
+export function UnpinPluginVersion(arg1) {
+  return window['go']['main']['App']['UnpinPluginVersion'](arg1);
+}
+
+export function UpdateAllRemotePlugins() {
+  return window['go']['main']['App']['UpdateAllRemotePlugins']();
 }
 
 export function UpdatePluginFromRepo(arg1) {
   return window['go']['main']['App']['UpdatePluginFromRepo'](arg1);
 }
 
+export function UpdatePluginToCommit(arg1, arg2) {
+  return window['go']['main']['App']['UpdatePluginToCommit'](arg1, arg2);
+}
+
 export function ValidatePluginYAML(arg1) {
   return window['go']['main']['App']['ValidatePluginYAML'](arg1);
+}
+
+export function ValidateSSHKey(arg1, arg2) {
+  return window['go']['main']['App']['ValidateSSHKey'](arg1, arg2);
 }
 
 export function WriteJobOutputFile(arg1, arg2, arg3) {

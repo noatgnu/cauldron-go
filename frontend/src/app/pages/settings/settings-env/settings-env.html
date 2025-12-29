@@ -13,11 +13,11 @@
         <div class="add-var-row">
           <mat-form-field appearance="outline">
             <mat-label>Key</mat-label>
-            <input matInput [value]="newGlobalKey()" (input)="newGlobalKey.set($any($event.target).value)" placeholder="e.g. BLAST_PATH">
+            <input matInput [value]="newGlobalKey()" (input)="newGlobalKey.set($any($event.target).value)">
           </mat-form-field>
           <mat-form-field appearance="outline">
             <mat-label>Value</mat-label>
-            <input matInput [value]="newGlobalValue()" (input)="newGlobalValue.set($any($event.target).value)" placeholder="/usr/bin/...">
+            <input matInput [value]="newGlobalValue()" (input)="newGlobalValue.set($any($event.target).value)">
           </mat-form-field>
           <button mat-raised-button color="primary" (click)="addGlobalVar()" [disabled]="!newGlobalKey() || !newGlobalValue()">
             <mat-icon>add</mat-icon>

@@ -1,4 +1,4 @@
-import { Component, Inject } from '@angular/core';
+import { Component, Inject, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
@@ -7,9 +7,20 @@ import { MatInputModule } from '@angular/material/input';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatExpansionModule } from '@angular/material/expansion';
+import { MatTooltipModule } from '@angular/material/tooltip';
+import { Wails } from '../../core/services/wails';
+import { NotificationService } from '../../core/services/notification.service';
 
 export interface InstallPluginDialogData {
   repoURL?: string;
+}
+
+export interface InstallPluginResult {
+  repoURL: string;
+  commitHash: string;
+  sshKeyPath?: string;
+  passphrase?: string;
 }
 
 @Component({
@@ -23,15 +34,22 @@ export interface InstallPluginDialogData {
     MatInputModule,
     MatFormFieldModule,
     MatIconModule,
-    MatProgressSpinnerModule
+    MatProgressSpinnerModule,
+    MatExpansionModule,
+    MatTooltipModule
   ],
   templateUrl: './install-plugin-dialog.html',
   styleUrl: './install-plugin-dialog.scss'
 })
 export class InstallPluginDialog {
+  private wails = inject(Wails);
+  private notification = inject(NotificationService);
+
   form: FormGroup;
   installing = false;
   error = '';
+  showPassphrase = signal(false);
+  validatingKey = signal(false);
 
   urlPattern = /^(https?:\/\/|git@)[\w.-]+[:/][\w.-]+\/[\w.-]+(\.git)?$/;
 
@@ -42,7 +60,9 @@ export class InstallPluginDialog {
   ) {
     this.form = this.fb.group({
       repoURL: [data.repoURL || '', [Validators.required, Validators.pattern(this.urlPattern)]],
-      commitHash: ['']
+      commitHash: [''],
+      sshKeyPath: [''],
+      passphrase: ['']
     });
   }
 
@@ -57,12 +77,50 @@ export class InstallPluginDialog {
     return '';
   }
 
+  async browseSSHKey() {
+    try {
+      const path = await this.wails.openFile('Select SSH Private Key');
+      if (path) {
+        this.form.patchValue({ sshKeyPath: path });
+      }
+    } catch (err: any) {
+      this.notification.showError('Failed to select SSH key file');
+    }
+  }
+
+  async validateKey() {
+    const keyPath = this.form.value.sshKeyPath;
+    const passphrase = this.form.value.passphrase;
+
+    if (!keyPath) {
+      this.notification.showWarning('Please select an SSH key file first');
+      return;
+    }
+
+    this.validatingKey.set(true);
+    try {
+      await this.wails.validateSSHKey(keyPath, passphrase || '');
+      this.notification.showSuccess('SSH key is valid');
+    } catch (err: any) {
+      this.notification.showError(`Invalid SSH key: ${err}`);
+    } finally {
+      this.validatingKey.set(false);
+    }
+  }
+
+  togglePassphraseVisibility() {
+    this.showPassphrase.update(v => !v);
+  }
+
   install() {
     if (this.form.valid) {
-      this.dialogRef.close({
+      const result: InstallPluginResult = {
         repoURL: this.form.value.repoURL,
-        commitHash: this.form.value.commitHash
-      });
+        commitHash: this.form.value.commitHash,
+        sshKeyPath: this.form.value.sshKeyPath || undefined,
+        passphrase: this.form.value.passphrase || undefined
+      };
+      this.dialogRef.close(result);
     }
   }
 

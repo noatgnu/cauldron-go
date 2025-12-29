@@ -103,18 +103,25 @@ func (ph *ProtocolHandler) HandleURL(urlStr string) error {
 func (ph *ProtocolHandler) handleInstall(parsedURL *url.URL) error {
 	query := parsedURL.Query()
 	repoURL := query.Get("repo")
+	ref := query.Get("ref")
+	registryURL := query.Get("registry")
 
 	if repoURL == "" {
 		return fmt.Errorf("missing 'repo' parameter")
 	}
 
-	log.Printf("[ProtocolHandler] Install request for: %s", repoURL)
+	if registryURL != "" {
+		log.Printf("[ProtocolHandler] Install request for: %s (ref: %s, registry: %s)", repoURL, ref, registryURL)
+	} else {
+		log.Printf("[ProtocolHandler] Install request for: %s (ref: %s)", repoURL, ref)
+	}
 
 	isInstalled, err := ph.pluginInstaller.IsPluginInstalled(repoURL)
 	if err != nil {
 		log.Printf("[ProtocolHandler] Failed to check if plugin is installed: %v", err)
 		runtime.EventsEmit(ph.ctx, "plugin:install:error", map[string]interface{}{
 			"repo":  repoURL,
+			"ref":   ref,
 			"error": err.Error(),
 		})
 		return fmt.Errorf("failed to check if plugin is installed: %w", err)
@@ -123,6 +130,7 @@ func (ph *ProtocolHandler) handleInstall(parsedURL *url.URL) error {
 	if isInstalled {
 		runtime.EventsEmit(ph.ctx, "plugin:install:error", map[string]interface{}{
 			"repo":  repoURL,
+			"ref":   ref,
 			"error": "Plugin from this repository is already installed",
 		})
 		return fmt.Errorf("plugin from this repository is already installed")
@@ -133,21 +141,27 @@ func (ph *ProtocolHandler) handleInstall(parsedURL *url.URL) error {
 		log.Printf("[ProtocolHandler] Failed to fetch plugin info: %v", err)
 		runtime.EventsEmit(ph.ctx, "plugin:install:error", map[string]interface{}{
 			"repo":  repoURL,
+			"ref":   ref,
 			"error": fmt.Sprintf("Failed to fetch plugin information: %v", err),
 		})
 		return fmt.Errorf("failed to fetch plugin information: %w", err)
 	}
 
 	log.Printf("[ProtocolHandler] Requesting user confirmation for plugin: %s", pluginInfo.Plugin.Name)
-	runtime.EventsEmit(ph.ctx, "plugin:install:request", map[string]interface{}{
+	eventData := map[string]interface{}{
 		"repo":        repoURL,
+		"ref":         ref,
 		"name":        pluginInfo.Plugin.Name,
 		"id":          pluginInfo.Plugin.ID,
 		"version":     pluginInfo.Plugin.Version,
 		"author":      pluginInfo.Plugin.Author,
 		"description": pluginInfo.Plugin.Description,
 		"category":    pluginInfo.Plugin.Category,
-	})
+	}
+	if registryURL != "" {
+		eventData["registry"] = registryURL
+	}
+	runtime.EventsEmit(ph.ctx, "plugin:install:request", eventData)
 
 	return nil
 }

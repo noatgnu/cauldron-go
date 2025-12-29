@@ -28,10 +28,10 @@
       </mat-card-header>
 
       <app-environment-indicator
-        [python]="getRuntimeIcon(plugin()!.definition.runtime.type).python"
-        [r]="getRuntimeIcon(plugin()!.definition.runtime.type).r"
-        [pythonWithR]="getRuntimeIcon(plugin()!.definition.runtime.type).pythonWithR"
-        [direct]="getRuntimeIcon(plugin()!.definition.runtime.type).direct"
+        [python]="getRuntimeIndicator(plugin()!).python"
+        [r]="getRuntimeIndicator(plugin()!).r"
+        [pythonWithR]="getRuntimeIndicator(plugin()!).pythonWithR"
+        [direct]="getRuntimeIndicator(plugin()!).direct"
         [pythonBound]="pythonBound()"
         [rBound]="rBound()">
       </app-environment-indicator>
@@ -93,7 +93,7 @@
           </div>
           <div class="info-item">
             <strong>Runtime:</strong>
-            <span>{{ plugin()!.definition.runtime.type }}</span>
+            <span>{{ getRuntimeLabel(plugin()!) }}</span>
           </div>
           <div class="info-item">
             <strong>Inputs:</strong>
@@ -108,13 +108,13 @@
             <span>{{ plugin()!.installSource | titlecase }}</span>
           </div>
           @if (plugin()!.installSource === 'remote' && plugin()!.commitHash) {
-            <div class="info-item">
+            <div class="info-item full-width">
               <strong>Commit Hash:</strong>
               <span class="commit-hash">{{ plugin()!.commitHash }}</span>
             </div>
           }
           @if (plugin()!.repository) {
-            <div class="info-item">
+            <div class="info-item full-width">
               <strong>Repository:</strong>
               <span class="repo-text">{{ plugin()!.repository }}</span>
             </div>

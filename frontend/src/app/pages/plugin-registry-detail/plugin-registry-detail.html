@@ -1,0 +1,89 @@
+<div class="detail-container">
+  @if (loading()) {
+    <div class="loading-container">
+      <mat-spinner diameter="48"></mat-spinner>
+      <p>Loading plugin details...</p>
+    </div>
+  }
+
+  @if (!loading() && plugin()) {
+    <div class="header-bar">
+      <button mat-icon-button (click)="goBack()">
+        <mat-icon>arrow_back</mat-icon>
+      </button>
+      <h1>{{ plugin()!.name }}</h1>
+      <button
+        mat-raised-button
+        color="primary"
+        (click)="installPlugin()"
+        [disabled]="isInstalled()">
+        <mat-icon>{{ isInstalled() ? 'check_circle' : 'download' }}</mat-icon>
+        {{ isInstalled() ? 'Installed' : 'Install Plugin' }}
+      </button>
+    </div>
+
+    <p class="description">{{ plugin()!.description }}</p>
+
+    <div class="metadata-grid">
+      <div class="metadata-item">
+        <span class="metadata-label">Category</span>
+        <span class="metadata-value">{{ plugin()!.category?.name || 'N/A' }}</span>
+      </div>
+      <div class="metadata-item">
+        <span class="metadata-label">Author</span>
+        <span class="metadata-value">{{ plugin()!.author?.name || 'N/A' }}</span>
+      </div>
+      <div class="metadata-item">
+        <span class="metadata-label">Repository</span>
+        <span class="metadata-value">{{ plugin()!.repository || 'N/A' }}</span>
+      </div>
+      <div class="metadata-item">
+        <span class="metadata-label">Version</span>
+        <span class="metadata-value">{{ plugin()!.version || 'N/A' }}</span>
+      </div>
+    </div>
+
+    <mat-tab-group>
+      <mat-tab label="README">
+        <div class="section">
+          <div class="readme-content" [innerHTML]="readmeHtml()"></div>
+        </div>
+      </mat-tab>
+
+      <mat-tab [label]="'Inputs (' + (plugin()!.inputs?.length || 0) + ')'">
+        <div class="section">
+          @for (input of plugin()!.inputs || []; track input.name) {
+            <div class="item">
+              <strong>{{ input.name }}</strong>
+              <span class="type-badge">{{ input.type }}</span>
+              <p class="item-description">{{ input.description }}</p>
+            </div>
+          }
+        </div>
+      </mat-tab>
+
+      <mat-tab [label]="'Outputs (' + (plugin()!.outputs?.length || 0) + ')'">
+        <div class="section">
+          @for (output of plugin()!.outputs || []; track output.name) {
+            <div class="item">
+              <strong>{{ output.name }}</strong>
+              <span class="type-badge">{{ output.type }}</span>
+              <p class="item-description">{{ output.description }}</p>
+            </div>
+          }
+        </div>
+      </mat-tab>
+
+      <mat-tab [label]="'Environment (' + (plugin()!.env_variables?.length || 0) + ')'">
+        <div class="section">
+          @for (env of plugin()!.env_variables || []; track env.name) {
+            <div class="item">
+              <strong>{{ env.name }}</strong>
+              <p class="item-description">{{ env.description }}</p>
+            </div>
+          }
+        </div>
+      </mat-tab>
+    </mat-tab-group>
+  }
+</div>

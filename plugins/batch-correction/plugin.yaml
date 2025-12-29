@@ -8,7 +8,7 @@ plugin:
   icon: "sync_alt"
 
 runtime:
-  type: "r"
+  environments: ["r"]
   script: "batch_correction.R"
 
 inputs:

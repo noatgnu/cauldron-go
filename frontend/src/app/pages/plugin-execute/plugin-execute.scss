@@ -23,6 +23,8 @@
 }
 
 .plugin-card {
+  border: 1px solid var(--border);
+
   mat-card-header {
     mat-icon[mat-card-avatar] {
       font-size: 40px;
@@ -34,6 +36,7 @@
       display: flex;
       align-items: center;
       gap: 8px;
+      color: var(--on-surface);
 
       .binding-indicator {
         font-size: 20px;
@@ -41,6 +44,10 @@
         height: 20px;
         opacity: 0.8;
       }
+    }
+
+    mat-card-subtitle {
+      color: var(--on-surface-variant);
     }
   }
 
@@ -71,12 +78,12 @@
 
   .output-item {
     padding: 12px;
-    border: 1px solid rgba(0, 0, 0, 0.12);
+    border: 1px solid var(--border);
     border-radius: 4px;
-    background-color: #fafafa;
+    background-color: var(--surface-container);
 
     &:hover {
-      background-color: #f5f5f5;
+      background-color: var(--hover);
     }
 
     .output-header {
@@ -92,11 +99,11 @@
         flex-shrink: 0;
 
         &.data-icon {
-          color: #1976d2;
+          color: var(--primary);
         }
 
         &.plot-icon {
-          color: #388e3c;
+          color: var(--success);
         }
       }
 
@@ -109,7 +116,7 @@
 
         strong {
           font-size: 13px;
-          color: rgba(0, 0, 0, 0.87);
+          color: var(--on-surface);
         }
 
         .output-type-badge {
@@ -119,13 +126,13 @@
           font-weight: 500;
 
           &.data-badge {
-            background-color: #e3f2fd;
-            color: #1976d2;
+            background-color: var(--primary-container);
+            color: var(--primary);
           }
 
           &.plot-badge {
-            background-color: #e8f5e9;
-            color: #388e3c;
+            background-color: var(--success-container);
+            color: var(--success);
           }
         }
       }
@@ -133,7 +140,7 @@
 
     .output-description {
       font-size: 12px;
-      color: rgba(0, 0, 0, 0.6);
+      color: var(--on-surface-variant);
       line-height: 1.5;
       margin-left: 36px;
     }
@@ -141,6 +148,9 @@
 }
 
 .info-card {
+  margin-top: 1.5rem;
+  border: 1px solid var(--border);
+
   .info-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -151,13 +161,28 @@
       flex-direction: column;
       gap: 0.25rem;
 
+      &.full-width {
+        grid-column: 1 / -1;
+      }
+
       strong {
         font-size: 0.85rem;
-        color: rgba(0, 0, 0, 0.6);
+        color: var(--on-surface-variant);
       }
 
       span {
         font-size: 1rem;
+        word-break: break-all;
+        color: var(--on-surface);
+
+        &.commit-hash, &.repo-text {
+          font-family: 'Courier New', monospace;
+          background-color: var(--surface-variant);
+          padding: 0.25rem 0.5rem;
+          border-radius: 4px;
+          border: 1px solid var(--border);
+          margin-top: 0.25rem;
+        }
       }
     }
   }

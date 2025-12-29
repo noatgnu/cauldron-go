@@ -9,9 +9,9 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatExpansionModule } from '@angular/material/expansion';
-import { MatSnackBar } from '@angular/material/snack-bar';
 import { ImportedFileSelection } from '../../../components/imported-file-selection/imported-file-selection';
 import { Wails } from '../../../core/services/wails';
+import { NotificationService } from '../../../core/services/notification.service';
 import { PlotlyExport } from '../../../core/services/plotly-export';
 import * as Plotly from 'plotly.js-dist-min';
 
@@ -64,7 +64,7 @@ export class ViolinPlot implements OnInit {
     private fb: FormBuilder,
     private wails: Wails,
     private plotlyExport: PlotlyExport,
-    private snackBar: MatSnackBar
+    private notification: NotificationService
   ) {
     this.form = this.fb.group({
       filePath: ['', Validators.required],
@@ -156,12 +156,7 @@ export class ViolinPlot implements OnInit {
       const fullData = await this.wails.parseDataFile(filePath, 0);
 
       if (!fullData || !fullData.rows) {
-        this.snackBar.open('Failed to load data', 'Close', {
-          duration: 5000,
-          horizontalPosition: 'center',
-          verticalPosition: 'top',
-          panelClass: ['error-snackbar']
-        });
+        this.notification.showError('Failed to load data');
         return;
       }
 
@@ -257,12 +252,7 @@ export class ViolinPlot implements OnInit {
       }
     } catch (error) {
       console.error('Failed to generate plot:', error);
-      this.snackBar.open('Failed to generate plot. Please check your data.', 'Close', {
-        duration: 5000,
-        horizontalPosition: 'center',
-        verticalPosition: 'top',
-        panelClass: ['error-snackbar']
-      });
+      this.notification.showError('Failed to generate plot. Please check your data.');
     }
   }
 
@@ -313,12 +303,7 @@ export class ViolinPlot implements OnInit {
         this.selectedColumns.set(selected);
       }
     } catch (error) {
-      this.snackBar.open('Failed to load example data. Please ensure example files are available.', 'Close', {
-        duration: 5000,
-        horizontalPosition: 'center',
-        verticalPosition: 'top',
-        panelClass: ['error-snackbar']
-      });
+      this.notification.showError('Failed to load example data. Please ensure example files are available.');
     }
   }
 
@@ -330,12 +315,7 @@ export class ViolinPlot implements OnInit {
         height: 800
       });
     } catch (error) {
-      this.snackBar.open('Failed to export plot to SVG. Please try again.', 'Close', {
-        duration: 5000,
-        horizontalPosition: 'center',
-        verticalPosition: 'top',
-        panelClass: ['error-snackbar']
-      });
+      this.notification.showError('Failed to export plot to SVG. Please try again.');
     }
   }
 }

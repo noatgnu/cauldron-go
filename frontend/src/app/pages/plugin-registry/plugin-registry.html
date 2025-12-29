@@ -18,7 +18,7 @@
   <div class="search-filters">
     <mat-form-field appearance="outline" class="search-field">
       <mat-label>Search plugins</mat-label>
-      <input matInput [(ngModel)]="searchQuery" (keyup.enter)="onSearch()" placeholder="Search by name or description">
+      <input matInput [(ngModel)]="searchQuery" (keyup.enter)="onSearch()">
       <mat-icon matPrefix>search</mat-icon>
       <button mat-icon-button matSuffix (click)="onSearch()" [disabled]="loading()">
         <mat-icon>arrow_forward</mat-icon>
@@ -49,71 +49,106 @@
       <p>No plugins match your search criteria. Try adjusting your filters or check your registry URL in settings.</p>
     </div>
   } @else {
-    <div class="plugins-grid">
-      @for (plugin of plugins(); track plugin.id) {
-        <mat-card class="plugin-card">
-          <mat-card-header>
-            <div mat-card-avatar class="plugin-icon">
+    <div class="table-container">
+      <table mat-table [dataSource]="plugins()" class="plugins-table">
+
+        <ng-container matColumnDef="name">
+          <th mat-header-cell *matHeaderCellDef>Plugin Name</th>
+          <td mat-cell *matCellDef="let plugin">
+            <div class="name-cell">
               @if (plugin.icon) {
-                <img [src]="plugin.icon" [alt]="plugin.name">
+                <img [src]="plugin.icon" [alt]="plugin.name" class="plugin-icon-small">
               } @else {
-                <mat-icon>extension</mat-icon>
+                <mat-icon class="plugin-icon-small">extension</mat-icon>
+              }
+              <span class="plugin-name">{{ plugin.name }}</span>
+              @if (plugin.requires_authentication) {
+                <mat-icon class="auth-icon" matTooltip="Requires SSH Authentication">lock</mat-icon>
               }
             </div>
-            <mat-card-title>{{ plugin.name }}</mat-card-title>
-            <mat-card-subtitle>
-              <span class="author">by {{ plugin.author.name }}</span>
-              <span class="version">v{{ plugin.version }}</span>
-            </mat-card-subtitle>
-          </mat-card-header>
+          </td>
+        </ng-container>
 
-          <mat-card-content>
-            <p class="description">{{ plugin.description }}</p>
+        <ng-container matColumnDef="version">
+          <th mat-header-cell *matHeaderCellDef>Version</th>
+          <td mat-cell *matCellDef="let plugin">
+            <code class="version-badge">{{ plugin.version || '1.0.0' }}</code>
+          </td>
+        </ng-container>
 
-            <div class="metadata">
-              <mat-chip class="category-chip">
-                <mat-icon>folder</mat-icon>
-                {{ plugin.category.name }}
-              </mat-chip>
+        <ng-container matColumnDef="category">
+          <th mat-header-cell *matHeaderCellDef>Category</th>
+          <td mat-cell *matCellDef="let plugin">
+            <mat-chip class="category-chip-small">
+              {{ getCategoryName(plugin) }}
+            </mat-chip>
+          </td>
+        </ng-container>
 
-              @if (plugin.tags && plugin.tags.length > 0) {
-                <div class="tags">
-                  @for (tag of plugin.tags; track tag.id) {
-                    <mat-chip class="tag-chip">{{ tag.name }}</mat-chip>
-                  }
-                </div>
-              }
-            </div>
+        <ng-container matColumnDef="author">
+          <th mat-header-cell *matHeaderCellDef>Author</th>
+          <td mat-cell *matCellDef="let plugin">
+            {{ getAuthorName(plugin) }}
+          </td>
+        </ng-container>
 
-            <div class="dates">
-              <small>
-                <mat-icon>access_time</mat-icon>
-                Updated {{ formatDate(plugin.updated_at) }}
-              </small>
-            </div>
-          </mat-card-content>
+        <ng-container matColumnDef="updated">
+          <th mat-header-cell *matHeaderCellDef>Updated</th>
+          <td mat-cell *matCellDef="let plugin" class="date-cell">
+            <mat-icon class="date-icon">access_time</mat-icon>
+            {{ formatDate(plugin.updated_at) }}
+          </td>
+        </ng-container>
 
-          <mat-card-actions>
-            <button mat-raised-button color="primary" (click)="installPlugin(plugin)" [disabled]="!plugin.repository">
+        <ng-container matColumnDef="actions">
+          <th mat-header-cell *matHeaderCellDef>Actions</th>
+          <td mat-cell *matCellDef="let plugin" class="actions-cell">
+            <button
+              mat-icon-button
+              (click)="viewDetails(plugin)"
+              matTooltip="View Details">
+              <mat-icon>info</mat-icon>
+            </button>
+            <button
+              mat-icon-button
+              color="primary"
+              (click)="installPlugin(plugin)"
+              [disabled]="!plugin.repository || isPluginInstalled(plugin)"
+              [matTooltip]="isPluginInstalled(plugin) ? 'Already Installed' : 'Install Plugin'">
               <mat-icon>download</mat-icon>
-              Install
             </button>
             @if (plugin.repository) {
-              <a mat-button [href]="plugin.repository" target="_blank" rel="noopener noreferrer">
+              <a
+                mat-icon-button
+                [href]="plugin.repository"
+                target="_blank"
+                rel="noopener noreferrer"
+                matTooltip="View Repository">
                 <mat-icon>open_in_new</mat-icon>
-                Repository
               </a>
             }
-          </mat-card-actions>
-        </mat-card>
-      }
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="description">
+          <td mat-cell *matCellDef="let plugin" [attr.colspan]="displayedColumns.length" class="description-row">
+            <div class="description-content">
+              {{ plugin.description || 'No description available' }}
+            </div>
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="plugin-row"></tr>
+        <tr mat-row *matRowDef="let row; columns: ['description'];" class="description-row-container"></tr>
+      </table>
     </div>
 
     <mat-paginator
       [length]="totalCount()"
       [pageSize]="pageSize"
       [pageIndex]="pageIndex"
-      [pageSizeOptions]="[5, 10, 20, 50]"
+      [pageSizeOptions]="[5, 10, 20]"
       (page)="onPageChange($event)"
       showFirstLastButtons
       class="registry-paginator">

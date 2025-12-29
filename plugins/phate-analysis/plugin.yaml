@@ -8,7 +8,7 @@ plugin:
   icon: "timeline"
 
 runtime:
-  type: "python"
+  environments: ["python"]
   script: "phate_analysis.py"
 
 inputs:

@@ -1,12 +1,12 @@
 .toolbar {
   height: 48px;
   font-size: 14px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 4px var(--border);
   z-index: 100;
 
   button {
     mat-icon {
-      color: white;
+      color: var(--on-primary);
     }
   }
 }
@@ -15,7 +15,7 @@
   font-size: 16px;
   font-weight: 500;
   margin-left: 8px;
-  color: white;
+  color: var(--on-primary);
 }
 
 .toolbar-spacer {

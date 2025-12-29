@@ -5,11 +5,11 @@ import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatTabsModule } from '@angular/material/tabs';
 import { DynamicFormComponent } from '../../components/dynamic-form/dynamic-form';
 import { PluginV2Service } from '../../core/services/plugin-v2';
+import { NotificationService } from '../../core/services/notification.service';
 import { models } from '../../../wailsjs/go/models';
 import { EnvironmentIndicator } from '../../components/environment-indicator/environment-indicator';
 import { Wails } from '../../core/services/wails';
@@ -22,7 +22,6 @@ import { Wails } from '../../core/services/wails';
     MatButtonModule,
     MatIconModule,
     MatProgressSpinnerModule,
-    MatSnackBarModule,
     MatTooltipModule,
     MatTabsModule,
     DynamicFormComponent,
@@ -48,7 +47,7 @@ export class PluginExecute implements OnInit {
     private route: ActivatedRoute,
     private router: Router,
     private pluginService: PluginV2Service,
-    private snackBar: MatSnackBar,
+    private notification: NotificationService,
     private wails: Wails
   ) {}
 
@@ -132,18 +131,9 @@ export class PluginExecute implements OnInit {
       const jobId = await this.pluginService.executePlugin(plugin.id, parameters);
       this.createdJobId.set(jobId);
 
-      this.snackBar.open('Job created successfully!', 'Close', {
-        duration: 3000,
-        horizontalPosition: 'end',
-        verticalPosition: 'top'
-      });
+      this.notification.showSuccess('Job created successfully!');
     } catch (err) {
-      this.snackBar.open(`Failed to execute plugin: ${err}`, 'Close', {
-        duration: 5000,
-        horizontalPosition: 'end',
-        verticalPosition: 'top',
-        panelClass: ['error-snackbar']
-      });
+      this.notification.showError(`Failed to execute plugin: ${err}`);
     } finally {
       this.executing.set(false);
     }
@@ -172,5 +162,29 @@ export class PluginExecute implements OnInit {
       pythonWithR: runtime === 'pythonWithR',
       direct: runtime === 'direct'
     };
+  }
+
+  getRuntimeIndicator(plugin: models.PluginV2): { python: boolean; r: boolean; pythonWithR: boolean; direct: boolean } {
+    const envs = this.getPluginEnvironments(plugin);
+    const hasPython = envs.includes('python');
+    const hasR = envs.includes('r');
+    return {
+      python: hasPython && !hasR,
+      r: hasR && !hasPython,
+      pythonWithR: hasPython && hasR,
+      direct: envs.includes('direct')
+    };
+  }
+
+  private getPluginEnvironments(plugin: models.PluginV2): string[] {
+    return plugin.definition.runtime.environments || [];
+  }
+
+  getRuntimeLabel(plugin: models.PluginV2): string {
+    const envs = this.getPluginEnvironments(plugin);
+    if (envs.length === 0) {
+      return 'Direct';
+    }
+    return envs.map(e => e.charAt(0).toUpperCase() + e.slice(1)).join(' + ');
   }
 }

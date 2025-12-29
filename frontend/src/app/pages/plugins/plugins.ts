@@ -16,7 +16,7 @@ import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { Wails, PluginEnvironmentBinding } from '../../core/services/wails';
 import { Plugin, PluginInput, PluginExecutionRequest } from '../../core/models/plugin';
 import { EnvironmentIndicator } from '../../components/environment-indicator/environment-indicator';
-import { InstallPluginDialog } from '../../components/install-plugin-dialog/install-plugin-dialog';
+import { InstallPluginDialog, InstallPluginResult } from '../../components/install-plugin-dialog/install-plugin-dialog';
 import { PluginInstallProgress } from '../../components/plugin-install-progress/plugin-install-progress';
 
 @Component({
@@ -246,12 +246,14 @@ export class Plugins implements OnInit {
       disableClose: true
     });
 
-    dialogRef.afterClosed().subscribe((result: { repoURL: string, commitHash?: string }) => {
+    dialogRef.afterClosed().subscribe((result: InstallPluginResult) => {
       if (result && result.repoURL) {
         const progressRef = this.dialog.open(PluginInstallProgress, {
           data: {
             repoURL: result.repoURL,
-            commitHash: result.commitHash
+            commitHash: result.commitHash,
+            sshKeyPath: result.sshKeyPath,
+            passphrase: result.passphrase
           },
           disableClose: true,
           width: '500px'

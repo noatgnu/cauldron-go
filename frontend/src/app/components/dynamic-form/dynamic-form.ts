@@ -15,6 +15,7 @@ import { Wails } from '../../core/services/wails';
 import { NotificationService } from '../../core/services/notification.service';
 import { SampleAnnotation } from '../sample-annotation/sample-annotation';
 import { GenericTableEditor, TableColumn } from '../generic-table-editor/generic-table-editor';
+import { ImportedFileSelectionDialog } from '../imported-file-selection/imported-file-selection-dialog';
 import { Subscription } from 'rxjs';
 
 @Component({
@@ -149,6 +150,37 @@ export class DynamicFormComponent implements OnInit, OnChanges, OnDestroy {
       if (input) {
         await this.loadColumnsForDependents(inputName, filePath);
       }
+    }
+  }
+
+  async openImportedFileSelector(inputName: string) {
+    const dialogRef = this.dialog.open(ImportedFileSelectionDialog, {
+      width: '600px',
+      disableClose: false
+    });
+
+    dialogRef.afterClosed().subscribe(async (result) => {
+      if (result && result.filePath) {
+        this.form.patchValue({ [inputName]: result.filePath });
+
+        const input = this.plugin.definition.inputs.find(i => i.name === inputName);
+        if (input && result.columns) {
+          await this.loadColumnsForDependentsWithHeaders(inputName, result.filePath, result.columns);
+        } else if (input) {
+          await this.loadColumnsForDependents(inputName, result.filePath);
+        }
+      }
+    });
+  }
+
+  private async loadColumnsForDependentsWithHeaders(sourceInputName: string, filePath: string, headers: string[]) {
+    const dependentInputs = this.plugin.definition.inputs.filter(
+      i => i.sourceFile === sourceInputName
+    );
+
+    for (const input of dependentInputs) {
+      await this.wails.logToFile(`[DynamicForm] Setting columns for ${input.name} from imported file headers`);
+      this.columnOptions.set(input.name, headers);
     }
   }
 

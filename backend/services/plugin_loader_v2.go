@@ -152,22 +152,26 @@ func (l *PluginLoaderV2) validateDefinition(def *models.PluginDefinition) error 
 		return fmt.Errorf("plugin name is required")
 	}
 
-	if def.Runtime.Type == "" {
-		return fmt.Errorf("runtime type is required")
+	if def.Runtime.Environments == nil || len(def.Runtime.Environments) == 0 {
+		return fmt.Errorf("runtime environments is required")
 	}
 
 	if def.Runtime.Script == "" {
 		return fmt.Errorf("runtime script is required")
 	}
 
-	validRuntimes := map[string]bool{
-		"python":      true,
-		"r":           true,
-		"pythonWithR": true,
-		"direct":      true,
+	validEnvironments := map[string]bool{
+		"python": true,
+		"r":      true,
+		"direct": true,
+		"julia":  true,
+		"node":   true,
 	}
-	if !validRuntimes[def.Runtime.Type] {
-		return fmt.Errorf("invalid runtime type: %s", def.Runtime.Type)
+
+	for _, env := range def.Runtime.Environments {
+		if !validEnvironments[env] {
+			return fmt.Errorf("invalid runtime environment: %s", env)
+		}
 	}
 
 	inputNames := make(map[string]bool)
@@ -280,6 +284,15 @@ func (l *PluginLoaderV2) ReloadPlugins() error {
 
 func (l *PluginLoaderV2) GetPluginsDirectory() string {
 	return l.pluginsDir
+}
+
+func (l *PluginLoaderV2) GetPluginByStringID(pluginID string) (*models.PluginV2, error) {
+	for _, plugin := range l.plugins {
+		if plugin.Definition.Plugin.ID == pluginID {
+			return plugin, nil
+		}
+	}
+	return nil, fmt.Errorf("plugin not found with ID: %s", pluginID)
 }
 
 func (l *PluginLoaderV2) loadRequirementsFromFiles(pluginDir string, def *models.PluginDefinition) error {

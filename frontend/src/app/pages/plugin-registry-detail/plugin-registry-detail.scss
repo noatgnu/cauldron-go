@@ -1,0 +1,327 @@
+.detail-container {
+  padding: 24px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  overflow-y: auto;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.header-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+
+  h1 {
+    margin: 0;
+    font-weight: 600;
+    font-size: 24px;
+    color: var(--on-surface);
+    flex: 1;
+  }
+}
+
+.description {
+  margin: 0;
+  color: var(--on-surface-variant);
+  font-size: 14px;
+  line-height: 1.6;
+  padding: 12px 0;
+}
+
+.metadata-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+  background: var(--surface);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  padding: 16px 20px;
+  margin-bottom: 16px;
+
+  .metadata-item {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+
+    .metadata-label {
+      font-size: 11px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--on-surface-variant);
+    }
+
+    .metadata-value {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--on-surface);
+      word-break: break-all;
+    }
+  }
+}
+
+mat-tab-group {
+  flex: 1;
+  margin-top: 16px;
+}
+
+.section {
+  padding: 24px;
+
+  .item {
+    margin: 12px 0;
+    padding: 16px 20px;
+    background: var(--surface-variant);
+    border-radius: 8px;
+    border-left: 3px solid var(--primary);
+    font-size: 14px;
+    line-height: 1.6;
+    transition: all 0.2s ease;
+
+    &:hover {
+      background: var(--surface-container-high);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      transform: translateX(2px);
+    }
+
+    strong {
+      color: var(--primary);
+      font-weight: 600;
+      font-size: 16px;
+      display: inline-block;
+      margin-right: 12px;
+    }
+
+    .type-badge {
+      display: inline-block;
+      background: var(--primary-container);
+      color: var(--on-primary-container);
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .item-description {
+      margin: 10px 0 0 0;
+      color: var(--on-surface-variant);
+      line-height: 1.6;
+      font-size: 14px;
+    }
+  }
+}
+
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 64px;
+  gap: 16px;
+
+  p {
+    margin: 0;
+    color: var(--on-surface-variant);
+  }
+}
+
+.readme-content {
+  background: var(--surface);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  padding: 32px;
+  line-height: 1.8;
+  color: var(--on-surface);
+  font-size: 14px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+
+  ::ng-deep {
+    h1 {
+      font-size: 32px;
+      font-weight: 700;
+      margin: 32px 0 16px 0;
+      color: var(--on-surface);
+      padding-bottom: 12px;
+      border-bottom: 2px solid var(--primary);
+
+      &:first-child {
+        margin-top: 0;
+      }
+    }
+
+    h2 {
+      font-size: 24px;
+      font-weight: 700;
+      margin: 28px 0 14px 0;
+      color: var(--on-surface);
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+
+      &:first-child {
+        margin-top: 0;
+      }
+    }
+
+    h3 {
+      font-size: 20px;
+      font-weight: 600;
+      margin: 24px 0 12px 0;
+      color: var(--on-surface);
+
+      &:first-child {
+        margin-top: 0;
+      }
+    }
+
+    h4 {
+      font-size: 17px;
+      font-weight: 600;
+      margin: 20px 0 10px 0;
+      color: var(--primary);
+
+      &:first-child {
+        margin-top: 0;
+      }
+    }
+
+    p {
+      margin: 0 0 16px 0;
+      color: var(--on-surface-variant);
+      line-height: 1.8;
+    }
+
+    strong {
+      color: var(--on-surface);
+      font-weight: 700;
+    }
+
+    em {
+      color: var(--on-surface-variant);
+      font-style: italic;
+    }
+
+    code {
+      background: var(--surface-variant);
+      color: var(--primary);
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+      font-size: 13px;
+      border: 1px solid var(--border);
+    }
+
+    pre {
+      background: var(--surface-variant);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      margin: 16px 0;
+      overflow-x: auto;
+      font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+      font-size: 13px;
+      line-height: 1.6;
+
+      code {
+        background: transparent;
+        border: none;
+        padding: 0;
+        color: var(--on-surface);
+      }
+    }
+
+    ul, ol {
+      margin: 12px 0;
+      padding-left: 28px;
+      color: var(--on-surface-variant);
+
+      li {
+        margin: 6px 0;
+        line-height: 1.6;
+      }
+    }
+
+    ul {
+      list-style-type: disc;
+    }
+
+    ol {
+      list-style-type: decimal;
+    }
+
+    a {
+      color: var(--primary);
+      text-decoration: none;
+      border-bottom: 1px solid transparent;
+      transition: border-bottom-color 0.2s ease;
+
+      &:hover {
+        border-bottom-color: var(--primary);
+      }
+    }
+
+    .markdown-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 20px 0;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+
+      thead {
+        background: var(--surface-variant);
+
+        tr {
+          th {
+            padding: 12px 16px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 13px;
+            color: var(--on-surface);
+            border-bottom: 2px solid var(--border);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+          }
+        }
+      }
+
+      tbody {
+        tr {
+          border-bottom: 1px solid var(--border);
+          transition: background-color 0.2s ease;
+
+          &:hover {
+            background: var(--hover);
+          }
+
+          &:last-child {
+            border-bottom: none;
+          }
+
+          td {
+            padding: 12px 16px;
+            color: var(--on-surface-variant);
+            font-size: 14px;
+            vertical-align: top;
+
+            code {
+              font-size: 12px;
+            }
+          }
+        }
+      }
+    }
+
+    br {
+      line-height: 2;
+    }
+  }
+}

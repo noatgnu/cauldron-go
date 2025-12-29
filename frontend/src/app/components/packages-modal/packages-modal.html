@@ -12,7 +12,7 @@
   } @else {
     <mat-form-field appearance="outline" class="search-field">
       <mat-label>Search packages</mat-label>
-      <input matInput [(ngModel)]="searchQuery" placeholder="Search...">
+      <input matInput [(ngModel)]="searchQuery">
       <mat-icon matPrefix>search</mat-icon>
       @if (searchQuery()) {
         <button matSuffix mat-icon-button (click)="clearSearch()">

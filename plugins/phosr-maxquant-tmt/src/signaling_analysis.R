@@ -199,3 +199,43 @@ generate_network_plot <- function(all_network_results, output_folder, top_n = 50
     message("  - Warning: Network plotting failed: ", e$message)
   })
 }
+
+generate_phosr_signalome_network_single <- function(kssMat, ks_pred, se_ptm, comparison_name, top_kinases = 5) {
+  message("    - Generating PhosR signalome for ", comparison_name)
+
+  if (is.null(kssMat) || is.null(ks_pred) || is.null(se_ptm)) {
+    message("    - Missing data for signalome construction (need kinase scores, predictions, and phospho data)")
+    return(NULL)
+  }
+
+  tryCatch({
+    if (is.null(kssMat$combinedScoreMatrix)) {
+      message("    - No kinase score matrix available")
+      return(NULL)
+    }
+
+    kinase_scores_sums <- sort(apply(kssMat$combinedScoreMatrix, 2, function(x) sum(x, na.rm = TRUE)), decreasing = TRUE)
+    kinase_OI <- head(names(kinase_scores_sums), min(top_kinases, length(kinase_scores_sums)))
+
+    if (length(kinase_OI) == 0) {
+      message("    - No kinases available for signalome construction")
+      return(NULL)
+    }
+
+    message("    - Constructing signalome for top ", length(kinase_OI), " kinases")
+
+    if (!is(se_ptm, "SummarizedExperiment")) {
+      message("    - ERROR: se_ptm is not a SummarizedExperiment object")
+      return(NULL)
+    }
+
+    exprsMat <- SummarizedExperiment::assay(se_ptm, "log2intensity")
+
+    message("    - PhosR Signalomes function is unreliable - skipping signalome-based visualization")
+    message("    - The kinase activities and kinase-substrate networks are available in the data outputs")
+    return(NULL)
+  }, error = function(e) {
+    message("    - Warning: Signalome generation failed for ", comparison_name, ": ", e$message)
+    return(NULL)
+  })
+}

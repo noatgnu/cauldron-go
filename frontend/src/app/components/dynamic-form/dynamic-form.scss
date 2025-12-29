@@ -50,7 +50,7 @@
   .hint {
     margin: 0;
     font-size: 0.85rem;
-    color: rgba(0, 0, 0, 0.6);
+    color: var(--on-surface-variant);
   }
 }
 
@@ -58,7 +58,7 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  color: rgba(0, 0, 0, 0.6);
+  color: var(--on-surface-variant);
   font-size: 0.9rem;
   margin: 0.5rem 0;
 
@@ -79,7 +79,7 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(255, 255, 255, 0.7);
+    background: var(--overlay);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -92,10 +92,10 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.5rem;
-  background: rgba(63, 81, 181, 0.1);
+  background: var(--primary-container);
   border-radius: 4px;
   margin: 0.5rem 0;
-  color: #3f51b5;
+  color: var(--primary);
   font-size: 0.9rem;
 
   mat-spinner {
@@ -110,15 +110,15 @@
   font-size: 0.9rem;
 
   &.has-errors {
-    background: rgba(244, 67, 54, 0.1);
-    border: 1px solid rgba(244, 67, 54, 0.3);
-    color: #c62828;
+    background: var(--error-subtle);
+    border: 1px solid var(--error);
+    color: var(--error-dark);
   }
 
   &.is-valid {
-    background: rgba(76, 175, 80, 0.1);
-    border: 1px solid rgba(76, 175, 80, 0.3);
-    color: #2e7d32;
+    background: var(--success-container);
+    border: 1px solid var(--success);
+    color: var(--success-dark);
   }
 
   ul {

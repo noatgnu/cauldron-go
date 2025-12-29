@@ -1,8 +1,8 @@
 import {Component} from '@angular/core';
 import {FormBuilder, FormControl, FormGroup, ReactiveFormsModule, Validators} from "@angular/forms";
 import {MatDialogModule, MatDialogRef} from "@angular/material/dialog";
-import {MatSnackBar} from "@angular/material/snack-bar";
 import {Wails} from "../../core/services/wails";
+import {NotificationService} from "../../core/services/notification.service";
 import {ImportedFileSelection} from "../imported-file-selection/imported-file-selection";
 import {MatButtonModule} from "@angular/material/button";
 import {MatFormFieldModule} from "@angular/material/form-field";
@@ -54,7 +54,7 @@ export class EstimationPlotModal {
     private fb: FormBuilder,
     public dialogRef: MatDialogRef<EstimationPlotModal>,
     private wails: Wails,
-    private snackBar: MatSnackBar
+    private notification: NotificationService
   ) {
     this.form = this.fb.group({
       input_file: new FormControl<string | null>(null, Validators.required),
@@ -163,12 +163,7 @@ export class EstimationPlotModal {
       this.form.controls['index_col'].setValue('Precursor.Id');
     } catch (error) {
       console.error('Failed to load example:', error);
-      this.snackBar.open('Failed to load example data. Please ensure example files are available.', 'Close', {
-        duration: 5000,
-        horizontalPosition: 'center',
-        verticalPosition: 'top',
-        panelClass: ['error-snackbar']
-      });
+      this.notification.showError('Failed to load example data. Please ensure example files are available.');
     }
   }
 

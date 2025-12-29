@@ -67,17 +67,17 @@ func (s *ScriptExecutor) prepareEnv(pluginID uint) []string {
 }
 
 type ScriptConfig struct {
-	PluginID    uint
-	Type        string
-	RuntimeType string
-	ScriptName  string
-	Args        []string
-	OutputDir   string
-	FolderPath  string
+	PluginID     uint
+	Type         string
+	Environments []string
+	ScriptName   string
+	Args         []string
+	OutputDir    string
+	FolderPath   string
 }
 
 func (s *ScriptExecutor) ExecutePythonScript(ctx context.Context, jobID string, config ScriptConfig) error {
-	log.Printf("[ExecutePythonScript] Called for job %s with RuntimeType: '%s'", jobID, config.RuntimeType)
+	log.Printf("[ExecutePythonScript] Called for job %s with environments: %v", jobID, config.Environments)
 	cfg := s.settingsService.GetConfig()
 	if cfg.PythonPath == "" {
 		return fmt.Errorf("python path not configured")
@@ -108,9 +108,17 @@ func (s *ScriptExecutor) ExecutePythonScript(ctx context.Context, jobID string, 
 
 	env := s.prepareEnv(config.PluginID)
 
-	if config.RuntimeType == "pythonWithR" {
+	hasR := false
+	for _, e := range config.Environments {
+		if e == "r" {
+			hasR = true
+			break
+		}
+	}
+
+	if hasR {
 		if cfg.RPath == "" {
-			return fmt.Errorf("R path not configured for pythonWithR runtime")
+			return fmt.Errorf("R path not configured for python+R runtime")
 		}
 
 		rBinPath := filepath.Dir(cfg.RPath)
@@ -229,6 +237,64 @@ func (s *ScriptExecutor) executeCommand(ctx context.Context, jobID string, cmd *
 			logFile.Close()
 		}
 	}()
+
+	// Log the exact command and environment variables for reproducibility
+	cmdInfo := fmt.Sprintf("=== COMMAND EXECUTION INFO ===\nWorking Directory: %s\nExecutable: %s\nArguments: %v\n",
+		cmd.Dir, cmd.Path, cmd.Args[1:])
+	log.Printf("[ScriptExecutor][%s] %s", jobID, cmdInfo)
+	if logFile != nil {
+		logFile.WriteString(cmdInfo + "\n")
+	}
+
+	// Log environment variables
+	envInfo := "Environment Variables:\n"
+	baseEnv := os.Environ()
+	baseEnvMap := make(map[string]string)
+	for _, e := range baseEnv {
+		parts := strings.SplitN(e, "=", 2)
+		if len(parts) == 2 {
+			baseEnvMap[parts[0]] = parts[1]
+		}
+	}
+
+	// Log custom and modified environment variables
+	for _, e := range cmd.Env {
+		parts := strings.SplitN(e, "=", 2)
+		if len(parts) == 2 {
+			key, value := parts[0], parts[1]
+			// Only log if it's different from base environment or is a known custom variable
+			if baseVal, exists := baseEnvMap[key]; !exists || baseVal != value {
+				envInfo += fmt.Sprintf("  %s=%s\n", key, value)
+			}
+		}
+	}
+	log.Printf("[ScriptExecutor][%s] %s", jobID, envInfo)
+	if logFile != nil {
+		logFile.WriteString(envInfo + "\n")
+	}
+
+	// Create a reproducible command string
+	reproducibleCmd := fmt.Sprintf("cd \"%s\" && ", cmd.Dir)
+	// Add environment variables
+	for _, e := range cmd.Env {
+		parts := strings.SplitN(e, "=", 2)
+		if len(parts) == 2 {
+			key, value := parts[0], parts[1]
+			if baseVal, exists := baseEnvMap[key]; !exists || baseVal != value {
+				reproducibleCmd += fmt.Sprintf("%s=\"%s\" ", key, value)
+			}
+		}
+	}
+	// Add the command
+	reproducibleCmd += fmt.Sprintf("\"%s\"", cmd.Path)
+	for _, arg := range cmd.Args[1:] {
+		reproducibleCmd += fmt.Sprintf(" \"%s\"", arg)
+	}
+	reproducibleCmdInfo := fmt.Sprintf("Reproducible Command:\n%s\n=== END COMMAND INFO ===\n", reproducibleCmd)
+	log.Printf("[ScriptExecutor][%s] %s", jobID, reproducibleCmdInfo)
+	if logFile != nil {
+		logFile.WriteString(reproducibleCmdInfo + "\n")
+	}
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {

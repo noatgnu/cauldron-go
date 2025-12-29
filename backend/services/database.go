@@ -97,6 +97,15 @@ type CustomEnvVar struct {
 	UpdatedAt int64  `gorm:"autoUpdateTime"`
 }
 
+type GitAuthConfig struct {
+	ID               uint   `gorm:"primaryKey"`
+	RepositoryURL    string `gorm:"not null;uniqueIndex"`
+	SSHKeyPath       string `gorm:"not null"`
+	SSHKeyPassphrase string `gorm:""`
+	CreatedAt        int64  `gorm:"autoCreateTime"`
+	UpdatedAt        int64  `gorm:"autoUpdateTime"`
+}
+
 func NewDatabaseService(ctx context.Context) (*DatabaseService, error) {
 	userConfigDir, _ := os.UserConfigDir()
 	dbDir := filepath.Join(userConfigDir, "cauldron")
@@ -161,6 +170,7 @@ func (d *DatabaseService) autoMigrate() error {
 		&PythonEnvironmentDB{},
 		&REnvironmentDB{},
 		&CustomEnvVar{},
+		&GitAuthConfig{},
 		&models.Job{},
 		&models.PluginRegistry{},
 	)

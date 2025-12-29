@@ -1,69 +1,166 @@
-<h2 mat-dialog-title>
-  <mat-icon>security</mat-icon>
-  Confirm Plugin Installation
-</h2>
+<h2 mat-dialog-title>Confirm Plugin Installation</h2>
 
 <mat-dialog-content>
   <div class="warning-box">
-    <mat-icon>warning</mat-icon>
-    <p>You are about to install a plugin from an external source. Please review the details below before proceeding.</p>
+    <p>You are about to install a plugin from an external source. Please review the details below.</p>
   </div>
+
+  @if (data.requiresAuthentication) {
+    <div class="auth-warning-box">
+      <strong>Authentication Required</strong>
+      <p>This plugin requires SSH authentication to access the repository.</p>
+    </div>
+  }
 
   <div class="plugin-details">
     <div class="detail-row">
-      <span class="label">Plugin Name:</span>
+      <span class="label">Plugin Name</span>
       <span class="value">{{ data.name }}</span>
     </div>
 
     <div class="detail-row">
-      <span class="label">Plugin ID:</span>
-      <span class="value">{{ data.id }}</span>
-    </div>
-
-    <div class="detail-row">
-      <span class="label">Version:</span>
+      <span class="label">Version</span>
       <span class="value">{{ data.version }}</span>
     </div>
 
     <div class="detail-row">
-      <span class="label">Author:</span>
+      <span class="label">Author</span>
       <span class="value">{{ data.author }}</span>
     </div>
 
     <div class="detail-row">
-      <span class="label">Category:</span>
+      <span class="label">Category</span>
       <span class="value">{{ data.category }}</span>
     </div>
 
-    <mat-divider></mat-divider>
-
-    <div class="detail-row source-row">
-      <span class="label">
-        <mat-icon>link</mat-icon>
-        Source Repository:
-      </span>
+    <div class="detail-row">
+      <span class="label">Repository</span>
       <span class="value repo-url">{{ data.repo }}</span>
     </div>
 
-    @if (data.description) {
-      <mat-divider></mat-divider>
-      <div class="description-section">
-        <span class="label">Description:</span>
-        <p class="description">{{ data.description }}</p>
+    @if (data.ref) {
+      <div class="detail-row">
+        <span class="label">Commit</span>
+        <span class="value commit-hash">{{ data.ref }}</span>
       </div>
     }
   </div>
 
+  <form [formGroup]="form">
+    <mat-expansion-panel class="auth-panel">
+      <mat-expansion-panel-header>
+        <mat-panel-title>Git Authentication (Optional)</mat-panel-title>
+        <mat-panel-description>Configure SSH key for private repositories</mat-panel-description>
+      </mat-expansion-panel-header>
+
+      <div class="auth-content">
+        <div class="ssh-key-row">
+          <mat-form-field appearance="outline" class="flex-grow">
+            <mat-label>SSH Private Key Path</mat-label>
+            <input matInput formControlName="sshKeyPath" readonly>
+            <mat-hint>Select your SSH private key file</mat-hint>
+          </mat-form-field>
+          <button mat-raised-button type="button" (click)="browseSSHKey()" class="browse-btn">Browse</button>
+        </div>
+
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Passphrase (Optional)</mat-label>
+          <input matInput formControlName="passphrase" [type]="showPassphrase() ? 'text' : 'password'">
+          <button mat-button matSuffix type="button" (click)="togglePassphraseVisibility()" class="toggle-visibility-btn">
+            {{ showPassphrase() ? 'Hide' : 'Show' }}
+          </button>
+          <mat-hint>Leave empty if key is not encrypted</mat-hint>
+        </mat-form-field>
+
+        <div class="validate-row">
+          <button mat-stroked-button type="button" (click)="validateKey()" [disabled]="!form.value.sshKeyPath || validatingKey()">
+            @if (validatingKey()) {
+              <mat-spinner diameter="16"></mat-spinner>
+              <span>Validating...</span>
+            } @else {
+              <span>Validate Key</span>
+            }
+          </button>
+          <span class="validate-hint">Test SSH key before installation</span>
+        </div>
+
+        <div class="info-section">
+          <p><strong>Note:</strong> SSH authentication is only required for private repositories.</p>
+        </div>
+      </div>
+    </mat-expansion-panel>
+
+    <mat-expansion-panel class="env-panel">
+      <mat-expansion-panel-header>
+        <mat-panel-title>Environment Setup (Optional)</mat-panel-title>
+        <mat-panel-description>Create virtual environments for this plugin</mat-panel-description>
+      </mat-expansion-panel-header>
+
+      <div class="env-content">
+        @if (loadingEnvironments()) {
+          <div class="loading-env">
+            <mat-spinner diameter="24"></mat-spinner>
+            <span>Loading environments...</span>
+          </div>
+        } @else {
+          <div class="env-options">
+            <div class="env-option-group">
+              <mat-checkbox formControlName="createVenv">
+                Create Python Virtual Environment
+              </mat-checkbox>
+
+              @if (form.value.createVenv) {
+                <mat-form-field appearance="outline" class="full-width env-select">
+                  <mat-label>Base Python Environment</mat-label>
+                  <mat-select formControlName="basePythonPath">
+                    @for (env of basePythonEnvironments(); track env.path) {
+                      <mat-option [value]="env.path">
+                        {{ env.name }} ({{ env.version }}) - {{ getEnvTypeLabel(env.type) }}
+                      </mat-option>
+                    }
+                  </mat-select>
+                  <mat-hint>Select Python environment to use as base</mat-hint>
+                </mat-form-field>
+
+                @if (basePythonEnvironments().length === 0) {
+                  <p class="warning-text">No base Python environments detected. Please configure Python in Settings.</p>
+                }
+              }
+            </div>
+
+            <div class="env-option-group">
+              <mat-checkbox formControlName="createRenv">
+                Create R Environment (renv)
+              </mat-checkbox>
+
+              @if (form.value.createRenv) {
+                <mat-form-field appearance="outline" class="full-width env-input">
+                  <mat-label>Environment Name</mat-label>
+                  <input matInput formControlName="renvName" placeholder="my-renv">
+                  <mat-hint>Name for the renv environment</mat-hint>
+                </mat-form-field>
+
+                @if (rEnvironments().length === 0) {
+                  <p class="warning-text">No R environments detected. Please configure R in Settings.</p>
+                }
+              }
+            </div>
+          </div>
+
+          <div class="info-section">
+            <p><strong>Note:</strong> Environments will be created after plugin installation completes. You can also create environments later from the plugin list.</p>
+          </div>
+        }
+      </div>
+    </mat-expansion-panel>
+  </form>
+
   <div class="security-notice">
-    <mat-icon>info</mat-icon>
     <p>Only install plugins from sources you trust. Plugins have access to your data and system resources.</p>
   </div>
 </mat-dialog-content>
 
 <mat-dialog-actions align="end">
   <button mat-button (click)="cancel()">Cancel</button>
-  <button mat-raised-button color="primary" (click)="confirm()">
-    <mat-icon>download</mat-icon>
-    Install Plugin
-  </button>
+  <button mat-raised-button color="primary" (click)="confirm()">Install Plugin</button>
 </mat-dialog-actions>

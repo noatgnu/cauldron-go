@@ -28,7 +28,7 @@
     font-size: 16px;
     font-weight: 500;
     margin: 0 0 16px 0;
-    color: rgba(0, 0, 0, 0.87);
+    color: var(--on-surface);
 
     mat-icon {
       font-size: 20px;
@@ -41,7 +41,7 @@
     font-size: 14px;
     font-weight: 500;
     margin: 0 0 20px 0;
-    color: rgba(0, 0, 0, 0.87);
+    color: var(--on-surface);
   }
 }
 
@@ -59,7 +59,7 @@ mat-dialog-content {
   .section-description {
     margin: -8px 0 24px 0;
     font-size: 13px;
-    color: rgba(0, 0, 0, 0.6);
+    color: var(--on-surface-variant);
   }
 }
 
@@ -80,7 +80,7 @@ mat-dialog-actions {
   p {
     margin: 0;
     font-size: 14px;
-    color: rgba(0, 0, 0, 0.6);
+    color: var(--on-surface-variant);
   }
 }
 
@@ -128,14 +128,14 @@ mat-dialog-actions {
       font-size: 14px;
       font-weight: 500;
       margin-bottom: 4px;
-      color: rgba(0, 0, 0, 0.87);
+      color: var(--on-surface);
     }
   }
 
   .env-path {
     margin: 0;
     font-size: 12px;
-    color: rgba(0, 0, 0, 0.6);
+    color: var(--on-surface-variant);
     word-break: break-all;
     line-height: 1.4;
   }
@@ -144,10 +144,10 @@ mat-dialog-actions {
 .no-bindings {
   padding: 20px;
   text-align: center;
-  color: rgba(0, 0, 0, 0.54);
+  color: var(--on-surface-muted);
   font-style: italic;
   font-size: 14px;
-  background: rgba(0, 0, 0, 0.02);
+  background: var(--surface-variant);
   border-radius: 4px;
   margin: 0;
 }
@@ -183,7 +183,7 @@ mat-selection-list {
     strong {
       font-size: 14px;
       font-weight: 500;
-      color: rgba(0, 0, 0, 0.87);
+      color: var(--on-surface);
     }
   }
 
@@ -192,23 +192,23 @@ mat-selection-list {
     font-size: 11px;
     font-weight: 500;
     border-radius: 3px;
-    background: rgba(0, 0, 0, 0.08);
-    color: rgba(0, 0, 0, 0.7);
+    background: var(--surface-variant);
+    color: var(--on-surface-variant);
   }
 
   small {
     font-size: 12px;
-    color: rgba(0, 0, 0, 0.6);
+    color: var(--on-surface-variant);
   }
 }
 
 .no-envs {
   padding: 20px;
   text-align: center;
-  color: rgba(0, 0, 0, 0.54);
+  color: var(--on-surface-muted);
   font-style: italic;
   font-size: 14px;
-  background: rgba(0, 0, 0, 0.02);
+  background: var(--surface-variant);
   border-radius: 4px;
   margin: 0;
 }
@@ -231,9 +231,9 @@ mat-selection-list {
 
 .creation-form {
   margin-top: 16px;
-  background: rgba(0, 0, 0, 0.02);
+  background: var(--surface-variant);
   box-shadow: none !important;
-  border: 1px solid rgba(0, 0, 0, 0.12);
+  border: 1px solid var(--border);
 
   mat-card-content {
     padding: 20px !important;
@@ -261,12 +261,12 @@ mat-selection-list {
   .info-text {
     margin: 0 0 20px 0;
     padding: 12px;
-    background: rgba(33, 150, 243, 0.08);
-    border-left: 3px solid #2196f3;
+    background: var(--info-container);
+    border-left: 3px solid var(--info);
     border-radius: 4px;
     font-size: 13px;
     line-height: 1.5;
-    color: rgba(0, 0, 0, 0.7);
+    color: var(--on-surface-variant);
   }
 
   .toggle-row {
@@ -278,13 +278,13 @@ mat-selection-list {
     align-items: center;
     gap: 12px;
     padding: 16px;
-    background: rgba(33, 150, 243, 0.08);
+    background: var(--info-container);
     border-radius: 4px;
     margin-bottom: 16px;
 
     span {
       font-size: 14px;
-      color: rgba(0, 0, 0, 0.87);
+      color: var(--on-surface);
       font-weight: 500;
     }
 
@@ -299,7 +299,7 @@ mat-selection-list {
     gap: 8px;
     margin-top: 24px;
     padding-top: 16px;
-    border-top: 1px solid rgba(0, 0, 0, 0.08);
+    border-top: 1px solid var(--border);
 
     button {
       mat-icon {

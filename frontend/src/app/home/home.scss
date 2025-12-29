@@ -5,6 +5,53 @@
   padding: 16px;
 }
 
+.debug-card {
+  margin: 16px;
+  background: var(--warning-container) !important;
+  border-left: 4px solid var(--warning);
+}
+
+.debug-content {
+  padding: 12px;
+}
+
+.debug-text {
+  font-size: 12px;
+  font-family: monospace;
+}
+
+.error-text {
+  color: var(--error);
+}
+
+.hint-text {
+  color: var(--on-surface-variant);
+  margin-top: 8px;
+}
+
+.error-subtitle {
+  color: var(--on-surface-variant);
+}
+
+.error-detail {
+  font-size: 12px;
+  font-family: monospace;
+  background: var(--surface-variant);
+  padding: 12px;
+  border-radius: 4px;
+  margin-top: 16px;
+}
+
+.error-message {
+  color: var(--error);
+  font-size: 12px;
+  padding: 8px;
+
+  .error-icon {
+    font-size: 16px;
+  }
+}
+
 .jobs-content {
   flex: 1;
   overflow-y: auto;
@@ -50,7 +97,7 @@
   th {
     font-weight: 500;
     font-size: 12px;
-    color: rgba(0, 0, 0, 0.6);
+    color: var(--on-surface-variant);
   }
 
   td, th {
@@ -58,11 +105,11 @@
   }
 
   tr.mat-mdc-row:hover {
-    background-color: #f5f5f5;
+    background-color: var(--hover);
   }
 
   tr.in-progress {
-    background-color: rgba(25, 118, 210, 0.05);
+    background-color: var(--primary-hover);
   }
 
   .status-icon {
@@ -122,7 +169,7 @@
   justify-content: center;
   align-items: center;
   padding: 64px 16px;
-  color: rgba(0, 0, 0, 0.6);
+  color: var(--on-surface-variant);
 
   mat-icon {
     font-size: 64px;
@@ -173,7 +220,7 @@
   align-items: flex-start;
   gap: 12px;
   padding: 12px;
-  background: #f5f5f5;
+  background: var(--surface-variant);
   border-radius: 8px;
   margin-bottom: 12px;
 
@@ -196,19 +243,19 @@
   .status-label {
     font-size: 12px;
     font-weight: 500;
-    color: rgba(0, 0, 0, 0.6);
+    color: var(--on-surface-variant);
     margin-bottom: 4px;
   }
 
   .status-value {
     font-size: 13px;
-    color: rgba(0, 0, 0, 0.87);
+    color: var(--on-surface);
     word-break: break-word;
   }
 
   .status-path {
     font-size: 10px;
-    color: rgba(0, 0, 0, 0.54);
+    color: var(--on-surface-muted);
     margin-top: 4px;
     word-break: break-all;
     font-family: monospace;
@@ -221,7 +268,7 @@
   align-items: center;
   justify-content: center;
   padding: 24px 16px;
-  color: rgba(0, 0, 0, 0.6);
+  color: var(--on-surface-variant);
 
   mat-icon {
     font-size: 48px;
@@ -248,12 +295,12 @@
   align-items: center;
   justify-content: space-between;
   padding: 8px;
-  background: #f5f5f5;
+  background: var(--surface-variant);
   border-radius: 4px;
   gap: 8px;
 
   &:hover {
-    background: #eeeeee;
+    background: var(--hover);
   }
 }
 
@@ -269,7 +316,7 @@
     width: 20px;
     height: 20px;
     flex-shrink: 0;
-    color: rgba(0, 0, 0, 0.6);
+    color: var(--on-surface-variant);
   }
 }
 
@@ -288,7 +335,7 @@
 
 .file-item-preview {
   font-size: 10px;
-  color: rgba(0, 0, 0, 0.6);
+  color: var(--on-surface-variant);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

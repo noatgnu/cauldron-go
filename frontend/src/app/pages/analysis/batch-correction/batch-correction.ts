@@ -10,7 +10,6 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatButtonModule } from '@angular/material/button';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatIconModule } from '@angular/material/icon';
-import { MatSnackBar } from '@angular/material/snack-bar';
 import { ImportedFileSelection } from '../../../components/imported-file-selection/imported-file-selection';
 import { EnvironmentIndicator } from '../../../components/environment-indicator/environment-indicator';
 import { Wails } from '../../../core/services/wails';
@@ -45,8 +44,7 @@ export class BatchCorrection implements OnInit {
     private fb: FormBuilder,
     private wails: Wails,
     private router: Router,
-    private notificationService: NotificationService,
-    private snackBar: MatSnackBar
+    private notification: NotificationService
   ) {
     this.form = this.fb.group({
       filePath: ['', Validators.required],
@@ -148,12 +146,7 @@ export class BatchCorrection implements OnInit {
         method: 'combat'
       });
     } catch (error) {
-      this.snackBar.open('Failed to load example data. Please ensure example files are available.', 'Close', {
-        duration: 5000,
-        horizontalPosition: 'center',
-        verticalPosition: 'top',
-        panelClass: ['error-snackbar']
-      });
+      this.notification.showError('Failed to load example data. Please ensure example files are available.');
     }
   }
 }

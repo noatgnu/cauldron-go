@@ -8,7 +8,7 @@ plugin:
   icon: "timeline"
 
 runtime:
-  type: "python"
+  environments: ["python"]
   script: "dose_response_analyzer.py"
 
 inputs:

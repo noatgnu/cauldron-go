@@ -12,8 +12,8 @@ import { MatDividerModule } from '@angular/material/divider';
 import { MatListModule } from '@angular/material/list';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatDialog } from '@angular/material/dialog';
-import { MatSnackBar } from '@angular/material/snack-bar';
 import { Wails, PythonEnvironment, VirtualEnvironment, Config, PluginEnvironmentBinding } from '../../../core/services/wails';
+import { NotificationService } from '../../../core/services/notification.service';
 import { PackagesModal } from '../../../components/packages-modal/packages-modal';
 import { DownloadPortableEnvDialogComponent } from '../../../components/download-portable-env-dialog/download-portable-env-dialog';
 import { BoundPluginsDialogComponent, BoundPlugin } from '../../../components/bound-plugins-dialog/bound-plugins-dialog';
@@ -54,17 +54,9 @@ export class SettingsPython implements OnInit {
   constructor(
     private wails: Wails,
     private dialog: MatDialog,
-    private snackBar: MatSnackBar
+    private notification: NotificationService
   ) {}
 
-  private showError(message: string): void {
-    this.snackBar.open(message, 'Close', {
-      duration: 5000,
-      horizontalPosition: 'center',
-      verticalPosition: 'top',
-      panelClass: ['error-snackbar']
-    });
-  }
 
   async ngOnInit(): Promise<void> {
     await this.loadSettings();
@@ -203,7 +195,7 @@ export class SettingsPython implements OnInit {
       const requirementsPath = await this.wails.getBundledRequirementsPath('python');
       await this.wails.installPythonRequirements(pythonPath, requirementsPath);
     } catch (error) {
-      this.showError('Failed to install Python packages');
+      this.notification.showError('Failed to install Python packages');
     } finally {
       this.installingPythonPackages.set(false);
     }
@@ -237,11 +229,7 @@ export class SettingsPython implements OnInit {
       dialogRef.componentInstance.setLoading(false);
     } catch (error) {
       dialogRef.componentInstance.setLoading(false);
-      this.snackBar.open('Failed to load Python packages', 'Close', {
-        duration: 3000,
-        horizontalPosition: 'center',
-        verticalPosition: 'top'
-      });
+      this.notification.showError('Failed to load Python packages', 3000);
     }
   }
 
@@ -249,11 +237,7 @@ export class SettingsPython implements OnInit {
     const selectedPath = this.selectedPythonEnv();
 
     if (!selectedPath) {
-      this.snackBar.open('No Python environment selected', 'Close', {
-        duration: 3000,
-        horizontalPosition: 'center',
-        verticalPosition: 'top'
-      });
+      this.notification.showError('No Python environment selected', 3000);
       return;
     }
 
@@ -262,11 +246,7 @@ export class SettingsPython implements OnInit {
     if (env) {
       this.viewPythonPackages(env);
     } else {
-      this.snackBar.open('Python environment not found', 'Close', {
-        duration: 3000,
-        horizontalPosition: 'center',
-        verticalPosition: 'top'
-      });
+      this.notification.showError('Python environment not found', 3000);
     }
   }
 
@@ -331,7 +311,7 @@ export class SettingsPython implements OnInit {
       await this.loadVirtualEnvironments();
     } catch (error) {
       await this.wails.logToFile(`[SettingsPython] Failed to create virtual environment: ${error}`);
-      this.showError('Failed to create virtual environment');
+      this.notification.showError('Failed to create virtual environment');
     } finally {
       this.creatingVenvEnv.set(false);
       this.venvCreationProgress.set(null);

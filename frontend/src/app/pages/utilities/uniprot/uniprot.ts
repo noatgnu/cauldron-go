@@ -8,9 +8,9 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatButtonModule } from '@angular/material/button';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatIconModule } from '@angular/material/icon';
-import { MatSnackBar } from '@angular/material/snack-bar';
 import { ImportedFileSelection } from '../../../components/imported-file-selection/imported-file-selection';
 import { Wails } from '../../../core/services/wails';
+import { NotificationService } from '../../../core/services/notification.service';
 import { getUniprotFromFields, uniprotColumns, uniprotSections } from 'uniprotparserjs';
 
 @Component({
@@ -43,7 +43,7 @@ export class Uniprot implements OnInit {
   constructor(
     private fb: FormBuilder,
     private wails: Wails,
-    private snackBar: MatSnackBar
+    private notification: NotificationService
   ) {
     this.form = this.fb.group({
       inputFile: ['', Validators.required],
@@ -112,11 +112,7 @@ export class Uniprot implements OnInit {
     }
 
     if (selectedColumns.length === 0) {
-      this.snackBar.open('Please select at least one UniProt field', 'Close', {
-        duration: 3000,
-        horizontalPosition: 'center',
-        verticalPosition: 'top'
-      });
+      this.notification.showError('Please select at least one UniProt field', 3000);
       return;
     }
 

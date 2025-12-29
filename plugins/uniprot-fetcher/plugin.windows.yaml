@@ -8,7 +8,8 @@ plugin:
   icon: "cloud_download"
 
 runtime:
-  type: "direct"
+  environments:
+    - direct
   script: "uniprot-fetcher.exe"
 
 inputs:

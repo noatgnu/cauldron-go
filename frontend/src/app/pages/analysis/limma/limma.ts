@@ -11,10 +11,10 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTableModule } from '@angular/material/table';
-import { MatSnackBar } from '@angular/material/snack-bar';
 import { ImportedFileSelection } from '../../../components/imported-file-selection/imported-file-selection';
 import { EnvironmentIndicator } from '../../../components/environment-indicator/environment-indicator';
 import { Wails } from '../../../core/services/wails';
+import { NotificationService } from '../../../core/services/notification.service';
 import { fromCSV } from 'data-forge';
 
 interface Comparison {
@@ -57,7 +57,7 @@ export class Limma implements OnInit {
     private fb: FormBuilder,
     private wails: Wails,
     private router: Router,
-    private snackBar: MatSnackBar
+    private notification: NotificationService
   ) {
     this.form = this.fb.group({
       inputFile: ['', Validators.required],
@@ -120,12 +120,7 @@ export class Limma implements OnInit {
 
     for (const c of comparisons) {
       if (!conditions.includes(c.condition_A) || !conditions.includes(c.condition_B) || !c.comparison_label) {
-        this.snackBar.open('Please select valid conditions for all comparisons', 'Close', {
-          duration: 5000,
-          horizontalPosition: 'center',
-          verticalPosition: 'top',
-          panelClass: ['error-snackbar']
-        });
+        this.notification.showError('Please select valid conditions for all comparisons');
         return;
       }
     }
@@ -211,12 +206,7 @@ export class Limma implements OnInit {
         log2: true
       });
     } catch (error) {
-      this.snackBar.open('Failed to load example data. Please ensure example files are available.', 'Close', {
-        duration: 5000,
-        horizontalPosition: 'center',
-        verticalPosition: 'top',
-        panelClass: ['error-snackbar']
-      });
+      this.notification.showError('Failed to load example data. Please ensure example files are available.');
     }
   }
 }

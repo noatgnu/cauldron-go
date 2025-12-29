@@ -8,7 +8,7 @@ plugin:
   icon: "difference"
 
 runtime:
-  type: "r"
+  environments: ["r"]
   script: "limma.R"
 
 inputs:

@@ -57,7 +57,7 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    color: rgba(0, 0, 0, 0.6);
+    color: var(--on-surface-variant);
 
     small {
       font-size: 11px;
@@ -70,7 +70,7 @@
   align-items: center;
   gap: 12px;
   padding: 16px 0;
-  color: rgba(0, 0, 0, 0.6);
+  color: var(--on-surface-variant);
   font-size: 13px;
 }
 
@@ -78,7 +78,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  color: rgba(0, 0, 0, 0.6);
+  color: var(--on-surface-variant);
   font-size: 13px;
   margin-top: -8px;
 
@@ -125,13 +125,13 @@ mat-divider {
   .install-progress {
     margin-bottom: 12px;
     padding: 12px;
-    background: rgba(0, 0, 0, 0.02);
+    background: var(--hover);
     border-radius: 4px;
 
     small {
       display: block;
       font-size: 12px;
-      color: rgba(0, 0, 0, 0.6);
+      color: var(--on-surface-variant);
       margin-bottom: 6px;
     }
   }
@@ -139,7 +139,7 @@ mat-divider {
   .package-hint {
     margin: 0;
     font-size: 13px;
-    color: rgba(0, 0, 0, 0.54);
+    color: var(--on-surface-variant);
     padding-left: 4px;
   }
 }
@@ -156,12 +156,12 @@ mat-divider {
   .section-description {
     margin: 0 0 16px 0;
     font-size: 14px;
-    color: rgba(0, 0, 0, 0.6);
+    color: var(--on-surface-variant);
     line-height: 1.5;
   }
 
   .no-venvs {
-    color: rgba(0, 0, 0, 0.54);
+    color: var(--on-surface-variant);
     font-size: 13px;
     margin: 0;
     padding: 8px 0;
@@ -172,7 +172,7 @@ mat-divider {
   }
 
   mat-list-item {
-    border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+    border-bottom: 1px solid var(--border);
     height: auto !important;
     min-height: 48px;
     overflow: visible;
@@ -182,10 +182,10 @@ mat-divider {
     display: flex;
     gap: 16px;
     font-size: 12px;
-    color: rgba(0, 0, 0, 0.6);
+    color: var(--on-surface-variant);
 
     .venv-date {
-      color: rgba(0, 0, 0, 0.4);
+      color: var(--on-surface-variant);
     }
   }
 

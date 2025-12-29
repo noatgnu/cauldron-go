@@ -62,7 +62,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  color: rgba(0, 0, 0, 0.6);
+  color: var(--on-surface-variant);
   font-size: 13px;
   margin-top: -8px;
 
@@ -130,7 +130,7 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    color: rgba(0, 0, 0, 0.6);
+    color: var(--on-surface-variant);
 
     small {
       font-size: 11px;
@@ -140,7 +140,7 @@
       font-size: 14px;
       width: 14px;
       height: 14px;
-      color: #4caf50;
+      color: var(--success);
     }
   }
 }
@@ -150,7 +150,7 @@
   align-items: center;
   gap: 12px;
   padding: 16px 0;
-  color: rgba(0, 0, 0, 0.6);
+  color: var(--on-surface-variant);
   font-size: 13px;
 }
 
@@ -160,7 +160,7 @@ mat-divider {
 
 .help-panel {
   margin-bottom: 24px;
-  background: #f5f5f5;
+  background: var(--surface);
 
   mat-panel-title {
     display: flex;
@@ -190,20 +190,20 @@ mat-divider {
     font-size: 18px;
     font-weight: 500;
     margin: 0 0 12px 0;
-    color: rgba(0, 0, 0, 0.87);
+    color: var(--on-surface);
   }
 
   h4 {
     font-size: 15px;
     font-weight: 500;
     margin: 16px 0 12px 0;
-    color: rgba(0, 0, 0, 0.87);
+    color: var(--on-surface);
   }
 
   .help-description {
     margin: 0 0 20px 0;
     font-size: 14px;
-    color: rgba(0, 0, 0, 0.7);
+    color: var(--on-surface-variant);
     line-height: 1.6;
   }
 
@@ -218,7 +218,7 @@ mat-divider {
       height: auto !important;
       min-height: 64px;
       padding: 12px 0 !important;
-      border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+      border-bottom: 1px solid var(--selected);
 
       mat-icon {
         margin-right: 16px;
@@ -228,7 +228,7 @@ mat-divider {
       }
 
       a {
-        color: #1976d2;
+        color: var(--primary);
         text-decoration: none;
         font-size: 13px;
         word-break: break-all;
@@ -240,15 +240,15 @@ mat-divider {
 
       small {
         font-size: 12px;
-        color: rgba(0, 0, 0, 0.5);
+        color: var(--on-surface-variant);
         font-style: italic;
       }
     }
   }
 
   .setup-instructions {
-    background: #f9f9f9;
-    border-left: 3px solid #2196f3;
+    background: var(--surface-container);
+    border-left: 3px solid var(--primary);
     padding: 16px 20px;
     margin-bottom: 20px;
     border-radius: 4px;
@@ -261,7 +261,7 @@ mat-divider {
         margin: 8px 0;
         font-size: 13px;
         line-height: 1.6;
-        color: rgba(0, 0, 0, 0.8);
+        color: var(--on-surface);
       }
     }
   }
@@ -270,7 +270,7 @@ mat-divider {
     display: flex;
     gap: 12px;
     padding: 16px;
-    background: #e3f2fd;
+    background: var(--primary-container);
     border-radius: 4px;
     margin-top: 20px;
 
@@ -326,13 +326,13 @@ mat-divider {
   .install-progress {
     margin-bottom: 12px;
     padding: 12px;
-    background: rgba(0, 0, 0, 0.02);
+    background: var(--hover);
     border-radius: 4px;
 
     small {
       display: block;
       font-size: 12px;
-      color: rgba(0, 0, 0, 0.6);
+      color: var(--on-surface-variant);
       margin-bottom: 6px;
     }
 
@@ -344,7 +344,7 @@ mat-divider {
   .package-hint {
     margin: 0;
     font-size: 13px;
-    color: rgba(0, 0, 0, 0.54);
+    color: var(--on-surface-variant);
     padding-left: 4px;
   }
 }
@@ -359,7 +359,7 @@ mat-divider {
   }
 
   .no-venvs {
-    color: rgba(0, 0, 0, 0.54);
+    color: var(--on-surface-variant);
     font-size: 13px;
     margin: 0;
     padding: 8px 0;
@@ -370,34 +370,34 @@ mat-divider {
   }
 
   mat-list-item {
-    border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+    border-bottom: 1px solid var(--border);
   }
 
   .venv-details {
     display: flex;
     gap: 16px;
     font-size: 12px;
-    color: rgba(0, 0, 0, 0.6);
+    color: var(--on-surface-variant);
 
     .venv-date {
-      color: rgba(0, 0, 0, 0.4);
+      color: var(--on-surface-variant);
     }
   }
 }
 
 .environment-status {
-  background: #e8f5e9 !important;
+  background: var(--success) !important;
   margin-bottom: 16px;
 }
 
 .warning-box {
-  background: #fff3e0 !important;
+  background: var(--warning) !important;
   margin-bottom: 16px;
 
   p {
     margin: 8px 0 0 0;
     font-size: 13px;
-    color: rgba(0, 0, 0, 0.7);
+    color: var(--on-surface);
   }
 }
 
@@ -408,7 +408,7 @@ mat-divider {
     font-size: 14px;
     font-weight: 500;
     margin: 0 0 12px 0;
-    color: rgba(0, 0, 0, 0.7);
+    color: var(--on-surface-variant);
   }
 
   .hint-text {
@@ -417,14 +417,14 @@ mat-divider {
     gap: 8px;
     margin: 12px 0 0 0;
     font-size: 13px;
-    color: rgba(0, 0, 0, 0.6);
+    color: var(--on-surface-variant);
     font-style: italic;
 
     mat-icon {
       font-size: 16px;
       width: 16px;
       height: 16px;
-      color: rgba(0, 0, 0, 0.4);
+      color: var(--on-surface-variant);
     }
   }
 }

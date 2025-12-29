@@ -1,9 +1,3 @@
-
-// Include theming for Angular Material with `mat.theme()`.
-// This Sass mixin will define CSS variables that are used for styling Angular Material
-// components according to the Material 3 design spec.
-// Learn more about theming and how to use it for your application's
-// custom components at https://material.angular.dev/guide/theming
 @use '@angular/material' as mat;
 
 html {
@@ -17,31 +11,132 @@ html {
   ));
 }
 
-body {
-  // Default the application to a light color theme. This can be changed to
-  // `dark` to enable the dark color theme, or to `light dark` to defer to the
-  // user's system settings.
+:root {
+  --background: #ffffff;
+  --surface: #f5f5f5;
+  --surface-variant: #e0e0e0;
+  --surface-container: #fafafa;
+  --on-background: rgba(0, 0, 0, 0.87);
+  --on-surface: rgba(0, 0, 0, 0.87);
+  --on-surface-variant: rgba(0, 0, 0, 0.6);
+  --on-surface-muted: rgba(0, 0, 0, 0.54);
+  --border: rgba(0, 0, 0, 0.12);
+  --divider: rgba(0, 0, 0, 0.12);
+  --hover: rgba(0, 0, 0, 0.04);
+  --selected: rgba(0, 0, 0, 0.08);
+  --disabled: rgba(0, 0, 0, 0.38);
+  --overlay: rgba(0, 0, 0, 0.7);
+
+  --primary: #1976d2;
+  --primary-light: #2196f3;
+  --primary-dark: #0d47a1;
+  --primary-container: #e3f2fd;
+  --primary-hover: rgba(25, 118, 210, 0.08);
+  --on-primary: #ffffff;
+
+  --error: #d32f2f;
+  --error-light: #f44336;
+  --error-dark: #c62828;
+  --error-container: #ffebee;
+  --error-subtle: #fff5f5;
+  --on-error: #ffffff;
+  --on-error-container: #c62828;
+
+  --success: #4caf50;
+  --success-light: #81c784;
+  --success-dark: #2e7d32;
+  --success-container: #e8f5e9;
+  --on-success: #ffffff;
+
+  --warning: #ff9800;
+  --warning-light: #ffb74d;
+  --warning-dark: #f57c00;
+  --warning-container: #fff3e0;
+  --warning-subtle: #fff3cd;
+  --warning-text: #856404;
+  --on-warning: #ffffff;
+  --on-warning-container: #856404;
+
+  --info: #2196f3;
+  --info-container: #e3f2fd;
+  --on-info: #ffffff;
+  --on-info-container: #0d47a1;
+
+  --console-background: #1e1e1e;
+  --console-text: #d4d4d4;
+  --console-border: #333333;
+}
+
+body.dark-theme {
+  color-scheme: dark;
+
+  --background: #121212;
+  --surface: #1e1e1e;
+  --surface-variant: #2d2d2d;
+  --surface-container: #252525;
+  --on-background: rgba(255, 255, 255, 0.87);
+  --on-surface: rgba(255, 255, 255, 0.87);
+  --on-surface-variant: rgba(255, 255, 255, 0.6);
+  --on-surface-muted: rgba(255, 255, 255, 0.5);
+  --border: rgba(255, 255, 255, 0.12);
+  --divider: rgba(255, 255, 255, 0.12);
+  --hover: rgba(255, 255, 255, 0.04);
+  --selected: rgba(255, 255, 255, 0.08);
+  --disabled: rgba(255, 255, 255, 0.38);
+  --overlay: rgba(0, 0, 0, 0.8);
+
+  --primary: #64b5f6;
+  --primary-light: #90caf9;
+  --primary-dark: #42a5f5;
+  --primary-container: rgba(33, 150, 243, 0.2);
+  --primary-hover: rgba(100, 181, 246, 0.08);
+  --on-primary: rgba(0, 0, 0, 0.87);
+
+  --error: #ef5350;
+  --error-light: #e57373;
+  --error-dark: #f44336;
+  --error-container: rgba(244, 67, 54, 0.2);
+  --error-subtle: rgba(244, 67, 54, 0.1);
+  --on-error: rgba(0, 0, 0, 0.87);
+  --on-error-container: #ef5350;
+
+  --success: #81c784;
+  --success-light: #a5d6a7;
+  --success-dark: #66bb6a;
+  --success-container: rgba(76, 175, 80, 0.2);
+  --on-success: rgba(0, 0, 0, 0.87);
+
+  --warning: #ffb74d;
+  --warning-light: #ffcc80;
+  --warning-dark: #ffa726;
+  --warning-container: rgba(255, 152, 0, 0.2);
+  --warning-subtle: rgba(255, 152, 0, 0.1);
+  --warning-text: rgba(255, 255, 255, 0.87);
+  --on-warning: rgba(0, 0, 0, 0.87);
+  --on-warning-container: #ffb74d;
+
+  --info: #64b5f6;
+  --info-container: rgba(33, 150, 243, 0.2);
+  --on-info: rgba(0, 0, 0, 0.87);
+  --on-info-container: #64b5f6;
+}
+
+body.light-theme {
   color-scheme: light;
-
-  // Set a default background, font and text colors for the application using
-  // Angular Material's system-level CSS variables. Learn more about these
-  // variables at https://material.angular.dev/guide/system-variables
-  background-color: var(--mat-sys-surface);
-  color: var(--mat-sys-on-surface);
-  font: var(--mat-sys-body-medium);
-
-  // Reset the user agent margin.
-  margin: 0;
-}
-html, body {
-  height: 100%;
-  overflow: hidden;
 }
 
 body {
+  background-color: var(--background);
+  color: var(--on-background);
+  font: var(--mat-sys-body-medium);
   margin: 0;
   font-family: Roboto, "Helvetica Neue", sans-serif;
   font-size: 13px;
+}
+
+html, body {
+  height: 100%;
+  overflow: hidden;
 }
 
 * {
@@ -54,12 +149,318 @@ h1, h2, h3, h4, h5, h6 {
 
 .mat-mdc-card {
   --mdc-elevated-card-container-shape: 8px;
+  background-color: var(--surface) !important;
+  color: var(--on-surface) !important;
 }
 
 .mat-mdc-button, .mat-mdc-raised-button {
   font-size: 13px;
   padding: 0 12px;
   min-height: 36px;
+}
+
+.mat-mdc-button:not(.mat-mdc-button-disabled) {
+  color: var(--primary) !important;
+}
+
+.mat-mdc-raised-button:not([color]):not(.mat-mdc-button-disabled) {
+  background-color: var(--surface-variant) !important;
+  color: var(--on-surface) !important;
+}
+
+.mat-mdc-unelevated-button:not([color]):not(.mat-mdc-button-disabled) {
+  background-color: var(--surface-variant) !important;
+  color: var(--on-surface) !important;
+}
+
+.mat-mdc-table {
+  background-color: var(--surface) !important;
+  color: var(--on-surface) !important;
+}
+
+.mat-mdc-header-cell {
+  color: var(--on-surface) !important;
+}
+
+.mat-mdc-cell {
+  color: var(--on-surface) !important;
+  border-bottom-color: var(--border) !important;
+}
+
+.mat-mdc-row:hover {
+  background-color: var(--hover) !important;
+}
+
+.mat-mdc-form-field {
+  .mat-mdc-text-field-wrapper {
+    background-color: var(--surface) !important;
+  }
+
+  .mat-mdc-input-element {
+    color: var(--on-surface) !important;
+    caret-color: var(--primary) !important;
+  }
+
+  .mat-mdc-input-element::placeholder {
+    color: var(--on-surface-variant) !important;
+    opacity: 0.6;
+  }
+
+  .mat-mdc-floating-label {
+    color: var(--on-surface-variant) !important;
+  }
+
+  .mat-mdc-form-field-focus-overlay {
+    background-color: var(--on-surface) !important;
+  }
+
+  .mdc-notched-outline__leading,
+  .mdc-notched-outline__notch,
+  .mdc-notched-outline__trailing {
+    border-color: var(--border) !important;
+  }
+
+  &.mat-focused {
+    .mdc-notched-outline__leading,
+    .mdc-notched-outline__notch,
+    .mdc-notched-outline__trailing {
+      border-color: var(--primary) !important;
+    }
+
+    .mat-mdc-floating-label {
+      color: var(--primary) !important;
+    }
+  }
+}
+
+.mat-mdc-select {
+  .mat-mdc-select-value {
+    color: var(--on-surface) !important;
+  }
+
+  .mat-mdc-select-placeholder {
+    color: var(--on-surface-variant) !important;
+  }
+
+  .mat-mdc-select-arrow {
+    color: var(--on-surface-variant) !important;
+  }
+}
+
+.mat-mdc-option {
+  color: var(--on-surface) !important;
+
+  &:hover:not(.mat-mdc-option-disabled) {
+    background-color: var(--hover) !important;
+  }
+
+  &.mat-mdc-option-active {
+    background-color: var(--selected) !important;
+  }
+}
+
+.cdk-overlay-dark-backdrop {
+  background: var(--overlay) !important;
+}
+
+.mat-mdc-dialog-container {
+  --mdc-dialog-container-color: var(--surface);
+  --mdc-dialog-subhead-color: var(--on-surface);
+  --mdc-dialog-supporting-text-color: var(--on-surface-variant);
+  background-color: var(--surface) !important;
+  color: var(--on-surface) !important;
+
+  .mat-mdc-dialog-title,
+  [mat-dialog-title] {
+    background-color: var(--surface) !important;
+    color: var(--on-surface) !important;
+  }
+
+  .mat-mdc-dialog-content,
+  [mat-dialog-content] {
+    background-color: var(--surface) !important;
+    color: var(--on-surface) !important;
+  }
+
+  .mat-mdc-dialog-actions,
+  [mat-dialog-actions] {
+    background-color: var(--surface) !important;
+    color: var(--on-surface) !important;
+    border-top: 1px solid var(--border);
+  }
+}
+
+.mat-mdc-checkbox {
+  .mdc-checkbox__background {
+    border-color: var(--on-surface-variant) !important;
+  }
+
+  &.mat-mdc-checkbox-checked .mdc-checkbox__background {
+    background-color: var(--primary) !important;
+    border-color: var(--primary) !important;
+  }
+
+  .mdc-label {
+    color: var(--on-surface) !important;
+  }
+
+  .mdc-form-field label {
+    color: var(--on-surface) !important;
+  }
+}
+
+.mat-mdc-radio-button {
+  .mdc-radio__outer-circle {
+    border-color: var(--on-surface-variant) !important;
+  }
+
+  &.mat-mdc-radio-checked .mdc-radio__outer-circle {
+    border-color: var(--primary) !important;
+  }
+
+  &.mat-mdc-radio-checked .mdc-radio__inner-circle {
+    background-color: var(--primary) !important;
+  }
+}
+
+.mat-mdc-slide-toggle {
+  .mdc-switch__track {
+    background-color: var(--on-surface-variant) !important;
+  }
+
+  &.mat-mdc-slide-toggle-checked .mdc-switch__track {
+    background-color: var(--primary) !important;
+  }
+}
+
+.mat-mdc-tab-group {
+  background-color: var(--surface) !important;
+
+  .mat-mdc-tab-body-content {
+    background-color: var(--surface) !important;
+  }
+
+  .mat-mdc-tab-label {
+    color: var(--on-surface-variant) !important;
+    opacity: 1 !important;
+
+    &.mat-mdc-tab-label-active {
+      color: var(--primary) !important;
+    }
+
+    .mdc-tab__text-label {
+      color: var(--on-surface-variant) !important;
+    }
+
+    &.mat-mdc-tab-label-active .mdc-tab__text-label {
+      color: var(--primary) !important;
+    }
+  }
+
+  .mdc-tab__text-label {
+    color: var(--on-surface-variant) !important;
+  }
+
+  .mdc-tab--active .mdc-tab__text-label {
+    color: var(--primary) !important;
+  }
+}
+
+.mat-mdc-paginator {
+  background-color: var(--surface) !important;
+  color: var(--on-surface) !important;
+}
+
+.mat-mdc-menu-panel {
+  background-color: var(--surface) !important;
+
+  .mat-mdc-menu-item {
+    color: var(--on-surface) !important;
+
+    &:hover:not([disabled]) {
+      background-color: var(--hover) !important;
+    }
+  }
+}
+
+.mat-mdc-snack-bar-container {
+  --mdc-snackbar-container-color: var(--surface);
+  --mdc-snackbar-supporting-text-color: var(--on-surface);
+}
+
+.mat-drawer-container {
+  background-color: var(--background) !important;
+  color: var(--on-background) !important;
+}
+
+.mat-drawer {
+  background-color: var(--surface) !important;
+  color: var(--on-surface) !important;
+}
+
+.mat-drawer-content {
+  background-color: var(--background) !important;
+}
+
+.mat-expansion-panel {
+  background-color: var(--surface) !important;
+  color: var(--on-surface) !important;
+
+  .mat-expansion-panel-header {
+    color: var(--on-surface) !important;
+
+    &:hover:not([aria-disabled=true]) {
+      background-color: var(--hover) !important;
+    }
+  }
+
+  .mat-expansion-panel-header-title,
+  .mat-expansion-panel-header-description {
+    color: var(--on-surface) !important;
+  }
+
+  .mat-expansion-panel-body {
+    color: var(--on-surface) !important;
+  }
+}
+
+.mat-button-toggle-group {
+  border-color: var(--border) !important;
+
+  .mat-button-toggle {
+    color: var(--on-surface) !important;
+    background-color: var(--surface) !important;
+
+    &.mat-button-toggle-checked {
+      background-color: var(--primary-hover) !important;
+      color: var(--primary) !important;
+    }
+  }
+
+  .mat-button-toggle-button {
+    border-left-color: var(--border) !important;
+  }
+}
+
+.mat-mdc-list {
+  .mat-mdc-list-item {
+    color: var(--on-surface) !important;
+  }
+}
+
+.mat-mdc-chip {
+  --mdc-chip-label-text-color: var(--on-surface);
+  --mdc-chip-outline-color: var(--border);
+}
+
+.console-output,
+.log-viewer,
+.terminal,
+pre code,
+.code-block {
+  background-color: var(--console-background) !important;
+  color: var(--console-text) !important;
+  border-color: var(--console-border) !important;
 }
 
 .error-snackbar {

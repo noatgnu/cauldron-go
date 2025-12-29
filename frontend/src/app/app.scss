@@ -13,7 +13,8 @@
 
 .sidenav {
   width: 260px;
-  border-right: 1px solid rgba(0, 0, 0, 0.12);
+  border-right: 1px solid var(--border);
+  background-color: var(--surface);
 }
 
 .main-content {
@@ -21,4 +22,5 @@
   overflow: auto;
   display: flex;
   flex-direction: column;
+  background-color: var(--background);
 }

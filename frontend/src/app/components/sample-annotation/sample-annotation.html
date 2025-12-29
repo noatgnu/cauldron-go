@@ -19,22 +19,22 @@
             <div class="regex-rule-row">
               <mat-form-field appearance="outline" class="pattern-field">
                 <mat-label>Pattern</mat-label>
-                <input matInput [(ngModel)]="rule.pattern" placeholder="^control.*">
+                <input matInput [(ngModel)]="rule.pattern">
               </mat-form-field>
 
               <mat-form-field appearance="outline" class="condition-field">
                 <mat-label>Condition</mat-label>
-                <input matInput [(ngModel)]="rule.condition" placeholder="Control">
+                <input matInput [(ngModel)]="rule.condition">
               </mat-form-field>
 
               <mat-form-field appearance="outline" class="batch-field">
                 <mat-label>BioReplicate</mat-label>
-                <input matInput [(ngModel)]="rule.bioreplicate" placeholder="Optional">
+                <input matInput [(ngModel)]="rule.bioreplicate">
               </mat-form-field>
 
               <mat-form-field appearance="outline" class="batch-field">
                 <mat-label>Batch</mat-label>
-                <input matInput [(ngModel)]="rule.batch" placeholder="Optional">
+                <input matInput [(ngModel)]="rule.batch">
               </mat-form-field>
 
               <button mat-icon-button color="warn" (click)="removeRegexRule($index)" matTooltip="Remove rule">
@@ -76,17 +76,17 @@
             <div class="batch-inputs">
               <mat-form-field appearance="outline" class="batch-input-field">
                 <mat-label>Condition</mat-label>
-                <input matInput [(ngModel)]="batchCondition" placeholder="Enter condition">
+                <input matInput [(ngModel)]="batchCondition">
               </mat-form-field>
 
               <mat-form-field appearance="outline" class="batch-input-field">
                 <mat-label>BioReplicate</mat-label>
-                <input matInput [(ngModel)]="batchBioReplicate" placeholder="Optional">
+                <input matInput [(ngModel)]="batchBioReplicate">
               </mat-form-field>
 
               <mat-form-field appearance="outline" class="batch-input-field">
                 <mat-label>Batch</mat-label>
-                <input matInput [(ngModel)]="batchBatch" placeholder="Optional">
+                <input matInput [(ngModel)]="batchBatch">
               </mat-form-field>
 
               <button mat-raised-button color="primary" (click)="applyBatchAssignment()">

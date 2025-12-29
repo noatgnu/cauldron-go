@@ -8,7 +8,7 @@ plugin:
   icon: "analytics"
 
 runtime:
-  type: "pythonWithR"
+  environments: ["python", "r"]
   script: "alphapept_process.py"
 
 inputs:

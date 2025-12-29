@@ -11,10 +11,10 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTableModule } from '@angular/material/table';
-import { MatSnackBar } from '@angular/material/snack-bar';
 import { ImportedFileSelection } from '../../../components/imported-file-selection/imported-file-selection';
 import { EnvironmentIndicator } from '../../../components/environment-indicator/environment-indicator';
 import { Wails } from '../../../core/services/wails';
+import { NotificationService } from '../../../core/services/notification.service';
 import { IDataFrame, DataFrame, fromCSV } from 'data-forge';
 
 @Component({
@@ -58,7 +58,7 @@ export class Alphastats implements OnInit {
     private fb: FormBuilder,
     private wails: Wails,
     private router: Router,
-    private snackBar: MatSnackBar
+    private notification: NotificationService
   ) {
     this.form = this.fb.group({
       inputFile: ['', Validators.required],
@@ -173,12 +173,7 @@ export class Alphastats implements OnInit {
       });
     } catch (error) {
       console.error('Failed to load example:', error);
-      this.snackBar.open('Failed to load example data. Please ensure example files are available.', 'Close', {
-        duration: 5000,
-        horizontalPosition: 'center',
-        verticalPosition: 'top',
-        panelClass: ['error-snackbar']
-      });
+      this.notification.showError('Failed to load example data. Please ensure example files are available.');
     }
   }
 
@@ -188,12 +183,7 @@ export class Alphastats implements OnInit {
     const comparisons = this.comparisons();
     for (const c of comparisons) {
       if (!c.condition_A || !c.condition_B || !c.comparison_label) {
-        this.snackBar.open('Please complete all comparison fields', 'Close', {
-          duration: 5000,
-          horizontalPosition: 'center',
-          verticalPosition: 'top',
-          panelClass: ['error-snackbar']
-        });
+        this.notification.showError('Please complete all comparison fields');
         return;
       }
     }

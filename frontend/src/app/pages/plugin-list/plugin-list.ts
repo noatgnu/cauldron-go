@@ -14,10 +14,23 @@ import { MatMenuModule } from '@angular/material/menu';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatBadgeModule } from '@angular/material/badge';
+import { MatToolbarModule } from '@angular/material/toolbar';
 import { PluginV2Service } from '../../core/services/plugin-v2';
+import { NotificationService } from '../../core/services/notification.service';
 import { models } from '../../../wailsjs/go/models';
 import { PluginEnvironmentDialog } from '../../components/plugin-environment-dialog/plugin-environment-dialog';
+import { UninstallPluginDialog, UninstallPluginResult } from '../../components/uninstall-plugin-dialog/uninstall-plugin-dialog';
 import { Wails } from '../../core/services/wails';
+
+interface UpdateInfo {
+  hasUpdate: boolean;
+  currentCommit: string;
+  latestCommit?: string;
+  recommendedCommit?: string;
+  changelogUrl?: string;
+  checking?: boolean;
+  error?: string;
+}
 
 @Component({
   selector: 'app-plugin-list',
@@ -35,19 +48,23 @@ import { Wails } from '../../core/services/wails';
     MatMenuModule,
     MatButtonToggleModule,
     MatTooltipModule,
-    MatBadgeModule
+    MatBadgeModule,
+    MatToolbarModule
   ],
   templateUrl: './plugin-list.html',
   styleUrl: './plugin-list.scss',
 })
+
 export class PluginList implements OnInit {
   plugins = signal<models.PluginV2[]>([]);
   filteredPlugins = signal<models.PluginV2[]>([]);
   loading = signal(true);
+  updatingAll = signal(false);
   error = signal('');
   searchQuery = '';
   sourceFilter: 'all' | 'builtin' | 'remote' = 'all';
   pluginBindings = signal<Map<string, { python: boolean, r: boolean }>>(new Map());
+  updateInfo = signal<Map<string, UpdateInfo>>(new Map());
 
   categoryIcons: Record<string, string> = {
     'analysis': 'analytics',
@@ -60,7 +77,8 @@ export class PluginList implements OnInit {
     private pluginService: PluginV2Service,
     private router: Router,
     private dialog: MatDialog,
-    private wails: Wails
+    private wails: Wails,
+    private notification: NotificationService
   ) {}
 
   async ngOnInit() {
@@ -174,6 +192,32 @@ export class PluginList implements OnInit {
     this.router.navigate(['/plugin', pluginId.toString()]);
   }
 
+  getRuntimeIconFromPlugin(plugin: models.PluginV2): string {
+    const envs = this.getPluginEnvironments(plugin);
+    if (envs.length > 1) {
+      return 'hub';
+    }
+    if (envs.includes('python')) {
+      return 'code';
+    }
+    if (envs.includes('r')) {
+      return 'analytics';
+    }
+    return 'terminal';
+  }
+
+  getRuntimeLabelFromPlugin(plugin: models.PluginV2): string {
+    const envs = this.getPluginEnvironments(plugin);
+    if (envs.length === 0) {
+      return 'Direct';
+    }
+    return envs.map(e => e.charAt(0).toUpperCase() + e.slice(1)).join(' + ');
+  }
+
+  private getPluginEnvironments(plugin: models.PluginV2): string[] {
+    return plugin.definition.runtime.environments || [];
+  }
+
   getRuntimeIcon(runtime: string): string {
     switch (runtime) {
       case 'python':
@@ -209,9 +253,172 @@ export class PluginList implements OnInit {
       data: {
         pluginId: plugin.id.toString(),
         pluginName: plugin.definition.plugin.name,
-        runtimeType: plugin.definition.runtime.type,
+        runtimeEnvironments: plugin.definition.runtime.environments,
         plugin: plugin
       }
     });
   }
+
+  async checkForUpdate(event: Event, plugin: models.PluginV2) {
+    event.stopPropagation();
+
+    if (plugin.installSource !== 'remote' || !plugin.repository) {
+      return;
+    }
+
+    const key = plugin.id.toString();
+    const currentMap = new Map(this.updateInfo());
+    currentMap.set(key, {
+      hasUpdate: false,
+      currentCommit: plugin.commitHash || '',
+      checking: true
+    });
+    this.updateInfo.set(currentMap);
+
+    try {
+      const result = await this.wails.checkPluginUpdate(
+        plugin.repository,
+        plugin.commitHash || '',
+        null
+      );
+
+      const newMap = new Map(this.updateInfo());
+      newMap.set(key, {
+        hasUpdate: result.has_update || false,
+        currentCommit: result.current_commit || plugin.commitHash || '',
+        latestCommit: result.latest_commit,
+        recommendedCommit: result.recommended_commit,
+        changelogUrl: result.changelog_url,
+        checking: false
+      });
+      this.updateInfo.set(newMap);
+    } catch (err) {
+      const errorMap = new Map(this.updateInfo());
+      errorMap.set(key, {
+        hasUpdate: false,
+        currentCommit: plugin.commitHash || '',
+        checking: false,
+        error: String(err)
+      });
+      this.updateInfo.set(errorMap);
+    }
+  }
+
+  hasUpdateInfo(pluginId: number): boolean {
+    return this.updateInfo().has(pluginId.toString());
+  }
+
+  getUpdateInfo(pluginId: number): UpdateInfo | undefined {
+    return this.updateInfo().get(pluginId.toString());
+  }
+
+  isCheckingUpdate(pluginId: number): boolean {
+    const info = this.getUpdateInfo(pluginId);
+    return info?.checking || false;
+  }
+
+  hasAvailableUpdate(pluginId: number): boolean {
+    const info = this.getUpdateInfo(pluginId);
+    return info?.hasUpdate || false;
+  }
+
+  async installUpdate(event: Event, plugin: models.PluginV2) {
+    event.stopPropagation();
+
+    const updateInfo = this.getUpdateInfo(plugin.id);
+    if (!updateInfo || !updateInfo.hasUpdate || !plugin.repository) {
+      return;
+    }
+
+    const targetCommit = updateInfo.recommendedCommit || updateInfo.latestCommit;
+    if (!targetCommit) {
+      this.notification.showWarning('No target commit available for update');
+      return;
+    }
+
+    try {
+      const shortCommit = targetCommit.substring(0, 7);
+      this.notification.showInfo(`Updating ${plugin.definition.plugin.name} to ${shortCommit}...`, 2000);
+
+      await this.wails.updatePluginToCommit(plugin.repository, targetCommit);
+
+      this.notification.showSuccess('Plugin updated successfully! Reloading...', 2000);
+
+      const updateMap = new Map(this.updateInfo());
+      updateMap.delete(plugin.id.toString());
+      this.updateInfo.set(updateMap);
+
+      await this.loadPlugins();
+
+    } catch (err) {
+      this.notification.showError(`Update failed: ${err}`);
+    }
+  }
+
+  async updateAllRemotePlugins() {
+    this.updatingAll.set(true);
+
+    try {
+      this.notification.showInfo('Updating all external plugins...', 2000);
+
+      await this.wails.updateAllRemotePlugins();
+
+      this.notification.showSuccess('All external plugins updated successfully! Reloading...');
+
+      this.updateInfo.set(new Map());
+
+      await this.loadPlugins();
+
+    } catch (err) {
+      this.notification.showError(`Update failed: ${err}`);
+    } finally {
+      this.updatingAll.set(false);
+    }
+  }
+
+  async uninstallPlugin(event: Event, plugin: models.PluginV2) {
+    event.stopPropagation();
+
+    if (plugin.installSource !== 'remote' || !plugin.repository) {
+      this.notification.showWarning('Only externally installed plugins can be uninstalled');
+      return;
+    }
+
+    const dialogRef = this.dialog.open(UninstallPluginDialog, {
+      width: '600px',
+      disableClose: true,
+      data: {
+        pluginId: plugin.definition.plugin.id,
+        pluginName: plugin.definition.plugin.name,
+        repositoryURL: plugin.repository
+      }
+    });
+
+    dialogRef.afterClosed().subscribe(async (result: UninstallPluginResult) => {
+      if (result && result.confirmed) {
+        try {
+          this.notification.showInfo(`Uninstalling ${plugin.definition.plugin.name}...`, 2000);
+
+          await this.wails.uninstallPluginFromRepo(
+            plugin.repository!,
+            result.removeGitAuth,
+            result.deleteJobHistory,
+            result.deleteEnvironments
+          );
+
+          this.notification.showSuccess('Plugin uninstalled successfully! Reloading...');
+
+          const updateMap = new Map(this.updateInfo());
+          updateMap.delete(plugin.id.toString());
+          this.updateInfo.set(updateMap);
+
+          await this.loadPlugins();
+
+        } catch (err) {
+          this.notification.showError(`Uninstall failed: ${err}`);
+        }
+      }
+    });
+  }
+
 }

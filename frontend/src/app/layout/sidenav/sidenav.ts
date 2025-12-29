@@ -137,9 +137,11 @@ export class Sidenav implements OnInit {
   settingsNavItems: NavItem[] = [
     { label: 'Back to Plugins', icon: 'arrow_back', route: '/home' },
     { label: 'General', icon: 'settings', route: '/settings/general' },
+    { label: 'Appearance', icon: 'palette', route: '/settings/appearance' },
     { label: 'Python', icon: 'language', route: '/settings/python' },
     { label: 'R', icon: 'analytics', route: '/settings/r' },
     { label: 'Environment Variables', icon: 'tune', route: '/settings/env' },
+    { label: 'Git Authentication', icon: 'key', route: '/settings/git' },
     { label: 'Plugin Registry', icon: 'cloud', route: '/settings/registry' }
   ];
 
@@ -200,6 +202,12 @@ export class Sidenav implements OnInit {
 
   async ngOnInit() {
     await this.loadPlugins();
+
+    if (window.runtime) {
+      window.runtime.EventsOn('plugin:install:success', () => {
+        this.loadPlugins();
+      });
+    }
   }
 
   async loadPlugins() {

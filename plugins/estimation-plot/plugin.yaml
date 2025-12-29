@@ -8,7 +8,7 @@ plugin:
   icon: "show_chart"
 
 runtime:
-  type: "python"
+  environments: ["python"]
   script: "estimation_plot.py"
 
 inputs:

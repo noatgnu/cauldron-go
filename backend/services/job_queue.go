@@ -82,10 +82,10 @@ func (j *JobQueueService) worker() {
 }
 
 func (j *JobQueueService) CreateJob(jobType string, name string, command string, args []string) (string, error) {
-	return j.CreateJobWithParameters(jobType, name, command, args, make(map[string]interface{}))
+	return j.CreateJobWithParameters(jobType, name, command, args, make(map[string]interface{}), "", "")
 }
 
-func (j *JobQueueService) CreateJobWithParameters(jobType string, name string, command string, args []string, parameters map[string]interface{}) (string, error) {
+func (j *JobQueueService) CreateJobWithParameters(jobType string, name string, command string, args []string, parameters map[string]interface{}, pluginVersion string, pluginCommitHash string) (string, error) {
 	pythonPath := ""
 	pythonEnvType := ""
 	rPath := ""
@@ -118,20 +118,22 @@ func (j *JobQueueService) CreateJobWithParameters(jobType string, name string, c
 	}
 
 	job := &models.Job{
-		ID:             uuid.New().String(),
-		Type:           jobType,
-		Name:           name,
-		Status:         models.JobStatusPending,
-		Progress:       0,
-		Command:        command,
-		Args:           args,
-		Parameters:     parameters,
-		PythonEnvPath:  pythonPath,
-		PythonEnvType:  pythonEnvType,
-		REnvPath:       rPath,
-		REnvType:       rEnvType,
-		TerminalOutput: []string{},
-		CreatedAt:      time.Now(),
+		ID:               uuid.New().String(),
+		Type:             jobType,
+		Name:             name,
+		Status:           models.JobStatusPending,
+		Progress:         0,
+		Command:          command,
+		Args:             args,
+		Parameters:       parameters,
+		PythonEnvPath:    pythonPath,
+		PythonEnvType:    pythonEnvType,
+		REnvPath:         rPath,
+		REnvType:         rEnvType,
+		TerminalOutput:   []string{},
+		PluginVersion:    pluginVersion,
+		PluginCommitHash: pluginCommitHash,
+		CreatedAt:        time.Now(),
 	}
 
 	j.mu.Lock()
@@ -469,20 +471,22 @@ func (j *JobQueueService) RerunJob(jobID string, useSameEnvironment bool, python
 				}
 
 				newJob := &models.Job{
-					ID:             uuid.New().String(),
-					Type:           originalJob.Type,
-					Name:           originalJob.Name + " (Rerun)",
-					Status:         models.JobStatusPending,
-					Progress:       0,
-					Command:        originalJob.Command,
-					Args:           newArgs,
-					Parameters:     newParameters,
-					PythonEnvPath:  newPythonPath,
-					PythonEnvType:  newPythonType,
-					REnvPath:       newRPath,
-					REnvType:       newRType,
-					TerminalOutput: []string{},
-					CreatedAt:      time.Now(),
+					ID:               uuid.New().String(),
+					Type:             originalJob.Type,
+					Name:             originalJob.Name + " (Rerun)",
+					Status:           models.JobStatusPending,
+					Progress:         0,
+					Command:          originalJob.Command,
+					Args:             newArgs,
+					Parameters:       newParameters,
+					PythonEnvPath:    newPythonPath,
+					PythonEnvType:    newPythonType,
+					REnvPath:         newRPath,
+					REnvType:         newRType,
+					TerminalOutput:   []string{},
+					PluginVersion:    originalJob.PluginVersion,
+					PluginCommitHash: originalJob.PluginCommitHash,
+					CreatedAt:        time.Now(),
 				}
 
 				j.mu.Lock()
@@ -504,20 +508,22 @@ func (j *JobQueueService) RerunJob(jobID string, useSameEnvironment bool, python
 
 	// Fallback: if no output directory found, use original behavior
 	newJob := &models.Job{
-		ID:             uuid.New().String(),
-		Type:           originalJob.Type,
-		Name:           originalJob.Name + " (Rerun)",
-		Status:         models.JobStatusPending,
-		Progress:       0,
-		Command:        originalJob.Command,
-		Args:           originalJob.Args,
-		Parameters:     originalJob.Parameters,
-		PythonEnvPath:  newPythonPath,
-		PythonEnvType:  newPythonType,
-		REnvPath:       newRPath,
-		REnvType:       newRType,
-		TerminalOutput: []string{},
-		CreatedAt:      time.Now(),
+		ID:               uuid.New().String(),
+		Type:             originalJob.Type,
+		Name:             originalJob.Name + " (Rerun)",
+		Status:           models.JobStatusPending,
+		Progress:         0,
+		Command:          originalJob.Command,
+		Args:             originalJob.Args,
+		Parameters:       originalJob.Parameters,
+		PythonEnvPath:    newPythonPath,
+		PythonEnvType:    newPythonType,
+		REnvPath:         newRPath,
+		REnvType:         newRType,
+		TerminalOutput:   []string{},
+		PluginVersion:    originalJob.PluginVersion,
+		PluginCommitHash: originalJob.PluginCommitHash,
+		CreatedAt:        time.Now(),
 	}
 
 	j.mu.Lock()

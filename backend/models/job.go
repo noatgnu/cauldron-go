@@ -64,24 +64,26 @@ func (j JSONMap) Value() (driver.Value, error) {
 }
 
 type Job struct {
-	ID             string      `gorm:"primaryKey" json:"id"`
-	Type           string      `gorm:"not null" json:"type"`
-	Name           string      `gorm:"not null" json:"name"`
-	Status         JobStatus   `gorm:"not null;default:pending" json:"status"`
-	Progress       float64     `gorm:"default:0" json:"progress"`
-	Command        string      `gorm:"not null" json:"command"`
-	Args           StringArray `gorm:"type:text" json:"args"`
-	Parameters     JSONMap     `gorm:"type:text" json:"parameters"`
-	PythonEnvPath  string      `json:"pythonEnvPath,omitempty"`
-	PythonEnvType  string      `json:"pythonEnvType,omitempty"`
-	REnvPath       string      `json:"rEnvPath,omitempty"`
-	REnvType       string      `json:"rEnvType,omitempty"`
-	OutputPath     string      `json:"outputPath"`
-	TerminalOutput StringArray `gorm:"type:text" json:"terminalOutput"`
-	CreatedAt      time.Time   `gorm:"not null" json:"createdAt"`
-	StartedAt      *time.Time  `json:"startedAt,omitempty"`
-	CompletedAt    *time.Time  `json:"completedAt,omitempty"`
-	Error          string      `json:"error,omitempty"`
+	ID               string      `gorm:"primaryKey" json:"id"`
+	Type             string      `gorm:"not null" json:"type"`
+	Name             string      `gorm:"not null" json:"name"`
+	Status           JobStatus   `gorm:"not null;default:pending" json:"status"`
+	Progress         float64     `gorm:"default:0" json:"progress"`
+	Command          string      `gorm:"not null" json:"command"`
+	Args             StringArray `gorm:"type:text" json:"args"`
+	Parameters       JSONMap     `gorm:"type:text" json:"parameters"`
+	PythonEnvPath    string      `json:"pythonEnvPath,omitempty"`
+	PythonEnvType    string      `json:"pythonEnvType,omitempty"`
+	REnvPath         string      `json:"rEnvPath,omitempty"`
+	REnvType         string      `json:"rEnvType,omitempty"`
+	OutputPath       string      `json:"outputPath"`
+	TerminalOutput   StringArray `gorm:"type:text" json:"terminalOutput"`
+	PluginVersion    string      `json:"pluginVersion,omitempty"`
+	PluginCommitHash string      `json:"pluginCommitHash,omitempty"`
+	CreatedAt        time.Time   `gorm:"not null" json:"createdAt"`
+	StartedAt        *time.Time  `json:"startedAt,omitempty"`
+	CompletedAt      *time.Time  `json:"completedAt,omitempty"`
+	Error            string      `json:"error,omitempty"`
 }
 
 type JobRequest struct {

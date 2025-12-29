@@ -9,7 +9,7 @@ plugin:
   icon: "biotech"
 
 runtime:
-  type: "r"
+  environments: ["r"]
   script: "phosr_maxquant_tmt_modular.R"
 
 inputs:
@@ -343,19 +343,6 @@ inputs:
       field: "perform_kinase_analysis"
       equals: true
 
-  - name: "signaling_network_top_kinases"
-    label: "Top Variable Kinases in Signaling Network"
-    type: "number"
-    required: false
-    default: 30
-    min: 10
-    max: 50
-    step: 5
-    description: "Number of top variable kinases to show in signaling network heatmap"
-    visibleWhen:
-      field: "perform_kinase_analysis"
-      equals: true
-
   - name: "network_plot_top_interactions"
     label: "Top Kinase-Substrate Interactions to Plot"
     type: "number"
@@ -490,11 +477,6 @@ outputs:
     description: "Network visualizations of top kinase-substrate interactions for each comparison. Bar plots show top kinase-substrate pairs ranked by prediction score. Network plots display kinases (colored nodes) connected to their predicted substrates (gray nodes) with edge width representing score strength. Reveals signaling network topology for significant phosphosites."
     format: "pdf"
 
-  - name: "signaling_network_plots"
-    path: "signaling_network.pdf"
-    type: "plot"
-    description: "Integrated signaling network heatmap showing top variable kinases across all samples. Displays kinase activities (row-scaled) with hierarchical clustering of kinases and samples. Provides overview of kinome activation state across experimental conditions."
-    format: "pdf"
 
 execution:
   argsMapping:
@@ -539,7 +521,6 @@ execution:
     top_ptmset_plot: "--top_ptmset_plot"
     top_diff_sites_heatmap: "--top_diff_sites_heatmap"
     top_phosphosite_heatmap: "--top_phosphosite_heatmap"
-    signaling_network_top_kinases: "--signaling_network_top_kinases"
     network_plot_top_interactions: "--network_plot_top_interactions"
 
   outputDir: "--output_folder"

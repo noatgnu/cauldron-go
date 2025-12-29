@@ -8,7 +8,7 @@ plugin:
   icon: "bubble_chart"
 
 runtime:
-  type: "python"
+  environments: ["python"]
   script: "bubble_plot.py"
 
 inputs:

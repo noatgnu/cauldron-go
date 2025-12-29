@@ -48,8 +48,8 @@ func (v *PluginValidator) ValidateDefinition(def *models.PluginDefinition) (bool
 		errors = append(errors, "Plugin category is required")
 	}
 
-	if def.Runtime.Type == "" {
-		errors = append(errors, "Runtime type is required")
+	if def.Runtime.Environments == nil || len(def.Runtime.Environments) == 0 {
+		errors = append(errors, "Runtime environments is required")
 	}
 
 	if def.Runtime.Script == "" {

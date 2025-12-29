@@ -8,7 +8,7 @@ plugin:
   icon: "analytics"
 
 runtime:
-  type: "python"
+  environments: ["python"]
   script: "cv.py"
 
 inputs:

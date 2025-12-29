@@ -1,16 +1,15 @@
 <div class="home-container">
   <div class="jobs-content">
-    <!-- Debug Info - Always Visible -->
-    <mat-card style="margin: 16px; background: #fff3cd; border-left: 4px solid #ffc107;">
-      <mat-card-content style="padding: 12px;">
-        <div style="font-size: 12px; font-family: monospace;">
+    <mat-card class="debug-card">
+      <mat-card-content class="debug-content">
+        <div class="debug-text">
           <strong>Debug Status:</strong><br>
           window.go: <span [style.color]="debugInfo().windowGoExists ? 'green' : 'red'">{{ debugInfo().windowGoExists ? 'EXISTS' : 'MISSING' }}</span> |
           Wails: <span [style.color]="wails.isWails ? 'green' : 'red'">{{ wails.isWails ? 'READY' : 'NOT READY' }}</span> |
           Jobs: {{ debugInfo().jobsLoaded }} |
           Loading: {{ loading() ? 'YES' : 'NO' }}
           @if (debugInfo().lastError) {
-            <br><strong style="color: #c62828;">Error:</strong> {{ debugInfo().lastError }}
+            <br><strong class="error-text">Error:</strong> {{ debugInfo().lastError }}
           }
           <br><strong>Last 3 logs:</strong>
           @for (log of debugInfo().logs.slice(-3); track $index) {
@@ -32,14 +31,14 @@
         <div class="loading-container">
           <mat-spinner></mat-spinner>
           <p>Loading jobs...</p>
-          <small style="color: #666; margin-top: 8px;">If this takes more than 5 seconds, check debug info above</small>
+          <small class="hint-text">If this takes more than 5 seconds, check debug info above</small>
         </div>
       } @else if (debugInfo().lastError && !wails.isWails) {
         <div class="error-state">
           <mat-icon color="warn">error</mat-icon>
           <h3>Cannot connect to backend</h3>
-          <p style="color: #666;">Wails runtime is not available</p>
-          <p style="font-size: 12px; font-family: monospace; background: #f5f5f5; padding: 12px; border-radius: 4px; margin-top: 16px;">
+          <p class="error-subtitle">Wails runtime is not available</p>
+          <p class="error-detail">
             window.go exists: {{ debugInfo().windowGoExists ? 'Yes' : 'No' }}<br>
             window.runtime exists: {{ debugInfo().windowRuntimeExists ? 'Yes' : 'No' }}<br>
             Error: {{ debugInfo().lastError }}
@@ -115,8 +114,8 @@
             <mat-spinner diameter="32"></mat-spinner>
           </div>
         } @else if (debugInfo().versionsLoaded.startsWith('✗')) {
-          <div class="error-message" style="color: #c62828; font-size: 12px; padding: 8px;">
-            <mat-icon color="warn" style="font-size: 16px;">error</mat-icon>
+          <div class="error-message">
+            <mat-icon color="warn" class="error-icon">error</mat-icon>
             Failed to load versions<br>
             <small>{{ debugInfo().versionsLoaded }}</small>
           </div>
@@ -159,8 +158,8 @@
             <mat-spinner diameter="32"></mat-spinner>
           </div>
         } @else if (debugInfo().filesLoaded.startsWith('✗')) {
-          <div class="error-message" style="color: #c62828; font-size: 12px; padding: 8px;">
-            <mat-icon color="warn" style="font-size: 16px;">error</mat-icon>
+          <div class="error-message">
+            <mat-icon color="warn" class="error-icon">error</mat-icon>
             Failed to load files<br>
             <small>{{ debugInfo().filesLoaded }}</small>
           </div>

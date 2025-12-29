@@ -1,3 +1,68 @@
+export namespace main {
+	
+	export class GitAuthConfigResponse {
+	    id: number;
+	    repositoryURL: string;
+	    sshKeyPath: string;
+	    hasPassphrase: boolean;
+	    createdAt: number;
+	    updatedAt: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new GitAuthConfigResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.repositoryURL = source["repositoryURL"];
+	        this.sshKeyPath = source["sshKeyPath"];
+	        this.hasPassphrase = source["hasPassphrase"];
+	        this.createdAt = source["createdAt"];
+	        this.updatedAt = source["updatedAt"];
+	    }
+	}
+	export class PluginInstallResult {
+	    pluginId: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new PluginInstallResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.pluginId = source["pluginId"];
+	    }
+	}
+	export class PluginRequirementsInfo {
+	    pluginId: string;
+	    pluginName: string;
+	    runtimeEnvironments: string[];
+	    pythonRequirementsFile?: string;
+	    rPackagesFile?: string;
+	    pythonPackages?: string[];
+	    rPackages?: string[];
+	    requirementsExist: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new PluginRequirementsInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.pluginId = source["pluginId"];
+	        this.pluginName = source["pluginName"];
+	        this.runtimeEnvironments = source["runtimeEnvironments"];
+	        this.pythonRequirementsFile = source["pythonRequirementsFile"];
+	        this.rPackagesFile = source["rPackagesFile"];
+	        this.pythonPackages = source["pythonPackages"];
+	        this.rPackages = source["rPackages"];
+	        this.requirementsExist = source["requirementsExist"];
+	    }
+	}
+
+}
+
 export namespace models {
 	
 	export class AnnotationConfig {
@@ -618,7 +683,7 @@ export namespace models {
 		}
 	}
 	export class PluginRuntimeV2 {
-	    type: string;
+	    environments: string[];
 	    script: string;
 	
 	    static createFrom(source: any = {}) {
@@ -627,7 +692,7 @@ export namespace models {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.type = source["type"];
+	        this.environments = source["environments"];
 	        this.script = source["script"];
 	    }
 	}

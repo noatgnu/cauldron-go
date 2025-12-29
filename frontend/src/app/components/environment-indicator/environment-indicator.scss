@@ -3,7 +3,7 @@
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
-  background: #f5f5f5;
+  background: var(--surface-variant);
   border-radius: 4px;
   margin: 12px 16px;
   max-width: 100%;
@@ -13,7 +13,7 @@
   .label {
     font-size: 12px;
     font-weight: 500;
-    color: rgba(0, 0, 0, 0.6);
+    color: var(--on-surface-variant);
     flex-shrink: 0;
   }
 

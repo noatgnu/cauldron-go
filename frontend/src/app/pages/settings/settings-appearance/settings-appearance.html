@@ -1,0 +1,41 @@
+<div class="appearance-settings">
+  <div class="form-section">
+    <h3>Theme</h3>
+    <p class="section-description">Choose between light, dark, or system theme</p>
+
+    <mat-button-toggle-group
+      [value]="themeService.theme()"
+      (change)="setTheme($any($event.value))"
+      class="theme-toggle-group">
+      <mat-button-toggle value="light">
+        <mat-icon>light_mode</mat-icon>
+        Light
+      </mat-button-toggle>
+      <mat-button-toggle value="dark">
+        <mat-icon>dark_mode</mat-icon>
+        Dark
+      </mat-button-toggle>
+      <mat-button-toggle value="system">
+        <mat-icon>brightness_auto</mat-icon>
+        System
+      </mat-button-toggle>
+    </mat-button-toggle-group>
+
+    <div class="info-box">
+      <mat-icon>info</mat-icon>
+      <div>
+        <strong>Current theme:</strong> {{ themeService.theme() }}
+        @if (themeService.theme() === 'system') {
+          <br><span class="system-theme-info">System preference: {{ themeService.isDark() ? 'Dark' : 'Light' }}</span>
+        }
+      </div>
+    </div>
+
+    <div class="info-box">
+      <mat-icon>code</mat-icon>
+      <div>
+        Console and terminal outputs will always use dark theme regardless of the selected app theme for better readability.
+      </div>
+    </div>
+  </div>
+</div>
