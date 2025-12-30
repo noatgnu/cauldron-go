@@ -19,4 +19,31 @@
       </div>
     }
   </div>
+
+  <div class="form-section">
+    <h3>Advanced Plugin Management</h3>
+    <p class="section-description">Advanced operations for managing external plugins</p>
+
+    <div class="warning-box">
+      <mat-icon>warning</mat-icon>
+      <div>
+        <strong>Force Update All External Plugins</strong><br>
+        This will update all external plugins to their latest commit, regardless of stability recommendations.
+        Only use this when the application has breaking changes that require all plugins to be updated.
+      </div>
+    </div>
+
+    <button mat-raised-button
+            color="warn"
+            (click)="forceUpdateAllPlugins()"
+            [disabled]="forceUpdating()"
+            class="force-update-button">
+      <mat-icon>update</mat-icon>
+      @if (forceUpdating()) {
+        Force Updating...
+      } @else {
+        Force Update All External Plugins
+      }
+    </button>
+  </div>
 </div>

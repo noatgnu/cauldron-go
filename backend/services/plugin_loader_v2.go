@@ -72,6 +72,7 @@ func (l *PluginLoaderV2) LoadPlugins() error {
 		plugin.InstallSource = registry.InstallSource
 		plugin.CommitHash = registry.CommitHash
 		plugin.Repository = registry.Repository
+		plugin.Enabled = registry.Enabled
 		l.plugins[registry.ID] = plugin
 		loadedCount++
 		log.Printf("[PluginLoader] Loaded plugin: %s [ID:%d] (%s) from %s [%s]",
@@ -239,6 +240,7 @@ func (l *PluginLoaderV2) getOrCreateRegistry(plugin *models.PluginV2, folderPath
 		Repository:    plugin.Definition.Plugin.Repository,
 		FolderPath:    folderPath,
 		InstallSource: installSource,
+		Enabled:       true,
 		InstalledAt:   time.Now(),
 		UpdatedAt:     time.Now(),
 	}
@@ -257,6 +259,26 @@ func (l *PluginLoaderV2) GetPlugin(id uint) (*models.PluginV2, error) {
 		return nil, fmt.Errorf("plugin not found with ID: %d", id)
 	}
 	return plugin, nil
+}
+
+func (l *PluginLoaderV2) SetPluginEnabled(id uint, enabled bool) error {
+	plugin, exists := l.plugins[id]
+	if !exists {
+		return fmt.Errorf("plugin not found with ID: %d", id)
+	}
+
+	result := l.db.GetDB().Model(&models.PluginRegistry{}).Where("id = ?", id).Update("enabled", enabled)
+	if result.Error != nil {
+		return fmt.Errorf("failed to update plugin enabled state: %w", result.Error)
+	}
+
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("no plugin registry entry found with ID: %d", id)
+	}
+
+	plugin.Enabled = enabled
+	log.Printf("[PluginLoader] Updated plugin %s [ID:%d] enabled state to: %v", plugin.Definition.Plugin.Name, id, enabled)
+	return nil
 }
 
 func (l *PluginLoaderV2) GetAllPlugins() []*models.PluginV2 {

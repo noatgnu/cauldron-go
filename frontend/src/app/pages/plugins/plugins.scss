@@ -160,11 +160,23 @@
           gap: 8px;
 
           .output-chip {
+            --mdc-chip-elevated-container-color: var(--primary) !important;
+            --mdc-chip-flat-container-color: var(--primary) !important;
+            --mdc-chip-label-text-color: var(--on-primary) !important;
+            background-color: var(--primary) !important;
+            color: var(--on-primary) !important;
+
+            .mdc-evolution-chip__action,
+            .mat-mdc-chip-action-label {
+              color: var(--on-primary) !important;
+            }
+
             mat-icon {
               font-size: 16px;
               width: 16px;
               height: 16px;
               margin-right: 4px;
+              color: var(--on-primary) !important;
             }
           }
         }

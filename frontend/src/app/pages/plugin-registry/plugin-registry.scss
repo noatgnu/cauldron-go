@@ -238,10 +238,19 @@
   }
 
   .category-chip-small {
+    --mdc-chip-elevated-container-color: var(--primary) !important;
+    --mdc-chip-flat-container-color: var(--primary) !important;
+    --mdc-chip-label-text-color: var(--on-primary) !important;
     font-size: 11px;
     min-height: 24px;
     padding: 4px 10px;
-    background: var(--primary-container);
+    background: var(--primary) !important;
+    color: var(--on-primary) !important;
+
+    .mdc-evolution-chip__action,
+    .mat-mdc-chip-action-label {
+      color: var(--on-primary) !important;
+    }
   }
 
   .date-cell {

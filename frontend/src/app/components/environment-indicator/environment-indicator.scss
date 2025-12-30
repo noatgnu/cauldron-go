@@ -32,34 +32,56 @@
     line-height: 1 !important;
 
     &.python-chip {
-      background-color: #306998 !important;
-      color: #ffffff !important;
+      --mdc-chip-elevated-container-color: var(--primary) !important;
+      --mdc-chip-flat-container-color: var(--primary) !important;
+      --mdc-chip-label-text-color: var(--on-primary) !important;
+      background-color: var(--primary) !important;
+      color: var(--on-primary) !important;
+
+      .mdc-evolution-chip__action,
+      .mat-mdc-chip-action-label {
+        color: var(--on-primary) !important;
+      }
     }
 
     &.r-chip {
-      background-color: #165caa !important;
-      color: #ffffff !important;
-    }
+      --mdc-chip-elevated-container-color: var(--accent) !important;
+      --mdc-chip-flat-container-color: var(--accent) !important;
+      --mdc-chip-label-text-color: var(--on-accent) !important;
+      background-color: var(--accent) !important;
+      color: var(--on-accent) !important;
 
-    &.python-r-chip {
-      background-color: #4a148c !important;
-      color: #ffffff !important;
+      .mdc-evolution-chip__action,
+      .mat-mdc-chip-action-label {
+        color: var(--on-accent) !important;
+      }
     }
 
     &.direct-chip {
-      background-color: #2e7d32 !important;
-      color: #ffffff !important;
+      --mdc-chip-elevated-container-color: var(--success) !important;
+      --mdc-chip-flat-container-color: var(--success) !important;
+      --mdc-chip-label-text-color: var(--on-success) !important;
+      background-color: var(--success) !important;
+      color: var(--on-success) !important;
+
+      .mdc-evolution-chip__action,
+      .mat-mdc-chip-action-label {
+        color: var(--on-success) !important;
+      }
     }
 
     .success-icon {
-      color: #a5d6a7 !important;
+      color: var(--success-light) !important;
     }
 
     .warn-icon {
-      color: #ffcc80 !important;
+      color: var(--warning) !important;
     }
 
-    // Target the material icon inside the chip
+    mat-icon {
+      color: inherit !important;
+    }
+
     ::ng-deep .mat-icon {
       font-size: 16px !important;
       height: 16px !important;

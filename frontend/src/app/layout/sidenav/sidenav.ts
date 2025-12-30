@@ -56,6 +56,9 @@ export class Sidenav implements OnInit {
     const categoryMap = new Map<string, Map<string | null, models.PluginV2[]>>();
 
     for (const plugin of this.plugins()) {
+      if (!plugin.enabled) {
+        continue;
+      }
       const category = plugin.definition.plugin.category || 'uncategorized';
       const subcategory = plugin.definition.plugin.subcategory || null;
 
@@ -209,6 +212,10 @@ export class Sidenav implements OnInit {
       });
 
       window.runtime.EventsOn('plugin:uninstall:success', () => {
+        this.loadPlugins();
+      });
+
+      window.runtime.EventsOn('plugin:enabled:changed', () => {
         this.loadPlugins();
       });
     }

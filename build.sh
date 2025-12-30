@@ -50,41 +50,50 @@ build_frontend() {
     cd "$FRONTEND_DIR"
 
     # Try to build frontend first
-    if npm run build 2>&1 | tee /tmp/frontend-build.log; then
-        print_success "Frontend build completed"
-        return 0
-    else
-        # Check if it's a bindings issue
-        if grep -q "does not exist on type" /tmp/frontend-build.log; then
-            print_error "Frontend build failed due to missing Wails bindings"
-            echo "Attempting to bootstrap bindings generation..."
+    npm run build 2>&1 | tee /tmp/frontend-build.log
+    local build_exit_code=$?
 
-            # Create placeholder frontend to allow bindings generation
-            create_placeholder_frontend
+    # Check if there are TypeScript binding errors even if build exits with 0
+    # (Angular CLI treats some TypeScript errors as warnings but still builds)
+    if grep -qE "(has no exported member|does not exist on type|Cannot find name)" /tmp/frontend-build.log; then
+        print_error "Frontend build has missing Wails bindings errors"
+        echo "Attempting to bootstrap bindings generation..."
 
-            # Generate bindings
-            if generate_bindings; then
-                print_success "Bindings generated, retrying frontend build..."
+        # Create placeholder frontend to allow bindings generation
+        create_placeholder_frontend
 
-                # Now try building frontend again with proper bindings
-                cd "$FRONTEND_DIR"
-                if npm run build 2>&1 | tee /tmp/frontend-build-retry.log; then
-                    print_success "Frontend build completed on retry"
-                    return 0
-                else
-                    print_error "Frontend build failed again after bindings generation"
+        # Generate bindings
+        if generate_bindings; then
+            print_success "Bindings generated, retrying frontend build..."
+
+            # Now try building frontend again with proper bindings
+            cd "$FRONTEND_DIR"
+            if npm run build 2>&1 | tee /tmp/frontend-build-retry.log; then
+                # Check again for binding errors after retry
+                if grep -qE "(has no exported member|does not exist on type|Cannot find name)" /tmp/frontend-build-retry.log; then
+                    print_error "Frontend build still has binding errors after retry"
                     echo "Check /tmp/frontend-build-retry.log for details"
                     exit 1
+                else
+                    print_success "Frontend build completed successfully on retry"
+                    return 0
                 fi
             else
-                print_error "Failed to generate bindings"
+                print_error "Frontend build failed after bindings generation"
+                echo "Check /tmp/frontend-build-retry.log for details"
                 exit 1
             fi
         else
-            print_error "Frontend build failed"
-            echo "Check /tmp/frontend-build.log for details"
+            print_error "Failed to generate bindings"
             exit 1
         fi
+    elif [ $build_exit_code -ne 0 ]; then
+        print_error "Frontend build failed with exit code $build_exit_code"
+        echo "Check /tmp/frontend-build.log for details"
+        exit 1
+    else
+        print_success "Frontend build completed"
+        return 0
     fi
 }
 

@@ -1,0 +1,3 @@
+curtainutils>=0.2.0
+pandas>=2.0.0
+click>=8.0.0

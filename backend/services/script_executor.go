@@ -86,12 +86,10 @@ func (s *ScriptExecutor) ExecutePythonScript(ctx context.Context, jobID string, 
 	// Check for plugin-specific venv binding
 	binding, err := s.db.GetPluginEnvironmentBinding(config.Type, "python")
 	if err != nil {
-		log.Printf("[ExecutePythonScript] Error looking up venv binding for plugin %s: %v", config.Type, err)
 	}
 
 	if binding != nil && binding.EnvironmentPath != "" {
 		// Use bound venv
-		log.Printf("[ExecutePythonScript] Found venv binding for plugin %s: %s", config.Type, binding.EnvironmentPath)
 		venvPath := binding.EnvironmentPath
 
 		// Construct Python executable path from venv
@@ -193,27 +191,15 @@ func (s *ScriptExecutor) ExecuteRScript(ctx context.Context, jobID string, confi
 	var envInfo string
 
 	// Check for plugin-specific renv binding
-	log.Printf("[ExecuteRScript] Looking up renv binding for plugin '%s' with environment type 'r'", config.Type)
 	binding, err := s.db.GetPluginEnvironmentBinding(config.Type, "r")
 	if err != nil {
-		log.Printf("[ExecuteRScript] Error looking up renv binding for plugin %s: %v", config.Type, err)
-	} else if binding == nil {
-		log.Printf("[ExecuteRScript] No renv binding found for plugin %s (binding is nil)", config.Type)
-	} else {
-		log.Printf("[ExecuteRScript] Binding lookup succeeded: PluginID=%s, EnvType=%s, EnvID=%d, EnvPath=%s",
-			binding.PluginID, binding.EnvironmentType, binding.EnvironmentID, binding.EnvironmentPath)
 	}
 
 	var renvProjectPath string
 	if binding != nil && binding.EnvironmentPath != "" {
-		log.Printf("[ExecuteRScript] Processing renv binding for plugin %s: %s", config.Type, binding.EnvironmentPath)
-
 		renvEnv, err := s.db.GetRenvEnvironmentByID(binding.EnvironmentID)
-		if err != nil {
-			log.Printf("[ExecuteRScript] Error getting renv environment: %v", err)
-		} else {
+		if err == nil {
 			renvProjectPath = renvEnv.ProjectPath
-			log.Printf("[ExecuteRScript] Using renv project path: %s", renvProjectPath)
 			envInfo = fmt.Sprintf("R (Bound renv): %s", renvProjectPath)
 		}
 	}

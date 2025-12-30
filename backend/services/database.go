@@ -161,7 +161,7 @@ func NewDatabaseService(ctx context.Context) (*DatabaseService, error) {
 }
 
 func (d *DatabaseService) autoMigrate() error {
-	return d.db.AutoMigrate(
+	if err := d.db.AutoMigrate(
 		&Setting{},
 		&ImportedFile{},
 		&VirtualEnvironment{},
@@ -173,7 +173,15 @@ func (d *DatabaseService) autoMigrate() error {
 		&GitAuthConfig{},
 		&models.Job{},
 		&models.PluginRegistry{},
-	)
+	); err != nil {
+		return err
+	}
+
+	if err := d.db.Model(&models.PluginRegistry{}).Where("enabled IS NULL").Update("enabled", true).Error; err != nil {
+		log.Printf("[Database] Warning: Failed to update plugin enabled defaults: %v", err)
+	}
+
+	return nil
 }
 
 func (d *DatabaseService) GetDB() *gorm.DB {
@@ -432,15 +440,11 @@ func (d *DatabaseService) SavePluginEnvironmentBinding(binding PluginEnvironment
 }
 
 func (d *DatabaseService) GetPluginEnvironmentBinding(pluginID string, envType string) (*PluginEnvironmentBinding, error) {
-	log.Printf("[GetPluginEnvironmentBinding] Querying for pluginID='%s', envType='%s'", pluginID, envType)
 	var binding PluginEnvironmentBinding
 	err := d.db.Where("plugin_id = ? AND environment_type = ?", pluginID, envType).First(&binding).Error
 	if err != nil {
-		log.Printf("[GetPluginEnvironmentBinding] Query failed: %v", err)
 		return nil, err
 	}
-	log.Printf("[GetPluginEnvironmentBinding] Found binding: ID=%d, PluginID=%s, EnvType=%s, EnvID=%d, EnvPath=%s",
-		binding.ID, binding.PluginID, binding.EnvironmentType, binding.EnvironmentID, binding.EnvironmentPath)
 	return &binding, nil
 }
 

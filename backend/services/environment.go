@@ -1005,23 +1005,7 @@ func (e *EnvironmentService) GetVirtualEnvironments() ([]VirtualEnvironment, err
 func (e *EnvironmentService) DeleteVirtualEnvironment(id uint) error {
 	log.Printf("[DeleteVirtualEnvironment] Deleting environment with ID: %d\n", id)
 
-	var bindings []PluginEnvironmentBinding
-	if err := e.db.GetDB().Where("environment_id = ? AND environment_type = ?", id, "python").Find(&bindings).Error; err != nil {
-		log.Printf("[DeleteVirtualEnvironment] Error finding bindings: %v\n", err)
-	} else {
-		log.Printf("[DeleteVirtualEnvironment] Found %d bindings to delete\n", len(bindings))
-		for _, binding := range bindings {
-			log.Printf("[DeleteVirtualEnvironment] Binding: ID=%d, PluginID=%s, EnvID=%d, EnvType=%s\n",
-				binding.ID, binding.PluginID, binding.EnvironmentID, binding.EnvironmentType)
-		}
-	}
-
-	result := e.db.GetDB().Where("environment_id = ? AND environment_type = ?", id, "python").Delete(&PluginEnvironmentBinding{})
-	if result.Error != nil {
-		log.Printf("[DeleteVirtualEnvironment] Error deleting plugin bindings: %v\n", result.Error)
-	} else {
-		log.Printf("[DeleteVirtualEnvironment] Deleted %d plugin bindings\n", result.RowsAffected)
-	}
+	e.db.GetDB().Where("environment_id = ? AND environment_type = ?", id, "python").Delete(&PluginEnvironmentBinding{})
 
 	return e.db.GetDB().Delete(&VirtualEnvironment{}, id).Error
 }
@@ -1346,23 +1330,7 @@ func (e *EnvironmentService) DeleteRenvEnvironment(id uint) error {
 		return err
 	}
 
-	var bindings []PluginEnvironmentBinding
-	if err := e.db.GetDB().Where("environment_id = ? AND environment_type = ?", id, "r").Find(&bindings).Error; err != nil {
-		log.Printf("[DeleteRenvEnvironment] Error finding bindings: %v\n", err)
-	} else {
-		log.Printf("[DeleteRenvEnvironment] Found %d bindings to delete\n", len(bindings))
-		for _, binding := range bindings {
-			log.Printf("[DeleteRenvEnvironment] Binding: ID=%d, PluginID=%s, EnvID=%d, EnvType=%s\n",
-				binding.ID, binding.PluginID, binding.EnvironmentID, binding.EnvironmentType)
-		}
-	}
-
-	result := e.db.GetDB().Where("environment_id = ? AND environment_type = ?", id, "r").Delete(&PluginEnvironmentBinding{})
-	if result.Error != nil {
-		log.Printf("[DeleteRenvEnvironment] Error deleting plugin bindings: %v\n", result.Error)
-	} else {
-		log.Printf("[DeleteRenvEnvironment] Deleted %d plugin bindings\n", result.RowsAffected)
-	}
+	e.db.GetDB().Where("environment_id = ? AND environment_type = ?", id, "r").Delete(&PluginEnvironmentBinding{})
 
 	if err := os.RemoveAll(env.ProjectPath); err != nil {
 		log.Printf("[DeleteRenvEnvironment] Warning: Failed to delete directory %s: %v", env.ProjectPath, err)

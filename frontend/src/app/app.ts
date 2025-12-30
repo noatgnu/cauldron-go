@@ -53,22 +53,6 @@ export class App implements OnInit {
     window.runtime.EventsOn('menu:settings', () => {
       this.router.navigate(['/settings']);
     });
-
-    window.runtime.EventsOn('menu:pca', () => {
-      this.router.navigate(['/analysis/pca']);
-    });
-
-    window.runtime.EventsOn('menu:imputation', () => {
-      this.router.navigate(['/analysis/imputation']);
-    });
-
-    window.runtime.EventsOn('menu:normalization', () => {
-      this.router.navigate(['/analysis/normalization']);
-    });
-
-    window.runtime.EventsOn('menu:limma', () => {
-      this.router.navigate(['/analysis/limma']);
-    });
   }
 
   private setupPluginInstallationListeners(): void {

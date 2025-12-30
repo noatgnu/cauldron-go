@@ -1,0 +1,112 @@
+<h2 mat-dialog-title>
+  <mat-icon>update</mat-icon>
+  Plugin Updates Available
+</h2>
+
+<mat-dialog-content>
+  @if (checking()) {
+    <div class="checking-container">
+      <mat-spinner diameter="40"></mat-spinner>
+      <p>Checking for plugin updates...</p>
+    </div>
+  } @else if (availableUpdates().length === 0) {
+    <div class="no-updates">
+      <mat-icon>check_circle</mat-icon>
+      <p>All plugins are up to date!</p>
+    </div>
+  } @else {
+    <p class="updates-info">
+      Found {{ availableUpdates().length }} plugin(s) with available updates.
+      Select the plugins you want to update:
+    </p>
+
+    <table mat-table [dataSource]="availableUpdates()" class="updates-table">
+      <ng-container matColumnDef="select">
+        <th mat-header-cell *matHeaderCellDef>
+          <mat-checkbox
+            (change)="$event ? masterToggle() : null"
+            [checked]="selection.hasValue() && isAllSelected()"
+            [indeterminate]="selection.hasValue() && !isAllSelected()">
+          </mat-checkbox>
+        </th>
+        <td mat-cell *matCellDef="let row">
+          <mat-checkbox
+            (click)="$event.stopPropagation()"
+            (change)="$event ? selection.toggle(row) : null"
+            [checked]="selection.isSelected(row)">
+          </mat-checkbox>
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="name">
+        <th mat-header-cell *matHeaderCellDef>Plugin</th>
+        <td mat-cell *matCellDef="let element">
+          <div class="plugin-name">
+            <mat-icon>{{ element.plugin.definition.plugin.icon || 'extension' }}</mat-icon>
+            <span>{{ element.plugin.definition.plugin.name }}</span>
+          </div>
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="current">
+        <th mat-header-cell *matHeaderCellDef>Current</th>
+        <td mat-cell *matCellDef="let element">
+          <code class="commit-hash">{{ getShortCommit(element.currentCommit) }}</code>
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="recommended">
+        <th mat-header-cell *matHeaderCellDef>Recommended</th>
+        <td mat-cell *matCellDef="let element">
+          <code class="commit-hash recommended">{{ getShortCommit(element.recommendedCommit) }}</code>
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="latest">
+        <th mat-header-cell *matHeaderCellDef>Latest</th>
+        <td mat-cell *matCellDef="let element">
+          <code class="commit-hash">{{ getShortCommit(element.latestCommit) }}</code>
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="changelog">
+        <th mat-header-cell *matHeaderCellDef>Changelog</th>
+        <td mat-cell *matCellDef="let element">
+          @if (element.changelogUrl) {
+            <button mat-icon-button (click)="openChangelog(element.changelogUrl)" matTooltip="View changelog">
+              <mat-icon>open_in_new</mat-icon>
+            </button>
+          }
+        </td>
+      </ng-container>
+
+      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+      <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+    </table>
+  }
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  @if (!checking()) {
+    @if (availableUpdates().length > 0) {
+      <button mat-button (click)="close()" [disabled]="updating()">
+        Cancel
+      </button>
+      <button mat-raised-button
+              color="primary"
+              (click)="updateSelected()"
+              [disabled]="selection.selected.length === 0 || updating()">
+        <mat-icon>download</mat-icon>
+        @if (updating()) {
+          Updating...
+        } @else {
+          Update {{ selection.selected.length }} Plugin(s)
+        }
+      </button>
+    } @else {
+      <button mat-raised-button color="primary" (click)="close()">
+        Close
+      </button>
+    }
+  }
+</mat-dialog-actions>

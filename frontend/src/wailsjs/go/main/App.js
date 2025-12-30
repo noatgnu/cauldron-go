@@ -114,6 +114,10 @@ export function ExecuteRScript(arg1, arg2) {
   return window['go']['main']['App']['ExecuteRScript'](arg1, arg2);
 }
 
+export function ForceUpdateAllRemotePlugins() {
+  return window['go']['main']['App']['ForceUpdateAllRemotePlugins']();
+}
+
 export function GetActivePythonEnvironment() {
   return window['go']['main']['App']['GetActivePythonEnvironment']();
 }
@@ -448,6 +452,10 @@ export function SetActivePythonEnvironment(arg1) {
 
 export function SetActiveREnvironment(arg1) {
   return window['go']['main']['App']['SetActiveREnvironment'](arg1);
+}
+
+export function SetPluginEnabled(arg1, arg2) {
+  return window['go']['main']['App']['SetPluginEnabled'](arg1, arg2);
 }
 
 export function SetPluginUpdatePolicy(arg1, arg2) {

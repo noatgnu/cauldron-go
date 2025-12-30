@@ -1,0 +1,122 @@
+plugin:
+  id: diann-curtainptm-converter
+  name: DIA-NN to CurtainPTM Converter
+  description: Convert DIA-NN PTM differential analysis output to CurtainPTM upload format. Processes modified sequences, maps PTM positions to protein sequences, and generates sequence windows around modification sites.
+  version: 1.0.0
+  author: CauldronGO Team
+  category: utilities
+  subcategory: format-conversion
+  icon: transform
+
+runtime:
+  environments:
+    - python
+  script: convert.py
+
+inputs:
+  - name: pr_file
+    label: PR File (Differential Analysis)
+    type: file
+    required: true
+    accept: .txt,.tsv
+    description: DIA-NN precursor-level differential analysis file containing Modified.Sequence, Precursor.Id, and Protein.Group columns
+
+  - name: report_file
+    label: Report File (Optional)
+    type: file
+    required: false
+    accept: .txt,.tsv
+    description: DIA-NN report file containing protein sequences and PTM.Site.Confidence scores
+
+  - name: modification_type
+    label: Modification Type
+    type: select
+    required: true
+    default: UniMod:21
+    options:
+      - UniMod:21
+      - UniMod:1
+      - UniMod:35
+      - UniMod:4
+    description: Type of modification to process (UniMod:21 = Phosphorylation, UniMod:1 = Acetylation, UniMod:35 = Oxidation, UniMod:4 = Carbamidomethyl)
+
+  - name: custom_modification
+    label: Custom Modification (Advanced)
+    type: text
+    required: false
+    placeholder: e.g., UniMod:123
+    description: Specify a custom UniMod modification identifier
+    visibleWhen:
+      field: modification_type
+      equals: custom
+
+  - name: fasta_file
+    label: FASTA File (Optional)
+    type: file
+    required: false
+    accept: .fasta,.fa
+    description: Protein sequence FASTA file. If not provided, sequences will be fetched from UniProt automatically.
+
+  - name: localization_score_col
+    label: Localization Score Column
+    type: text
+    required: false
+    default: PTM.Site.Confidence
+    placeholder: PTM.Site.Confidence
+    description: Column name containing PTM site confidence scores in the report file
+
+  - name: multiple_site
+    label: Process Multiple Sites
+    type: boolean
+    required: false
+    default: false
+    description: Enable this to process peptides with multiple modification sites. When enabled, all sites will be reported in semicolon-separated format.
+
+  - name: uniprot_columns
+    label: UniProt Data Columns
+    type: text
+    required: false
+    default: accession,id,sequence,protein_name
+    placeholder: accession,id,sequence,protein_name
+    description: Comma-separated list of UniProt columns to retrieve when fetching sequences online
+
+  - name: output_filename
+    label: Output Filename
+    type: text
+    required: false
+    default: curtainptm_input.txt
+    placeholder: curtainptm_input.txt
+    description: Name of the output file (will be created in the output folder)
+
+  - name: output_meta
+    label: Output Metadata File
+    type: boolean
+    required: false
+    default: false
+    description: Generate an additional metadata file with intensity information from the report file. Only works when a report file is provided.
+    visibleWhen:
+      field: report_file
+      equals: null
+
+  - name: sequence_window_size
+    label: Sequence Window Size
+    type: number
+    required: false
+    default: 21
+    min: 1
+    max: 101
+    step: 2
+    description: Size of the sequence window around modification sites (must be odd number). Default is 21 (10 residues before + modification + 10 after).
+
+outputs:
+  - name: converted_file
+    path: '*.txt'
+    type: data
+    format: tsv
+    description: Converted file in CurtainPTM upload format with PTM positions, sequence windows, and protein annotations
+
+execution:
+  outputDir: --output_folder
+  requirements:
+    pythonRequirementsFile: requirements.txt
+    python: '>=3.10'

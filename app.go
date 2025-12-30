@@ -1682,6 +1682,10 @@ func (a *App) GetPluginV2(id uint) (*models.PluginV2, error) {
 	return a.pluginLoaderV2.GetPlugin(id)
 }
 
+func (a *App) SetPluginEnabled(id uint, enabled bool) error {
+	return a.pluginLoaderV2.SetPluginEnabled(id, enabled)
+}
+
 func (a *App) ExecutePluginV2(req models.PluginExecutionRequestV2) (string, error) {
 	log.Printf("[ExecutePluginV2] Starting execution for plugin ID: %d", req.PluginID)
 	plugin, err := a.pluginLoaderV2.GetPlugin(req.PluginID)
@@ -2192,6 +2196,50 @@ func (a *App) UpdateAllRemotePlugins() error {
 	}
 
 	log.Printf("[App] Updated %d/%d remote plugins", successCount, len(registries))
+
+	if len(errors) > 0 {
+		return fmt.Errorf("some plugins failed to update: %s", strings.Join(errors, "; "))
+	}
+
+	return nil
+}
+
+func (a *App) ForceUpdateAllRemotePlugins() error {
+	log.Printf("[App] Force updating all remote plugins to latest")
+
+	var registries []models.PluginRegistry
+	if err := a.db.GetDB().Where("install_source = ?", "remote").Find(&registries).Error; err != nil {
+		return fmt.Errorf("failed to fetch remote plugins: %w", err)
+	}
+
+	if len(registries) == 0 {
+		log.Printf("[App] No remote plugins found to update")
+		return fmt.Errorf("no external plugins installed")
+	}
+
+	log.Printf("[App] Found %d remote plugin(s) to force update", len(registries))
+
+	var errors []string
+	successCount := 0
+
+	for _, registry := range registries {
+		if registry.Repository == "" {
+			log.Printf("[App] Skipping plugin %s: no repository URL", registry.PluginID)
+			continue
+		}
+
+		log.Printf("[App] Force updating plugin %s from %s", registry.PluginID, registry.Repository)
+		if err := a.pluginInstaller.UpdatePlugin(registry.Repository); err != nil {
+			errMsg := fmt.Sprintf("Failed to update %s: %v", registry.PluginID, err)
+			log.Printf("[App] %s", errMsg)
+			errors = append(errors, errMsg)
+		} else {
+			successCount++
+			log.Printf("[App] Successfully force updated %s", registry.PluginID)
+		}
+	}
+
+	log.Printf("[App] Force updated %d/%d remote plugins", successCount, len(registries))
 
 	if len(errors) > 0 {
 		return fmt.Errorf("some plugins failed to update: %s", strings.Join(errors, "; "))

@@ -70,3 +70,37 @@
     }
   }
 }
+
+.warning-box {
+  display: flex;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--warning-container);
+  border: 1px solid var(--warning);
+  border-radius: 4px;
+  margin: 12px 0;
+
+  mat-icon {
+    flex-shrink: 0;
+    font-size: 20px;
+    width: 20px;
+    height: 20px;
+    color: var(--warning);
+  }
+
+  div {
+    flex: 1;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--on-surface);
+
+    strong {
+      font-weight: 600;
+      color: var(--on-surface);
+    }
+  }
+}
+
+.force-update-button {
+  margin-top: 12px;
+}

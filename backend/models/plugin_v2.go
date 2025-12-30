@@ -198,6 +198,7 @@ type PluginV2 struct {
 	InstallSource string           `json:"installSource"`
 	CommitHash    string           `json:"commitHash"`
 	Repository    string           `json:"repository"`
+	Enabled       bool             `json:"enabled" gorm:"default:true"`
 }
 
 type PluginExecutionRequestV2 struct {

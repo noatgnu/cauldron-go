@@ -31,26 +31,7 @@ export class Breadcrumbs implements OnInit {
     'job': { label: 'Jobs', listRoute: '/jobs' },
     'plugin': { label: 'Plugins', listRoute: '/plugin-list' },
     'plugin-list': { label: 'Plugin List' },
-    'plugins': { label: 'Plugin Management' },
-    'analysis': { label: 'Analysis' },
-    'pca': { label: 'PCA' },
-    'imputation': { label: 'Imputation' },
-    'normalization': { label: 'Normalization' },
-    'limma': { label: 'Limma' },
-    'phate': { label: 'PHATE' },
-    'fuzzy-clustering': { label: 'Fuzzy Clustering' },
-    'alphastats': { label: 'AlphaStats' },
-    'qfeatures-limma': { label: 'QFeatures + Limma' },
-    'batch-correction': { label: 'Batch Correction' },
-    'correlation-matrix': { label: 'Correlation Matrix' },
-    'venn-diagram': { label: 'Venn Diagram' },
-    'maxlfq': { label: 'MaxLFQ' },
-    'utilities': { label: 'Utilities' },
-    'uniprot': { label: 'UniProt Lookup' },
-    'coverage-map': { label: 'Coverage Map' },
-    'ptm-remap': { label: 'PTM Remapping' },
-    'peptide-check': { label: 'Peptide Library Check' },
-    'format-conversion': { label: 'Format Conversion' }
+    'plugins': { label: 'Plugin Management' }
   };
 
   constructor(

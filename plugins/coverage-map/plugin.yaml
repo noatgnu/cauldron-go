@@ -1,0 +1,73 @@
+plugin:
+  id: coverage-map
+  name: Protein Coverage Map
+  version: 1.0.0
+  description: Generate protein coverage maps from peptide data with intensity values
+  author: Cauldron Team
+  category: utilities
+  icon: map
+
+runtime:
+  type: python
+  script: get_coverage.py
+  requirements:
+    - pandas
+    - click
+    - uniprotparser
+    - numpy
+
+inputs:
+  - name: input_file
+    label: Input File
+    type: file
+    required: true
+    description: Tab-separated or CSV file containing peptide data with intensity values
+    file_types:
+      - .txt
+      - .tsv
+      - .csv
+
+  - name: sequence_column
+    label: Peptide Sequence Column
+    type: column
+    required: true
+    description: Column containing peptide sequences
+    source: input_file
+
+  - name: index_column
+    label: Index Column
+    type: column
+    required: true
+    description: Column to use as peptide identifier/index
+    source: input_file
+
+  - name: uniprot_acc_column
+    label: UniProt Accession Column
+    type: column
+    required: true
+    description: Column containing UniProt accession IDs
+    source: input_file
+
+  - name: value_columns
+    label: Intensity/Value Columns
+    type: multi-column
+    required: true
+    description: Columns containing intensity or abundance values (comma-separated)
+    source: input_file
+
+  - name: fasta_file
+    label: FASTA File (Optional)
+    type: file
+    required: false
+    description: Optional FASTA file with protein sequences. If not provided, sequences will be fetched from UniProt.
+    file_types:
+      - .fasta
+      - .fa
+
+outputs:
+  - name: coverage.txt
+    type: file
+    description: Tab-separated file with coverage map data
+  - name: uniprot_data.txt
+    type: file
+    description: UniProt sequence data used for mapping

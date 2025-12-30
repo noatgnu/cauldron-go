@@ -345,8 +345,6 @@ func (pi *PluginInstaller) UninstallPlugin(repoURL string, options UninstallOpti
 
 	if err := pi.db.GetDB().Where("plugin_id = ?", pluginID).Delete(&PluginEnvironmentBinding{}).Error; err != nil {
 		log.Printf("[PluginInstaller] Warning: failed to delete environment bindings: %v", err)
-	} else {
-		log.Printf("[PluginInstaller] Deleted environment bindings for plugin: %s", pluginID)
 	}
 
 	if err := pi.db.GetDB().Where("plugin_id = ?", registry.ID).Delete(&CustomEnvVar{}).Error; err != nil {

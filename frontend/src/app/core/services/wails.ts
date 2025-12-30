@@ -608,6 +608,11 @@ export class Wails {
     return WailsApp.UpdateAllRemotePlugins();
   }
 
+  async forceUpdateAllRemotePlugins(): Promise<void> {
+    if (!this.isWails) throw new Error('Wails not available');
+    return WailsApp.ForceUpdateAllRemotePlugins();
+  }
+
   async uninstallPluginFromRepo(repoURL: string, removeGitAuth: boolean, deleteJobHistory: boolean, deleteEnvironments: boolean): Promise<void> {
     if (!this.isWails) throw new Error('Wails not available');
     return WailsApp.UninstallPluginFromRepo(repoURL, removeGitAuth, deleteJobHistory, deleteEnvironments);

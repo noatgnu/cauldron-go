@@ -22,18 +22,23 @@
 
     <span class="spacer"></span>
 
+    <button mat-raised-button (click)="createNewPlugin()" matTooltip="Create a new plugin">
+      <mat-icon>add</mat-icon>
+      Create Plugin
+    </button>
+
     <button mat-raised-button color="primary" (click)="reloadPlugins()" [disabled]="loading()">
       <mat-icon>refresh</mat-icon>
       Reload
     </button>
 
-    <button mat-raised-button color="accent" (click)="updateAllRemotePlugins()" [disabled]="loading() || updatingAll()">
+    <button mat-raised-button
+            color="accent"
+            (click)="updateAllRemotePlugins()"
+            [disabled]="loading()"
+            matTooltip="Check for plugin updates and choose which to install">
       <mat-icon>cloud_sync</mat-icon>
-      @if (updatingAll()) {
-        Updating...
-      } @else {
-        Update All
-      }
+      Check Updates
     </button>
   </mat-toolbar>
 
@@ -104,7 +109,14 @@
                   }
                 </mat-card-content>
 
-                <mat-card-actions align="end">
+                <mat-card-actions align="end" (click)="$event.stopPropagation()">
+                  <mat-slide-toggle
+                    [(ngModel)]="plugin.enabled"
+                    (ngModelChange)="onPluginEnabledChange(plugin)"
+                    color="primary"
+                    [matTooltip]="plugin.enabled ? 'Disable plugin (hide from sidebar)' : 'Enable plugin (show in sidebar)'">
+                    Enabled
+                  </mat-slide-toggle>
                   @if (hasCustomBinding(plugin.id)) {
                     <button mat-icon-button (click)="openEnvironmentDialog($event, plugin)" [matTooltip]="getBindingTooltip(plugin.id)" color="accent">
                       <mat-icon>link</mat-icon>
@@ -112,6 +124,9 @@
                   }
                   <button mat-icon-button (click)="openEnvironmentDialog($event, plugin)" matTooltip="Environment Settings">
                     <mat-icon>settings</mat-icon>
+                  </button>
+                  <button mat-icon-button (click)="editPlugin($event, plugin)" matTooltip="Edit Plugin">
+                    <mat-icon>edit</mat-icon>
                   </button>
                   @if (plugin.installSource === 'remote' && plugin.repository) {
                     @if (hasAvailableUpdate(plugin.id)) {

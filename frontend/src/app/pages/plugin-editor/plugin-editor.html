@@ -78,9 +78,21 @@
               </mat-form-field>
 
               <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Subcategory</mat-label>
+                <input matInput formControlName="subcategory">
+                <mat-hint>Optional finer categorization (e.g., msstats, msqrob2)</mat-hint>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline" class="full-width">
                 <mat-label>Icon (Material Icon Name)</mat-label>
                 <input matInput formControlName="icon">
                 <mat-hint>Optional Material Design icon name</mat-hint>
+              </mat-form-field>
+
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Repository URL</mat-label>
+                <input matInput formControlName="repository">
+                <mat-hint>Git repository URL for remote plugins (e.g., https://github.com/org/plugin)</mat-hint>
               </mat-form-field>
             </div>
 
@@ -95,14 +107,31 @@
             <div class="form-section">
               <h3>Runtime Configuration</h3>
 
-              <mat-form-field appearance="outline" class="full-width">
-                <mat-label>Runtime Type</mat-label>
-                <mat-select formControlName="type">
-                  @for (rt of runtimeTypes; track rt.value) {
-                    <mat-option [value]="rt.value">{{ rt.label }}</mat-option>
-                  }
-                </mat-select>
-              </mat-form-field>
+              <h4>Runtime Environments</h4>
+              <p class="field-description">Select one or more runtime environments required by this plugin</p>
+
+              @for (env of environments.controls; track $index; let i = $index) {
+                <div class="array-item">
+                  <mat-form-field appearance="outline" class="flex-1">
+                    <mat-label>Environment {{ i + 1 }}</mat-label>
+                    <mat-select [formControl]="$any(env)">
+                      <mat-option value="python">Python</mat-option>
+                      <mat-option value="r">R</mat-option>
+                      <mat-option value="julia">Julia</mat-option>
+                      <mat-option value="node">Node.js</mat-option>
+                      <mat-option value="direct">Direct (no runtime)</mat-option>
+                    </mat-select>
+                  </mat-form-field>
+                  <button mat-icon-button (click)="removeEnvironment(i)" type="button" [disabled]="environments.length === 1">
+                    <mat-icon>delete</mat-icon>
+                  </button>
+                </div>
+              }
+
+              <button mat-stroked-button (click)="addEnvironment()" type="button">
+                <mat-icon>add</mat-icon>
+                Add Environment
+              </button>
 
               <mat-form-field appearance="outline" class="full-width">
                 <mat-label>Script Path</mat-label>
@@ -256,6 +285,146 @@
             <button mat-button matStepperPrevious type="button">Back</button>
             <button mat-button matStepperNext type="button">Next</button>
           </div>
+        </mat-step>
+
+        <mat-step label="Execution">
+          <form [formGroup]="$any(pluginForm.get('execution'))">
+            <div class="form-section">
+              <h3>Execution Configuration</h3>
+
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>Output Directory Flag</mat-label>
+                <input matInput formControlName="outputDir">
+                <mat-hint>Command-line flag for output directory (e.g., --output_folder)</mat-hint>
+              </mat-form-field>
+
+              <h4>Requirements</h4>
+              <form [formGroup]="$any(pluginForm.get('execution.requirements'))">
+                <mat-form-field appearance="outline" class="full-width">
+                  <mat-label>Python Version</mat-label>
+                  <input matInput formControlName="python">
+                  <mat-hint>Minimum Python version (e.g., >=3.11)</mat-hint>
+                </mat-form-field>
+
+                <mat-form-field appearance="outline" class="full-width">
+                  <mat-label>R Version</mat-label>
+                  <input matInput formControlName="r">
+                  <mat-hint>Minimum R version (e.g., >=4.0)</mat-hint>
+                </mat-form-field>
+
+                <h4>Python Requirements File</h4>
+                <mat-form-field appearance="outline" class="full-width">
+                  <mat-label>Requirements File Path</mat-label>
+                  <input matInput formControlName="pythonRequirementsFile">
+                  <mat-hint>Path to requirements.txt (e.g., requirements.txt)</mat-hint>
+                </mat-form-field>
+
+                <h4>R Packages File</h4>
+                <mat-form-field appearance="outline" class="full-width">
+                  <mat-label>R Packages File Path</mat-label>
+                  <input matInput formControlName="rPackagesFile">
+                  <mat-hint>Path to R packages file (e.g., r-packages.txt)</mat-hint>
+                </mat-form-field>
+
+                <h4>Inline Package List</h4>
+                <p class="field-description">Alternatively, specify packages inline (one per field)</p>
+
+                @for (pkg of packages.controls; track $index; let i = $index) {
+                  <div class="array-item">
+                    <mat-form-field appearance="outline" class="flex-1">
+                      <mat-label>Package {{ i + 1 }}</mat-label>
+                      <input matInput [formControl]="$any(pkg)">
+                      <mat-hint>Package name with optional version (e.g., pandas>=2.0.0)</mat-hint>
+                    </mat-form-field>
+                    <button mat-icon-button (click)="removePackage(i)" type="button">
+                      <mat-icon>delete</mat-icon>
+                    </button>
+                  </div>
+                }
+
+                <button mat-stroked-button (click)="addPackage()" type="button">
+                  <mat-icon>add</mat-icon>
+                  Add Package
+                </button>
+              </form>
+
+              <h4>Environment Variables</h4>
+              <p class="field-description">Environment variables required by the plugin</p>
+
+              @for (envVar of envVariables.controls; track $index; let i = $index) {
+                <mat-expansion-panel>
+                  <mat-expansion-panel-header>
+                    <mat-panel-title>Environment Variable {{ i + 1 }}</mat-panel-title>
+                  </mat-expansion-panel-header>
+
+                  <form [formGroup]="$any(envVar)">
+                    <mat-form-field appearance="outline" class="full-width">
+                      <mat-label>Variable Name</mat-label>
+                      <input matInput formControlName="name">
+                    </mat-form-field>
+
+                    <mat-form-field appearance="outline" class="full-width">
+                      <mat-label>Label</mat-label>
+                      <input matInput formControlName="label">
+                    </mat-form-field>
+
+                    <mat-form-field appearance="outline" class="full-width">
+                      <mat-label>Type</mat-label>
+                      <mat-select formControlName="type">
+                        <mat-option value="text">Text</mat-option>
+                        <mat-option value="number">Number</mat-option>
+                        <mat-option value="boolean">Boolean</mat-option>
+                      </mat-select>
+                    </mat-form-field>
+
+                    <mat-checkbox formControlName="required">Required</mat-checkbox>
+
+                    <mat-form-field appearance="outline" class="full-width">
+                      <mat-label>Description</mat-label>
+                      <textarea matInput formControlName="description"></textarea>
+                    </mat-form-field>
+
+                    <button mat-stroked-button color="warn" (click)="removeEnvVariable(i)" type="button">
+                      <mat-icon>delete</mat-icon>
+                      Remove Environment Variable
+                    </button>
+                  </form>
+                </mat-expansion-panel>
+              }
+
+              <button mat-stroked-button (click)="addEnvVariable()" type="button">
+                <mat-icon>add</mat-icon>
+                Add Environment Variable
+              </button>
+
+              <h4>Additional Configuration</h4>
+
+              <form [formGroup]="$any(pluginForm.get('annotation'))">
+                <h4>Annotation Configuration</h4>
+                <mat-form-field appearance="outline" class="full-width">
+                  <mat-label>Samples From (Input Field Name)</mat-label>
+                  <input matInput formControlName="samplesFrom">
+                  <mat-hint>Name of input field containing sample names</mat-hint>
+                </mat-form-field>
+
+                <mat-form-field appearance="outline" class="full-width">
+                  <mat-label>Annotation File (Input Field Name)</mat-label>
+                  <input matInput formControlName="annotationFile">
+                  <mat-hint>Name of input field for annotation file upload</mat-hint>
+                </mat-form-field>
+              </form>
+
+              <form [formGroup]="$any(pluginForm.get('diagram'))">
+                <h4>Workflow Diagram</h4>
+                <mat-checkbox formControlName="enabled">Enable automatic workflow diagram generation</mat-checkbox>
+              </form>
+            </div>
+
+            <div class="stepper-buttons">
+              <button mat-button matStepperPrevious type="button">Back</button>
+              <button mat-button matStepperNext type="button">Next</button>
+            </div>
+          </form>
         </mat-step>
 
         <mat-step label="Preview & Save">

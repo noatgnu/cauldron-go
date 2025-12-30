@@ -18,6 +18,7 @@ type PluginRegistry struct {
 	RegistrySource *string        `json:"registrySource,omitempty"`
 	UpdatePolicy   string         `gorm:"default:'auto'" json:"updatePolicy"`
 	PinnedVersion  *string        `json:"pinnedVersion,omitempty"`
+	Enabled        bool           `gorm:"default:true" json:"enabled"`
 	InstalledAt    time.Time      `json:"installedAt"`
 	UpdatedAt      time.Time      `json:"updatedAt"`
 	DeletedAt      gorm.DeletedAt `gorm:"index" json:"-"`

@@ -15,11 +15,15 @@ import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatBadgeModule } from '@angular/material/badge';
 import { MatToolbarModule } from '@angular/material/toolbar';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
+import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { PluginV2Service } from '../../core/services/plugin-v2';
 import { NotificationService } from '../../core/services/notification.service';
 import { models } from '../../../wailsjs/go/models';
+import { SetPluginEnabled } from '../../../wailsjs/go/main/App';
 import { PluginEnvironmentDialog } from '../../components/plugin-environment-dialog/plugin-environment-dialog';
 import { UninstallPluginDialog, UninstallPluginResult } from '../../components/uninstall-plugin-dialog/uninstall-plugin-dialog';
+import { PluginUpdateDialog } from '../../components/plugin-update-dialog/plugin-update-dialog';
 import { Wails } from '../../core/services/wails';
 
 interface UpdateInfo {
@@ -49,7 +53,9 @@ interface UpdateInfo {
     MatButtonToggleModule,
     MatTooltipModule,
     MatBadgeModule,
-    MatToolbarModule
+    MatToolbarModule,
+    MatSlideToggleModule,
+    MatSnackBarModule
   ],
   templateUrl: './plugin-list.html',
   styleUrl: './plugin-list.scss',
@@ -59,7 +65,6 @@ export class PluginList implements OnInit {
   plugins = signal<models.PluginV2[]>([]);
   filteredPlugins = signal<models.PluginV2[]>([]);
   loading = signal(true);
-  updatingAll = signal(false);
   error = signal('');
   searchQuery = '';
   sourceFilter: 'all' | 'builtin' | 'remote' = 'all';
@@ -78,7 +83,8 @@ export class PluginList implements OnInit {
     private router: Router,
     private dialog: MatDialog,
     private wails: Wails,
-    private notification: NotificationService
+    private notification: NotificationService,
+    private snackBar: MatSnackBar
   ) {}
 
   async ngOnInit() {
@@ -192,6 +198,15 @@ export class PluginList implements OnInit {
     this.router.navigate(['/plugin', pluginId.toString()]);
   }
 
+  editPlugin(event: Event, plugin: models.PluginV2) {
+    event.stopPropagation();
+    this.router.navigate(['/plugin-editor', plugin.id.toString()]);
+  }
+
+  createNewPlugin() {
+    this.router.navigate(['/plugin-editor', 'new']);
+  }
+
   getRuntimeIconFromPlugin(plugin: models.PluginV2): string {
     const envs = this.getPluginEnvironments(plugin);
     if (envs.length > 1) {
@@ -241,6 +256,31 @@ export class PluginList implements OnInit {
         return 'Python + R';
       default:
         return runtime;
+    }
+  }
+
+  async onPluginEnabledChange(plugin: models.PluginV2) {
+    const newEnabledState = plugin.enabled;
+
+    try {
+      await SetPluginEnabled(plugin.id, newEnabledState);
+
+      this.snackBar.open(
+        `Plugin ${newEnabledState ? 'enabled' : 'disabled'} successfully`,
+        'Close',
+        { duration: 3000 }
+      );
+
+      if (window.runtime) {
+        window.runtime.EventsEmit('plugin:enabled:changed');
+      }
+    } catch (error) {
+      this.snackBar.open(
+        `Failed to ${newEnabledState ? 'enable' : 'disable'} plugin`,
+        'Close',
+        { duration: 3000 }
+      );
+      plugin.enabled = !newEnabledState;
     }
   }
 
@@ -356,24 +396,20 @@ export class PluginList implements OnInit {
   }
 
   async updateAllRemotePlugins() {
-    this.updatingAll.set(true);
+    const dialogRef = this.dialog.open(PluginUpdateDialog, {
+      width: '900px',
+      disableClose: true
+    });
 
-    try {
-      this.notification.showInfo('Updating all external plugins...', 2000);
+    dialogRef.afterClosed().subscribe(async (result) => {
+      if (result && result.updated) {
+        this.notification.showSuccess(`Successfully updated ${result.count} plugin(s)! Reloading...`);
 
-      await this.wails.updateAllRemotePlugins();
+        this.updateInfo.set(new Map());
 
-      this.notification.showSuccess('All external plugins updated successfully! Reloading...');
-
-      this.updateInfo.set(new Map());
-
-      await this.loadPlugins();
-
-    } catch (err) {
-      this.notification.showError(`Update failed: ${err}`);
-    } finally {
-      this.updatingAll.set(false);
-    }
+        await this.loadPlugins();
+      }
+    });
   }
 
   async uninstallPlugin(event: Event, plugin: models.PluginV2) {

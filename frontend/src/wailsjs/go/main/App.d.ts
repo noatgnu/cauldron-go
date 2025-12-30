@@ -60,6 +60,8 @@ export function ExecutePythonScript(arg1:string,arg2:Array<string>):Promise<stri
 
 export function ExecuteRScript(arg1:string,arg2:Array<string>):Promise<string>;
 
+export function ForceUpdateAllRemotePlugins():Promise<void>;
+
 export function GetActivePythonEnvironment():Promise<services.PythonEnvironment>;
 
 export function GetActiveREnvironment():Promise<services.REnvironment>;
@@ -227,6 +229,8 @@ export function SaveTempFile(arg1:string,arg2:string):Promise<string>;
 export function SetActivePythonEnvironment(arg1:string):Promise<void>;
 
 export function SetActiveREnvironment(arg1:string):Promise<void>;
+
+export function SetPluginEnabled(arg1:number,arg2:boolean):Promise<void>;
 
 export function SetPluginUpdatePolicy(arg1:string,arg2:string):Promise<void>;
 

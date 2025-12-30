@@ -817,6 +817,7 @@ export namespace models {
 	    installSource: string;
 	    commitHash: string;
 	    repository: string;
+	    enabled: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new PluginV2(source);
@@ -831,6 +832,7 @@ export namespace models {
 	        this.installSource = source["installSource"];
 	        this.commitHash = source["commitHash"];
 	        this.repository = source["repository"];
+	        this.enabled = source["enabled"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

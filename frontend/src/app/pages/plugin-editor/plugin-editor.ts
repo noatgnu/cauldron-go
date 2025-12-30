@@ -89,10 +89,12 @@ export class PluginEditor implements OnInit {
         version: ['1.0.0', [Validators.required, Validators.pattern(/^\d+\.\d+\.\d+$/)]],
         author: ['CauldronGO Team'],
         category: ['analysis', Validators.required],
-        icon: ['']
+        subcategory: [''],
+        icon: [''],
+        repository: ['']
       }),
       runtime: this.fb.group({
-        type: ['python', Validators.required],
+        environments: this.fb.array([this.fb.control('python')]),
         script: ['', Validators.required]
       }),
       inputs: this.fb.array([]),
@@ -104,8 +106,11 @@ export class PluginEditor implements OnInit {
         requirements: this.fb.group({
           python: [''],
           r: [''],
-          packages: this.fb.array([])
-        })
+          packages: this.fb.array([]),
+          pythonRequirementsFile: [''],
+          rPackagesFile: ['']
+        }),
+        envVariables: this.fb.array([])
       }),
       annotation: this.fb.group({
         samplesFrom: [''],
@@ -114,6 +119,9 @@ export class PluginEditor implements OnInit {
       example: this.fb.group({
         enabled: [false],
         values: this.fb.group({})
+      }),
+      diagram: this.fb.group({
+        enabled: [false]
       })
     });
   }
@@ -134,18 +142,33 @@ export class PluginEditor implements OnInit {
     return this.pluginForm.get('execution.requirements.packages') as FormArray;
   }
 
+  get environments(): FormArray {
+    return this.pluginForm.get('runtime.environments') as FormArray;
+  }
+
+  get envVariables(): FormArray {
+    return this.pluginForm.get('execution.envVariables') as FormArray;
+  }
+
   async loadPlugin(pluginID: string) {
     this.mode.set('edit');
     this.loading.set(true);
 
     try {
-      const id = parseInt(pluginID, 10);
-      if (isNaN(id)) {
-        throw new Error('Invalid plugin ID');
+      const plugins = await this.wails.getPluginsV2();
+      const plugin = plugins.find((p: any) => p.id === parseInt(pluginID, 10));
+
+      if (!plugin) {
+        throw new Error(`Plugin not found: ${pluginID}`);
       }
-      const plugin = await this.wails.getPlugin(id);
-      this.populateForm(plugin.definition);
-      await this.wails.logToFile(`[PluginEditor] Loaded plugin: ${pluginID}`);
+
+      if (plugin.definition) {
+        this.populateForm(plugin.definition);
+      } else {
+        throw new Error('Plugin definition not available');
+      }
+
+      await this.wails.logToFile(`[PluginEditor] Loaded pluginV2: ${pluginID}`);
     } catch (error) {
       await this.wails.logToFile(`[PluginEditor] Error loading plugin: ${error}`);
     } finally {
@@ -175,10 +198,27 @@ export class PluginEditor implements OnInit {
   private populateForm(definition: models.PluginDefinition) {
     this.pluginForm.patchValue({
       plugin: definition.plugin,
-      runtime: definition.runtime,
       execution: {
         outputDir: definition.execution?.outputDir || '--output_folder',
         requirements: definition.execution?.requirements || {}
+      },
+      annotation: definition.annotation || {},
+      example: definition.example || { enabled: false },
+      diagram: { enabled: false }
+    });
+
+    this.environments.clear();
+    if (definition.runtime?.environments && definition.runtime.environments.length > 0) {
+      definition.runtime.environments.forEach((env: string) => {
+        this.environments.push(this.fb.control(env));
+      });
+    } else {
+      this.environments.push(this.fb.control('python'));
+    }
+
+    this.pluginForm.patchValue({
+      runtime: {
+        script: definition.runtime?.script || ''
       }
     });
 
@@ -195,6 +235,20 @@ export class PluginEditor implements OnInit {
         this.outputs.push(this.createOutputFormGroup(output));
       });
     }
+
+    this.packages.clear();
+    if (definition.execution?.requirements?.packages) {
+      definition.execution.requirements.packages.forEach((pkg: string) => {
+        this.packages.push(this.fb.control(pkg));
+      });
+    }
+
+    this.envVariables.clear();
+    if (definition.execution?.envVariables) {
+      definition.execution.envVariables.forEach((envVar: any) => {
+        this.envVariables.push(this.createEnvVariableFormGroup(envVar));
+      });
+    }
   }
 
   private createInputFormGroup(input?: any): FormGroup {
@@ -205,7 +259,59 @@ export class PluginEditor implements OnInit {
       required: [input?.required || false],
       default: [input?.default || null],
       description: [input?.description || ''],
-      placeholder: [input?.placeholder || '']
+      placeholder: [input?.placeholder || ''],
+      accept: [input?.accept || ''],
+      options: this.fb.array(input?.options?.map((opt: string) => this.fb.control(opt)) || []),
+      optionsFromFile: [input?.optionsFromFile || ''],
+      groups: this.fb.array(input?.groups?.map((g: any) => this.createGroupFormGroup(g)) || []),
+      groupsFromFile: [input?.groupsFromFile || ''],
+      multiple: [input?.multiple || false],
+      sourceFile: [input?.sourceFile || ''],
+      min: [input?.min ?? null],
+      max: [input?.max ?? null],
+      step: [input?.step ?? null],
+      visibleWhen: this.fb.group({
+        field: [input?.visibleWhen?.field || ''],
+        equals: [input?.visibleWhen?.equals ?? null],
+        equalsAny: this.fb.array(input?.visibleWhen?.equalsAny?.map((v: any) => this.fb.control(v)) || [])
+      }),
+      disableAnnotationManagement: [input?.disableAnnotationManagement || false],
+      tableColumns: this.fb.array(input?.tableColumns?.map((col: any) => this.createTableColumnFormGroup(col)) || [])
+    });
+  }
+
+  private createGroupFormGroup(group?: any): FormGroup {
+    return this.fb.group({
+      name: [group?.name || '', Validators.required],
+      options: this.fb.array(group?.options?.map((opt: any) => this.createFieldOptionFormGroup(opt)) || [])
+    });
+  }
+
+  private createFieldOptionFormGroup(option?: any): FormGroup {
+    return this.fb.group({
+      value: [option?.value || '', Validators.required],
+      label: [option?.label || '', Validators.required]
+    });
+  }
+
+  private createTableColumnFormGroup(column?: any): FormGroup {
+    return this.fb.group({
+      name: [column?.name || '', [Validators.required, Validators.pattern(/^[a-zA-Z][a-zA-Z0-9_]*$/)]],
+      label: [column?.label || '', Validators.required],
+      type: [column?.type || 'text'],
+      required: [column?.required || false],
+      description: [column?.description || '']
+    });
+  }
+
+  private createEnvVariableFormGroup(envVar?: any): FormGroup {
+    return this.fb.group({
+      name: [envVar?.name || '', [Validators.required, Validators.pattern(/^[a-zA-Z][a-zA-Z0-9_]*$/)]],
+      label: [envVar?.label || '', Validators.required],
+      type: [envVar?.type || 'text', Validators.required],
+      required: [envVar?.required || false],
+      default: [envVar?.default || null],
+      description: [envVar?.description || '']
     });
   }
 
@@ -233,6 +339,80 @@ export class PluginEditor implements OnInit {
 
   removeOutput(index: number) {
     this.outputs.removeAt(index);
+  }
+
+  addEnvironment() {
+    this.environments.push(this.fb.control('python'));
+  }
+
+  removeEnvironment(index: number) {
+    if (this.environments.length > 1) {
+      this.environments.removeAt(index);
+    }
+  }
+
+  addPackage() {
+    this.packages.push(this.fb.control(''));
+  }
+
+  removePackage(index: number) {
+    this.packages.removeAt(index);
+  }
+
+  addEnvVariable() {
+    this.envVariables.push(this.createEnvVariableFormGroup());
+  }
+
+  removeEnvVariable(index: number) {
+    this.envVariables.removeAt(index);
+  }
+
+  getInputOptions(inputIndex: number): FormArray {
+    return this.inputs.at(inputIndex).get('options') as FormArray;
+  }
+
+  addInputOption(inputIndex: number) {
+    this.getInputOptions(inputIndex).push(this.fb.control(''));
+  }
+
+  removeInputOption(inputIndex: number, optionIndex: number) {
+    this.getInputOptions(inputIndex).removeAt(optionIndex);
+  }
+
+  getInputGroups(inputIndex: number): FormArray {
+    return this.inputs.at(inputIndex).get('groups') as FormArray;
+  }
+
+  addInputGroup(inputIndex: number) {
+    this.getInputGroups(inputIndex).push(this.createGroupFormGroup());
+  }
+
+  removeInputGroup(inputIndex: number, groupIndex: number) {
+    this.getInputGroups(inputIndex).removeAt(groupIndex);
+  }
+
+  getGroupOptions(inputIndex: number, groupIndex: number): FormArray {
+    return this.getInputGroups(inputIndex).at(groupIndex).get('options') as FormArray;
+  }
+
+  addGroupOption(inputIndex: number, groupIndex: number) {
+    this.getGroupOptions(inputIndex, groupIndex).push(this.createFieldOptionFormGroup());
+  }
+
+  removeGroupOption(inputIndex: number, groupIndex: number, optionIndex: number) {
+    this.getGroupOptions(inputIndex, groupIndex).removeAt(optionIndex);
+  }
+
+  getInputTableColumns(inputIndex: number): FormArray {
+    return this.inputs.at(inputIndex).get('tableColumns') as FormArray;
+  }
+
+  addInputTableColumn(inputIndex: number) {
+    this.getInputTableColumns(inputIndex).push(this.createTableColumnFormGroup());
+  }
+
+  removeInputTableColumn(inputIndex: number, columnIndex: number) {
+    this.getInputTableColumns(inputIndex).removeAt(columnIndex);
   }
 
   async generatePreview() {
@@ -263,15 +443,22 @@ export class PluginEditor implements OnInit {
 
     return new models.PluginDefinition({
       plugin: new models.PluginMetadata(formValue.plugin),
-      runtime: new models.PluginRuntimeV2(formValue.runtime),
+      runtime: new models.PluginRuntimeV2({
+        environments: formValue.runtime.environments,
+        script: formValue.runtime.script
+      }),
       inputs: formValue.inputs.map((i: any) => new models.PluginInputV2(i)),
       outputs: formValue.outputs.map((o: any) => new models.PluginOutputV2(o)),
       plots: [],
       execution: new models.PluginExecution({
         argsMapping: {},
         outputDir: formValue.execution.outputDir,
-        requirements: formValue.execution.requirements
-      })
+        requirements: formValue.execution.requirements,
+        envVariables: formValue.execution.envVariables
+      }),
+      annotation: formValue.annotation?.samplesFrom || formValue.annotation?.annotationFile ? formValue.annotation : undefined,
+      example: formValue.example?.enabled ? formValue.example : undefined,
+      diagram: formValue.diagram
     });
   }
 

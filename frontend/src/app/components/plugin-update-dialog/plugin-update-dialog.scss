@@ -1,0 +1,109 @@
+h2[mat-dialog-title] {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+  padding: 20px 24px;
+  background: var(--surface-variant);
+  border-bottom: 1px solid var(--border);
+
+  mat-icon {
+    font-size: 24px;
+    width: 24px;
+    height: 24px;
+    color: var(--primary);
+  }
+}
+
+mat-dialog-content {
+  padding: 24px !important;
+  min-height: 200px;
+  max-height: 60vh;
+}
+
+.checking-container,
+.no-updates {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  gap: 16px;
+
+  mat-icon {
+    font-size: 48px;
+    width: 48px;
+    height: 48px;
+    color: var(--primary);
+  }
+
+  p {
+    margin: 0;
+    font-size: 14px;
+    color: var(--on-surface-variant);
+  }
+}
+
+.updates-info {
+  margin: 0 0 16px 0;
+  font-size: 14px;
+  color: var(--on-surface-variant);
+  line-height: 1.5;
+}
+
+.updates-table {
+  width: 100%;
+  background: var(--surface);
+
+  th {
+    background: var(--surface-variant);
+    font-weight: 600;
+    color: var(--on-surface);
+  }
+
+  td, th {
+    padding: 12px 16px !important;
+  }
+
+  tr.mat-mdc-row:hover {
+    background: var(--hover);
+  }
+
+  .plugin-name {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    mat-icon {
+      font-size: 20px;
+      width: 20px;
+      height: 20px;
+      color: var(--on-surface-variant);
+    }
+
+    span {
+      font-weight: 500;
+      color: var(--on-surface);
+    }
+  }
+
+  .commit-hash {
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    padding: 4px 8px;
+    background: var(--surface-variant);
+    border-radius: 4px;
+    color: var(--on-surface-variant);
+
+    &.recommended {
+      background: var(--primary-container);
+      color: var(--primary);
+      font-weight: 600;
+    }
+  }
+}
+
+mat-dialog-actions {
+  padding: 16px 24px !important;
+  border-top: 1px solid var(--border);
+}

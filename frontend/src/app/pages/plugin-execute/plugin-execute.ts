@@ -155,23 +155,19 @@ export class PluginExecute implements OnInit {
     }
   }
 
-  getRuntimeIcon(runtime: string): { python: boolean; r: boolean; pythonWithR: boolean; direct: boolean } {
+  getRuntimeIcon(runtime: string): { python: boolean; r: boolean; direct: boolean } {
     return {
       python: runtime === 'python',
       r: runtime === 'r',
-      pythonWithR: runtime === 'pythonWithR',
       direct: runtime === 'direct'
     };
   }
 
-  getRuntimeIndicator(plugin: models.PluginV2): { python: boolean; r: boolean; pythonWithR: boolean; direct: boolean } {
+  getRuntimeIndicator(plugin: models.PluginV2): { python: boolean; r: boolean; direct: boolean } {
     const envs = this.getPluginEnvironments(plugin);
-    const hasPython = envs.includes('python');
-    const hasR = envs.includes('r');
     return {
-      python: hasPython && !hasR,
-      r: hasR && !hasPython,
-      pythonWithR: hasPython && hasR,
+      python: envs.includes('python'),
+      r: envs.includes('r'),
       direct: envs.includes('direct')
     };
   }
