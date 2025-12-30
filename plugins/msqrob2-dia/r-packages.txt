@@ -2,5 +2,6 @@ QFeatures
 msqrob2
 limma
 MsCoreUtils
+impute
 ggplot2
 reshape2
