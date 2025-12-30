@@ -201,7 +201,7 @@ func TestVenvCreationWithExternalPlugin(t *testing.T) {
 	}
 	db.GetDB().Create(&reg)
 	venvPath := filepath.Join(tmpDir, "test_venv")
-	err = envService.CreatePythonVirtualEnv(pythonPath, venvPath, strconv.FormatUint(uint64(reg.ID), 10))
+	err = envService.CreatePythonVirtualEnv(pythonPath, venvPath, strconv.FormatUint(uint64(reg.ID), 10), pluginPath)
 	if err != nil {
 		t.Fatalf("CreatePythonVirtualEnv failed: %v", err)
 	}

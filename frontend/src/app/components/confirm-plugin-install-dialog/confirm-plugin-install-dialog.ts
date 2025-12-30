@@ -104,6 +104,12 @@ export class ConfirmPluginInstallDialog implements OnInit {
       if (baseEnvs.length > 0) {
         this.form.patchValue({ basePythonPath: baseEnvs[0].path });
       }
+
+      this.form.get('createRenv')?.valueChanges.subscribe((checked: boolean) => {
+        if (checked && !this.form.value.renvName) {
+          this.form.patchValue({ renvName: `renv-${this.data.id}` });
+        }
+      });
     } catch (error) {
       await this.wails.logToFile(`[ConfirmPluginInstallDialog] Failed to load environments: ${error}`);
     } finally {

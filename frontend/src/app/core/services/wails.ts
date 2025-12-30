@@ -387,6 +387,11 @@ export class Wails {
     this.bindingsUpdatedSubject.next();
   }
 
+  async getDefaultVenvPath(pluginID: string): Promise<string> {
+    if (!this.isWails) throw new Error('Wails not available');
+    return WailsApp.GetDefaultVenvPath(pluginID);
+  }
+
   async getVirtualEnvironments(): Promise<services.VirtualEnvironment[]> {
     if (!this.isWails) throw new Error('Wails not available');
     return WailsApp.GetVirtualEnvironments();
@@ -663,6 +668,11 @@ export class Wails {
   async getJobQueueStatus(): Promise<any> {
     if (!this.isWails) throw new Error('Wails not available');
     return WailsApp.GetJobQueueStatus();
+  }
+
+  async processPendingJobs(): Promise<void> {
+    if (!this.isWails) throw new Error('Wails not available');
+    return WailsApp.ProcessPendingJobs();
   }
 
   async openLogFile(): Promise<void> {

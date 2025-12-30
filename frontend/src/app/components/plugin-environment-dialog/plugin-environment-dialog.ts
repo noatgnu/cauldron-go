@@ -267,13 +267,11 @@ export class PluginEnvironmentDialog implements OnInit {
       return;
     }
 
-    const venvPath = await this.wails.openDirectoryDialog('Select location for virtual environment');
-    if (!venvPath) return;
-
     this.creatingEnvironment.set(true);
     this.creationProgress.set('Creating virtual environment...');
 
     try {
+      const venvPath = await this.wails.getDefaultVenvPath(this.data.pluginId);
       await this.wails.createPythonVirtualEnv(basePython, venvPath, this.data.pluginId);
 
       const venvs = await this.wails.getVirtualEnvironments();
@@ -303,7 +301,7 @@ export class PluginEnvironmentDialog implements OnInit {
       return;
     }
 
-    this.renvName.set('');
+    this.renvName.set(`renv-${this.data.pluginId}`);
     this.renvPackages.set('');
     this.showRenvCreation.set(true);
   }

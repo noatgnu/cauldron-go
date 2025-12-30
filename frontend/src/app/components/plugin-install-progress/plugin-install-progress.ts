@@ -107,17 +107,15 @@ export class PluginInstallProgress implements OnInit, OnDestroy {
         this.currentStatus.set('Creating Python virtual environment...');
         this.progress.set(50);
 
-        const venvPath = await this.wails.openDirectoryDialog('Select location for virtual environment');
-        if (venvPath) {
-          await this.wails.createPythonVirtualEnv(this.data.basePythonPath, venvPath, pluginId);
+        const venvPath = await this.wails.getDefaultVenvPath(pluginId);
+        await this.wails.createPythonVirtualEnv(this.data.basePythonPath, venvPath, pluginId);
 
-          const venvs = await this.wails.getVirtualEnvironments();
-          const newVenv = venvs.find(v => v.Path.includes(venvPath) || venvPath.includes(v.Name));
+        const venvs = await this.wails.getVirtualEnvironments();
+        const newVenv = venvs.find(v => v.Path.includes(venvPath) || venvPath.includes(v.Name));
 
-          if (newVenv) {
-            await this.wails.bindPluginToEnvironment(pluginId, 'python', newVenv.ID, newVenv.Path);
-            this.notification.showSuccess('Python virtual environment created and bound');
-          }
+        if (newVenv) {
+          await this.wails.bindPluginToEnvironment(pluginId, 'python', newVenv.ID, newVenv.Path);
+          this.notification.showSuccess('Python virtual environment created and bound');
         }
       }
 

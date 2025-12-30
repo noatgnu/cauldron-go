@@ -21,16 +21,70 @@ print_error() {
     echo -e "\033[0;31m✗ $1\033[0m"
 }
 
+create_placeholder_frontend() {
+    print_header "Creating Placeholder Frontend for Bindings"
+    cd "$PROJECT_ROOT"
+
+    mkdir -p "$FRONTEND_DIR/dist/browser"
+    echo "<!DOCTYPE html><html><head><title>Placeholder</title></head><body>Placeholder</body></html>" > "$FRONTEND_DIR/dist/browser/index.html"
+
+    print_success "Placeholder frontend created"
+}
+
+generate_bindings() {
+    print_header "Generating Wails Bindings"
+    cd "$PROJECT_ROOT"
+
+    if ~/go/bin/wails generate module 2>&1 | tee /tmp/bindings-gen.log; then
+        print_success "Bindings generated successfully"
+        return 0
+    else
+        print_error "Bindings generation failed"
+        echo "Check /tmp/bindings-gen.log for details"
+        return 1
+    fi
+}
+
 build_frontend() {
     print_header "Building Frontend"
     cd "$FRONTEND_DIR"
 
+    # Try to build frontend first
     if npm run build 2>&1 | tee /tmp/frontend-build.log; then
         print_success "Frontend build completed"
+        return 0
     else
-        print_error "Frontend build failed"
-        echo "Check /tmp/frontend-build.log for details"
-        exit 1
+        # Check if it's a bindings issue
+        if grep -q "does not exist on type" /tmp/frontend-build.log; then
+            print_error "Frontend build failed due to missing Wails bindings"
+            echo "Attempting to bootstrap bindings generation..."
+
+            # Create placeholder frontend to allow bindings generation
+            create_placeholder_frontend
+
+            # Generate bindings
+            if generate_bindings; then
+                print_success "Bindings generated, retrying frontend build..."
+
+                # Now try building frontend again with proper bindings
+                cd "$FRONTEND_DIR"
+                if npm run build 2>&1 | tee /tmp/frontend-build-retry.log; then
+                    print_success "Frontend build completed on retry"
+                    return 0
+                else
+                    print_error "Frontend build failed again after bindings generation"
+                    echo "Check /tmp/frontend-build-retry.log for details"
+                    exit 1
+                fi
+            else
+                print_error "Failed to generate bindings"
+                exit 1
+            fi
+        else
+            print_error "Frontend build failed"
+            echo "Check /tmp/frontend-build.log for details"
+            exit 1
+        fi
     fi
 }
 

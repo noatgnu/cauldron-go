@@ -256,7 +256,11 @@ export class PluginRegistry implements OnInit {
               repoURL: plugin.repository,
               commitHash: plugin.commit_hash,
               sshKeyPath: result.sshKeyPath,
-              passphrase: result.passphrase
+              passphrase: result.passphrase,
+              createVenv: result.createVenv,
+              basePythonPath: result.basePythonPath,
+              createRenv: result.createRenv,
+              renvName: result.renvName
             },
             disableClose: true,
             width: '500px'

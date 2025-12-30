@@ -1,6 +1,17 @@
+mat-dialog-title {
+  background-color: var(--surface);
+  color: var(--on-surface);
+  margin: 0;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--border);
+}
+
 mat-dialog-content {
+  background-color: var(--surface);
+  color: var(--on-surface);
   min-width: 500px;
   max-width: 600px;
+  padding: 20px 24px;
 }
 
 .warning-box {
@@ -214,5 +225,8 @@ mat-dialog-content {
 }
 
 mat-dialog-actions {
+  background-color: var(--surface);
+  padding: 12px 24px;
+  border-top: 1px solid var(--border);
   gap: 8px;
 }

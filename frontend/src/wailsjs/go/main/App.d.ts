@@ -74,6 +74,8 @@ export function GetBundledRequirementsPath(arg1:string):Promise<string>;
 
 export function GetCustomEnvVars(arg1:number):Promise<Array<services.CustomEnvVar>>;
 
+export function GetDefaultVenvPath(arg1:string):Promise<string>;
+
 export function GetExampleFilePath(arg1:string,arg2:string):Promise<string>;
 
 export function GetGitAuthConfig(arg1:string):Promise<main.GitAuthConfigResponse>;
@@ -187,6 +189,8 @@ export function ParsePluginYAML(arg1:string):Promise<models.PluginDefinition>;
 export function PauseJobQueue():Promise<void>;
 
 export function PinPluginVersion(arg1:string,arg2:string):Promise<void>;
+
+export function ProcessPendingJobs():Promise<void>;
 
 export function ReExecuteJob(arg1:string):Promise<string>;
 

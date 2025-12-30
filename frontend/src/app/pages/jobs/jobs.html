@@ -30,6 +30,12 @@
             <mat-icon>stop</mat-icon>
             Stop Immediately
           </button>
+          @if (queueStatus().pendingCount > 0) {
+            <button mat-raised-button (click)="processPendingJobs()">
+              <mat-icon>refresh</mat-icon>
+              Process Pending Jobs
+            </button>
+          }
         } @else {
           <button mat-raised-button color="primary" (click)="resumeQueue()">
             <mat-icon>play_arrow</mat-icon>

@@ -142,6 +142,10 @@ func (a *App) startup(ctx context.Context) {
 	}
 	a.pluginExecutor = services.NewPluginExecutor()
 
+	log.Println("[App.startup] Wiring up job queue with script executor and plugin loader...")
+	a.jobQueue.SetScriptExecutor(a.scriptExecutor)
+	a.jobQueue.SetPluginLoader(a.pluginLoaderV2)
+
 	log.Println("[App.startup] Initializing Git authentication service...")
 	a.gitAuthService = services.NewGitAuthService(a.db)
 	log.Println("[App.startup] Git authentication service initialized")
@@ -542,7 +546,7 @@ func (a *App) CreateJob(req models.JobRequest) (string, error) {
 			"outputDir": jobOutputDir,
 		}
 
-		return a.jobQueue.CreateJobWithParameters(req.Type, req.Name, runtime, args, parameters)
+		return a.jobQueue.CreateJobWithParameters(req.Type, req.Name, runtime, args, parameters, "", "")
 
 	case "normalization":
 		if len(req.InputFiles) == 0 {
@@ -599,7 +603,7 @@ func (a *App) CreateJob(req models.JobRequest) (string, error) {
 			"outputDir": jobOutputDir,
 		}
 
-		return a.jobQueue.CreateJobWithParameters(req.Type, req.Name, runtime, args, parameters)
+		return a.jobQueue.CreateJobWithParameters(req.Type, req.Name, runtime, args, parameters, "", "")
 
 	case "correlation-matrix":
 		if len(req.InputFiles) == 0 {
@@ -684,7 +688,7 @@ func (a *App) CreateJob(req models.JobRequest) (string, error) {
 			"inputFiles": req.InputFiles,
 		}
 
-		return a.jobQueue.CreateJobWithParameters(req.Type, req.Name, "r", args, parameters)
+		return a.jobQueue.CreateJobWithParameters(req.Type, req.Name, "r", args, parameters, "", "")
 
 	case "maxlfq":
 		if len(req.InputFiles) == 0 {
@@ -725,7 +729,7 @@ func (a *App) CreateJob(req models.JobRequest) (string, error) {
 			"outputDir": jobOutputDir,
 		}
 
-		return a.jobQueue.CreateJobWithParameters(req.Type, req.Name, "r", args, parameters)
+		return a.jobQueue.CreateJobWithParameters(req.Type, req.Name, "r", args, parameters, "", "")
 
 	case "batch-correction":
 		if len(req.InputFiles) == 0 {
@@ -763,7 +767,7 @@ func (a *App) CreateJob(req models.JobRequest) (string, error) {
 			"outputDir": jobOutputDir,
 		}
 
-		return a.jobQueue.CreateJobWithParameters(req.Type, req.Name, "r", args, parameters)
+		return a.jobQueue.CreateJobWithParameters(req.Type, req.Name, "r", args, parameters, "", "")
 
 	case "venn-diagram":
 		if len(req.InputFiles) == 0 {
@@ -806,7 +810,7 @@ func (a *App) CreateJob(req models.JobRequest) (string, error) {
 			"outputDir": jobOutputDir,
 		}
 
-		return a.jobQueue.CreateJobWithParameters(req.Type, req.Name, "r", args, parameters)
+		return a.jobQueue.CreateJobWithParameters(req.Type, req.Name, "r", args, parameters, "", "")
 
 	case "estimation-plot":
 		if len(req.InputFiles) < 2 {
@@ -1033,7 +1037,7 @@ func (a *App) ReExecuteJob(id string) (string, error) {
 		}
 		rerunParameters["outputDir"] = jobOutputDir
 
-		return a.jobQueue.CreateJobWithParameters(job.Type, job.Name, "r", args, rerunParameters)
+		return a.jobQueue.CreateJobWithParameters(job.Type, job.Name, "r", args, rerunParameters, "", "")
 
 	default:
 		return "", fmt.Errorf("unsupported job type for re-execution: %s", job.Type)
@@ -1071,7 +1075,12 @@ func (a *App) Greet(name string) string {
 }
 
 func (a *App) DetectPythonEnvironments() ([]services.PythonEnvironment, error) {
-	return a.envService.DetectPythonEnvironments()
+	envs, err := a.envService.DetectPythonEnvironments()
+	log.Printf("[App] DetectPythonEnvironments called - returning %d environments, error: %v", len(envs), err)
+	for i, env := range envs {
+		log.Printf("[App] [%d] Name=%s, Path=%s, Type=%s, IsVirtual=%v", i, env.Name, env.Path, env.Type, env.IsVirtual)
+	}
+	return envs, err
 }
 
 func (a *App) DetectREnvironments() ([]services.REnvironment, error) {
@@ -1115,11 +1124,38 @@ func (a *App) ListRPackages(rPath string) ([]string, error) {
 }
 
 func (a *App) CreatePythonVirtualEnv(basePythonPath string, venvPath string, pluginID string) error {
-	return a.envService.CreatePythonVirtualEnv(basePythonPath, venvPath, pluginID)
+	var pluginFolderPath string
+	if pluginID != "" {
+		plugin, err := a.pluginLoaderV2.GetPluginByStringID(pluginID)
+		if err == nil {
+			pluginFolderPath = plugin.FolderPath
+			log.Printf("[App] CreatePythonVirtualEnv: Found plugin folder path: %s", pluginFolderPath)
+		} else {
+			log.Printf("[App] CreatePythonVirtualEnv: Failed to get plugin folder path: %v", err)
+		}
+	}
+	return a.envService.CreatePythonVirtualEnv(basePythonPath, venvPath, pluginID, pluginFolderPath)
 }
 
 func (a *App) GetVirtualEnvironments() ([]services.VirtualEnvironment, error) {
-	return a.envService.GetVirtualEnvironments()
+	venvs, err := a.envService.GetVirtualEnvironments()
+	log.Printf("[App] GetVirtualEnvironments called - returning %d venvs, error: %v", len(venvs), err)
+	return venvs, err
+}
+
+func (a *App) GetDefaultVenvPath(pluginID string) (string, error) {
+	userConfigDir, err := os.UserConfigDir()
+	if err != nil {
+		return "", fmt.Errorf("failed to get user config dir: %w", err)
+	}
+
+	venvBaseDir := filepath.Join(userConfigDir, "cauldron", "venvs")
+	if err := os.MkdirAll(venvBaseDir, 0755); err != nil {
+		return "", fmt.Errorf("failed to create venv base directory: %w", err)
+	}
+
+	venvPath := filepath.Join(venvBaseDir, fmt.Sprintf("venv-%s", pluginID))
+	return venvPath, nil
 }
 
 func (a *App) DeleteVirtualEnvironment(id uint) error {
@@ -1354,7 +1390,7 @@ func (a *App) RunPCAAnalysis(inputFile string, outputDir string, columns []strin
 		"useLog2":     useLog2,
 	}
 
-	jobID, err := a.jobQueue.CreateJobWithParameters("pca", "PCA Analysis", "python", args, parameters)
+	jobID, err := a.jobQueue.CreateJobWithParameters("pca", "PCA Analysis", "python", args, parameters, "", "")
 	if err != nil {
 		log.Printf("[RunPCAAnalysis] ERROR creating job: %v", err)
 		return "", err
@@ -1421,7 +1457,7 @@ func (a *App) RunPHATEAnalysis(inputFile string, outputDir string, columns []str
 		"useLog2":     useLog2,
 	}
 
-	jobID, err := a.jobQueue.CreateJobWithParameters("phate", "PHATE Analysis", "python", args, parameters)
+	jobID, err := a.jobQueue.CreateJobWithParameters("phate", "PHATE Analysis", "python", args, parameters, "", "")
 	if err != nil {
 		log.Printf("[RunPHATEAnalysis] ERROR creating job: %v", err)
 		return "", err
@@ -1476,7 +1512,7 @@ func (a *App) RunNormalization(inputFile string, outputDir string, columns []str
 		"scalerType": scalerType,
 	}
 
-	jobID, err := a.jobQueue.CreateJobWithParameters("normalization", "Data Normalization", "python", args, parameters)
+	jobID, err := a.jobQueue.CreateJobWithParameters("normalization", "Data Normalization", "python", args, parameters, "", "")
 	if err != nil {
 		return "", err
 	}
@@ -1573,7 +1609,7 @@ func (a *App) ExecutePlugin(req models.PluginExecutionRequest) (string, error) {
 	var jobID string
 	switch plugin.Config.Runtime {
 	case models.PluginRuntimePython:
-		jobID, err = a.jobQueue.CreateJobWithParameters("plugin", jobName, "python", args, parameters)
+		jobID, err = a.jobQueue.CreateJobWithParameters("plugin", jobName, "python", args, parameters, "", "")
 		if err != nil {
 			return "", err
 		}
@@ -1591,7 +1627,7 @@ func (a *App) ExecutePlugin(req models.PluginExecutionRequest) (string, error) {
 		}()
 
 	case models.PluginRuntimeR:
-		jobID, err = a.jobQueue.CreateJobWithParameters("plugin", jobName, "r", args, parameters)
+		jobID, err = a.jobQueue.CreateJobWithParameters("plugin", jobName, "r", args, parameters, "", "")
 		if err != nil {
 			return "", err
 		}
@@ -1609,7 +1645,7 @@ func (a *App) ExecutePlugin(req models.PluginExecutionRequest) (string, error) {
 		}()
 
 	case models.PluginRuntimePythonWithR:
-		jobID, err = a.jobQueue.CreateJobWithParameters("plugin", jobName, "python", args, parameters)
+		jobID, err = a.jobQueue.CreateJobWithParameters("plugin", jobName, "python", args, parameters, "", "")
 		if err != nil {
 			return "", err
 		}
@@ -1710,72 +1746,7 @@ func (a *App) ExecutePluginV2(req models.PluginExecutionRequestV2) (string, erro
 		return "", err
 	}
 
-	go func() {
-		jobCtx, cancel := context.WithCancel(a.ctx)
-		defer cancel()
-
-		a.jobQueue.RegisterJobCancelFunc(jobID, cancel)
-		defer a.jobQueue.UnregisterJobCancelFunc(jobID)
-
-		job, err := a.jobQueue.GetJob(jobID)
-		if err == nil {
-			now := time.Now()
-			job.StartedAt = &now
-			job.Status = models.JobStatusInProgress
-			a.db.GetDB().Save(job)
-			runtime.EventsEmit(a.ctx, "job:update", job)
-		}
-
-		var execErr error
-		envs := plugin.Definition.Runtime.GetEnvironments()
-		log.Printf("[ExecutePluginV2] Plugin environments: %v", envs)
-		log.Printf("[ExecutePluginV2] Plugin folder path: %s", plugin.FolderPath)
-
-		if len(envs) == 0 {
-			execErr = fmt.Errorf("no runtime environments specified")
-		} else {
-			primaryEnv := envs[0]
-			log.Printf("[ExecutePluginV2] Primary environment: %s", primaryEnv)
-
-			switch primaryEnv {
-			case "python":
-				log.Printf("[ExecutePluginV2] Executing as Python script")
-				execErr = a.scriptExecutor.ExecutePythonScript(jobCtx, jobID, services.ScriptConfig{
-					PluginID:     plugin.ID,
-					Type:         plugin.Definition.Plugin.ID,
-					Environments: envs,
-					ScriptName:   filepath.Base(plugin.ScriptPath),
-					Args:         args[1:],
-					OutputDir:    outputDir,
-					FolderPath:   plugin.FolderPath,
-				})
-			case "r":
-				log.Printf("[ExecutePluginV2] Executing as R script")
-				execErr = a.scriptExecutor.ExecuteRScript(jobCtx, jobID, services.ScriptConfig{
-					PluginID:     plugin.ID,
-					Type:         plugin.Definition.Plugin.ID,
-					Environments: envs,
-					ScriptName:   filepath.Base(plugin.ScriptPath),
-					Args:         args[1:],
-					OutputDir:    outputDir,
-					FolderPath:   plugin.FolderPath,
-				})
-			case "julia":
-				execErr = fmt.Errorf("julia runtime not yet implemented")
-			case "node":
-				execErr = fmt.Errorf("node runtime not yet implemented")
-			case "direct":
-				execErr = fmt.Errorf("direct runtime not yet implemented")
-			default:
-				execErr = fmt.Errorf("unsupported primary environment: %s", primaryEnv)
-			}
-		}
-
-		if execErr != nil {
-			log.Printf("[ExecutePluginV2] Error: %v", execErr)
-		}
-	}()
-
+	log.Printf("[ExecutePluginV2] Created job %s - will be processed by job queue worker", jobID)
 	return jobID, nil
 }
 
@@ -1985,6 +1956,13 @@ func (a *App) GetJobQueueStatus() map[string]interface{} {
 	return a.jobQueue.GetQueueStatus()
 }
 
+func (a *App) ProcessPendingJobs() error {
+	if a.jobQueue == nil {
+		return fmt.Errorf("job queue not initialized")
+	}
+	return a.jobQueue.ProcessPendingJobs()
+}
+
 func (a *App) HasInProgressJobs() bool {
 	if a.jobQueue == nil {
 		log.Println("[HasInProgressJobs] jobQueue is nil")
@@ -2118,9 +2096,26 @@ func (a *App) beforeClose(ctx context.Context) bool {
 		if selection == "Yes" {
 			log.Println("[beforeClose] User chose to stop jobs and exit")
 			if a.jobQueue != nil {
+				log.Println("[beforeClose] Stopping all jobs and killing processes...")
 				a.jobQueue.StopQueueImmediate()
-				time.Sleep(2 * time.Second)
-				log.Println("[beforeClose] Waited 2 seconds for jobs to terminate")
+
+				log.Println("[beforeClose] Waiting up to 5 seconds for jobs to terminate...")
+				waitDuration := 5 * time.Second
+				waitStart := time.Now()
+				ticker := time.NewTicker(500 * time.Millisecond)
+				defer ticker.Stop()
+
+				for time.Since(waitStart) < waitDuration {
+					if !a.HasInProgressJobs() {
+						log.Println("[beforeClose] All jobs terminated successfully")
+						break
+					}
+					<-ticker.C
+				}
+
+				if a.HasInProgressJobs() {
+					log.Println("[beforeClose] WARNING: Some jobs still in progress after 5 seconds, forcing shutdown")
+				}
 			}
 			return false
 		}
@@ -2212,7 +2207,17 @@ func (a *App) UninstallPluginFromRepo(repoURL string, removeGitAuth bool, delete
 		DeleteJobHistory:   deleteJobHistory,
 		DeleteEnvironments: deleteEnvironments,
 	}
-	return a.pluginInstaller.UninstallPlugin(repoURL, options)
+	err := a.pluginInstaller.UninstallPlugin(repoURL, options)
+	if err != nil {
+		return err
+	}
+
+	log.Printf("[App] Plugin uninstalled successfully from: %s", repoURL)
+	runtime.EventsEmit(a.ctx, "plugin:uninstall:success", map[string]interface{}{
+		"repo": repoURL,
+	})
+
+	return nil
 }
 
 func (a *App) GetPluginJobCount(pluginID string) (int64, error) {
@@ -2507,6 +2512,15 @@ func (a *App) InstallPluginRequirements(pluginID string) error {
 		reqPath := filepath.Join(plugin.FolderPath, plugin.Definition.Execution.Requirements.PythonRequirementsFile)
 		if _, err := os.Stat(reqPath); err == nil {
 			pythonPath := config.PythonPath
+
+			pythonBinding, err := a.db.GetPluginEnvironmentBinding(pluginID, "python")
+			if err == nil && pythonBinding != nil {
+				pythonPath = pythonBinding.EnvironmentPath
+				log.Printf("[App] Using bound Python environment: %s", pythonPath)
+			} else {
+				log.Printf("[App] No Python binding found, using global Python: %s", pythonPath)
+			}
+
 			if pythonPath == "" {
 				return fmt.Errorf("Python path not configured")
 			}
@@ -2522,6 +2536,15 @@ func (a *App) InstallPluginRequirements(pluginID string) error {
 		reqPath := filepath.Join(plugin.FolderPath, plugin.Definition.Execution.Requirements.RPackagesFile)
 		if _, err := os.Stat(reqPath); err == nil {
 			rPath := config.RPath
+
+			rBinding, err := a.db.GetPluginEnvironmentBinding(pluginID, "r")
+			if err == nil && rBinding != nil {
+				rPath = rBinding.EnvironmentPath
+				log.Printf("[App] Using bound R environment: %s", rPath)
+			} else {
+				log.Printf("[App] No R binding found, using global R: %s", rPath)
+			}
+
 			if rPath == "" {
 				return fmt.Errorf("R path not configured")
 			}

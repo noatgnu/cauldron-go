@@ -1,4 +1,4 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, signal, computed } from '@angular/core';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -41,6 +41,9 @@ export class SettingsPython implements OnInit {
   protected config = signal<Partial<Config>>({});
   protected pythonVersion = signal('');
   protected pythonEnvironments = signal<PythonEnvironment[]>([]);
+  protected basePythonEnvironments = computed(() =>
+    this.pythonEnvironments().filter(env => !env.isVirtual)
+  );
   protected virtualEnvironments = signal<VirtualEnvironment[]>([]);
   protected detectingPythonEnvs = signal(false);
   protected installingPythonPackages = signal(false);
@@ -151,7 +154,14 @@ export class SettingsPython implements OnInit {
     this.detectingPythonEnvs.set(true);
     try {
       const envs = await this.wails.detectPythonEnvironments();
+      await this.wails.logToFile(`[SettingsPython] Received ${envs?.length || 0} Python environments from backend`);
+      if (envs && envs.length > 0) {
+        for (let i = 0; i < envs.length; i++) {
+          await this.wails.logToFile(`[SettingsPython] [${i}] Name=${envs[i].name}, Path=${envs[i].path}, Type=${envs[i].type}, IsVirtual=${envs[i].isVirtual}`);
+        }
+      }
       this.pythonEnvironments.set(envs || []);
+      await this.wails.logToFile(`[SettingsPython] Signal pythonEnvironments now has ${this.pythonEnvironments().length} items`);
 
       if (envs && envs.length > 0) {
         const activeEnv = await this.wails.getActivePythonEnvironment();
@@ -324,8 +334,15 @@ export class SettingsPython implements OnInit {
         this.wails.getVirtualEnvironments(),
         this.wails.getAllPluginEnvironmentBindings()
       ]);
+      await this.wails.logToFile(`[SettingsPython] loadVirtualEnvironments received ${venvs?.length || 0} venvs`);
+      if (venvs && venvs.length > 0) {
+        for (let i = 0; i < venvs.length; i++) {
+          await this.wails.logToFile(`[SettingsPython] Venv[${i}] ID=${venvs[i].ID}, Name=${venvs[i].Name}, Path=${venvs[i].Path}`);
+        }
+      }
       this.virtualEnvironments.set(venvs || []);
       this.bindings.set(bindings || []);
+      await this.wails.logToFile(`[SettingsPython] Set virtualEnvironments signal with ${venvs?.length || 0} items`);
     } catch (error) {
       await this.wails.logToFile(`[SettingsPython] Failed to load virtual environments: ${error}`);
     }

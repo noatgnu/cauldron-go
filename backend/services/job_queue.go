@@ -16,21 +16,23 @@ import (
 )
 
 type JobQueueService struct {
-	ctx           context.Context
-	db            *DatabaseService
-	jobs          map[string]*models.Job
-	queue         chan *models.Job
-	workers       int
-	mu            sync.RWMutex
-	wg            sync.WaitGroup
-	pythonRunner  *PythonRunner
-	rRunner       *RRunner
-	directRunner  *DirectRunner
-	settingsServ  *SettingsService
-	paused        bool
-	stopImmediate bool
-	currentJobID  string
-	cancelFuncs   map[string]context.CancelFunc
+	ctx            context.Context
+	db             *DatabaseService
+	jobs           map[string]*models.Job
+	queue          chan *models.Job
+	workers        int
+	mu             sync.RWMutex
+	wg             sync.WaitGroup
+	pythonRunner   *PythonRunner
+	rRunner        *RRunner
+	directRunner   *DirectRunner
+	scriptExecutor *ScriptExecutor
+	pluginLoader   *PluginLoaderV2
+	settingsServ   *SettingsService
+	paused         bool
+	stopImmediate  bool
+	currentJobID   string
+	cancelFuncs    map[string]context.CancelFunc
 }
 
 func NewJobQueueService(ctx context.Context, db *DatabaseService) *JobQueueService {
@@ -60,29 +62,99 @@ func (j *JobQueueService) SetRunners(pythonRunner *PythonRunner, rRunner *RRunne
 	j.settingsServ = settings
 }
 
+func (j *JobQueueService) SetScriptExecutor(scriptExecutor *ScriptExecutor) {
+	j.scriptExecutor = scriptExecutor
+}
+
+func (j *JobQueueService) SetPluginLoader(pluginLoader *PluginLoaderV2) {
+	j.pluginLoader = pluginLoader
+}
+
 func (j *JobQueueService) worker() {
 	defer j.wg.Done()
 
-	for job := range j.queue {
+	for {
+		// Check if paused before trying to pull from queue
 		j.mu.RLock()
 		isPaused := j.paused
 		j.mu.RUnlock()
 
 		if isPaused {
-			log.Printf("[worker] Queue is paused, requeueing job: %s", job.ID)
-			j.mu.Lock()
-			j.queue <- job
-			j.mu.Unlock()
-			time.Sleep(1 * time.Second)
+			// Don't consume from queue while paused
+			time.Sleep(500 * time.Millisecond)
 			continue
 		}
 
-		j.processJob(job)
+		// Try to get a job from the queue with timeout
+		select {
+		case job, ok := <-j.queue:
+			if !ok {
+				// Queue channel closed
+				return
+			}
+
+			// Double-check paused status after receiving job
+			j.mu.RLock()
+			isPaused = j.paused
+			j.mu.RUnlock()
+
+			if isPaused {
+				// Queue was paused while we were getting the job
+				// Put it back as pending for ResumeQueue to pick up
+				log.Printf("[worker] Queue paused after receiving job, marking as pending: %s", job.ID)
+				job.Status = models.JobStatusPending
+				if err := j.db.GetDB().Save(job).Error; err != nil {
+					log.Printf("[worker] Failed to save job status: %v", err)
+				}
+				continue
+			}
+
+			// Process the job
+			j.processJob(job)
+
+		case <-time.After(1 * time.Second):
+			// Timeout - just loop back to check paused status
+			continue
+		}
 	}
 }
 
 func (j *JobQueueService) CreateJob(jobType string, name string, command string, args []string) (string, error) {
 	return j.CreateJobWithParameters(jobType, name, command, args, make(map[string]interface{}), "", "")
+}
+
+func (j *JobQueueService) CreateJobWithEnvironments(jobType string, name string, command string, args []string, parameters map[string]interface{}, pluginVersion string, pluginCommitHash string, pythonPath string, pythonEnvType string, rPath string, rEnvType string) (string, error) {
+	job := &models.Job{
+		ID:               uuid.New().String(),
+		Type:             jobType,
+		Name:             name,
+		Status:           models.JobStatusPending,
+		Progress:         0,
+		Command:          command,
+		Args:             args,
+		Parameters:       parameters,
+		PythonEnvPath:    pythonPath,
+		PythonEnvType:    pythonEnvType,
+		REnvPath:         rPath,
+		REnvType:         rEnvType,
+		TerminalOutput:   []string{},
+		PluginVersion:    pluginVersion,
+		PluginCommitHash: pluginCommitHash,
+		CreatedAt:        time.Now(),
+	}
+
+	j.mu.Lock()
+	j.jobs[job.ID] = job
+	j.mu.Unlock()
+
+	if err := j.db.GetDB().Create(job).Error; err != nil {
+		return "", err
+	}
+
+	j.queue <- job
+	j.emitJobUpdate(job)
+
+	return job.ID, nil
 }
 
 func (j *JobQueueService) CreateJobWithParameters(jobType string, name string, command string, args []string, parameters map[string]interface{}, pluginVersion string, pluginCommitHash string) (string, error) {
@@ -117,37 +189,7 @@ func (j *JobQueueService) CreateJobWithParameters(jobType string, name string, c
 		}
 	}
 
-	job := &models.Job{
-		ID:               uuid.New().String(),
-		Type:             jobType,
-		Name:             name,
-		Status:           models.JobStatusPending,
-		Progress:         0,
-		Command:          command,
-		Args:             args,
-		Parameters:       parameters,
-		PythonEnvPath:    pythonPath,
-		PythonEnvType:    pythonEnvType,
-		REnvPath:         rPath,
-		REnvType:         rEnvType,
-		TerminalOutput:   []string{},
-		PluginVersion:    pluginVersion,
-		PluginCommitHash: pluginCommitHash,
-		CreatedAt:        time.Now(),
-	}
-
-	j.mu.Lock()
-	j.jobs[job.ID] = job
-	j.mu.Unlock()
-
-	if err := j.db.GetDB().Create(job).Error; err != nil {
-		return "", err
-	}
-
-	j.queue <- job
-	j.emitJobUpdate(job)
-
-	return job.ID, nil
+	return j.CreateJobWithEnvironments(jobType, name, command, args, parameters, pluginVersion, pluginCommitHash, pythonPath, pythonEnvType, rPath, rEnvType)
 }
 
 func (j *JobQueueService) GetJob(id string) (*models.Job, error) {
@@ -267,18 +309,6 @@ func (j *JobQueueService) processJob(job *models.Job) {
 		j.mu.Unlock()
 	}()
 
-	// Skip processing for plugin v2 jobs - they are handled by ExecutePluginV2 directly
-	if job.Command == "python" || job.Command == "pythonWithR" || job.Command == "r" {
-		if pluginID, ok := job.Parameters["pluginId"].(uint); ok && pluginID > 0 {
-			log.Printf("[processJob] Skipping plugin v2 job %s (pluginId: %d) - handled by ExecutePluginV2", job.ID, pluginID)
-			return
-		}
-		if pluginID, ok := job.Parameters["pluginId"].(float64); ok && pluginID > 0 {
-			log.Printf("[processJob] Skipping plugin v2 job %s (pluginId: %.0f) - handled by ExecutePluginV2", job.ID, pluginID)
-			return
-		}
-	}
-
 	now := time.Now()
 	job.StartedAt = &now
 	job.Status = models.JobStatusInProgress
@@ -322,54 +352,136 @@ func (j *JobQueueService) processJob(job *models.Job) {
 	}
 
 	var err error
-	outputCallback := func(line string) {
-		job.TerminalOutput = append(job.TerminalOutput, line)
-		j.db.GetDB().Save(job)
-		if j.ctx.Value("wails-test") == nil {
-			runtime.EventsEmit(j.ctx, "job:output", map[string]interface{}{
-				"jobId":  job.ID,
-				"output": line,
-			})
-		}
+
+	var pluginID uint
+	var isPluginV2Job bool
+	if pid, ok := job.Parameters["pluginId"].(uint); ok && pid > 0 {
+		pluginID = pid
+		isPluginV2Job = true
+	} else if pid, ok := job.Parameters["pluginId"].(float64); ok && pid > 0 {
+		pluginID = uint(pid)
+		isPluginV2Job = true
 	}
 
-	if job.Command == "r" {
-		if j.rRunner == nil {
+	if isPluginV2Job && j.scriptExecutor != nil && j.pluginLoader != nil {
+		log.Printf("[processJob] Processing plugin v2 job %s (pluginId: %d)", job.ID, pluginID)
+
+		plugin, err := j.pluginLoader.GetPlugin(pluginID)
+		if err != nil {
 			completedTime := time.Now()
 			job.CompletedAt = &completedTime
 			job.Status = models.JobStatusFailed
-			job.Error = "R runner not initialized"
+			job.Error = fmt.Sprintf("Failed to load plugin: %v", err)
 			j.db.GetDB().Save(job)
 			j.emitJobUpdate(job)
 			return
 		}
-		err = j.rRunner.ExecuteScript(job.Args[0], job.Args[1:], outputCallback)
-	} else if job.Command == "direct" {
-		if j.directRunner == nil {
+
+		log.Printf("[processJob] Loaded plugin: Name=%s, ID=%s, FolderPath=%s",
+			plugin.Definition.Plugin.Name, plugin.Definition.Plugin.ID, plugin.FolderPath)
+
+		var outputDir string
+		if od, ok := job.Parameters["outputDir"].(string); ok {
+			outputDir = od
+		}
+
+		config := ScriptConfig{
+			PluginID:     pluginID,
+			Type:         plugin.Definition.Plugin.ID,
+			Environments: plugin.Definition.Runtime.GetEnvironments(),
+			ScriptName:   filepath.Base(plugin.ScriptPath),
+			Args:         job.Args[1:],
+			OutputDir:    outputDir,
+			FolderPath:   plugin.FolderPath,
+		}
+
+		log.Printf("[processJob] Created ScriptConfig with Type='%s' for plugin binding lookup", config.Type)
+
+		jobCtx, cancel := context.WithCancel(j.ctx)
+		defer cancel()
+		j.RegisterJobCancelFunc(job.ID, cancel)
+		defer j.UnregisterJobCancelFunc(job.ID)
+
+		envs := config.Environments
+		if len(envs) == 0 {
 			completedTime := time.Now()
 			job.CompletedAt = &completedTime
 			job.Status = models.JobStatusFailed
-			job.Error = "Direct runner not initialized"
+			job.Error = "No runtime environments specified"
 			j.db.GetDB().Save(job)
 			j.emitJobUpdate(job)
 			return
 		}
-		var workingDir string
-		if outputDir, ok := job.Parameters["outputDir"].(string); ok {
-			workingDir = outputDir
+
+		primaryEnv := envs[0]
+		log.Printf("[processJob] Executing plugin v2 job with primary environment: %s", primaryEnv)
+
+		switch primaryEnv {
+		case "python":
+			err = j.scriptExecutor.ExecutePythonScript(jobCtx, job.ID, config)
+		case "r":
+			err = j.scriptExecutor.ExecuteRScript(jobCtx, job.ID, config)
+		case "julia":
+			err = fmt.Errorf("julia runtime not yet implemented")
+		case "node":
+			err = fmt.Errorf("node runtime not yet implemented")
+		case "direct":
+			err = j.scriptExecutor.ExecuteDirectScript(jobCtx, job.ID, config)
+		default:
+			err = fmt.Errorf("unsupported primary environment: %s", primaryEnv)
 		}
-		err = j.directRunner.ExecuteProgram(job.Args[0], job.Args[1:], workingDir, outputCallback)
 	} else {
-		if j.pythonRunner == nil {
-			completedTime := time.Now()
-			job.CompletedAt = &completedTime
-			job.Status = models.JobStatusFailed
-			job.Error = "Python runner not initialized"
+		log.Printf("[processJob] Processing legacy job %s with command: %s", job.ID, job.Command)
+
+		outputCallback := func(line string) {
+			job.TerminalOutput = append(job.TerminalOutput, line)
 			j.db.GetDB().Save(job)
-			j.emitJobUpdate(job)
-			return
+			if j.ctx.Value("wails-test") == nil {
+				runtime.EventsEmit(j.ctx, "job:output", map[string]interface{}{
+					"jobId":  job.ID,
+					"output": line,
+				})
+			}
 		}
-		err = j.pythonRunner.ExecuteScript(job.Args[0], job.Args[1:], outputCallback)
+
+		if job.Command == "r" {
+			if j.rRunner == nil {
+				completedTime := time.Now()
+				job.CompletedAt = &completedTime
+				job.Status = models.JobStatusFailed
+				job.Error = "R runner not initialized"
+				j.db.GetDB().Save(job)
+				j.emitJobUpdate(job)
+				return
+			}
+			err = j.rRunner.ExecuteScript(job.Args[0], job.Args[1:], outputCallback)
+		} else if job.Command == "direct" {
+			if j.directRunner == nil {
+				completedTime := time.Now()
+				job.CompletedAt = &completedTime
+				job.Status = models.JobStatusFailed
+				job.Error = "Direct runner not initialized"
+				j.db.GetDB().Save(job)
+				j.emitJobUpdate(job)
+				return
+			}
+			var workingDir string
+			if outputDir, ok := job.Parameters["outputDir"].(string); ok {
+				workingDir = outputDir
+			}
+			err = j.directRunner.ExecuteProgram(job.Args[0], job.Args[1:], workingDir, outputCallback)
+		} else {
+			if j.pythonRunner == nil {
+				completedTime := time.Now()
+				job.CompletedAt = &completedTime
+				job.Status = models.JobStatusFailed
+				job.Error = "Python runner not initialized"
+				j.db.GetDB().Save(job)
+				j.emitJobUpdate(job)
+				return
+			}
+			err = j.pythonRunner.ExecuteScript(job.Args[0], job.Args[1:], outputCallback)
+		}
 	}
 
 	completedTime := time.Now()
@@ -507,6 +619,11 @@ func (j *JobQueueService) RerunJob(jobID string, useSameEnvironment bool, python
 	}
 
 	// Fallback: if no output directory found, use original behavior
+	fallbackParameters := make(map[string]interface{})
+	for k, v := range originalJob.Parameters {
+		fallbackParameters[k] = v
+	}
+
 	newJob := &models.Job{
 		ID:               uuid.New().String(),
 		Type:             originalJob.Type,
@@ -515,7 +632,7 @@ func (j *JobQueueService) RerunJob(jobID string, useSameEnvironment bool, python
 		Progress:         0,
 		Command:          originalJob.Command,
 		Args:             originalJob.Args,
-		Parameters:       originalJob.Parameters,
+		Parameters:       fallbackParameters,
 		PythonEnvPath:    newPythonPath,
 		PythonEnvType:    newPythonType,
 		REnvPath:         newRPath,
@@ -559,19 +676,55 @@ func (j *JobQueueService) loadFromDatabase() error {
 
 	log.Printf("[loadFromDatabase] Found %d jobs in database\n", len(jobs))
 
+	// Load all jobs into memory
 	j.mu.Lock()
 	for i := range jobs {
 		j.jobs[jobs[i].ID] = &jobs[i]
 	}
 	j.mu.Unlock()
 
+	// Find and queue pending jobs
+	var pendingJobs []*models.Job
+	for i := range jobs {
+		if jobs[i].Status == models.JobStatusPending {
+			pendingJobs = append(pendingJobs, &jobs[i])
+		}
+	}
+
+	if len(pendingJobs) > 0 {
+		log.Printf("[loadFromDatabase] Found %d pending jobs, queueing them...", len(pendingJobs))
+
+		// Queue pending jobs in background to avoid blocking startup
+		go func() {
+			for _, job := range pendingJobs {
+				j.queue <- job
+				log.Printf("[loadFromDatabase] Queued pending job: %s - %s", job.ID, job.Name)
+			}
+			log.Printf("[loadFromDatabase] Finished queueing %d pending jobs", len(pendingJobs))
+		}()
+	}
+
 	log.Println("[loadFromDatabase] Complete")
 	return nil
 }
 
 func (j *JobQueueService) Shutdown() {
+	log.Println("[Shutdown] Closing job queue...")
 	close(j.queue)
-	j.wg.Wait()
+
+	log.Println("[Shutdown] Waiting for workers to finish (max 10 seconds)...")
+	done := make(chan struct{})
+	go func() {
+		j.wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		log.Println("[Shutdown] All workers finished gracefully")
+	case <-time.After(10 * time.Second):
+		log.Println("[Shutdown] WARNING: Timeout waiting for workers, forcing shutdown")
+	}
 }
 
 func (j *JobQueueService) UpdateJobProgress(id string, progress float64, output string) error {
@@ -692,6 +845,12 @@ func (j *JobQueueService) StopQueueImmediate() error {
 	j.stopImmediate = true
 	log.Println("[StopQueueImmediate] Queue stopped immediately - stopping ALL in-progress jobs")
 
+	// Force kill all running processes in ScriptExecutor
+	if j.scriptExecutor != nil {
+		log.Println("[StopQueueImmediate] Killing all running processes...")
+		j.scriptExecutor.KillAllJobs()
+	}
+
 	var inProgressJobs []*models.Job
 	j.db.GetDB().Where("status = ?", models.JobStatusInProgress).Find(&inProgressJobs)
 
@@ -752,14 +911,18 @@ func (j *JobQueueService) UnregisterJobCancelFunc(jobID string) {
 
 func (j *JobQueueService) ResumeQueue() error {
 	j.mu.Lock()
-	defer j.mu.Unlock()
+	paused := j.paused
+	j.mu.Unlock()
 
-	if !j.paused {
+	if !paused {
 		return fmt.Errorf("queue is not paused")
 	}
 
+	j.mu.Lock()
 	j.paused = false
 	j.stopImmediate = false
+	j.mu.Unlock()
+
 	log.Println("[ResumeQueue] Queue resumed - processing will continue")
 
 	if j.ctx.Value("wails-test") == nil {
@@ -772,13 +935,42 @@ func (j *JobQueueService) ResumeQueue() error {
 	var pendingJobs []*models.Job
 	j.db.GetDB().Where("status = ?", models.JobStatusPending).Order("created_at ASC").Find(&pendingJobs)
 
+	log.Printf("[ResumeQueue] Found %d pending jobs to requeue", len(pendingJobs))
+
+	if len(pendingJobs) == 0 {
+		log.Println("[ResumeQueue] No pending jobs to requeue")
+		return nil
+	}
+
+	// Add jobs to memory map first
+	j.mu.Lock()
 	for _, job := range pendingJobs {
 		if _, exists := j.jobs[job.ID]; !exists {
 			j.jobs[job.ID] = job
+		}
+	}
+	j.mu.Unlock()
+
+	// Send jobs to queue in a goroutine to avoid blocking while holding lock
+	// Use blocking sends so workers can process them when ready
+	go func() {
+		for _, job := range pendingJobs {
+			// Check if we should stop (queue was paused again)
+			j.mu.RLock()
+			isPaused := j.paused
+			j.mu.RUnlock()
+
+			if isPaused {
+				log.Println("[ResumeQueue] Queue paused again, stopping requeue")
+				return
+			}
+
+			// Blocking send - waits for worker to be ready
 			j.queue <- job
 			log.Printf("[ResumeQueue] Requeued pending job: %s - %s", job.ID, job.Name)
 		}
-	}
+		log.Println("[ResumeQueue] Finished requeueing all pending jobs")
+	}()
 
 	return nil
 }
@@ -801,4 +993,41 @@ func (j *JobQueueService) GetQueueStatus() map[string]interface{} {
 		"inProgressCount": inProgressCount,
 		"queueLength":     len(j.queue),
 	}
+}
+
+func (j *JobQueueService) ProcessPendingJobs() error {
+	log.Println("[ProcessPendingJobs] Manually processing pending jobs")
+
+	var pendingJobs []*models.Job
+	if err := j.db.GetDB().Where("status = ?", models.JobStatusPending).Order("created_at ASC").Find(&pendingJobs).Error; err != nil {
+		return fmt.Errorf("failed to get pending jobs: %v", err)
+	}
+
+	log.Printf("[ProcessPendingJobs] Found %d pending jobs", len(pendingJobs))
+
+	if len(pendingJobs) == 0 {
+		log.Println("[ProcessPendingJobs] No pending jobs to process")
+		return nil
+	}
+
+	// Add jobs to memory map first
+	j.mu.Lock()
+	for _, job := range pendingJobs {
+		if _, exists := j.jobs[job.ID]; !exists {
+			j.jobs[job.ID] = job
+		}
+	}
+	j.mu.Unlock()
+
+	// Send jobs to queue in a goroutine using blocking sends
+	go func() {
+		for _, job := range pendingJobs {
+			// Blocking send - waits for worker to be ready
+			j.queue <- job
+			log.Printf("[ProcessPendingJobs] Queued pending job: %s - %s", job.ID, job.Name)
+		}
+		log.Println("[ProcessPendingJobs] Finished processing all pending jobs")
+	}()
+
+	return nil
 }

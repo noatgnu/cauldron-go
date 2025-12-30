@@ -313,4 +313,14 @@ export class Jobs implements OnInit {
       await this.wails.logToFile(`Failed to resume queue: ${error}`);
     }
   }
+
+  async processPendingJobs(): Promise<void> {
+    try {
+      await this.wails.processPendingJobs();
+      await this.loadQueueStatus();
+      await this.loadJobs();
+    } catch (error) {
+      await this.wails.logToFile(`Failed to process pending jobs: ${error}`);
+    }
+  }
 }

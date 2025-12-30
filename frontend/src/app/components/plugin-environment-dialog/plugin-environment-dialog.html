@@ -100,6 +100,11 @@
                     <mat-card-content>
                       <h4>Create Virtual Environment</h4>
                       <mat-form-field appearance="outline" class="full-width">
+                        <mat-label>Environment Name</mat-label>
+                        <input matInput [value]="'venv-' + data.pluginId" readonly>
+                        <mat-hint>Auto-generated name based on plugin ID</mat-hint>
+                      </mat-form-field>
+                      <mat-form-field appearance="outline" class="full-width">
                         <mat-label>Base Python</mat-label>
                         <mat-select [(ngModel)]="selectedBasePython">
                           @for (env of basePythonEnvironments(); track env.path) {
@@ -113,7 +118,6 @@
                         </mat-select>
                         <mat-hint>Select the Python environment to use as base</mat-hint>
                       </mat-form-field>
-                      <p class="info-text">After clicking Create, you'll be prompted to select a directory location.</p>
                       @if (creatingEnvironment()) {
                         <div class="creation-progress">
                           <mat-spinner diameter="24"></mat-spinner>

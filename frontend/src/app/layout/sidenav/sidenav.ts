@@ -207,6 +207,10 @@ export class Sidenav implements OnInit {
       window.runtime.EventsOn('plugin:install:success', () => {
         this.loadPlugins();
       });
+
+      window.runtime.EventsOn('plugin:uninstall:success', () => {
+        this.loadPlugins();
+      });
     }
   }
 

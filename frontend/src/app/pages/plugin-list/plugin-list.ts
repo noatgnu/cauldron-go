@@ -108,7 +108,7 @@ export class PluginList implements OnInit {
     const bindingsMap = new Map<string, { python: boolean, r: boolean }>();
 
     for (const plugin of plugins) {
-      const pluginId = plugin.id.toString();
+      const pluginId = plugin.definition.plugin.id;
       let hasPython = false;
       let hasR = false;
 
@@ -123,7 +123,7 @@ export class PluginList implements OnInit {
       } catch {}
 
       if (hasPython || hasR) {
-        bindingsMap.set(pluginId, { python: hasPython, r: hasR });
+        bindingsMap.set(plugin.id.toString(), { python: hasPython, r: hasR });
       }
     }
 
@@ -251,7 +251,7 @@ export class PluginList implements OnInit {
       width: '600px',
       disableClose: true,
       data: {
-        pluginId: plugin.id.toString(),
+        pluginId: plugin.definition.plugin.id,
         pluginName: plugin.definition.plugin.name,
         runtimeEnvironments: plugin.definition.runtime.environments,
         plugin: plugin

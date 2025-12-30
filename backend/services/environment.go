@@ -91,7 +91,24 @@ func (e *EnvironmentService) DetectPythonEnvironments() ([]PythonEnvironment, er
 		return []PythonEnvironment{}, err
 	}
 
-	log.Printf("[DetectPythonEnvironments] Complete, found %d environments in database\n", len(environments))
+	venvs, err := e.GetVirtualEnvironments()
+	if err != nil {
+		log.Printf("[DetectPythonEnvironments] Failed to get virtual environments: %v\n", err)
+	} else {
+		log.Printf("[DetectPythonEnvironments] Found %d virtual environments, adding to list\n", len(venvs))
+		for _, venv := range venvs {
+			version := e.getPythonVersion(venv.Path)
+			environments = append(environments, PythonEnvironment{
+				Name:      venv.Name,
+				Path:      venv.Path,
+				Type:      "venv",
+				Version:   version,
+				IsVirtual: true,
+			})
+		}
+	}
+
+	log.Printf("[DetectPythonEnvironments] Complete, found %d total environments (system + venvs)\n", len(environments))
 	return environments, nil
 }
 
@@ -873,14 +890,18 @@ func (e *EnvironmentService) installPythonPackagesList(pythonPath string, packag
 	return nil
 }
 
-func (e *EnvironmentService) CreatePythonVirtualEnv(basePythonPath string, venvPath string, pluginID string) error {
-	log.Printf("[CreatePythonVirtualEnv] Creating virtual environment at %s using %s for plugin %s\n", venvPath, basePythonPath, pluginID)
+func (e *EnvironmentService) CreatePythonVirtualEnv(basePythonPath string, venvPath string, pluginID string, pluginFolderPath string) error {
+	log.Printf("[CreatePythonVirtualEnv] Creating virtual environment at %s using %s for plugin %s (folder: %s)\n", venvPath, basePythonPath, pluginID, pluginFolderPath)
 
 	venvName := filepath.Base(venvPath)
 	e.progressNotifier.EmitStart(ProgressTypeInstall, "python-venv", fmt.Sprintf("Creating virtual environment '%s'...", venvName))
 
+	if _, err := os.Stat(venvPath); err == nil {
+		log.Printf("[CreatePythonVirtualEnv] Virtual environment directory already exists at %s, will recreate with --clear flag", venvPath)
+	}
+
 	e.progressNotifier.EmitProgress(ProgressTypeInstall, "python-venv", "Setting up virtual environment structure...", 20)
-	cmd := exec.Command(basePythonPath, "-m", "venv", venvPath)
+	cmd := exec.Command(basePythonPath, "-m", "venv", "--clear", venvPath)
 	hideConsoleWindow(cmd)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -895,27 +916,21 @@ func (e *EnvironmentService) CreatePythonVirtualEnv(basePythonPath string, venvP
 	}
 
 	// Auto-install plugin requirements if pluginID provided
-	if pluginID != "" {
-		// Attempt to resolve numeric ID to plugin string ID (folder name)
-		resolvedPluginID := pluginID
-		if id, err := strconv.ParseUint(pluginID, 10, 64); err == nil {
-			var pluginRegistry models.PluginRegistry
-			if err := e.db.GetDB().First(&pluginRegistry, id).Error; err == nil {
-				resolvedPluginID = pluginRegistry.PluginID
-				log.Printf("[CreatePythonVirtualEnv] Resolved numeric ID %s to plugin ID %s", pluginID, resolvedPluginID)
-			}
-		}
-
+	if pluginID != "" && pluginFolderPath != "" {
 		e.progressNotifier.EmitProgress(ProgressTypeInstall, "python-venv", "Installing plugin requirements...", 40)
 
 		// Try to load plugin definition to get inline packages
-		pluginYamlPath := filepath.Join("plugins", resolvedPluginID, "plugin.yaml")
+		pluginYamlPath := filepath.Join(pluginFolderPath, "plugin.yaml")
 		var inlinePackages []string
 		var requirementsFile string
 
+		log.Printf("[CreatePythonVirtualEnv] Looking for plugin.yaml at: %s", pluginYamlPath)
 		if pluginDef, err := e.loadPluginDefinition(pluginYamlPath); err == nil {
 			inlinePackages = pluginDef.Execution.Requirements.Packages
 			requirementsFile = pluginDef.Execution.Requirements.PythonRequirementsFile
+			log.Printf("[CreatePythonVirtualEnv] Found plugin definition - inline packages: %v, requirements file: %s", inlinePackages, requirementsFile)
+		} else {
+			log.Printf("[CreatePythonVirtualEnv] Failed to load plugin definition from %s: %v", pluginYamlPath, err)
 		}
 
 		// Use inline packages if available
@@ -926,21 +941,34 @@ func (e *EnvironmentService) CreatePythonVirtualEnv(basePythonPath string, venvP
 			}
 		} else if requirementsFile != "" {
 			// Use explicit pythonRequirementsFile from plugin.yaml
-			requirementsPath := filepath.Join("plugins", resolvedPluginID, requirementsFile)
+			requirementsPath := filepath.Join(pluginFolderPath, requirementsFile)
+			log.Printf("[CreatePythonVirtualEnv] Looking for requirements file at: %s", requirementsPath)
 			if _, err := os.Stat(requirementsPath); err == nil {
 				log.Printf("[CreatePythonVirtualEnv] Installing requirements from %s\n", requirementsPath)
 				if err := e.InstallPythonRequirements(pythonExe, requirementsPath); err != nil {
 					log.Printf("[CreatePythonVirtualEnv] Warning: Failed to install plugin requirements: %v\n", err)
 				}
 			} else {
-				log.Printf("[CreatePythonVirtualEnv] Warning: Specified pythonRequirementsFile '%s' not found\n", requirementsPath)
+				log.Printf("[CreatePythonVirtualEnv] Warning: Specified pythonRequirementsFile '%s' not found at %s\n", requirementsFile, requirementsPath)
 			}
 		} else {
-			log.Printf("[CreatePythonVirtualEnv] No package requirements specified for plugin %s (resolved from %s)\n", resolvedPluginID, pluginID)
+			log.Printf("[CreatePythonVirtualEnv] No package requirements specified for plugin %s\n", pluginID)
 		}
+	} else if pluginID != "" && pluginFolderPath == "" {
+		log.Printf("[CreatePythonVirtualEnv] Plugin ID provided but no folder path - skipping package installation for %s\n", pluginID)
 	}
 
 	e.progressNotifier.EmitProgress(ProgressTypeInstall, "python-venv", "Saving environment configuration...", 90)
+
+	var existingVenv VirtualEnvironment
+	err = e.db.GetDB().Where("path = ?", pythonExe).First(&existingVenv).Error
+	if err == nil {
+		log.Printf("[CreatePythonVirtualEnv] Found existing venv with path %s (ID: %d), deleting old record", pythonExe, existingVenv.ID)
+		if err := e.db.GetDB().Delete(&existingVenv).Error; err != nil {
+			log.Printf("[CreatePythonVirtualEnv] Warning: Failed to delete existing venv record: %v", err)
+		}
+	}
+
 	venv := VirtualEnvironment{
 		Name:           venvName,
 		Path:           pythonExe,
@@ -948,11 +976,14 @@ func (e *EnvironmentService) CreatePythonVirtualEnv(basePythonPath string, venvP
 		CreatedAt:      time.Now().Unix(),
 	}
 
+	log.Printf("[CreatePythonVirtualEnv] Attempting to save venv to database - Name: %s, Path: %s, BasePythonPath: %s", venvName, pythonExe, basePythonPath)
 	if err := e.db.GetDB().Create(&venv).Error; err != nil {
-		log.Printf("[CreatePythonVirtualEnv] Warning: Failed to save to database: %v\n", err)
+		log.Printf("[CreatePythonVirtualEnv] ERROR: Failed to save to database: %v\n", err)
+		e.progressNotifier.EmitError(ProgressTypeInstall, "python-venv", "Failed to save virtual environment to database", err.Error())
+		return fmt.Errorf("failed to save virtual environment to database: %w", err)
 	}
 
-	log.Printf("[CreatePythonVirtualEnv] Successfully created virtual environment\n")
+	log.Printf("[CreatePythonVirtualEnv] Successfully created and saved virtual environment with ID: %d\n", venv.ID)
 	e.progressNotifier.EmitComplete(ProgressTypeInstall, "python-venv", fmt.Sprintf("Virtual environment '%s' created successfully", venvName))
 	return nil
 }
@@ -960,7 +991,15 @@ func (e *EnvironmentService) CreatePythonVirtualEnv(basePythonPath string, venvP
 func (e *EnvironmentService) GetVirtualEnvironments() ([]VirtualEnvironment, error) {
 	var venvs []VirtualEnvironment
 	err := e.db.GetDB().Order("created_at DESC").Find(&venvs).Error
-	return venvs, err
+	if err != nil {
+		log.Printf("[GetVirtualEnvironments] ERROR: Failed to query virtual environments: %v", err)
+		return nil, err
+	}
+	log.Printf("[GetVirtualEnvironments] Found %d virtual environments", len(venvs))
+	for i, venv := range venvs {
+		log.Printf("[GetVirtualEnvironments] [%d] ID=%d, Name=%s, Path=%s", i, venv.ID, venv.Name, venv.Path)
+	}
+	return venvs, nil
 }
 
 func (e *EnvironmentService) DeleteVirtualEnvironment(id uint) error {
@@ -1095,12 +1134,17 @@ func (e *EnvironmentService) CreateRenvEnvironment(name string, packages []strin
 	// 2. Use restore if lock file exists, otherwise proceed to manual install
 	if hasExistingLock {
 		e.progressNotifier.EmitProgress(ProgressTypeInstall, "renv-init", "Restoring environment from renv.lock...", 50)
-		restoreCmd := fmt.Sprintf("setwd('%s'); renv::restore(confirm = FALSE)", strings.ReplaceAll(projectPath, "\\", "/"))
+		restoreCmd := fmt.Sprintf("Sys.setenv(RENV_PROJECT='%s'); source('%s/renv/activate.R'); renv::restore(confirm = FALSE)",
+			strings.ReplaceAll(projectPath, "\\", "/"),
+			strings.ReplaceAll(projectPath, "\\", "/"))
 		cmdR := exec.Command(rPath, "-e", restoreCmd)
 		hideConsoleWindow(cmdR)
+		envRestore := os.Environ()
 		if cacheDir != "" {
-			cmdR.Env = append(os.Environ(), fmt.Sprintf("RENV_PATHS_CACHE=%s", cacheDir))
+			envRestore = append(envRestore, fmt.Sprintf("RENV_PATHS_CACHE=%s", cacheDir))
 		}
+		envRestore = append(envRestore, fmt.Sprintf("RENV_PROJECT=%s", projectPath))
+		cmdR.Env = envRestore
 		if out, err := cmdR.CombinedOutput(); err != nil {
 			log.Printf("[CreateRenvEnvironment] renv::restore failed: %v\nOutput: %s", err, string(out))
 			// Fallback to manual installation if restore fails
@@ -1210,28 +1254,38 @@ func (e *EnvironmentService) InstallRenvPackages(projectPath string, rPath strin
 		var installCmd string
 		// Special case: Rmpi (from original logic)
 		if pkg == "Rmpi" {
-			installCmd = fmt.Sprintf("setwd('%s'); renv::install('Rmpi', configure.args='ORTED=prted')", strings.ReplaceAll(projectPath, "\\", "/"))
+			installCmd = fmt.Sprintf("Sys.setenv(RENV_PROJECT='%s'); source('%s/renv/activate.R'); renv::install('Rmpi', configure.args='ORTED=prted'); cat('Library paths:', .libPaths(), sep='\\n')",
+				strings.ReplaceAll(projectPath, "\\", "/"),
+				strings.ReplaceAll(projectPath, "\\", "/"))
 		} else {
 			// Try standard renv::install first
-			installCmd = fmt.Sprintf("setwd('%s'); renv::install('%s')", strings.ReplaceAll(projectPath, "\\", "/"), pkg)
+			installCmd = fmt.Sprintf("Sys.setenv(RENV_PROJECT='%s'); source('%s/renv/activate.R'); renv::install('%s'); cat('Library paths:', .libPaths(), sep='\\n')",
+				strings.ReplaceAll(projectPath, "\\", "/"),
+				strings.ReplaceAll(projectPath, "\\", "/"),
+				pkg)
 		}
 
 		cmd := exec.Command(rPath, "-e", installCmd)
 		hideConsoleWindow(cmd)
+		env := os.Environ()
 		if cacheDir != "" {
-			cmd.Env = append(os.Environ(), fmt.Sprintf("RENV_PATHS_CACHE=%s", cacheDir))
+			env = append(env, fmt.Sprintf("RENV_PATHS_CACHE=%s", cacheDir))
 		}
+		env = append(env, fmt.Sprintf("RENV_PROJECT=%s", projectPath))
+		cmd.Env = env
 
 		output, err := cmd.CombinedOutput()
+		log.Printf("[InstallRenvPackages] Output for %s:\n%s", pkg, string(output))
 		if err != nil {
 			log.Printf("[InstallRenvPackages] Standard install failed for %s, trying bioc:: fallback...", pkg)
 			// Fallback: Try explicit Bioconductor prefix
-			biocCmd := fmt.Sprintf("setwd('%s'); renv::install('bioc::%s')", strings.ReplaceAll(projectPath, "\\", "/"), pkg)
+			biocCmd := fmt.Sprintf("Sys.setenv(RENV_PROJECT='%s'); source('%s/renv/activate.R'); renv::install('bioc::%s'); cat('Library paths:', .libPaths(), sep='\\n')",
+				strings.ReplaceAll(projectPath, "\\", "/"),
+				strings.ReplaceAll(projectPath, "\\", "/"),
+				pkg)
 			cmdBioc := exec.Command(rPath, "-e", biocCmd)
 			hideConsoleWindow(cmdBioc)
-			if cacheDir != "" {
-				cmdBioc.Env = append(os.Environ(), fmt.Sprintf("RENV_PATHS_CACHE=%s", cacheDir))
-			}
+			cmdBioc.Env = env
 			output, err = cmdBioc.CombinedOutput()
 			if err != nil {
 				log.Printf("[InstallRenvPackages] Failed to install %s: %v\nOutput: %s", pkg, err, string(output))
@@ -1244,12 +1298,17 @@ func (e *EnvironmentService) InstallRenvPackages(projectPath string, rPath strin
 	}
 
 	e.progressNotifier.EmitProgress(ProgressTypeInstall, "renv-packages", "Creating renv snapshot...", 97)
-	snapshotCmd := fmt.Sprintf("setwd('%s'); renv::snapshot(confirm = FALSE)", strings.ReplaceAll(projectPath, "\\", "/"))
+	snapshotCmd := fmt.Sprintf("Sys.setenv(RENV_PROJECT='%s'); source('%s/renv/activate.R'); renv::snapshot(confirm = FALSE)",
+		strings.ReplaceAll(projectPath, "\\", "/"),
+		strings.ReplaceAll(projectPath, "\\", "/"))
 	cmd := exec.Command(rPath, "-e", snapshotCmd)
 	hideConsoleWindow(cmd)
+	envSnap := os.Environ()
 	if cacheDir != "" {
-		cmd.Env = append(os.Environ(), fmt.Sprintf("RENV_PATHS_CACHE=%s", cacheDir))
+		envSnap = append(envSnap, fmt.Sprintf("RENV_PATHS_CACHE=%s", cacheDir))
 	}
+	envSnap = append(envSnap, fmt.Sprintf("RENV_PROJECT=%s", projectPath))
+	cmd.Env = envSnap
 	if err := cmd.Run(); err != nil {
 		log.Printf("[InstallRenvPackages] Warning: snapshot failed: %v", err)
 	}

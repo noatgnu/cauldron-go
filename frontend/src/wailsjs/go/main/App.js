@@ -142,6 +142,10 @@ export function GetCustomEnvVars(arg1) {
   return window['go']['main']['App']['GetCustomEnvVars'](arg1);
 }
 
+export function GetDefaultVenvPath(arg1) {
+  return window['go']['main']['App']['GetDefaultVenvPath'](arg1);
+}
+
 export function GetExampleFilePath(arg1, arg2) {
   return window['go']['main']['App']['GetExampleFilePath'](arg1, arg2);
 }
@@ -368,6 +372,10 @@ export function PauseJobQueue() {
 
 export function PinPluginVersion(arg1, arg2) {
   return window['go']['main']['App']['PinPluginVersion'](arg1, arg2);
+}
+
+export function ProcessPendingJobs() {
+  return window['go']['main']['App']['ProcessPendingJobs']();
 }
 
 export function ReExecuteJob(arg1) {

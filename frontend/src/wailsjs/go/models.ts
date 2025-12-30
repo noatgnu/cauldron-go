@@ -181,6 +181,8 @@ export namespace models {
 	    rEnvType?: string;
 	    outputPath: string;
 	    terminalOutput: string[];
+	    pluginVersion?: string;
+	    pluginCommitHash?: string;
 	    // Go type: time
 	    createdAt: any;
 	    // Go type: time
@@ -209,6 +211,8 @@ export namespace models {
 	        this.rEnvType = source["rEnvType"];
 	        this.outputPath = source["outputPath"];
 	        this.terminalOutput = source["terminalOutput"];
+	        this.pluginVersion = source["pluginVersion"];
+	        this.pluginCommitHash = source["pluginCommitHash"];
 	        this.createdAt = this.convertValues(source["createdAt"], null);
 	        this.startedAt = this.convertValues(source["startedAt"], null);
 	        this.completedAt = this.convertValues(source["completedAt"], null);

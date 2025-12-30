@@ -79,11 +79,46 @@ type ScriptConfig struct {
 func (s *ScriptExecutor) ExecutePythonScript(ctx context.Context, jobID string, config ScriptConfig) error {
 	log.Printf("[ExecutePythonScript] Called for job %s with environments: %v", jobID, config.Environments)
 	cfg := s.settingsService.GetConfig()
-	if cfg.PythonPath == "" {
-		return fmt.Errorf("python path not configured")
+
+	var pythonPath string
+	var envInfo string
+
+	// Check for plugin-specific venv binding
+	binding, err := s.db.GetPluginEnvironmentBinding(config.Type, "python")
+	if err != nil {
+		log.Printf("[ExecutePythonScript] Error looking up venv binding for plugin %s: %v", config.Type, err)
 	}
 
-	pythonPath := cfg.PythonPath
+	if binding != nil && binding.EnvironmentPath != "" {
+		// Use bound venv
+		log.Printf("[ExecutePythonScript] Found venv binding for plugin %s: %s", config.Type, binding.EnvironmentPath)
+		venvPath := binding.EnvironmentPath
+
+		// Construct Python executable path from venv
+		if runtime.GOOS == "windows" {
+			pythonPath = filepath.Join(venvPath, "Scripts", "python.exe")
+		} else {
+			pythonPath = filepath.Join(venvPath, "bin", "python")
+		}
+
+		// Verify the Python executable exists
+		if _, err := os.Stat(pythonPath); err != nil {
+			log.Printf("[ExecutePythonScript] Warning: Bound venv Python not found at %s, falling back to global Python", pythonPath)
+			pythonPath = ""
+		} else {
+			envInfo = fmt.Sprintf("Python (Bound venv): %s", venvPath)
+		}
+	}
+
+	// Fall back to global Python if no binding or binding failed
+	if pythonPath == "" {
+		if cfg.PythonPath == "" {
+			return fmt.Errorf("python path not configured")
+		}
+		pythonPath = cfg.PythonPath
+		envInfo = fmt.Sprintf("Python (Global): %s", pythonPath)
+		log.Printf("[ExecutePythonScript] Using global Python: %s", pythonPath)
+	}
 
 	var pluginDir string
 	if config.FolderPath != "" {
@@ -143,10 +178,12 @@ func (s *ScriptExecutor) ExecutePythonScript(ctx context.Context, jobID string, 
 	}
 	cmd.Env = env
 
-	return s.executeCommand(ctx, jobID, cmd, config.OutputDir)
+	return s.executeCommand(ctx, jobID, cmd, config.OutputDir, envInfo)
 }
 
 func (s *ScriptExecutor) ExecuteRScript(ctx context.Context, jobID string, config ScriptConfig) error {
+	log.Printf("[ExecuteRScript] Starting execution for job %s with config.Type=%s", jobID, config.Type)
+
 	cfg := s.settingsService.GetConfig()
 	if cfg.RPath == "" {
 		return fmt.Errorf("R path not configured")
@@ -154,23 +191,38 @@ func (s *ScriptExecutor) ExecuteRScript(ctx context.Context, jobID string, confi
 
 	rPath := cfg.RPath
 	var rLibPath string
+	var envInfo string
 
+	// Check for plugin-specific renv binding
+	log.Printf("[ExecuteRScript] Looking up renv binding for plugin '%s' with environment type 'r'", config.Type)
 	binding, err := s.db.GetPluginEnvironmentBinding(config.Type, "r")
-	if err == nil && binding != nil {
-		log.Printf("[ExecuteRScript] Found renv binding for plugin %s: %s", config.Type, binding.EnvironmentPath)
+	if err != nil {
+		log.Printf("[ExecuteRScript] Error looking up renv binding for plugin %s: %v", config.Type, err)
+	} else if binding == nil {
+		log.Printf("[ExecuteRScript] No renv binding found for plugin %s (binding is nil)", config.Type)
+	} else {
+		log.Printf("[ExecuteRScript] Binding lookup succeeded: PluginID=%s, EnvType=%s, EnvID=%d, EnvPath=%s",
+			binding.PluginID, binding.EnvironmentType, binding.EnvironmentID, binding.EnvironmentPath)
+	}
+
+	var renvProjectPath string
+	if binding != nil && binding.EnvironmentPath != "" {
+		log.Printf("[ExecuteRScript] Processing renv binding for plugin %s: %s", config.Type, binding.EnvironmentPath)
 
 		renvEnv, err := s.db.GetRenvEnvironmentByID(binding.EnvironmentID)
-		if err == nil {
-			renvLibPath := filepath.Join(renvEnv.ProjectPath, "renv", "library")
-			dirs, err := os.ReadDir(renvLibPath)
-			if err == nil && len(dirs) > 0 {
-				platformDir := filepath.Join(renvLibPath, dirs[0].Name())
-				if _, err := os.Stat(platformDir); err == nil {
-					rLibPath = platformDir
-					log.Printf("[ExecuteRScript] Using renv library path: %s", rLibPath)
-				}
-			}
+		if err != nil {
+			log.Printf("[ExecuteRScript] Error getting renv environment: %v", err)
+		} else {
+			renvProjectPath = renvEnv.ProjectPath
+			log.Printf("[ExecuteRScript] Using renv project path: %s", renvProjectPath)
+			envInfo = fmt.Sprintf("R (Bound renv): %s", renvProjectPath)
 		}
+	}
+
+	// Fall back to global R if no binding
+	if envInfo == "" {
+		envInfo = fmt.Sprintf("R (Global): %s", rPath)
+		log.Printf("[ExecuteRScript] Using global R: %s", rPath)
 	}
 
 	var pluginDir string
@@ -190,32 +242,110 @@ func (s *ScriptExecutor) ExecuteRScript(ctx context.Context, jobID string, confi
 	log.Printf("[ExecuteRScript] R path: %s", rPath)
 	log.Printf("[ExecuteRScript] Working directory: %s", pluginDir)
 
-	args := []string{"--vanilla", "--slave", scriptName, "--args"}
-	args = append(args, config.Args...)
-	log.Printf("[ExecuteRScript] Full command: %s %v", rPath, args)
+	var args []string
+	var cmd *exec.Cmd
 
-	cmd := exec.CommandContext(ctx, rPath, args...)
-	hideConsoleWindow(cmd)
+	// If using renv, create wrapper script to activate renv before running plugin script
+	if renvProjectPath != "" {
+		// Create a temporary wrapper script that activates renv and sources the plugin script
+		renvProjectPathR := strings.ReplaceAll(renvProjectPath, "\\", "/")
+		scriptNameR := strings.ReplaceAll(scriptName, "\\", "/")
 
-	env := s.prepareEnv(config.PluginID)
-	env = append(env, "R_DEFAULT_DEVICE=null")
+		wrapperScript := fmt.Sprintf(`
+Sys.setenv(RENV_PROJECT='%s')
+source('%s/renv/activate.R')
+cat('Library paths after activation:\n')
+cat(.libPaths(), sep='\n')
+source('%s')
+`, renvProjectPathR, renvProjectPathR, scriptNameR)
 
-	if rLibPath != "" {
-		rLibPath = strings.ReplaceAll(rLibPath, "\\", "/")
-		env = append(env, fmt.Sprintf("R_LIBS_USER=%s", rLibPath))
-		env = append(env, fmt.Sprintf("R_LIBS=%s", rLibPath))
-		log.Printf("[ExecuteRScript] Set R_LIBS to: %s", rLibPath)
+		// Write wrapper to temp file
+		tmpFile, err := os.CreateTemp("", "renv-wrapper-*.R")
+		if err != nil {
+			return fmt.Errorf("failed to create temp wrapper script: %w", err)
+		}
+		defer os.Remove(tmpFile.Name())
+
+		if _, err := tmpFile.WriteString(wrapperScript); err != nil {
+			tmpFile.Close()
+			return fmt.Errorf("failed to write wrapper script: %w", err)
+		}
+		tmpFile.Close()
+
+		args = []string{"--vanilla", "--slave", tmpFile.Name(), "--args"}
+		args = append(args, config.Args...)
+		log.Printf("[ExecuteRScript] Using renv wrapper script: %s", tmpFile.Name())
+		log.Printf("[ExecuteRScript] Full command: %s %v", rPath, args)
+
+		cmd = exec.CommandContext(ctx, rPath, args...)
+		hideConsoleWindow(cmd)
+
+		env := s.prepareEnv(config.PluginID)
+		env = append(env, "R_DEFAULT_DEVICE=null")
+		env = append(env, fmt.Sprintf("RENV_PROJECT=%s", renvProjectPath))
+		cmd.Env = env
+	} else {
+		// No renv binding, run script directly
+		args = []string{"--vanilla", "--slave", scriptName, "--args"}
+		args = append(args, config.Args...)
+		log.Printf("[ExecuteRScript] Full command: %s %v", rPath, args)
+
+		cmd = exec.CommandContext(ctx, rPath, args...)
+		hideConsoleWindow(cmd)
+
+		env := s.prepareEnv(config.PluginID)
+		env = append(env, "R_DEFAULT_DEVICE=null")
+		cmd.Env = env
 	}
-
-	cmd.Env = env
 
 	cmd.Dir = pluginDir
 	log.Printf("[ExecuteRScript] Working directory: %s", cmd.Dir)
 
-	return s.executeCommand(ctx, jobID, cmd, config.OutputDir)
+	return s.executeCommand(ctx, jobID, cmd, config.OutputDir, envInfo)
 }
 
-func (s *ScriptExecutor) executeCommand(ctx context.Context, jobID string, cmd *exec.Cmd, outputDir string) error {
+func (s *ScriptExecutor) ExecuteDirectScript(ctx context.Context, jobID string, config ScriptConfig) error {
+	log.Printf("[ExecuteDirectScript] Called for job %s", jobID)
+
+	var pluginDir string
+	if config.FolderPath != "" {
+		pluginDir = config.FolderPath
+	} else {
+		exePath, err := os.Executable()
+		if err != nil {
+			return fmt.Errorf("failed to get executable path: %w", err)
+		}
+		exeDir := filepath.Dir(exePath)
+		pluginDir = filepath.Join(exeDir, "plugins", config.Type)
+	}
+
+	executablePath := filepath.Join(pluginDir, config.ScriptName)
+
+	if !filepath.IsAbs(executablePath) {
+		absPath, err := filepath.Abs(executablePath)
+		if err == nil {
+			executablePath = absPath
+		}
+	}
+
+	log.Printf("[ExecuteDirectScript] Executable path: %s", executablePath)
+	log.Printf("[ExecuteDirectScript] Working directory: %s", pluginDir)
+	log.Printf("[ExecuteDirectScript] Args: %v", config.Args)
+
+	cmd := exec.CommandContext(ctx, executablePath, config.Args...)
+	hideConsoleWindow(cmd)
+
+	cmd.Dir = pluginDir
+
+	env := s.prepareEnv(config.PluginID)
+	cmd.Env = env
+
+	envInfo := fmt.Sprintf("Direct execution: %s", executablePath)
+
+	return s.executeCommand(ctx, jobID, cmd, config.OutputDir, envInfo)
+}
+
+func (s *ScriptExecutor) executeCommand(ctx context.Context, jobID string, cmd *exec.Cmd, outputDir string, runtimeInfo string) error {
 	s.mu.Lock()
 	s.runningJobs[jobID] = cmd
 	s.mu.Unlock()
@@ -226,10 +356,16 @@ func (s *ScriptExecutor) executeCommand(ctx context.Context, jobID string, cmd *
 		s.mu.Unlock()
 	}()
 
+	if outputDir != "" {
+		if err := os.MkdirAll(outputDir, 0755); err != nil {
+			log.Printf("[ScriptExecutor] Warning: Failed to create output directory: %v", err)
+		}
+	}
+
 	logFilePath := filepath.Join(outputDir, "execution.log")
 	logFile, err := os.Create(logFilePath)
 	if err != nil {
-		log.Printf("[ScriptExecutor] Warning: Failed to create log file: %v", err)
+		log.Printf("[ScriptExecutor] Warning: Failed to create log file at %s: %v", logFilePath, err)
 		logFile = nil
 	}
 	defer func() {
@@ -239,8 +375,8 @@ func (s *ScriptExecutor) executeCommand(ctx context.Context, jobID string, cmd *
 	}()
 
 	// Log the exact command and environment variables for reproducibility
-	cmdInfo := fmt.Sprintf("=== COMMAND EXECUTION INFO ===\nWorking Directory: %s\nExecutable: %s\nArguments: %v\n",
-		cmd.Dir, cmd.Path, cmd.Args[1:])
+	cmdInfo := fmt.Sprintf("=== COMMAND EXECUTION INFO ===\nRuntime Environment: %s\nWorking Directory: %s\nExecutable: %s\nArguments: %v\n",
+		runtimeInfo, cmd.Dir, cmd.Path, cmd.Args[1:])
 	log.Printf("[ScriptExecutor][%s] %s", jobID, cmdInfo)
 	if logFile != nil {
 		logFile.WriteString(cmdInfo + "\n")
@@ -274,7 +410,7 @@ func (s *ScriptExecutor) executeCommand(ctx context.Context, jobID string, cmd *
 	}
 
 	// Create a reproducible command string
-	reproducibleCmd := fmt.Sprintf("cd \"%s\" && ", cmd.Dir)
+	reproducibleCmd := fmt.Sprintf("# Runtime: %s\ncd \"%s\" && ", runtimeInfo, cmd.Dir)
 	// Add environment variables
 	for _, e := range cmd.Env {
 		parts := strings.SplitN(e, "=", 2)
@@ -431,4 +567,28 @@ func (s *ScriptExecutor) CancelJob(jobID string) error {
 	}
 
 	return nil
+}
+
+func (s *ScriptExecutor) KillAllJobs() {
+	s.mu.RLock()
+	jobIDs := make([]string, 0, len(s.runningJobs))
+	for jobID := range s.runningJobs {
+		jobIDs = append(jobIDs, jobID)
+	}
+	s.mu.RUnlock()
+
+	log.Printf("[ScriptExecutor] Killing %d running jobs", len(jobIDs))
+	for _, jobID := range jobIDs {
+		s.mu.RLock()
+		cmd, exists := s.runningJobs[jobID]
+		s.mu.RUnlock()
+
+		if exists {
+			log.Printf("[ScriptExecutor] Force killing job %s", jobID)
+			if err := s.killProcessTree(cmd); err != nil {
+				log.Printf("[ScriptExecutor] Error killing job %s: %v", jobID, err)
+			}
+		}
+	}
+	log.Println("[ScriptExecutor] Finished killing all jobs")
 }
