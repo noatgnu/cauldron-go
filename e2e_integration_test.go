@@ -103,21 +103,32 @@ func TestE2EAngularWailsCommunication(t *testing.T) {
 
 		t.Log("\n=== Simulating User Creating PCA Job ===")
 
+		// Get PCA plugin ID
+		plugins := app.GetPluginsV2()
+		var pcaPluginID uint
+		for _, p := range plugins {
+			if p.Definition.Plugin.ID == "pca-analysis" {
+				pcaPluginID = p.ID
+				break
+			}
+		}
+		if pcaPluginID == 0 {
+			t.Skip("PCA plugin not installed, skipping test")
+		}
+
 		// User fills out PCA form and clicks submit
-		// Angular creates JobRequest object
-		jobReq := models.JobRequest{
-			Type:       "pca",
-			Name:       "E2E Test PCA",
-			InputFiles: []string{},
+		// Angular creates PluginExecutionRequestV2 object
+		jobReq := models.PluginExecutionRequestV2{
+			PluginID: pcaPluginID,
 			Parameters: map[string]interface{}{
-				"components": 2,
+				"n_components": 2,
 			},
 		}
 
-		t.Log("Angular calls: wails.createJob(jobRequest)")
-		jobID, err := app.CreateJob(jobReq)
+		t.Log("Angular calls: wails.executePluginV2(jobRequest)")
+		jobID, err := app.ExecutePluginV2(jobReq)
 		if err != nil {
-			t.Fatalf("❌ CreateJob failed: %v - Angular would show error!", err)
+			t.Fatalf("❌ ExecutePluginV2 failed: %v - Angular would show error!", err)
 		}
 
 		t.Logf("✓ Angular receives: jobID = '%s'", jobID)
@@ -213,9 +224,8 @@ func TestE2EDataSerialization(t *testing.T) {
 		t.Logf("GetAllJobs() serializes to: %s", string(jobsJSON))
 		t.Logf("GetImportedFiles() serializes to: %s", string(filesJSON))
 
-		// Create a job and check its arrays
-		req := models.JobRequest{Type: "test", Name: "Test"}
-		jobID, _ := app.CreateJob(req)
+		// Create a job and check its arrays (using low-level service for serialization test)
+		jobID, _ := app.jobQueue.CreateJob("test", "Test", "", []string{})
 		job, _ := app.GetJob(jobID)
 
 		type JobJSON struct {

@@ -71,17 +71,32 @@ func TestWailsBindings(t *testing.T) {
 	})
 
 	t.Run("CreateAndGetJob", func(t *testing.T) {
-		// Create a job
-		req := models.JobRequest{
-			Type: "pca",
-			Name: "Integration Test Job",
+		// Get PCA plugin ID
+		plugins := app.GetPluginsV2()
+		var pcaPluginID uint
+		for _, p := range plugins {
+			if p.Definition.Plugin.ID == "pca-analysis" {
+				pcaPluginID = p.ID
+				break
+			}
+		}
+		if pcaPluginID == 0 {
+			t.Skip("PCA plugin not installed, skipping test")
 		}
 
-		jobID, err := app.CreateJob(req)
-		if err != nil {
-			t.Fatalf("CreateJob failed: %v", err)
+		// Create a job using Plugin V2
+		req := models.PluginExecutionRequestV2{
+			PluginID: pcaPluginID,
+			Parameters: map[string]interface{}{
+				"n_components": 2,
+			},
 		}
-		t.Logf("✓ CreateJob returned ID: %s", jobID)
+
+		jobID, err := app.ExecutePluginV2(req)
+		if err != nil {
+			t.Fatalf("ExecutePluginV2 failed: %v", err)
+		}
+		t.Logf("✓ ExecutePluginV2 returned ID: %s", jobID)
 
 		// Get the job
 		job, err := app.GetJob(jobID)

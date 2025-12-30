@@ -14,8 +14,6 @@ export function ConfirmPluginInstallationWithRegistry(arg1:string,arg2:string,ar
 
 export function ConvertPluginToYAML(arg1:models.PluginDefinition):Promise<string>;
 
-export function CreateJob(arg1:models.JobRequest):Promise<string>;
-
 export function CreatePythonVirtualEnv(arg1:string,arg2:string,arg3:string):Promise<void>;
 
 export function CreateRenvEnvironment(arg1:string,arg2:Array<string>,arg3:string,arg4:boolean):Promise<void>;
@@ -55,10 +53,6 @@ export function DownloadPortableEnvironment(arg1:string,arg2:string):Promise<voi
 export function ExecutePlugin(arg1:models.PluginExecutionRequest):Promise<string>;
 
 export function ExecutePluginV2(arg1:models.PluginExecutionRequestV2):Promise<string>;
-
-export function ExecutePythonScript(arg1:string,arg2:Array<string>):Promise<string>;
-
-export function ExecuteRScript(arg1:string,arg2:Array<string>):Promise<string>;
 
 export function ForceUpdateAllRemotePlugins():Promise<void>;
 
@@ -194,8 +188,6 @@ export function PinPluginVersion(arg1:string,arg2:string):Promise<void>;
 
 export function ProcessPendingJobs():Promise<void>;
 
-export function ReExecuteJob(arg1:string):Promise<string>;
-
 export function ReadFile(arg1:string):Promise<Array<number>>;
 
 export function ReadFilePreview(arg1:string,arg2:number):Promise<Array<string>>;
@@ -209,12 +201,6 @@ export function ReloadPluginsV2():Promise<void>;
 export function RerunJob(arg1:string,arg2:boolean,arg3:string,arg4:string):Promise<string>;
 
 export function ResumeJobQueue():Promise<void>;
-
-export function RunNormalization(arg1:string,arg2:string,arg3:Array<string>,arg4:string):Promise<string>;
-
-export function RunPCAAnalysis(arg1:string,arg2:string,arg3:Array<string>,arg4:number,arg5:boolean):Promise<string>;
-
-export function RunPHATEAnalysis(arg1:string,arg2:string,arg3:Array<string>,arg4:number,arg5:boolean):Promise<string>;
 
 export function SaveCustomEnvVar(arg1:services.CustomEnvVar):Promise<void>;
 

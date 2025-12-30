@@ -22,10 +22,6 @@ export function ConvertPluginToYAML(arg1) {
   return window['go']['main']['App']['ConvertPluginToYAML'](arg1);
 }
 
-export function CreateJob(arg1) {
-  return window['go']['main']['App']['CreateJob'](arg1);
-}
-
 export function CreatePythonVirtualEnv(arg1, arg2, arg3) {
   return window['go']['main']['App']['CreatePythonVirtualEnv'](arg1, arg2, arg3);
 }
@@ -104,14 +100,6 @@ export function ExecutePlugin(arg1) {
 
 export function ExecutePluginV2(arg1) {
   return window['go']['main']['App']['ExecutePluginV2'](arg1);
-}
-
-export function ExecutePythonScript(arg1, arg2) {
-  return window['go']['main']['App']['ExecutePythonScript'](arg1, arg2);
-}
-
-export function ExecuteRScript(arg1, arg2) {
-  return window['go']['main']['App']['ExecuteRScript'](arg1, arg2);
 }
 
 export function ForceUpdateAllRemotePlugins() {
@@ -382,10 +370,6 @@ export function ProcessPendingJobs() {
   return window['go']['main']['App']['ProcessPendingJobs']();
 }
 
-export function ReExecuteJob(arg1) {
-  return window['go']['main']['App']['ReExecuteJob'](arg1);
-}
-
 export function ReadFile(arg1) {
   return window['go']['main']['App']['ReadFile'](arg1);
 }
@@ -412,18 +396,6 @@ export function RerunJob(arg1, arg2, arg3, arg4) {
 
 export function ResumeJobQueue() {
   return window['go']['main']['App']['ResumeJobQueue']();
-}
-
-export function RunNormalization(arg1, arg2, arg3, arg4) {
-  return window['go']['main']['App']['RunNormalization'](arg1, arg2, arg3, arg4);
-}
-
-export function RunPCAAnalysis(arg1, arg2, arg3, arg4, arg5) {
-  return window['go']['main']['App']['RunPCAAnalysis'](arg1, arg2, arg3, arg4, arg5);
-}
-
-export function RunPHATEAnalysis(arg1, arg2, arg3, arg4, arg5) {
-  return window['go']['main']['App']['RunPHATEAnalysis'](arg1, arg2, arg3, arg4, arg5);
 }
 
 export function SaveCustomEnvVar(arg1) {

@@ -58,13 +58,28 @@ func TestJobLifecycle(t *testing.T) {
 	app.startup(ctx)
 	defer app.shutdown(ctx)
 
-	// Create a job
-	req := models.JobRequest{
-		Type: "pca",
-		Name: "Test PCA Job",
+	// Get PCA plugin ID
+	plugins := app.GetPluginsV2()
+	var pcaPluginID uint
+	for _, p := range plugins {
+		if p.Definition.Plugin.ID == "pca-analysis" {
+			pcaPluginID = p.ID
+			break
+		}
+	}
+	if pcaPluginID == 0 {
+		t.Skip("PCA plugin not installed, skipping test")
 	}
 
-	jobID, err := app.CreateJob(req)
+	// Create a job using Plugin V2
+	req := models.PluginExecutionRequestV2{
+		PluginID: pcaPluginID,
+		Parameters: map[string]interface{}{
+			"n_components": 2,
+		},
+	}
+
+	jobID, err := app.ExecutePluginV2(req)
 	if err != nil {
 		t.Fatalf("Failed to create job: %v", err)
 	}
@@ -156,12 +171,28 @@ func TestDatabasePersistence(t *testing.T) {
 	app1 := NewApp()
 	app1.startup(ctx)
 
-	req := models.JobRequest{
-		Type: "normalization",
-		Name: "Test Persistence Job",
+	// Get normalization plugin ID
+	plugins := app1.GetPluginsV2()
+	var normPluginID uint
+	for _, p := range plugins {
+		if p.Definition.Plugin.ID == "normalization" {
+			normPluginID = p.ID
+			break
+		}
+	}
+	if normPluginID == 0 {
+		app1.shutdown(ctx)
+		t.Skip("Normalization plugin not installed, skipping test")
 	}
 
-	jobID, err := app1.CreateJob(req)
+	req := models.PluginExecutionRequestV2{
+		PluginID: normPluginID,
+		Parameters: map[string]interface{}{
+			"scaler_type": "minmax",
+		},
+	}
+
+	jobID, err := app1.ExecutePluginV2(req)
 	if err != nil {
 		t.Fatalf("Failed to create job in first instance: %v", err)
 	}

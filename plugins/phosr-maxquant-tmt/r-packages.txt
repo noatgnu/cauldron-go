@@ -1,3 +1,6 @@
+QFeatures
+msqrob2
+MsCoreUtils
 PhosR
 limma
 ggplot2

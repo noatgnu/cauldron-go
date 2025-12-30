@@ -23,9 +23,6 @@ type JobQueueService struct {
 	workers        int
 	mu             sync.RWMutex
 	wg             sync.WaitGroup
-	pythonRunner   *PythonRunner
-	rRunner        *RRunner
-	directRunner   *DirectRunner
 	scriptExecutor *ScriptExecutor
 	pluginLoader   *PluginLoaderV2
 	settingsServ   *SettingsService
@@ -53,13 +50,6 @@ func NewJobQueueService(ctx context.Context, db *DatabaseService) *JobQueueServi
 	}
 
 	return service
-}
-
-func (j *JobQueueService) SetRunners(pythonRunner *PythonRunner, rRunner *RRunner, directRunner *DirectRunner, settings *SettingsService) {
-	j.pythonRunner = pythonRunner
-	j.rRunner = rRunner
-	j.directRunner = directRunner
-	j.settingsServ = settings
 }
 
 func (j *JobQueueService) SetScriptExecutor(scriptExecutor *ScriptExecutor) {
@@ -429,58 +419,6 @@ func (j *JobQueueService) processJob(job *models.Job) {
 			err = j.scriptExecutor.ExecuteDirectScript(jobCtx, job.ID, config)
 		default:
 			err = fmt.Errorf("unsupported primary environment: %s", primaryEnv)
-		}
-	} else {
-		log.Printf("[processJob] Processing legacy job %s with command: %s", job.ID, job.Command)
-
-		outputCallback := func(line string) {
-			job.TerminalOutput = append(job.TerminalOutput, line)
-			j.db.GetDB().Save(job)
-			if j.ctx.Value("wails-test") == nil {
-				runtime.EventsEmit(j.ctx, "job:output", map[string]interface{}{
-					"jobId":  job.ID,
-					"output": line,
-				})
-			}
-		}
-
-		if job.Command == "r" {
-			if j.rRunner == nil {
-				completedTime := time.Now()
-				job.CompletedAt = &completedTime
-				job.Status = models.JobStatusFailed
-				job.Error = "R runner not initialized"
-				j.db.GetDB().Save(job)
-				j.emitJobUpdate(job)
-				return
-			}
-			err = j.rRunner.ExecuteScript(job.Args[0], job.Args[1:], outputCallback)
-		} else if job.Command == "direct" {
-			if j.directRunner == nil {
-				completedTime := time.Now()
-				job.CompletedAt = &completedTime
-				job.Status = models.JobStatusFailed
-				job.Error = "Direct runner not initialized"
-				j.db.GetDB().Save(job)
-				j.emitJobUpdate(job)
-				return
-			}
-			var workingDir string
-			if outputDir, ok := job.Parameters["outputDir"].(string); ok {
-				workingDir = outputDir
-			}
-			err = j.directRunner.ExecuteProgram(job.Args[0], job.Args[1:], workingDir, outputCallback)
-		} else {
-			if j.pythonRunner == nil {
-				completedTime := time.Now()
-				job.CompletedAt = &completedTime
-				job.Status = models.JobStatusFailed
-				job.Error = "Python runner not initialized"
-				j.db.GetDB().Save(job)
-				j.emitJobUpdate(job)
-				return
-			}
-			err = j.pythonRunner.ExecuteScript(job.Args[0], job.Args[1:], outputCallback)
 		}
 	}
 

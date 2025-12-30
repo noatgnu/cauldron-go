@@ -237,24 +237,6 @@ export namespace models {
 		    return a;
 		}
 	}
-	export class JobRequest {
-	    type: string;
-	    name: string;
-	    inputFiles: string[];
-	    parameters: Record<string, any>;
-	
-	    static createFrom(source: any = {}) {
-	        return new JobRequest(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.type = source["type"];
-	        this.name = source["name"];
-	        this.inputFiles = source["inputFiles"];
-	        this.parameters = source["parameters"];
-	    }
-	}
 	export class PlotAxes {
 	    x: string;
 	    y: string;

@@ -13,7 +13,6 @@ declare global {
 
 export type Config = models.Config;
 export type Job = models.Job;
-export type JobRequest = models.JobRequest;
 export type PythonEnvironment = services.PythonEnvironment;
 export type REnvironment = services.REnvironment;
 export type DataFilePreview = services.DataFilePreview;
@@ -176,11 +175,6 @@ export class Wails {
     return WailsApp.ReadFilePreview(path, limit);
   }
 
-  async createJob(jobRequest: JobRequest): Promise<string> {
-    if (!this.isWails) throw new Error('Wails not available');
-    return WailsApp.CreateJob(jobRequest);
-  }
-
   async getJob(id: string): Promise<Job> {
     if (!this.isWails) throw new Error('Wails not available');
     return WailsApp.GetJob(id);
@@ -214,24 +208,9 @@ export class Wails {
     return WailsApp.DeleteJob(id);
   }
 
-  async reExecuteJob(id: string): Promise<string> {
-    if (!this.isWails) throw new Error('Wails not available');
-    return WailsApp.ReExecuteJob(id);
-  }
-
   async rerunJob(jobID: string, useSameEnvironment: boolean, pythonEnvPath: string, rEnvPath: string): Promise<string> {
     if (!this.isWails) throw new Error('Wails not available');
     return WailsApp.RerunJob(jobID, useSameEnvironment, pythonEnvPath, rEnvPath);
-  }
-
-  async executePythonScript(scriptName: string, args: string[] = []): Promise<string> {
-    if (!this.isWails) throw new Error('Wails not available');
-    return WailsApp.ExecutePythonScript(scriptName, args);
-  }
-
-  async executeRScript(scriptName: string, args: string[] = []): Promise<string> {
-    if (!this.isWails) throw new Error('Wails not available');
-    return WailsApp.ExecuteRScript(scriptName, args);
   }
 
   async getPythonVersion(): Promise<string> {
