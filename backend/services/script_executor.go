@@ -190,7 +190,6 @@ func (s *ScriptExecutor) ExecuteRScript(ctx context.Context, jobID string, confi
 	}
 
 	rPath := cfg.RPath
-	var rLibPath string
 	var envInfo string
 
 	// Check for plugin-specific renv binding
