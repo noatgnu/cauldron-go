@@ -9,7 +9,7 @@ plugin:
 
 runtime:
   environments: ["python"]
-  script: "phate_analysis.py"
+  entrypoint: "phate_analysis.py"
 
 inputs:
   - name: "input_file"

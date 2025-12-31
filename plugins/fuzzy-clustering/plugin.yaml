@@ -9,7 +9,7 @@ plugin:
 
 runtime:
   environments: ["python"]
-  script: "fuzz_clustering.py"
+  entrypoint: "fuzz_clustering.py"
 
 inputs:
   - name: "input_file"

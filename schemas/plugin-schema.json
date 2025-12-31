@@ -67,7 +67,7 @@
     "runtime": {
       "type": "object",
       "description": "Runtime configuration",
-      "required": ["script"],
+      "required": ["entrypoint"],
       "properties": {
         "type": {
           "description": "DEPRECATED: Use 'environments' instead. Runtime environment(s). Can be a single string for backwards compatibility or an array for multiple environments.",
@@ -102,14 +102,23 @@
           "uniqueItems": true,
           "examples": [["python"], ["r"], ["python", "r"]]
         },
+        "entrypoint": {
+          "type": "string",
+          "description": "Entrypoint script filename or executable to run",
+          "pattern": "^[a-zA-Z0-9_-]+(\\.(py|R|jl|js|exe))?$",
+          "examples": ["analysis.py", "process.R", "uniprot-fetcher", "uniprot-fetcher.exe"]
+        },
         "script": {
           "type": "string",
-          "description": "Script filename or executable to run",
+          "description": "DEPRECATED: Use 'entrypoint' instead. Script filename or executable to run.",
+          "deprecated": true,
           "pattern": "^[a-zA-Z0-9_-]+(\\.(py|R|jl|js|exe))?$",
           "examples": ["analysis.py", "process.R", "uniprot-fetcher", "uniprot-fetcher.exe"]
         }
       },
       "oneOf": [
+        { "required": ["type", "entrypoint"] },
+        { "required": ["environments", "entrypoint"] },
         { "required": ["type", "script"] },
         { "required": ["environments", "script"] }
       ]

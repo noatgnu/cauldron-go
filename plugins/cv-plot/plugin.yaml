@@ -9,7 +9,7 @@ plugin:
 
 runtime:
   environments: ["python"]
-  script: "cv.py"
+  entrypoint: "cv.py"
 
 inputs:
   - name: "annotation_file"

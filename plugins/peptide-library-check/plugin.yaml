@@ -9,7 +9,7 @@ plugin:
 
 runtime:
   type: python
-  script: library_check_peptide.py
+  entrypoint: library_check_peptide.py
   requirements:
     - pandas
     - click

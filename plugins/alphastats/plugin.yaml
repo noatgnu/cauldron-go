@@ -9,7 +9,7 @@ plugin:
 
 runtime:
   environments: ["python", "r"]
-  script: "alphapept_process.py"
+  entrypoint: "alphapept_process.py"
 
 inputs:
   - name: "input_file"

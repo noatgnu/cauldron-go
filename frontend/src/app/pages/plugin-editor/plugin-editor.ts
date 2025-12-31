@@ -95,7 +95,7 @@ export class PluginEditor implements OnInit {
       }),
       runtime: this.fb.group({
         environments: this.fb.array([this.fb.control('python')]),
-        script: ['', Validators.required]
+        entrypoint: ['', Validators.required]
       }),
       inputs: this.fb.array([]),
       outputs: this.fb.array([]),
@@ -218,7 +218,7 @@ export class PluginEditor implements OnInit {
 
     this.pluginForm.patchValue({
       runtime: {
-        script: definition.runtime?.script || ''
+        entrypoint: definition.runtime?.entrypoint || definition.runtime?.script || ''
       }
     });
 
@@ -445,7 +445,7 @@ export class PluginEditor implements OnInit {
       plugin: new models.PluginMetadata(formValue.plugin),
       runtime: new models.PluginRuntimeV2({
         environments: formValue.runtime.environments,
-        script: formValue.runtime.script
+        entrypoint: formValue.runtime.entrypoint
       }),
       inputs: formValue.inputs.map((i: any) => new models.PluginInputV2(i)),
       outputs: formValue.outputs.map((o: any) => new models.PluginOutputV2(o)),

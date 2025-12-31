@@ -130,7 +130,8 @@ type PluginExecution struct {
 
 type PluginRuntimeV2 struct {
 	Environments []string `yaml:"environments" json:"environments"`
-	Script       string   `yaml:"script" json:"script"`
+	Entrypoint   string   `yaml:"entrypoint" json:"entrypoint"`
+	Script       string   `yaml:"script,omitempty" json:"script,omitempty"` // DEPRECATED: Use Entrypoint instead
 }
 
 func (r *PluginRuntimeV2) HasEnvironment(env string) bool {
@@ -155,6 +156,13 @@ func (r *PluginRuntimeV2) GetPrimaryEnvironment() string {
 		return envs[0]
 	}
 	return ""
+}
+
+func (r *PluginRuntimeV2) GetEntrypoint() string {
+	if r.Entrypoint != "" {
+		return r.Entrypoint
+	}
+	return r.Script
 }
 
 type PluginMetadata struct {

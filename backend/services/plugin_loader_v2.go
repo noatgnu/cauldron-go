@@ -112,9 +112,9 @@ func (l *PluginLoaderV2) loadPlugin(pluginDir string) (*models.PluginV2, error) 
 		return nil, fmt.Errorf("failed to load requirements from files: %w", err)
 	}
 
-	scriptPath := filepath.Join(pluginDir, definition.Runtime.Script)
+	scriptPath := filepath.Join(pluginDir, definition.Runtime.GetEntrypoint())
 	if _, err := os.Stat(scriptPath); os.IsNotExist(err) {
-		return nil, fmt.Errorf("script file not found: %s", scriptPath)
+		return nil, fmt.Errorf("entrypoint file not found: %s", scriptPath)
 	}
 
 	plugin := &models.PluginV2{
@@ -157,8 +157,8 @@ func (l *PluginLoaderV2) validateDefinition(def *models.PluginDefinition) error 
 		return fmt.Errorf("runtime environments is required")
 	}
 
-	if def.Runtime.Script == "" {
-		return fmt.Errorf("runtime script is required")
+	if def.Runtime.GetEntrypoint() == "" {
+		return fmt.Errorf("runtime entrypoint (or deprecated runtime.script) is required")
 	}
 
 	validEnvironments := map[string]bool{

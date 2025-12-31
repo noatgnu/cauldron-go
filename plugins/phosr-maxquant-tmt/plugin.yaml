@@ -10,7 +10,7 @@ plugin:
 
 runtime:
   environments: ["r"]
-  script: "phosr_maxquant_tmt_modular.R"
+  entrypoint: "phosr_maxquant_tmt_modular.R"
 
 inputs:
   - name: "input_file"

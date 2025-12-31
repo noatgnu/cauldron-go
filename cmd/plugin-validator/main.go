@@ -112,7 +112,15 @@ type PluginMetadata struct {
 
 type PluginRuntime struct {
 	Environments []string `yaml:"environments"`
-	Script       string   `yaml:"script"`
+	Entrypoint   string   `yaml:"entrypoint"`
+	Script       string   `yaml:"script,omitempty"` // DEPRECATED: Use Entrypoint instead
+}
+
+func (r *PluginRuntime) GetEntrypoint() string {
+	if r.Entrypoint != "" {
+		return r.Entrypoint
+	}
+	return r.Script
 }
 
 func (r *PluginRuntime) HasEnvironment(env string) bool {
@@ -212,15 +220,16 @@ func validatePlugin(pluginPath string) (bool, []string) {
 		}
 	}
 
-	if plugin.Runtime.Script == "" {
-		errors = append(errors, "runtime.script is required")
+	entrypoint := plugin.Runtime.GetEntrypoint()
+	if entrypoint == "" {
+		errors = append(errors, "runtime.entrypoint (or deprecated runtime.script) is required")
 	} else {
-		// Check if script exists (for direct runtime, script is the executable name)
+		// Check if entrypoint exists (for direct runtime, entrypoint is the executable name)
 		if !plugin.Runtime.HasEnvironment("direct") {
 			pluginDir := filepath.Dir(pluginPath)
-			scriptPath := filepath.Join(pluginDir, plugin.Runtime.Script)
+			scriptPath := filepath.Join(pluginDir, entrypoint)
 			if _, err := os.Stat(scriptPath); os.IsNotExist(err) {
-				errors = append(errors, fmt.Sprintf("Script not found: %s", plugin.Runtime.Script))
+				errors = append(errors, fmt.Sprintf("Entrypoint not found: %s", entrypoint))
 			}
 		}
 	}

@@ -9,7 +9,7 @@ plugin:
 
 runtime:
   type: python
-  script: get_coverage.py
+  entrypoint: get_coverage.py
   requirements:
     - pandas
     - click

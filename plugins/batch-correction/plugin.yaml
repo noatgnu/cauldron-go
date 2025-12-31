@@ -9,7 +9,7 @@ plugin:
 
 runtime:
   environments: ["r"]
-  script: "batch_correction.R"
+  entrypoint: "batch_correction.R"
 
 inputs:
   - name: "input_file"

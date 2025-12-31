@@ -11,7 +11,7 @@ plugin:
 runtime:
   environments:
     - python
-  script: convert.py
+  entrypoint: convert.py
 
 inputs:
   - name: pr_file

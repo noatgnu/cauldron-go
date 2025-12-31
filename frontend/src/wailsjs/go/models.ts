@@ -670,7 +670,8 @@ export namespace models {
 	}
 	export class PluginRuntimeV2 {
 	    environments: string[];
-	    script: string;
+	    entrypoint: string;
+	    script?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new PluginRuntimeV2(source);
@@ -679,6 +680,7 @@ export namespace models {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.environments = source["environments"];
+	        this.entrypoint = source["entrypoint"];
 	        this.script = source["script"];
 	    }
 	}

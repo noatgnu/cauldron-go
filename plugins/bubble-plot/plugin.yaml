@@ -9,7 +9,7 @@ plugin:
 
 runtime:
   environments: ["python"]
-  script: "bubble_plot.py"
+  entrypoint: "bubble_plot.py"
 
 inputs:
   - name: "input_file"

@@ -134,11 +134,11 @@
               </button>
 
               <mat-form-field appearance="outline" class="full-width">
-                <mat-label>Script Path</mat-label>
-                <input matInput formControlName="script">
-                <mat-hint>Relative path to script file (e.g., my_analysis.py)</mat-hint>
-                @if (pluginForm.get('runtime.script')?.hasError('required')) {
-                  <mat-error>Script path is required</mat-error>
+                <mat-label>Entrypoint</mat-label>
+                <input matInput formControlName="entrypoint">
+                <mat-hint>Relative path to entrypoint file (e.g., my_analysis.py)</mat-hint>
+                @if (pluginForm.get('runtime.entrypoint')?.hasError('required')) {
+                  <mat-error>Entrypoint is required</mat-error>
                 }
               </mat-form-field>
             </div>

@@ -9,7 +9,7 @@ plugin:
 
 runtime:
   type: python
-  script: remap_ptm.py
+  entrypoint: remap_ptm.py
   requirements:
     - pandas
     - click

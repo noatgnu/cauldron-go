@@ -52,8 +52,8 @@ func (v *PluginValidator) ValidateDefinition(def *models.PluginDefinition) (bool
 		errors = append(errors, "Runtime environments is required")
 	}
 
-	if def.Runtime.Script == "" {
-		errors = append(errors, "Runtime script is required")
+	if def.Runtime.GetEntrypoint() == "" {
+		errors = append(errors, "Runtime entrypoint (or deprecated runtime.script) is required")
 	}
 
 	if len(def.Inputs) == 0 {

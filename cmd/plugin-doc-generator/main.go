@@ -84,7 +84,15 @@ type PluginMetadata struct {
 
 type PluginRuntime struct {
 	Environments []string `yaml:"environments"`
-	Script       string   `yaml:"script"`
+	Entrypoint   string   `yaml:"entrypoint"`
+	Script       string   `yaml:"script,omitempty"` // DEPRECATED: Use Entrypoint instead
+}
+
+func (r *PluginRuntime) GetEntrypoint() string {
+	if r.Entrypoint != "" {
+		return r.Entrypoint
+	}
+	return r.Script
 }
 
 func (r *PluginRuntime) GetEnvironments() []string {
@@ -786,7 +794,7 @@ func generateDiagramSection(plugin PluginConfig, pluginDir string) string {
 		return ""
 	}
 
-	scriptPath := filepath.Join(pluginDir, plugin.Runtime.Script)
+	scriptPath := filepath.Join(pluginDir, plugin.Runtime.GetEntrypoint())
 	if _, err := os.Stat(scriptPath); os.IsNotExist(err) {
 		return ""
 	}
@@ -904,7 +912,7 @@ func generatePluginDoc(plugin PluginConfig, pluginDir string, useHTTPProtocol bo
 	lines = append(lines,
 		"## Runtime\n",
 		runtimeInfo,
-		fmt.Sprintf("- **Script**: `%s`\n", plugin.Runtime.Script),
+		fmt.Sprintf("- **Entrypoint**: `%s`\n", plugin.Runtime.GetEntrypoint()),
 		"## Inputs\n",
 		generateInputTable(plugin.Inputs),
 		generateInputDetails(plugin.Inputs),
