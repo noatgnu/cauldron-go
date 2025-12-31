@@ -56,6 +56,23 @@ func (v *PluginValidator) ValidateDefinition(def *models.PluginDefinition) (bool
 		errors = append(errors, "Runtime entrypoint (or deprecated runtime.script) is required")
 	}
 
+	if def.Runtime.IsDockerRuntime() {
+		if def.Runtime.Docker == nil {
+			errors = append(errors, "Docker runtime requires runtime.docker configuration")
+		} else {
+			hasImage := def.Runtime.Docker.Image != ""
+			hasDockerfile := def.Runtime.Docker.Dockerfile != ""
+
+			if !hasImage && !hasDockerfile {
+				errors = append(errors, "Docker runtime requires either runtime.docker.image or runtime.docker.dockerfile")
+			}
+
+			if hasImage && hasDockerfile {
+				errors = append(errors, "Specify either runtime.docker.image OR runtime.docker.dockerfile, not both")
+			}
+		}
+	}
+
 	if len(def.Inputs) == 0 {
 		errors = append(errors, "At least one input is required")
 	}

@@ -20,6 +20,7 @@ import (
 type ScriptExecutor struct {
 	settingsService *SettingsService
 	db              *DatabaseService
+	pluginLoader    *PluginLoaderV2
 	runningJobs     map[string]*exec.Cmd
 	mu              sync.RWMutex
 	updateCallback  func(string, models.Job)
@@ -32,6 +33,10 @@ func NewScriptExecutor(settingsService *SettingsService, db *DatabaseService) *S
 		db:              db,
 		runningJobs:     make(map[string]*exec.Cmd),
 	}
+}
+
+func (s *ScriptExecutor) SetPluginLoader(pluginLoader *PluginLoaderV2) {
+	s.pluginLoader = pluginLoader
 }
 
 func (s *ScriptExecutor) SetUpdateCallback(callback func(string, models.Job)) {
@@ -326,6 +331,69 @@ func (s *ScriptExecutor) ExecuteDirectScript(ctx context.Context, jobID string, 
 	cmd.Env = env
 
 	envInfo := fmt.Sprintf("Direct execution: %s", executablePath)
+
+	return s.executeCommand(ctx, jobID, cmd, config.OutputDir, envInfo)
+}
+
+func (s *ScriptExecutor) ExecuteDockerScript(ctx context.Context, jobID string, config ScriptConfig) error {
+	log.Printf("[ExecuteDockerScript] Starting execution for job %s", jobID)
+
+	plugin, err := s.pluginLoader.GetPlugin(config.PluginID)
+	if err != nil {
+		return fmt.Errorf("failed to get plugin: %w", err)
+	}
+
+	if plugin.Definition.Runtime.Docker == nil {
+		return fmt.Errorf("docker configuration not found for plugin")
+	}
+
+	imageName := plugin.Definition.Runtime.GetDockerImageName(plugin.Definition.Plugin.ID)
+	if plugin.Definition.Runtime.Docker.Image != "" {
+		imageName = plugin.Definition.Runtime.Docker.Image
+	}
+
+	checkCmd := exec.Command("docker", "image", "inspect", imageName)
+	if err := checkCmd.Run(); err != nil {
+		return fmt.Errorf("docker image not found: %s (hint: plugin may need reinstallation)", imageName)
+	}
+
+	args := []string{"run"}
+	args = append(args, "--rm")
+
+	pluginDir := config.FolderPath
+	args = append(args, "-v", fmt.Sprintf("%s:/workspace:ro", pluginDir))
+	args = append(args, "-v", fmt.Sprintf("%s:/output", config.OutputDir))
+	args = append(args, "-w", "/workspace")
+
+	env := s.prepareEnv(config.PluginID)
+	for _, e := range env {
+		parts := strings.SplitN(e, "=", 2)
+		if len(parts) == 2 {
+			args = append(args, "-e", fmt.Sprintf("%s=%s", parts[0], parts[1]))
+		}
+	}
+
+	if plugin.Definition.Runtime.Docker.Platform != "" {
+		args = append(args, "--platform", plugin.Definition.Runtime.Docker.Platform)
+	}
+
+	args = append(args, imageName)
+
+	primaryEnv := config.Environments[0]
+	if primaryEnv != "docker" {
+		return fmt.Errorf("docker must be primary environment when using docker runtime")
+	}
+
+	args = append(args, config.ScriptName)
+	args = append(args, config.Args...)
+
+	cmd := exec.CommandContext(ctx, "docker", args...)
+	hideConsoleWindow(cmd)
+
+	cmd.Dir = pluginDir
+	cmd.Env = os.Environ()
+
+	envInfo := fmt.Sprintf("Docker image: %s", imageName)
 
 	return s.executeCommand(ctx, jobID, cmd, config.OutputDir, envInfo)
 }

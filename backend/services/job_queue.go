@@ -415,6 +415,8 @@ func (j *JobQueueService) processJob(job *models.Job) {
 			err = fmt.Errorf("julia runtime not yet implemented")
 		case "node":
 			err = fmt.Errorf("node runtime not yet implemented")
+		case "docker":
+			err = j.scriptExecutor.ExecuteDockerScript(jobCtx, job.ID, config)
 		case "direct":
 			err = j.scriptExecutor.ExecuteDirectScript(jobCtx, job.ID, config)
 		default:

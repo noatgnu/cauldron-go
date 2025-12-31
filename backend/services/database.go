@@ -106,6 +106,19 @@ type GitAuthConfig struct {
 	UpdatedAt        int64  `gorm:"autoUpdateTime"`
 }
 
+type PluginDockerImage struct {
+	ID             uint   `gorm:"primaryKey"`
+	PluginID       string `gorm:"not null;index;uniqueIndex:idx_plugin_docker"`
+	ImageName      string `gorm:"not null"`
+	ImageID        string `gorm:"not null"`
+	Built          bool   `gorm:"not null;default:false"`
+	DockerfileHash string `gorm:""`
+	Platform       string `gorm:""`
+	BuildArgs      string `gorm:""`
+	CreatedAt      int64  `gorm:"autoCreateTime"`
+	UpdatedAt      int64  `gorm:"autoUpdateTime"`
+}
+
 func NewDatabaseService(ctx context.Context) (*DatabaseService, error) {
 	userConfigDir, _ := os.UserConfigDir()
 	dbDir := filepath.Join(userConfigDir, "cauldron")
@@ -171,6 +184,7 @@ func (d *DatabaseService) autoMigrate() error {
 		&REnvironmentDB{},
 		&CustomEnvVar{},
 		&GitAuthConfig{},
+		&PluginDockerImage{},
 		&models.Job{},
 		&models.PluginRegistry{},
 	); err != nil {
@@ -485,4 +499,28 @@ func (d *DatabaseService) DeleteCustomEnvVar(id uint) error {
 
 func (d *DatabaseService) DeleteCustomEnvVarByKey(pluginID uint, key string) error {
 	return d.db.Where("plugin_id = ? AND key = ?", pluginID, key).Delete(&CustomEnvVar{}).Error
+}
+
+func (d *DatabaseService) SavePluginDockerImage(image *PluginDockerImage) error {
+	var existing PluginDockerImage
+	result := d.db.Where("plugin_id = ?", image.PluginID).First(&existing)
+
+	if result.Error == nil {
+		image.ID = existing.ID
+		return d.db.Save(image).Error
+	}
+
+	return d.db.Create(image).Error
+}
+
+func (d *DatabaseService) GetPluginDockerImage(pluginID string) (*PluginDockerImage, error) {
+	var image PluginDockerImage
+	if err := d.db.Where("plugin_id = ?", pluginID).First(&image).Error; err != nil {
+		return nil, err
+	}
+	return &image, nil
+}
+
+func (d *DatabaseService) DeletePluginDockerImage(pluginID string) error {
+	return d.db.Where("plugin_id = ?", pluginID).Delete(&PluginDockerImage{}).Error
 }

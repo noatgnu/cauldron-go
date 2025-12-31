@@ -212,7 +212,7 @@ func validatePlugin(pluginPath string) (bool, []string) {
 	if plugin.Runtime.Environments == nil || len(plugin.Runtime.Environments) == 0 {
 		errors = append(errors, "runtime.environments is required")
 	} else {
-		validEnvironments := map[string]bool{"python": true, "r": true, "direct": true, "julia": true, "node": true}
+		validEnvironments := map[string]bool{"python": true, "r": true, "direct": true, "julia": true, "node": true, "docker": true}
 		for _, env := range plugin.Runtime.Environments {
 			if !validEnvironments[env] {
 				errors = append(errors, fmt.Sprintf("Invalid runtime environment: %s", env))

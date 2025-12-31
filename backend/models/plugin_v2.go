@@ -128,10 +128,18 @@ type PluginExecution struct {
 	EnvVariables []PluginInputV2        `yaml:"envVariables,omitempty" json:"envVariables,omitempty"`
 }
 
+type DockerConfig struct {
+	Image      string            `yaml:"image,omitempty" json:"image,omitempty"`
+	Dockerfile string            `yaml:"dockerfile,omitempty" json:"dockerfile,omitempty"`
+	Platform   string            `yaml:"platform,omitempty" json:"platform,omitempty"`
+	BuildArgs  map[string]string `yaml:"buildArgs,omitempty" json:"buildArgs,omitempty"`
+}
+
 type PluginRuntimeV2 struct {
-	Environments []string `yaml:"environments" json:"environments"`
-	Entrypoint   string   `yaml:"entrypoint" json:"entrypoint"`
-	Script       string   `yaml:"script,omitempty" json:"script,omitempty"` // DEPRECATED: Use Entrypoint instead
+	Environments []string      `yaml:"environments" json:"environments"`
+	Entrypoint   string        `yaml:"entrypoint" json:"entrypoint"`
+	Script       string        `yaml:"script,omitempty" json:"script,omitempty"` // DEPRECATED: Use Entrypoint instead
+	Docker       *DockerConfig `yaml:"docker,omitempty" json:"docker,omitempty"`
 }
 
 func (r *PluginRuntimeV2) HasEnvironment(env string) bool {
@@ -163,6 +171,20 @@ func (r *PluginRuntimeV2) GetEntrypoint() string {
 		return r.Entrypoint
 	}
 	return r.Script
+}
+
+func (r *PluginRuntimeV2) IsDockerRuntime() bool {
+	return r.HasEnvironment("docker")
+}
+
+func (r *PluginRuntimeV2) GetDockerImageName(pluginID string) string {
+	if r.Docker == nil {
+		return ""
+	}
+	if r.Docker.Image != "" {
+		return r.Docker.Image
+	}
+	return "cauldron-plugin-" + pluginID + ":latest"
 }
 
 type PluginMetadata struct {

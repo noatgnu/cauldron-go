@@ -129,14 +129,23 @@ func (a *App) startup(ctx context.Context) {
 	log.Println("[App.startup] Initializing plugin service...")
 	a.pluginService = services.NewPluginService()
 
+	log.Println("[App.startup] Initializing Docker image builder...")
+	dockerImageBuilder := services.NewDockerImageBuilder(a.db)
+	if err := dockerImageBuilder.CheckDockerAvailable(); err != nil {
+		log.Printf("[App.startup] Warning: Docker daemon not available. Docker-based plugins will not work: %v", err)
+	} else {
+		log.Println("[App.startup] Docker is available")
+	}
+
 	log.Println("[App.startup] Initializing plugin system V2...")
-	a.pluginLoaderV2 = services.NewPluginLoaderV2("", a.db)
+	a.pluginLoaderV2 = services.NewPluginLoaderV2("", a.db, dockerImageBuilder)
 	if err := a.pluginLoaderV2.LoadPlugins(); err != nil {
 		log.Printf("[App.startup] Failed to load plugins: %v", err)
 	}
 	a.pluginExecutor = services.NewPluginExecutor()
 
 	log.Println("[App.startup] Wiring up job queue with script executor and plugin loader...")
+	a.scriptExecutor.SetPluginLoader(a.pluginLoaderV2)
 	a.jobQueue.SetScriptExecutor(a.scriptExecutor)
 	a.jobQueue.SetPluginLoader(a.pluginLoaderV2)
 

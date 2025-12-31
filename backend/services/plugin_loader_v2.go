@@ -16,21 +16,23 @@ import (
 )
 
 type PluginLoaderV2 struct {
-	pluginsDir string
-	plugins    map[uint]*models.PluginV2
-	db         *DatabaseService
+	pluginsDir   string
+	plugins      map[uint]*models.PluginV2
+	db           *DatabaseService
+	imageBuilder *DockerImageBuilder
 }
 
-func NewPluginLoaderV2(pluginsDir string, db *DatabaseService) *PluginLoaderV2 {
+func NewPluginLoaderV2(pluginsDir string, db *DatabaseService, imageBuilder *DockerImageBuilder) *PluginLoaderV2 {
 	if pluginsDir == "" {
 		execPath, _ := os.Executable()
 		pluginsDir = filepath.Join(filepath.Dir(execPath), "plugins")
 	}
 
 	return &PluginLoaderV2{
-		pluginsDir: pluginsDir,
-		plugins:    make(map[uint]*models.PluginV2),
-		db:         db,
+		pluginsDir:   pluginsDir,
+		plugins:      make(map[uint]*models.PluginV2),
+		db:           db,
+		imageBuilder: imageBuilder,
 	}
 }
 
@@ -115,6 +117,58 @@ func (l *PluginLoaderV2) loadPlugin(pluginDir string) (*models.PluginV2, error) 
 	scriptPath := filepath.Join(pluginDir, definition.Runtime.GetEntrypoint())
 	if _, err := os.Stat(scriptPath); os.IsNotExist(err) {
 		return nil, fmt.Errorf("entrypoint file not found: %s", scriptPath)
+	}
+
+	if definition.Runtime.IsDockerRuntime() {
+		if definition.Runtime.Docker == nil {
+			return nil, fmt.Errorf("docker runtime specified but no docker configuration found")
+		}
+
+		imageName := definition.Runtime.GetDockerImageName(definition.Plugin.ID)
+
+		if definition.Runtime.Docker.Dockerfile != "" {
+			dockerfilePath := filepath.Join(pluginDir, definition.Runtime.Docker.Dockerfile)
+			if _, err := os.Stat(dockerfilePath); os.IsNotExist(err) {
+				return nil, fmt.Errorf("dockerfile not found: %s", dockerfilePath)
+			}
+
+			needsRebuild, err := l.imageBuilder.ShouldRebuildImage(
+				definition.Plugin.ID,
+				dockerfilePath,
+			)
+			if err != nil || needsRebuild {
+				log.Printf("[PluginLoader] Building Docker image for plugin %s", definition.Plugin.ID)
+
+				err := l.imageBuilder.BuildImage(
+					pluginDir,
+					definition.Runtime.Docker.Dockerfile,
+					imageName,
+					definition.Runtime.Docker.Platform,
+					definition.Runtime.Docker.BuildArgs,
+				)
+				if err != nil {
+					return nil, fmt.Errorf("failed to build Docker image: %w", err)
+				}
+
+				dockerfileHash, _ := l.imageBuilder.GetDockerfileHash(dockerfilePath)
+				l.imageBuilder.RecordBuiltImage(
+					definition.Plugin.ID,
+					imageName,
+					dockerfileHash,
+					definition.Runtime.Docker.Platform,
+					definition.Runtime.Docker.BuildArgs,
+				)
+			}
+		} else if definition.Runtime.Docker.Image != "" {
+			imageName = definition.Runtime.Docker.Image
+			if !l.imageBuilder.ImageExists(imageName) {
+				log.Printf("[PluginLoader] Pulling Docker image: %s", imageName)
+				err := l.imageBuilder.PullImage(imageName)
+				if err != nil {
+					return nil, fmt.Errorf("failed to pull Docker image: %w", err)
+				}
+			}
+		}
 	}
 
 	plugin := &models.PluginV2{

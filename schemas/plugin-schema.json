@@ -96,11 +96,11 @@
           "description": "List of runtime environments required by the plugin. This is the preferred way to specify runtime environments.",
           "items": {
             "type": "string",
-            "enum": ["python", "r", "julia", "node", "direct"]
+            "enum": ["python", "r", "julia", "node", "direct", "docker"]
           },
           "minItems": 1,
           "uniqueItems": true,
-          "examples": [["python"], ["r"], ["python", "r"]]
+          "examples": [["python"], ["r"], ["python", "r"], ["docker"]]
         },
         "entrypoint": {
           "type": "string",
@@ -114,6 +114,40 @@
           "deprecated": true,
           "pattern": "^[a-zA-Z0-9_-]+(\\.(py|R|jl|js|exe))?$",
           "examples": ["analysis.py", "process.R", "uniprot-fetcher", "uniprot-fetcher.exe"]
+        },
+        "docker": {
+          "type": "object",
+          "description": "Docker runtime configuration (required if environments includes 'docker')",
+          "properties": {
+            "image": {
+              "type": "string",
+              "description": "Docker image to use (e.g., 'python:3.11-slim', 'rocker/r-ver:4.3')",
+              "pattern": "^[a-z0-9][a-z0-9._/-]*:[a-z0-9._-]+$",
+              "examples": ["python:3.11-slim", "rocker/r-ver:4.3.0", "ghcr.io/myorg/plugin:latest"]
+            },
+            "dockerfile": {
+              "type": "string",
+              "description": "Path to Dockerfile relative to plugin directory (alternative to 'image')",
+              "pattern": "^[a-zA-Z0-9_.-]+$",
+              "examples": ["Dockerfile", "Dockerfile.alpine"]
+            },
+            "platform": {
+              "type": "string",
+              "description": "Target platform for multi-arch images (optional)",
+              "enum": ["linux/amd64", "linux/arm64", "linux/arm/v7"],
+              "default": "linux/amd64"
+            },
+            "buildArgs": {
+              "type": "object",
+              "description": "Build arguments for Dockerfile (optional)",
+              "additionalProperties": {"type": "string"},
+              "examples": [{"PYTHON_VERSION": "3.11", "BASE_IMAGE": "ubuntu:22.04"}]
+            }
+          },
+          "oneOf": [
+            {"required": ["image"]},
+            {"required": ["dockerfile"]}
+          ]
         }
       },
       "oneOf": [
