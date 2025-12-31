@@ -371,8 +371,7 @@ export class DynamicFormComponent implements OnInit, OnChanges, OnDestroy {
           const input = this.plugin.definition.inputs.find(i => i.name === targetField);
 
           if (input && input.type === 'column-selector') {
-            const [category, filename] = (value as string).split('/');
-            const filePath = await this.wails.getExampleFilePath(category, filename);
+            const filePath = await this.wails.getPluginExampleFilePath(this.plugin.definition.plugin.id, value as string);
             await this.loadColumns(targetField, filePath);
 
             if (!example.values[targetField]) {
@@ -391,8 +390,7 @@ export class DynamicFormComponent implements OnInit, OnChanges, OnDestroy {
           const input = this.plugin.definition.inputs.find(i => i.name === key);
 
           if (input && input.type === 'file') {
-            const [category, filename] = (value as string).split('/');
-            const filePath = await this.wails.getExampleFilePath(category, filename);
+            const filePath = await this.wails.getPluginExampleFilePath(this.plugin.definition.plugin.id, value as string);
             valuesToSet[key] = filePath;
 
             await this.loadColumnsForDependents(key, filePath);

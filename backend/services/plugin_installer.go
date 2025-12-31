@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/go-git/go-git/v5"
@@ -158,6 +159,7 @@ func (pi *PluginInstaller) InstallPlugin(repoURL string, commitHash string, regi
 		CommitHash:     actualHash,
 		InstallSource:  "remote",
 		RegistrySource: registrySource,
+		Enabled:        true,
 		InstalledAt:    time.Now(),
 		UpdatedAt:      time.Now(),
 	}
@@ -215,7 +217,11 @@ func (pi *PluginInstaller) readPluginDefinition(pluginDir string) (*models.Plugi
 }
 
 func (pi *PluginInstaller) UpdatePlugin(repoURL string) error {
-	log.Printf("[PluginInstaller] Updating plugin from: %s", repoURL)
+	return pi.UpdatePluginWithForce(repoURL, false)
+}
+
+func (pi *PluginInstaller) UpdatePluginWithForce(repoURL string, force bool) error {
+	log.Printf("[PluginInstaller] Updating plugin from: %s (force: %v)", repoURL, force)
 
 	var registry models.PluginRegistry
 	if err := pi.db.GetDB().Where("repository = ?", repoURL).First(&registry).Error; err != nil {
@@ -224,12 +230,33 @@ func (pi *PluginInstaller) UpdatePlugin(repoURL string) error {
 
 	repo, err := git.PlainOpen(registry.FolderPath)
 	if err != nil {
+		if os.IsNotExist(err) || strings.Contains(err.Error(), "repository does not exist") {
+			log.Printf("[PluginInstaller] Plugin folder missing, reinstalling from: %s", repoURL)
+			return pi.ReinstallPlugin(repoURL)
+		}
 		return fmt.Errorf("failed to open repository: %w", err)
 	}
 
 	w, err := repo.Worktree()
 	if err != nil {
 		return fmt.Errorf("failed to get worktree: %w", err)
+	}
+
+	status, err := w.Status()
+	if err != nil {
+		return fmt.Errorf("failed to check repository status: %w", err)
+	}
+
+	if !status.IsClean() && !force {
+		return fmt.Errorf("LOCAL_MODIFICATIONS: plugin has local modifications - updating will discard these changes")
+	}
+
+	if !status.IsClean() {
+		log.Printf("[PluginInstaller] Discarding local modifications (force update)")
+		err = w.Reset(&git.ResetOptions{Mode: git.HardReset})
+		if err != nil {
+			return fmt.Errorf("failed to discard local changes: %w", err)
+		}
 	}
 
 	auth, err := pi.gitAuth.GetAuthMethod(repoURL)
@@ -266,7 +293,11 @@ func (pi *PluginInstaller) UpdatePlugin(repoURL string) error {
 }
 
 func (pi *PluginInstaller) UpdatePluginToCommit(repoURL string, commitHash string) error {
-	log.Printf("[PluginInstaller] Updating plugin from %s to commit: %s", repoURL, commitHash)
+	return pi.UpdatePluginToCommitWithForce(repoURL, commitHash, false)
+}
+
+func (pi *PluginInstaller) UpdatePluginToCommitWithForce(repoURL string, commitHash string, force bool) error {
+	log.Printf("[PluginInstaller] Updating plugin from %s to commit: %s (force: %v)", repoURL, commitHash, force)
 
 	var registry models.PluginRegistry
 	if err := pi.db.GetDB().Where("repository = ?", repoURL).First(&registry).Error; err != nil {
@@ -283,6 +314,28 @@ func (pi *PluginInstaller) UpdatePluginToCommit(repoURL string, commitHash strin
 		return fmt.Errorf("failed to open repository: %w", err)
 	}
 
+	w, err := repo.Worktree()
+	if err != nil {
+		return fmt.Errorf("failed to get worktree: %w", err)
+	}
+
+	status, err := w.Status()
+	if err != nil {
+		return fmt.Errorf("failed to check repository status: %w", err)
+	}
+
+	if !status.IsClean() && !force {
+		return fmt.Errorf("LOCAL_MODIFICATIONS: plugin has local modifications - updating will discard these changes")
+	}
+
+	if !status.IsClean() {
+		log.Printf("[PluginInstaller] Discarding local modifications (force update)")
+		err = w.Reset(&git.ResetOptions{Mode: git.HardReset})
+		if err != nil {
+			return fmt.Errorf("failed to discard local changes: %w", err)
+		}
+	}
+
 	auth, err := pi.gitAuth.GetAuthMethod(repoURL)
 	if err != nil {
 		log.Printf("[PluginInstaller] Warning: failed to get auth method: %v", err)
@@ -297,14 +350,9 @@ func (pi *PluginInstaller) UpdatePluginToCommit(repoURL string, commitHash strin
 		log.Printf("[PluginInstaller] Warning: fetch failed: %v", err)
 	}
 
-	w, err := repo.Worktree()
-	if err != nil {
-		return fmt.Errorf("failed to get worktree: %w", err)
-	}
-
 	err = w.Checkout(&git.CheckoutOptions{
 		Hash:  plumbing.NewHash(commitHash),
-		Force: true,
+		Force: false,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to checkout commit %s: %w", commitHash, err)
@@ -317,6 +365,84 @@ func (pi *PluginInstaller) UpdatePluginToCommit(repoURL string, commitHash strin
 	}
 
 	log.Printf("[PluginInstaller] Successfully updated plugin to commit: %s", commitHash)
+
+	if err := pi.pluginLoader.ReloadPlugins(); err != nil {
+		log.Printf("[PluginInstaller] Warning: failed to reload plugins: %v", err)
+	}
+
+	return nil
+}
+
+func (pi *PluginInstaller) ReinstallPlugin(repoURL string) error {
+	log.Printf("[PluginInstaller] Reinstalling plugin from: %s", repoURL)
+
+	var registry models.PluginRegistry
+	if err := pi.db.GetDB().Where("repository = ?", repoURL).First(&registry).Error; err != nil {
+		return fmt.Errorf("plugin not installed: %w", err)
+	}
+
+	commitHash := registry.CommitHash
+	folderPath := registry.FolderPath
+
+	if _, err := os.Stat(folderPath); err == nil {
+		log.Printf("[PluginInstaller] Removing plugin folder: %s", folderPath)
+		if err := os.RemoveAll(folderPath); err != nil {
+			return fmt.Errorf("failed to remove plugin folder: %w", err)
+		}
+	} else {
+		log.Printf("[PluginInstaller] Plugin folder does not exist, skipping deletion: %s", folderPath)
+	}
+
+	tempDir := filepath.Join(pi.pluginsDir, ".temp-reinstall-"+fmt.Sprintf("%d", time.Now().Unix()))
+	defer os.RemoveAll(tempDir)
+
+	log.Printf("[PluginInstaller] Cloning fresh copy from repository...")
+
+	auth, err := pi.gitAuth.GetAuthMethod(repoURL)
+	if err != nil {
+		log.Printf("[PluginInstaller] Warning: failed to get auth method: %v", err)
+	}
+
+	repo, err := git.PlainClone(tempDir, false, &git.CloneOptions{
+		URL:      repoURL,
+		Progress: io.Discard,
+		Auth:     auth,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to clone repository: %w", err)
+	}
+
+	if commitHash != "" {
+		log.Printf("[PluginInstaller] Checking out commit: %s", commitHash)
+		w, err := repo.Worktree()
+		if err != nil {
+			return fmt.Errorf("failed to get worktree: %w", err)
+		}
+
+		err = w.Checkout(&git.CheckoutOptions{
+			Hash:  plumbing.NewHash(commitHash),
+			Force: true,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to checkout commit %s: %w", commitHash, err)
+		}
+	}
+
+	parentDir := filepath.Dir(folderPath)
+	if err := os.MkdirAll(parentDir, 0755); err != nil {
+		return fmt.Errorf("failed to create parent directory: %w", err)
+	}
+
+	if err := os.Rename(tempDir, folderPath); err != nil {
+		return fmt.Errorf("failed to move plugin to final location: %w", err)
+	}
+
+	registry.UpdatedAt = time.Now()
+	if err := pi.db.GetDB().Save(&registry).Error; err != nil {
+		log.Printf("[PluginInstaller] Warning: failed to update registry: %v", err)
+	}
+
+	log.Printf("[PluginInstaller] Successfully reinstalled plugin [ID:%d]", registry.ID)
 
 	if err := pi.pluginLoader.ReloadPlugins(); err != nil {
 		log.Printf("[PluginInstaller] Warning: failed to reload plugins: %v", err)

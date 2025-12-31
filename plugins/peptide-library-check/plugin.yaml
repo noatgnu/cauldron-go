@@ -6,13 +6,13 @@ plugin:
   author: Cauldron Team
   category: utilities
   icon: fact_check
-
-runtime:
-  type: python
-  entrypoint: library_check_peptide.py
   requirements:
     - pandas
     - click
+
+runtime:
+  environments: ["python"]
+  entrypoint: library_check_peptide.py
 
 inputs:
   - name: file_path
@@ -59,7 +59,17 @@ inputs:
     max: 50
     description: Minimum length of peptides to include in the library
 
+execution:
+  argsMapping:
+    file_path: "--input"
+    peptide_column: "--peptide-col"
+    fasta_file: "--fasta"
+    miss_cleavage: "--miss-cleavage"
+    min_length: "--min-length"
+  outputDir: "--output-dir"
+
 outputs:
   - name: peptide_in_library.txt
-    type: file
+    path: peptide_in_library.txt
+    type: data
     description: Tab-separated file with a "Found" column indicating whether each peptide was found in the FASTA library

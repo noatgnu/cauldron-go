@@ -34,10 +34,13 @@ type App struct {
 	httpInstallServer     *services.HTTPInstallServer
 	pluginRegistryService *services.PluginRegistryService
 	gitAuthService        *services.GitAuthService
+	ready                 chan bool
 }
 
 func NewApp() *App {
-	return &App{}
+	return &App{
+		ready: make(chan bool),
+	}
 }
 
 func (a *App) startup(ctx context.Context) {
@@ -187,6 +190,7 @@ func (a *App) startup(ctx context.Context) {
 	go a.checkUnfinishedJobs()
 
 	log.Println("[App.startup] Application startup complete!")
+	close(a.ready)
 }
 
 func (a *App) shutdown(ctx context.Context) {
@@ -404,6 +408,7 @@ func (a *App) RerunJob(jobID string, useSameEnvironment bool, pythonEnvPath stri
 func (a *App) GetPythonVersion() (string, error) {
 	cfg := a.settings.GetConfig()
 	cmd := exec.Command(cfg.PythonPath, "--version")
+	hideConsoleWindow(cmd)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", err
@@ -414,6 +419,7 @@ func (a *App) GetPythonVersion() (string, error) {
 func (a *App) GetRVersion() (string, error) {
 	cfg := a.settings.GetConfig()
 	cmd := exec.Command(cfg.RPath, "--version")
+	hideConsoleWindow(cmd)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", err
@@ -423,6 +429,21 @@ func (a *App) GetRVersion() (string, error) {
 		return strings.TrimSpace(lines[0]), nil
 	}
 	return strings.TrimSpace(string(output)), nil
+}
+
+func (a *App) CheckDockerVersion() (string, error) {
+	cmd := exec.Command("docker", "--version")
+	hideConsoleWindow(cmd)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("docker not available: %w", err)
+	}
+	version := strings.TrimSpace(string(output))
+	version = strings.TrimPrefix(version, "Docker version ")
+	if idx := strings.Index(version, ","); idx != -1 {
+		version = version[:idx]
+	}
+	return version, nil
 }
 
 func (a *App) Greet(name string) string {
@@ -643,6 +664,36 @@ func (a *App) GetExampleFilePath(exampleType string, fileName string) (string, e
 	return a.envService.GetExampleFilePath(exampleType, fileName)
 }
 
+func (a *App) GetPluginExampleFilePath(pluginID string, filePath string) (string, error) {
+	plugin, err := a.pluginLoaderV2.GetPluginByStringID(pluginID)
+	if err == nil {
+		examplePath := filepath.Join(plugin.FolderPath, filePath)
+		if _, err := os.Stat(examplePath); err == nil {
+			log.Printf("[GetPluginExampleFilePath] Found in plugin folder: %s", examplePath)
+			return examplePath, nil
+		}
+		log.Printf("[GetPluginExampleFilePath] Not found in plugin folder: %s", examplePath)
+	} else {
+		log.Printf("[GetPluginExampleFilePath] Plugin not found: %s", pluginID)
+	}
+
+	parts := strings.Split(filePath, string(filepath.Separator))
+	if len(parts) >= 2 {
+		exampleType := parts[0]
+		fileName := filepath.Join(parts[1:]...)
+		log.Printf("[GetPluginExampleFilePath] Trying global examples: %s/%s", exampleType, fileName)
+
+		globalPath, err := a.envService.GetExampleFilePath(exampleType, fileName)
+		if err == nil {
+			log.Printf("[GetPluginExampleFilePath] Found in global examples: %s", globalPath)
+			return globalPath, nil
+		}
+		log.Printf("[GetPluginExampleFilePath] Not found in global examples: %v", err)
+	}
+
+	return "", fmt.Errorf("example file not found: %s", filePath)
+}
+
 func (a *App) OpenDataFileDialog() (string, error) {
 	return a.fileService.OpenDataFileDialog()
 }
@@ -843,6 +894,7 @@ func (a *App) ExecutePlugin(req models.PluginExecutionRequest) (string, error) {
 }
 
 func (a *App) GetPluginsV2() []*models.PluginV2 {
+	<-a.ready
 	return a.pluginLoaderV2.GetAllPlugins()
 }
 
@@ -852,6 +904,11 @@ func (a *App) GetPluginV2(id uint) (*models.PluginV2, error) {
 
 func (a *App) SetPluginEnabled(id uint, enabled bool) error {
 	return a.pluginLoaderV2.SetPluginEnabled(id, enabled)
+}
+
+func (a *App) EnableAllPlugins() error {
+	log.Println("[App] Enabling all plugins")
+	return a.db.GetDB().Model(&models.PluginRegistry{}).Update("enabled", true).Error
 }
 
 func (a *App) ExecutePluginV2(req models.PluginExecutionRequestV2) (string, error) {
@@ -1323,9 +1380,24 @@ func (a *App) UpdatePluginFromRepo(repoURL string) error {
 	return a.pluginInstaller.UpdatePlugin(repoURL)
 }
 
+func (a *App) UpdatePluginFromRepoForce(repoURL string, force bool) error {
+	log.Printf("[App] Updating plugin from repository: %s (force: %v)", repoURL, force)
+	return a.pluginInstaller.UpdatePluginWithForce(repoURL, force)
+}
+
 func (a *App) UpdatePluginToCommit(repoURL string, commitHash string) error {
 	log.Printf("[App] Updating plugin from repository %s to commit: %s", repoURL, commitHash)
 	return a.pluginInstaller.UpdatePluginToCommit(repoURL, commitHash)
+}
+
+func (a *App) UpdatePluginToCommitForce(repoURL string, commitHash string, force bool) error {
+	log.Printf("[App] Updating plugin from repository %s to commit: %s (force: %v)", repoURL, commitHash, force)
+	return a.pluginInstaller.UpdatePluginToCommitWithForce(repoURL, commitHash, force)
+}
+
+func (a *App) ReinstallPlugin(repoURL string) error {
+	log.Printf("[App] Reinstalling plugin from repository: %s", repoURL)
+	return a.pluginInstaller.ReinstallPlugin(repoURL)
 }
 
 func (a *App) UpdateAllRemotePlugins() error {
@@ -1397,7 +1469,7 @@ func (a *App) ForceUpdateAllRemotePlugins() error {
 		}
 
 		log.Printf("[App] Force updating plugin %s from %s", registry.PluginID, registry.Repository)
-		if err := a.pluginInstaller.UpdatePlugin(registry.Repository); err != nil {
+		if err := a.pluginInstaller.UpdatePluginWithForce(registry.Repository, true); err != nil {
 			errMsg := fmt.Sprintf("Failed to update %s: %v", registry.PluginID, err)
 			log.Printf("[App] %s", errMsg)
 			errors = append(errors, errMsg)

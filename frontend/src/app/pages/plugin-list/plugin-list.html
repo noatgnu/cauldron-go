@@ -67,7 +67,7 @@
 
           <div class="plugin-cards">
             @for (plugin of category.value; track plugin.id) {
-              <mat-card class="plugin-card" (click)="navigateToPlugin(plugin.id)">
+              <mat-card class="plugin-card">
                 <mat-card-header>
                   <mat-icon mat-card-avatar>{{ plugin.definition.plugin.icon || 'extension' }}</mat-icon>
                   <mat-card-title>
@@ -109,7 +109,7 @@
                   }
                 </mat-card-content>
 
-                <mat-card-actions align="end" (click)="$event.stopPropagation()">
+                <mat-card-actions align="end">
                   <mat-slide-toggle
                     [(ngModel)]="plugin.enabled"
                     (ngModelChange)="onPluginEnabledChange(plugin)"
@@ -117,45 +117,53 @@
                     [matTooltip]="plugin.enabled ? 'Disable plugin (hide from sidebar)' : 'Enable plugin (show in sidebar)'">
                     Enabled
                   </mat-slide-toggle>
-                  @if (hasCustomBinding(plugin.id)) {
-                    <button mat-icon-button (click)="openEnvironmentDialog($event, plugin)" [matTooltip]="getBindingTooltip(plugin.id)" color="accent">
-                      <mat-icon>link</mat-icon>
+
+                  @if (plugin.installSource === 'remote' && plugin.repository && hasAvailableUpdate(plugin.id)) {
+                    <button mat-raised-button
+                            color="accent"
+                            (click)="installUpdate(plugin)">
+                      <mat-icon>download</mat-icon>
+                      Install Update
                     </button>
                   }
-                  <button mat-icon-button (click)="openEnvironmentDialog($event, plugin)" matTooltip="Environment Settings">
-                    <mat-icon>settings</mat-icon>
+
+                  <button mat-icon-button [matMenuTriggerFor]="pluginMenu" matTooltip="More actions">
+                    <mat-icon>more_vert</mat-icon>
                   </button>
-                  <button mat-icon-button (click)="editPlugin($event, plugin)" matTooltip="Edit Plugin">
-                    <mat-icon>edit</mat-icon>
-                  </button>
-                  @if (plugin.installSource === 'remote' && plugin.repository) {
-                    @if (hasAvailableUpdate(plugin.id)) {
-                      <button mat-raised-button
-                              color="accent"
-                              (click)="installUpdate($event, plugin)">
-                        <mat-icon>download</mat-icon>
-                        Install Update
+
+                  <mat-menu #pluginMenu="matMenu">
+                    <button mat-menu-item (click)="openEnvironmentDialog(plugin)">
+                      <mat-icon>settings</mat-icon>
+                      <span>Environment Settings</span>
+                    </button>
+                    <button mat-menu-item (click)="editPlugin(plugin)">
+                      <mat-icon>edit</mat-icon>
+                      <span>Edit Plugin</span>
+                    </button>
+                    @if (plugin.installSource === 'remote' && plugin.repository) {
+                      @if (!hasAvailableUpdate(plugin.id)) {
+                        <button mat-menu-item (click)="checkForUpdate(plugin)" [disabled]="isCheckingUpdate(plugin.id)">
+                          @if (isCheckingUpdate(plugin.id)) {
+                            <mat-icon class="spin-animation">sync</mat-icon>
+                          } @else {
+                            <mat-icon>update</mat-icon>
+                          }
+                          <span>Check for Updates</span>
+                        </button>
+                      }
+                      <button mat-menu-item (click)="reinstallPlugin(plugin)">
+                        <mat-icon>restart_alt</mat-icon>
+                        <span>Reinstall Plugin</span>
                       </button>
-                    } @else {
-                      <button mat-icon-button
-                              (click)="checkForUpdate($event, plugin)"
-                              [disabled]="isCheckingUpdate(plugin.id)"
-                              [matTooltip]="'Check for updates'">
-                        @if (isCheckingUpdate(plugin.id)) {
-                          <mat-icon class="spin-animation">sync</mat-icon>
-                        } @else {
-                          <mat-icon>update</mat-icon>
-                        }
+                      <mat-divider></mat-divider>
+                      <button mat-menu-item (click)="uninstallPlugin(plugin)" class="warn-menu-item">
+                        <mat-icon color="warn">delete</mat-icon>
+                        <span>Uninstall Plugin</span>
                       </button>
                     }
-                    <button mat-icon-button
-                            (click)="uninstallPlugin($event, plugin)"
-                            matTooltip="Uninstall plugin"
-                            color="warn">
-                      <mat-icon>delete</mat-icon>
-                    </button>
-                  }
-                  <button mat-button color="primary">
+                  </mat-menu>
+
+                  <button mat-button color="primary" (click)="navigateToPlugin(plugin.id)">
                     <mat-icon>play_arrow</mat-icon>
                     Run
                   </button>

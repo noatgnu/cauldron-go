@@ -202,6 +202,14 @@ export class PluginRegistry implements OnInit {
     await this.loadPlugins();
   }
 
+  async refreshRegistry(): Promise<void> {
+    this.notification.showInfo('Refreshing registry data...');
+    await this.loadCategories();
+    await this.loadPlugins();
+    await this.loadInstalledPlugins();
+    this.notification.showSuccess('Registry data refreshed successfully');
+  }
+
   openManualInstallDialog(): void {
     const dialogRef = this.dialog.open(InstallPluginDialog, {
       width: '600px',
@@ -306,5 +314,12 @@ export class PluginRegistry implements OnInit {
 
   getCategoryName(plugin: RegistryPlugin): string {
     return plugin.category?.name || 'Uncategorized';
+  }
+
+  isIconUrl(icon: string): boolean {
+    return icon.startsWith('http://') ||
+           icon.startsWith('https://') ||
+           icon.startsWith('/') ||
+           icon.includes('.');
   }
 }

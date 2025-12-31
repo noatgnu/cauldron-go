@@ -21,6 +21,7 @@ func NewDockerImageBuilder(db *DatabaseService) *DockerImageBuilder {
 
 func (d *DockerImageBuilder) CheckDockerAvailable() error {
 	cmd := exec.Command("docker", "version")
+	hideConsoleWindow(cmd)
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("docker daemon not available: %w", err)
 	}
@@ -49,6 +50,7 @@ func (d *DockerImageBuilder) BuildImage(
 	args = append(args, ".")
 
 	cmd := exec.Command("docker", args...)
+	hideConsoleWindow(cmd)
 	cmd.Dir = pluginDir
 
 	log.Printf("[DockerImageBuilder] Building image: docker %s", strings.Join(args, " "))
@@ -64,6 +66,7 @@ func (d *DockerImageBuilder) BuildImage(
 
 func (d *DockerImageBuilder) PullImage(imageName string) error {
 	cmd := exec.Command("docker", "pull", imageName)
+	hideConsoleWindow(cmd)
 
 	log.Printf("[DockerImageBuilder] Pulling image: %s", imageName)
 
@@ -78,6 +81,7 @@ func (d *DockerImageBuilder) PullImage(imageName string) error {
 
 func (d *DockerImageBuilder) ImageExists(imageName string) bool {
 	cmd := exec.Command("docker", "image", "inspect", imageName)
+	hideConsoleWindow(cmd)
 	err := cmd.Run()
 	return err == nil
 }
@@ -99,6 +103,7 @@ func (d *DockerImageBuilder) RecordBuiltImage(
 	buildArgs map[string]string,
 ) error {
 	cmd := exec.Command("docker", "image", "inspect", "--format={{.Id}}", imageName)
+	hideConsoleWindow(cmd)
 	output, err := cmd.Output()
 	if err != nil {
 		return fmt.Errorf("failed to get image ID: %w", err)

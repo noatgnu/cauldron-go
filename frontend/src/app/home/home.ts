@@ -35,6 +35,7 @@ export class Home implements OnInit {
   protected pythonPath = signal('');
   protected rVersion = signal('');
   protected rPath = signal('');
+  protected dockerVersion = signal('');
   protected jobs = signal<Job[]>([]);
   protected recentJobs = computed(() => this.jobs().slice(0, 5));
   protected importedFiles = signal<ImportedFile[]>([]);
@@ -221,6 +222,13 @@ export class Home implements OnInit {
     } catch (e) {
       this.rVersion.set('Not selected');
       this.rPath.set('');
+    }
+
+    try {
+      const dockerVer = await this.wails.checkDockerVersion();
+      this.dockerVersion.set(dockerVer);
+    } catch (e) {
+      this.dockerVersion.set('Not installed');
     }
 
     this.loadingVersions.set(false);

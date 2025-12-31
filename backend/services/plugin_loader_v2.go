@@ -114,9 +114,14 @@ func (l *PluginLoaderV2) loadPlugin(pluginDir string) (*models.PluginV2, error) 
 		return nil, fmt.Errorf("failed to load requirements from files: %w", err)
 	}
 
+	// Set script path (for Docker, this is the command; for others, it's the file path)
 	scriptPath := filepath.Join(pluginDir, definition.Runtime.GetEntrypoint())
-	if _, err := os.Stat(scriptPath); os.IsNotExist(err) {
-		return nil, fmt.Errorf("entrypoint file not found: %s", scriptPath)
+
+	// For non-Docker runtimes, verify entrypoint file exists
+	if !definition.Runtime.IsDockerRuntime() {
+		if _, err := os.Stat(scriptPath); os.IsNotExist(err) {
+			return nil, fmt.Errorf("entrypoint file not found: %s", scriptPath)
+		}
 	}
 
 	if definition.Runtime.IsDockerRuntime() {
@@ -221,6 +226,7 @@ func (l *PluginLoaderV2) validateDefinition(def *models.PluginDefinition) error 
 		"direct": true,
 		"julia":  true,
 		"node":   true,
+		"docker": true,
 	}
 
 	for _, env := range def.Runtime.Environments {

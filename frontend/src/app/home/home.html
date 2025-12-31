@@ -120,27 +120,49 @@
             <small>{{ debugInfo().versionsLoaded }}</small>
           </div>
         } @else {
-          <div class="status-item">
-            <mat-icon [color]="pythonVersion() !== 'Not detected' && pythonVersion() !== 'Not configured' && pythonVersion() !== 'Not selected' ? 'primary' : 'warn'">
-              {{ pythonVersion() !== 'Not detected' && pythonVersion() !== 'Not configured' && pythonVersion() !== 'Not selected' ? 'check_circle' : 'error' }}
-            </mat-icon>
-            <div class="status-info">
-              <div class="status-label">Python</div>
-              <div class="status-value">{{ pythonVersion() }}</div>
-              @if (pythonPath()) {
-                <div class="status-path">{{ pythonPath() }}</div>
+          <div class="status-grid">
+            <div class="status-row">
+              <span class="status-label">Python</span>
+              @if (pythonVersion() && pythonVersion() !== 'Not detected' && pythonVersion() !== 'Not configured' && pythonVersion() !== 'Not selected') {
+                <mat-chip class="status-chip">
+                  <mat-icon>check_circle</mat-icon>
+                  <span [matTooltip]="pythonPath() || 'No path configured'">{{ pythonVersion() }}</span>
+                </mat-chip>
+              } @else {
+                <mat-chip class="status-chip warn">
+                  <mat-icon>error</mat-icon>
+                  <span>{{ pythonVersion() || 'Not configured' }}</span>
+                </mat-chip>
               }
             </div>
-          </div>
-          <div class="status-item">
-            <mat-icon [color]="rVersion() !== 'Not detected' && rVersion() !== 'Not configured' && rVersion() !== 'Not selected' ? 'primary' : 'warn'">
-              {{ rVersion() !== 'Not detected' && rVersion() !== 'Not configured' && rVersion() !== 'Not selected' ? 'check_circle' : 'error' }}
-            </mat-icon>
-            <div class="status-info">
-              <div class="status-label">R</div>
-              <div class="status-value">{{ rVersion() }}</div>
-              @if (rPath()) {
-                <div class="status-path">{{ rPath() }}</div>
+
+            <div class="status-row">
+              <span class="status-label">R</span>
+              @if (rVersion() && rVersion() !== 'Not detected' && rVersion() !== 'Not configured' && rVersion() !== 'Not selected') {
+                <mat-chip class="status-chip">
+                  <mat-icon>check_circle</mat-icon>
+                  <span [matTooltip]="rPath() || 'No path configured'">{{ rVersion() }}</span>
+                </mat-chip>
+              } @else {
+                <mat-chip class="status-chip warn">
+                  <mat-icon>error</mat-icon>
+                  <span>{{ rVersion() || 'Not configured' }}</span>
+                </mat-chip>
+              }
+            </div>
+
+            <div class="status-row">
+              <span class="status-label">Docker</span>
+              @if (dockerVersion() && dockerVersion() !== 'Not installed') {
+                <mat-chip class="status-chip">
+                  <mat-icon>check_circle</mat-icon>
+                  <span [matTooltip]="'Docker installed'">{{ dockerVersion() }}</span>
+                </mat-chip>
+              } @else {
+                <mat-chip class="status-chip warn">
+                  <mat-icon>error</mat-icon>
+                  <span>Not installed</span>
+                </mat-chip>
               }
             </div>
           </div>

@@ -223,6 +223,11 @@ export class Wails {
     return WailsApp.GetRVersion();
   }
 
+  async checkDockerVersion(): Promise<string> {
+    if (!this.isWails) throw new Error('Wails not available');
+    return WailsApp.CheckDockerVersion();
+  }
+
   async greet(name: string): Promise<string> {
     if (!this.isWails) throw new Error('Wails not available');
     return WailsApp.Greet(name);
@@ -324,6 +329,11 @@ export class Wails {
   async getExampleFilePath(exampleType: string, fileName: string): Promise<string> {
     if (!this.isWails) throw new Error('Wails not available');
     return WailsApp.GetExampleFilePath(exampleType, fileName);
+  }
+
+  async getPluginExampleFilePath(pluginID: string, filePath: string): Promise<string> {
+    if (!this.isWails) throw new Error('Wails not available');
+    return WailsApp.GetPluginExampleFilePath(pluginID, filePath);
   }
 
   async openDataFileDialog(): Promise<string> {
@@ -580,6 +590,21 @@ export class Wails {
   async updatePluginToCommit(repoURL: string, commitHash: string): Promise<void> {
     if (!this.isWails) throw new Error('Wails not available');
     return WailsApp.UpdatePluginToCommit(repoURL, commitHash);
+  }
+
+  async updatePluginToCommitForce(repoURL: string, commitHash: string, force: boolean): Promise<void> {
+    if (!this.isWails) throw new Error('Wails not available');
+    return WailsApp.UpdatePluginToCommitForce(repoURL, commitHash, force);
+  }
+
+  async updatePluginFromRepoForce(repoURL: string, force: boolean): Promise<void> {
+    if (!this.isWails) throw new Error('Wails not available');
+    return WailsApp.UpdatePluginFromRepoForce(repoURL, force);
+  }
+
+  async reinstallPlugin(repoURL: string): Promise<void> {
+    if (!this.isWails) throw new Error('Wails not available');
+    return WailsApp.ReinstallPlugin(repoURL);
   }
 
   async updateAllRemotePlugins(): Promise<void> {

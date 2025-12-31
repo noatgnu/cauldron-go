@@ -226,7 +226,6 @@ export class Sidenav implements OnInit {
       const plugins = await this.pluginService.getAllPlugins();
       this.plugins.set(plugins);
     } catch (error) {
-      console.error('Failed to load plugins:', error);
     }
   }
 

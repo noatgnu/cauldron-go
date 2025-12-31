@@ -226,10 +226,25 @@
   }
 }
 
+.plugin-card {
+  mat-card-subtitle {
+    color: var(--on-surface) !important;
+    opacity: 0.7;
+  }
+}
+
 .commit-hash {
   font-size: 0.8em;
   color: var(--on-surface-variant);
   margin-left: 4px;
+}
+
+.warn-menu-item {
+  color: var(--warn) !important;
+
+  span {
+    color: var(--warn) !important;
+  }
 }
 
 .spin-animation {

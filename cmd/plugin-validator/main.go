@@ -224,8 +224,7 @@ func validatePlugin(pluginPath string) (bool, []string) {
 	if entrypoint == "" {
 		errors = append(errors, "runtime.entrypoint (or deprecated runtime.script) is required")
 	} else {
-		// Check if entrypoint exists (for direct runtime, entrypoint is the executable name)
-		if !plugin.Runtime.HasEnvironment("direct") {
+		if !plugin.Runtime.HasEnvironment("direct") && !plugin.Runtime.HasEnvironment("docker") {
 			pluginDir := filepath.Dir(pluginPath)
 			scriptPath := filepath.Join(pluginDir, entrypoint)
 			if _, err := os.Stat(scriptPath); os.IsNotExist(err) {

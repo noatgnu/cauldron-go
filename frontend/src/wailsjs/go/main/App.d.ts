@@ -6,6 +6,8 @@ import {main} from '../models';
 
 export function BindPluginToEnvironment(arg1:string,arg2:string,arg3:number,arg4:string):Promise<void>;
 
+export function CheckDockerVersion():Promise<string>;
+
 export function CheckPluginUpdate(arg1:string,arg2:string,arg3:any):Promise<any>;
 
 export function ConfirmPluginInstallation(arg1:string,arg2:string):Promise<void>;
@@ -50,6 +52,8 @@ export function DetectRPath():Promise<string>;
 
 export function DownloadPortableEnvironment(arg1:string,arg2:string):Promise<void>;
 
+export function EnableAllPlugins():Promise<void>;
+
 export function ExecutePlugin(arg1:models.PluginExecutionRequest):Promise<string>;
 
 export function ExecutePluginV2(arg1:models.PluginExecutionRequestV2):Promise<string>;
@@ -93,6 +97,8 @@ export function GetPlugin(arg1:string):Promise<models.Plugin>;
 export function GetPluginEnvironmentBinding(arg1:string,arg2:string):Promise<services.PluginEnvironmentBinding>;
 
 export function GetPluginEnvironmentCount(arg1:string):Promise<number>;
+
+export function GetPluginExampleFilePath(arg1:string,arg2:string):Promise<string>;
 
 export function GetPluginJobCount(arg1:string):Promise<number>;
 
@@ -194,6 +200,8 @@ export function ReadFilePreview(arg1:string,arg2:number):Promise<Array<string>>;
 
 export function ReadJobOutputFile(arg1:string,arg2:string):Promise<string>;
 
+export function ReinstallPlugin(arg1:string):Promise<void>;
+
 export function ReloadPlugins():Promise<void>;
 
 export function ReloadPluginsV2():Promise<void>;
@@ -232,7 +240,11 @@ export function UpdateAllRemotePlugins():Promise<void>;
 
 export function UpdatePluginFromRepo(arg1:string):Promise<void>;
 
+export function UpdatePluginFromRepoForce(arg1:string,arg2:boolean):Promise<void>;
+
 export function UpdatePluginToCommit(arg1:string,arg2:string):Promise<void>;
+
+export function UpdatePluginToCommitForce(arg1:string,arg2:string,arg3:boolean):Promise<void>;
 
 export function ValidatePluginYAML(arg1:string):Promise<boolean>;
 

@@ -353,22 +353,37 @@ func (s *ScriptExecutor) ExecuteDockerScript(ctx context.Context, jobID string, 
 	}
 
 	checkCmd := exec.Command("docker", "image", "inspect", imageName)
+	hideConsoleWindow(checkCmd)
 	if err := checkCmd.Run(); err != nil {
 		return fmt.Errorf("docker image not found: %s (hint: plugin may need reinstallation)", imageName)
 	}
 
+	pluginDir := config.FolderPath
+	if pluginDir == "" {
+		return fmt.Errorf("plugin folder path is empty")
+	}
+
+	if config.OutputDir == "" {
+		return fmt.Errorf("output directory is empty")
+	}
+
+	pluginDir = filepath.Clean(pluginDir)
+	outputDir := filepath.Clean(config.OutputDir)
+
+	pluginDir = filepath.ToSlash(pluginDir)
+	outputDir = filepath.ToSlash(outputDir)
+
 	args := []string{"run"}
 	args = append(args, "--rm")
 
-	pluginDir := config.FolderPath
-	args = append(args, "-v", fmt.Sprintf("%s:/workspace:ro", pluginDir))
-	args = append(args, "-v", fmt.Sprintf("%s:/output", config.OutputDir))
-	args = append(args, "-w", "/workspace")
+	args = append(args, "-v", fmt.Sprintf("%s:/output", outputDir))
+
+	log.Printf("[ExecuteDockerScript] Volume mounts: /output <- %s", outputDir)
 
 	env := s.prepareEnv(config.PluginID)
 	for _, e := range env {
 		parts := strings.SplitN(e, "=", 2)
-		if len(parts) == 2 {
+		if len(parts) == 2 && parts[0] != "" && !strings.HasPrefix(parts[0], "=") {
 			args = append(args, "-e", fmt.Sprintf("%s=%s", parts[0], parts[1]))
 		}
 	}
@@ -377,15 +392,39 @@ func (s *ScriptExecutor) ExecuteDockerScript(ctx context.Context, jobID string, 
 		args = append(args, "--platform", plugin.Definition.Runtime.Docker.Platform)
 	}
 
-	args = append(args, imageName)
-
 	primaryEnv := config.Environments[0]
 	if primaryEnv != "docker" {
 		return fmt.Errorf("docker must be primary environment when using docker runtime")
 	}
 
-	args = append(args, config.ScriptName)
-	args = append(args, config.Args...)
+	remappedArgs, volumeMounts, err := s.prepareDockerInputFiles(config.Args, outputDir)
+	if err != nil {
+		return fmt.Errorf("failed to prepare input files: %w", err)
+	}
+
+	for _, mount := range volumeMounts {
+		args = append(args, "-v", mount)
+	}
+
+	args = append(args, imageName)
+
+	entrypointIsCommand := strings.Contains(config.ScriptName, " ")
+
+	if entrypointIsCommand {
+		cmdStr := config.ScriptName
+		for _, arg := range remappedArgs {
+			escapedArg := strings.ReplaceAll(arg, "'", "'\\''")
+			cmdStr += " '" + escapedArg + "'"
+		}
+		args = append(args, "sh", "-c", cmdStr)
+		log.Printf("[ExecuteDockerScript] Using sh -c wrapper for complex entrypoint")
+	} else {
+		args = append(args, config.ScriptName)
+		args = append(args, remappedArgs...)
+		log.Printf("[ExecuteDockerScript] Using direct entrypoint: %s", config.ScriptName)
+	}
+
+	log.Printf("[ExecuteDockerScript] Full docker command: docker %v", args)
 
 	cmd := exec.CommandContext(ctx, "docker", args...)
 	hideConsoleWindow(cmd)
@@ -395,7 +434,54 @@ func (s *ScriptExecutor) ExecuteDockerScript(ctx context.Context, jobID string, 
 
 	envInfo := fmt.Sprintf("Docker image: %s", imageName)
 
-	return s.executeCommand(ctx, jobID, cmd, config.OutputDir, envInfo)
+	return s.executeCommand(ctx, jobID, cmd, outputDir, envInfo)
+}
+
+func (s *ScriptExecutor) prepareDockerInputFiles(args []string, outputDir string) ([]string, []string, error) {
+	remappedArgs := make([]string, len(args))
+	copy(remappedArgs, args)
+
+	var volumeMounts []string
+	fileIndex := 0
+
+	cleanOutputDir := filepath.Clean(outputDir)
+	cleanOutputDir = filepath.ToSlash(cleanOutputDir)
+
+	for i, arg := range remappedArgs {
+		if !filepath.IsAbs(arg) {
+			continue
+		}
+
+		cleanArg := filepath.Clean(arg)
+		cleanArg = filepath.ToSlash(cleanArg)
+
+		if cleanArg == cleanOutputDir {
+			remappedArgs[i] = "/output"
+			log.Printf("[prepareDockerInputFiles] Remapping output dir %s -> /output", arg)
+			continue
+		}
+
+		fileInfo, err := os.Stat(arg)
+		if err != nil {
+			continue
+		}
+
+		if fileInfo.IsDir() {
+			continue
+		}
+
+		ext := filepath.Ext(arg)
+		containerPath := fmt.Sprintf("/input_%d%s", fileIndex, ext)
+
+		volumeMount := fmt.Sprintf("%s:%s:ro", cleanArg, containerPath)
+		volumeMounts = append(volumeMounts, volumeMount)
+		log.Printf("[prepareDockerInputFiles] Mounting %s -> %s:ro", cleanArg, containerPath)
+
+		remappedArgs[i] = containerPath
+		fileIndex++
+	}
+
+	return remappedArgs, volumeMounts, nil
 }
 
 func (s *ScriptExecutor) executeCommand(ctx context.Context, jobID string, cmd *exec.Cmd, outputDir string, runtimeInfo string) error {

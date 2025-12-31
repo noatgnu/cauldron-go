@@ -11,6 +11,7 @@ import { MatChipsModule } from '@angular/material/chips';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatMenuModule } from '@angular/material/menu';
+import { MatDividerModule } from '@angular/material/divider';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatBadgeModule } from '@angular/material/badge';
@@ -24,6 +25,7 @@ import { SetPluginEnabled } from '../../../wailsjs/go/main/App';
 import { PluginEnvironmentDialog } from '../../components/plugin-environment-dialog/plugin-environment-dialog';
 import { UninstallPluginDialog, UninstallPluginResult } from '../../components/uninstall-plugin-dialog/uninstall-plugin-dialog';
 import { PluginUpdateDialog } from '../../components/plugin-update-dialog/plugin-update-dialog';
+import { ConfirmDialogComponent } from '../../components/confirm-dialog/confirm-dialog';
 import { Wails } from '../../core/services/wails';
 
 interface UpdateInfo {
@@ -50,6 +52,7 @@ interface UpdateInfo {
     MatProgressSpinnerModule,
     MatDialogModule,
     MatMenuModule,
+    MatDividerModule,
     MatButtonToggleModule,
     MatTooltipModule,
     MatBadgeModule,
@@ -198,8 +201,7 @@ export class PluginList implements OnInit {
     this.router.navigate(['/plugin', pluginId.toString()]);
   }
 
-  editPlugin(event: Event, plugin: models.PluginV2) {
-    event.stopPropagation();
+  editPlugin(plugin: models.PluginV2) {
     this.router.navigate(['/plugin-editor', plugin.id.toString()]);
   }
 
@@ -284,9 +286,7 @@ export class PluginList implements OnInit {
     }
   }
 
-  openEnvironmentDialog(event: Event, plugin: models.PluginV2) {
-    event.stopPropagation();
-
+  openEnvironmentDialog(plugin: models.PluginV2) {
     this.dialog.open(PluginEnvironmentDialog, {
       width: '600px',
       disableClose: true,
@@ -299,9 +299,7 @@ export class PluginList implements OnInit {
     });
   }
 
-  async checkForUpdate(event: Event, plugin: models.PluginV2) {
-    event.stopPropagation();
-
+  async checkForUpdate(plugin: models.PluginV2) {
     if (plugin.installSource !== 'remote' || !plugin.repository) {
       return;
     }
@@ -362,9 +360,7 @@ export class PluginList implements OnInit {
     return info?.hasUpdate || false;
   }
 
-  async installUpdate(event: Event, plugin: models.PluginV2) {
-    event.stopPropagation();
-
+  async installUpdate(plugin: models.PluginV2) {
     const updateInfo = this.getUpdateInfo(plugin.id);
     if (!updateInfo || !updateInfo.hasUpdate || !plugin.repository) {
       return;
@@ -391,7 +387,41 @@ export class PluginList implements OnInit {
       await this.loadPlugins();
 
     } catch (err) {
-      this.notification.showError(`Update failed: ${err}`);
+      const errorMessage = String(err);
+      if (errorMessage.includes('LOCAL_MODIFICATIONS')) {
+        const dialogRef = this.dialog.open(ConfirmDialogComponent, {
+          width: '500px',
+          data: {
+            title: 'Local Modifications Detected',
+            message: `Plugin "${plugin.definition.plugin.name}" has local modifications. Updating will discard all local changes. Do you want to continue?`,
+            confirmText: 'Discard & Update',
+            cancelText: 'Cancel'
+          }
+        });
+
+        dialogRef.afterClosed().subscribe(async (confirmed) => {
+          if (confirmed) {
+            try {
+              const shortCommit = targetCommit.substring(0, 7);
+              this.notification.showInfo(`Force updating ${plugin.definition.plugin.name} to ${shortCommit}...`, 2000);
+
+              await this.wails.updatePluginToCommitForce(plugin.repository, targetCommit, true);
+
+              this.notification.showSuccess('Plugin updated successfully! Reloading...', 2000);
+
+              const updateMap = new Map(this.updateInfo());
+              updateMap.delete(plugin.id.toString());
+              this.updateInfo.set(updateMap);
+
+              await this.loadPlugins();
+            } catch (forceErr) {
+              this.notification.showError(`Force update failed: ${forceErr}`);
+            }
+          }
+        });
+      } else {
+        this.notification.showError(`Update failed: ${err}`);
+      }
     }
   }
 
@@ -412,9 +442,45 @@ export class PluginList implements OnInit {
     });
   }
 
-  async uninstallPlugin(event: Event, plugin: models.PluginV2) {
-    event.stopPropagation();
+  async reinstallPlugin(plugin: models.PluginV2) {
+    if (plugin.installSource !== 'remote' || !plugin.repository) {
+      this.notification.showWarning('Only externally installed plugins can be reinstalled');
+      return;
+    }
 
+    const dialogRef = this.dialog.open(ConfirmDialogComponent, {
+      width: '500px',
+      data: {
+        title: 'Reinstall Plugin',
+        message: `This will delete the plugin folder and clone a fresh copy from the repository. All local modifications will be lost, but job history and environment bindings will be preserved. Do you want to continue?`,
+        confirmText: 'Reinstall',
+        cancelText: 'Cancel'
+      }
+    });
+
+    dialogRef.afterClosed().subscribe(async (confirmed) => {
+      if (confirmed) {
+        try {
+          this.notification.showInfo(`Reinstalling ${plugin.definition.plugin.name}...`, 2000);
+
+          await this.wails.reinstallPlugin(plugin.repository!);
+
+          this.notification.showSuccess('Plugin reinstalled successfully! Reloading...', 2000);
+
+          const updateMap = new Map(this.updateInfo());
+          updateMap.delete(plugin.id.toString());
+          this.updateInfo.set(updateMap);
+
+          await this.loadPlugins();
+
+        } catch (err) {
+          this.notification.showError(`Reinstall failed: ${err}`);
+        }
+      }
+    });
+  }
+
+  async uninstallPlugin(plugin: models.PluginV2) {
     if (plugin.installSource !== 'remote' || !plugin.repository) {
       this.notification.showWarning('Only externally installed plugins can be uninstalled');
       return;

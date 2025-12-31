@@ -38,6 +38,17 @@
   .header-actions {
     display: flex;
     gap: 12px;
+    align-items: center;
+
+    button[mat-icon-button] {
+      mat-icon {
+        transition: transform 0.3s ease;
+      }
+
+      &:hover:not([disabled]) mat-icon {
+        transform: rotate(180deg);
+      }
+    }
   }
 }
 

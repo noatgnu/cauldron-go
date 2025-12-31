@@ -191,7 +191,7 @@ func (d *DatabaseService) autoMigrate() error {
 		return err
 	}
 
-	if err := d.db.Model(&models.PluginRegistry{}).Where("enabled IS NULL").Update("enabled", true).Error; err != nil {
+	if err := d.db.Model(&models.PluginRegistry{}).Where("enabled = ?", false).Update("enabled", true).Error; err != nil {
 		log.Printf("[Database] Warning: Failed to update plugin enabled defaults: %v", err)
 	}
 

@@ -32,6 +32,13 @@ type JobQueueService struct {
 	cancelFuncs    map[string]context.CancelFunc
 }
 
+func getScriptName(plugin *models.PluginV2) string {
+	if plugin.Definition.Runtime.IsDockerRuntime() {
+		return plugin.Definition.Runtime.GetEntrypoint()
+	}
+	return filepath.Base(plugin.ScriptPath)
+}
+
 func NewJobQueueService(ctx context.Context, db *DatabaseService) *JobQueueService {
 	service := &JobQueueService{
 		ctx:         ctx,
@@ -379,7 +386,7 @@ func (j *JobQueueService) processJob(job *models.Job) {
 			PluginID:     pluginID,
 			Type:         plugin.Definition.Plugin.ID,
 			Environments: plugin.Definition.Runtime.GetEnvironments(),
-			ScriptName:   filepath.Base(plugin.ScriptPath),
+			ScriptName:   getScriptName(plugin),
 			Args:         job.Args[1:],
 			OutputDir:    outputDir,
 			FolderPath:   plugin.FolderPath,

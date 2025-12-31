@@ -6,6 +6,10 @@ export function BindPluginToEnvironment(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['BindPluginToEnvironment'](arg1, arg2, arg3, arg4);
 }
 
+export function CheckDockerVersion() {
+  return window['go']['main']['App']['CheckDockerVersion']();
+}
+
 export function CheckPluginUpdate(arg1, arg2, arg3) {
   return window['go']['main']['App']['CheckPluginUpdate'](arg1, arg2, arg3);
 }
@@ -94,6 +98,10 @@ export function DownloadPortableEnvironment(arg1, arg2) {
   return window['go']['main']['App']['DownloadPortableEnvironment'](arg1, arg2);
 }
 
+export function EnableAllPlugins() {
+  return window['go']['main']['App']['EnableAllPlugins']();
+}
+
 export function ExecutePlugin(arg1) {
   return window['go']['main']['App']['ExecutePlugin'](arg1);
 }
@@ -180,6 +188,10 @@ export function GetPluginEnvironmentBinding(arg1, arg2) {
 
 export function GetPluginEnvironmentCount(arg1) {
   return window['go']['main']['App']['GetPluginEnvironmentCount'](arg1);
+}
+
+export function GetPluginExampleFilePath(arg1, arg2) {
+  return window['go']['main']['App']['GetPluginExampleFilePath'](arg1, arg2);
 }
 
 export function GetPluginJobCount(arg1) {
@@ -382,6 +394,10 @@ export function ReadJobOutputFile(arg1, arg2) {
   return window['go']['main']['App']['ReadJobOutputFile'](arg1, arg2);
 }
 
+export function ReinstallPlugin(arg1) {
+  return window['go']['main']['App']['ReinstallPlugin'](arg1);
+}
+
 export function ReloadPlugins() {
   return window['go']['main']['App']['ReloadPlugins']();
 }
@@ -458,8 +474,16 @@ export function UpdatePluginFromRepo(arg1) {
   return window['go']['main']['App']['UpdatePluginFromRepo'](arg1);
 }
 
+export function UpdatePluginFromRepoForce(arg1, arg2) {
+  return window['go']['main']['App']['UpdatePluginFromRepoForce'](arg1, arg2);
+}
+
 export function UpdatePluginToCommit(arg1, arg2) {
   return window['go']['main']['App']['UpdatePluginToCommit'](arg1, arg2);
+}
+
+export function UpdatePluginToCommitForce(arg1, arg2, arg3) {
+  return window['go']['main']['App']['UpdatePluginToCommitForce'](arg1, arg2, arg3);
 }
 
 export function ValidatePluginYAML(arg1) {

@@ -6,14 +6,14 @@ plugin:
   author: Cauldron Team
   category: utilities
   icon: swap_horiz
-
-runtime:
-  type: python
-  entrypoint: remap_ptm.py
   requirements:
     - pandas
     - click
     - uniprotparser
+
+runtime:
+  environments: ["python"]
+  entrypoint: remap_ptm.py
 
 inputs:
   - name: input_file
@@ -56,7 +56,17 @@ inputs:
       - .fasta
       - .fa
 
+execution:
+  argsMapping:
+    input_file: "--input"
+    peptide_column: "--peptide-col"
+    position_in_peptide_column: "--position-col"
+    uniprot_acc_column: "--uniprot-col"
+    fasta_file: "--fasta"
+  outputDir: "--output-dir"
+
 outputs:
   - name: remapped_peptides.txt
-    type: file
+    path: remapped_peptides.txt
+    type: data
     description: Tab-separated file with remapped PTM positions
