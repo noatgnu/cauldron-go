@@ -148,15 +148,27 @@ func (ph *ProtocolHandler) handleInstall(parsedURL *url.URL) error {
 	}
 
 	log.Printf("[ProtocolHandler] Requesting user confirmation for plugin: %s", pluginInfo.Plugin.Name)
+
+	hasPythonDeps := false
+	hasRDeps := false
+
+	hasPythonDeps = pluginInfo.Execution.Requirements.PythonRequirementsFile != "" ||
+		(len(pluginInfo.Execution.Requirements.Packages) > 0 && pluginInfo.Runtime.HasEnvironment("python"))
+	hasRDeps = pluginInfo.Execution.Requirements.RPackagesFile != "" ||
+		(pluginInfo.Execution.Requirements.R != "" && pluginInfo.Runtime.HasEnvironment("r"))
+
 	eventData := map[string]interface{}{
-		"repo":        repoURL,
-		"ref":         ref,
-		"name":        pluginInfo.Plugin.Name,
-		"id":          pluginInfo.Plugin.ID,
-		"version":     pluginInfo.Plugin.Version,
-		"author":      pluginInfo.Plugin.Author,
-		"description": pluginInfo.Plugin.Description,
-		"category":    pluginInfo.Plugin.Category,
+		"repo":                repoURL,
+		"ref":                 ref,
+		"name":                pluginInfo.Plugin.Name,
+		"id":                  pluginInfo.Plugin.ID,
+		"version":             pluginInfo.Plugin.Version,
+		"author":              pluginInfo.Plugin.Author,
+		"description":         pluginInfo.Plugin.Description,
+		"category":            pluginInfo.Plugin.Category,
+		"runtimeEnvironments": pluginInfo.Runtime.Environments,
+		"hasPythonDeps":       hasPythonDeps,
+		"hasRDeps":            hasRDeps,
 	}
 	if registryURL != "" {
 		eventData["registry"] = registryURL

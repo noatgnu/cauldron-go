@@ -12,7 +12,7 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
-const installServerPort = 42069
+const installServerPort = 50060
 
 type HTTPInstallServer struct {
 	server          *http.Server
@@ -121,14 +121,26 @@ func (h *HTTPInstallServer) handleInstall(w http.ResponseWriter, r *http.Request
 		}
 
 		log.Printf("[HTTPInstallServer] Requesting user confirmation for plugin: %s", pluginInfo.Plugin.Name)
+
+		hasPythonDeps := false
+		hasRDeps := false
+
+		hasPythonDeps = pluginInfo.Execution.Requirements.PythonRequirementsFile != "" ||
+			(len(pluginInfo.Execution.Requirements.Packages) > 0 && pluginInfo.Runtime.HasEnvironment("python"))
+		hasRDeps = pluginInfo.Execution.Requirements.RPackagesFile != "" ||
+			(pluginInfo.Execution.Requirements.R != "" && pluginInfo.Runtime.HasEnvironment("r"))
+
 		runtime.EventsEmit(h.ctx, "plugin:install:request", map[string]interface{}{
-			"repo":        repoURL,
-			"name":        pluginInfo.Plugin.Name,
-			"id":          pluginInfo.Plugin.ID,
-			"version":     pluginInfo.Plugin.Version,
-			"author":      pluginInfo.Plugin.Author,
-			"description": pluginInfo.Plugin.Description,
-			"category":    pluginInfo.Plugin.Category,
+			"repo":                repoURL,
+			"name":                pluginInfo.Plugin.Name,
+			"id":                  pluginInfo.Plugin.ID,
+			"version":             pluginInfo.Plugin.Version,
+			"author":              pluginInfo.Plugin.Author,
+			"description":         pluginInfo.Plugin.Description,
+			"category":            pluginInfo.Plugin.Category,
+			"runtimeEnvironments": pluginInfo.Runtime.Environments,
+			"hasPythonDeps":       hasPythonDeps,
+			"hasRDeps":            hasRDeps,
 		})
 	}()
 

@@ -25,6 +25,7 @@ import { SetPluginEnabled } from '../../../wailsjs/go/main/App';
 import { PluginEnvironmentDialog } from '../../components/plugin-environment-dialog/plugin-environment-dialog';
 import { UninstallPluginDialog, UninstallPluginResult } from '../../components/uninstall-plugin-dialog/uninstall-plugin-dialog';
 import { PluginUpdateDialog } from '../../components/plugin-update-dialog/plugin-update-dialog';
+import { PluginUpdateCheckDialog, PluginUpdateCheckDialogResult } from '../../components/plugin-update-check-dialog/plugin-update-check-dialog';
 import { ConfirmDialogComponent } from '../../components/confirm-dialog/confirm-dialog';
 import { Wails } from '../../core/services/wails';
 
@@ -33,9 +34,7 @@ interface UpdateInfo {
   currentCommit: string;
   latestCommit?: string;
   recommendedCommit?: string;
-  changelogUrl?: string;
   checking?: boolean;
-  error?: string;
 }
 
 @Component({
@@ -104,7 +103,7 @@ export class PluginList implements OnInit {
       this.error.set('');
       const plugins = await this.pluginService.getAllPlugins();
       this.plugins.set(plugins);
-      this.filteredPlugins.set(plugins);
+      this.applyFilters();
       await this.loadPluginBindings(plugins);
     } catch (err) {
       this.error.set(`Failed to load plugins: ${err}`);
@@ -301,129 +300,24 @@ export class PluginList implements OnInit {
 
   async checkForUpdate(plugin: models.PluginV2) {
     if (plugin.installSource !== 'remote' || !plugin.repository) {
+      this.notification.showWarning('This plugin is not from a remote repository');
       return;
     }
 
-    const key = plugin.id.toString();
-    const currentMap = new Map(this.updateInfo());
-    currentMap.set(key, {
-      hasUpdate: false,
-      currentCommit: plugin.commitHash || '',
-      checking: true
+    const dialogRef = this.dialog.open(PluginUpdateCheckDialog, {
+      width: '600px',
+      disableClose: true,
+      data: { plugin }
     });
-    this.updateInfo.set(currentMap);
 
-    try {
-      const result = await this.wails.checkPluginUpdate(
-        plugin.repository,
-        plugin.commitHash || '',
-        null
-      );
+    const result: PluginUpdateCheckDialogResult | undefined = await dialogRef.afterClosed().toPromise();
 
-      const newMap = new Map(this.updateInfo());
-      newMap.set(key, {
-        hasUpdate: result.has_update || false,
-        currentCommit: result.current_commit || plugin.commitHash || '',
-        latestCommit: result.latest_commit,
-        recommendedCommit: result.recommended_commit,
-        changelogUrl: result.changelog_url,
-        checking: false
-      });
-      this.updateInfo.set(newMap);
-    } catch (err) {
-      const errorMap = new Map(this.updateInfo());
-      errorMap.set(key, {
-        hasUpdate: false,
-        currentCommit: plugin.commitHash || '',
-        checking: false,
-        error: String(err)
-      });
-      this.updateInfo.set(errorMap);
-    }
-  }
-
-  hasUpdateInfo(pluginId: number): boolean {
-    return this.updateInfo().has(pluginId.toString());
-  }
-
-  getUpdateInfo(pluginId: number): UpdateInfo | undefined {
-    return this.updateInfo().get(pluginId.toString());
-  }
-
-  isCheckingUpdate(pluginId: number): boolean {
-    const info = this.getUpdateInfo(pluginId);
-    return info?.checking || false;
-  }
-
-  hasAvailableUpdate(pluginId: number): boolean {
-    const info = this.getUpdateInfo(pluginId);
-    return info?.hasUpdate || false;
-  }
-
-  async installUpdate(plugin: models.PluginV2) {
-    const updateInfo = this.getUpdateInfo(plugin.id);
-    if (!updateInfo || !updateInfo.hasUpdate || !plugin.repository) {
-      return;
-    }
-
-    const targetCommit = updateInfo.recommendedCommit || updateInfo.latestCommit;
-    if (!targetCommit) {
-      this.notification.showWarning('No target commit available for update');
-      return;
-    }
-
-    try {
-      const shortCommit = targetCommit.substring(0, 7);
-      this.notification.showInfo(`Updating ${plugin.definition.plugin.name} to ${shortCommit}...`, 2000);
-
-      await this.wails.updatePluginToCommit(plugin.repository, targetCommit);
-
+    if (result?.updated) {
       this.notification.showSuccess('Plugin updated successfully! Reloading...', 2000);
-
-      const updateMap = new Map(this.updateInfo());
-      updateMap.delete(plugin.id.toString());
-      this.updateInfo.set(updateMap);
-
       await this.loadPlugins();
-
-    } catch (err) {
-      const errorMessage = String(err);
-      if (errorMessage.includes('LOCAL_MODIFICATIONS')) {
-        const dialogRef = this.dialog.open(ConfirmDialogComponent, {
-          width: '500px',
-          data: {
-            title: 'Local Modifications Detected',
-            message: `Plugin "${plugin.definition.plugin.name}" has local modifications. Updating will discard all local changes. Do you want to continue?`,
-            confirmText: 'Discard & Update',
-            cancelText: 'Cancel'
-          }
-        });
-
-        dialogRef.afterClosed().subscribe(async (confirmed) => {
-          if (confirmed) {
-            try {
-              const shortCommit = targetCommit.substring(0, 7);
-              this.notification.showInfo(`Force updating ${plugin.definition.plugin.name} to ${shortCommit}...`, 2000);
-
-              await this.wails.updatePluginToCommitForce(plugin.repository, targetCommit, true);
-
-              this.notification.showSuccess('Plugin updated successfully! Reloading...', 2000);
-
-              const updateMap = new Map(this.updateInfo());
-              updateMap.delete(plugin.id.toString());
-              this.updateInfo.set(updateMap);
-
-              await this.loadPlugins();
-            } catch (forceErr) {
-              this.notification.showError(`Force update failed: ${forceErr}`);
-            }
-          }
-        });
-      } else {
-        this.notification.showError(`Update failed: ${err}`);
-      }
     }
   }
+
 
   async updateAllRemotePlugins() {
     const dialogRef = this.dialog.open(PluginUpdateDialog, {
@@ -434,9 +328,6 @@ export class PluginList implements OnInit {
     dialogRef.afterClosed().subscribe(async (result) => {
       if (result && result.updated) {
         this.notification.showSuccess(`Successfully updated ${result.count} plugin(s)! Reloading...`);
-
-        this.updateInfo.set(new Map());
-
         await this.loadPlugins();
       }
     });
@@ -466,10 +357,6 @@ export class PluginList implements OnInit {
           await this.wails.reinstallPlugin(plugin.repository!);
 
           this.notification.showSuccess('Plugin reinstalled successfully! Reloading...', 2000);
-
-          const updateMap = new Map(this.updateInfo());
-          updateMap.delete(plugin.id.toString());
-          this.updateInfo.set(updateMap);
 
           await this.loadPlugins();
 
@@ -521,6 +408,24 @@ export class PluginList implements OnInit {
         }
       }
     });
+  }
+
+  hasUpdateInfo(pluginId: number): boolean {
+    return this.updateInfo().has(pluginId.toString());
+  }
+
+  getUpdateInfo(pluginId: number): UpdateInfo | undefined {
+    return this.updateInfo().get(pluginId.toString());
+  }
+
+  isCheckingUpdate(pluginId: number): boolean {
+    const info = this.updateInfo().get(pluginId.toString());
+    return info?.checking || false;
+  }
+
+  hasAvailableUpdate(pluginId: number): boolean {
+    const info = this.updateInfo().get(pluginId.toString());
+    return info?.hasUpdate || false;
   }
 
 }

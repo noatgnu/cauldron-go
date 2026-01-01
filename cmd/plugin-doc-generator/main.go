@@ -391,7 +391,7 @@ func generateInstallSectionMarkdown(repository string) string {
 		return ""
 	}
 
-	httpInstallURL := fmt.Sprintf("http://localhost:42069/install?repo=%s", url.QueryEscape(repository))
+	httpInstallURL := fmt.Sprintf("http://localhost:50060/install?repo=%s", url.QueryEscape(repository))
 
 	lines := []string{
 		"",

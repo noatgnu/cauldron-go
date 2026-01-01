@@ -26,6 +26,9 @@ export interface PluginInstallConfirmData {
   description: string;
   category: string;
   requiresAuthentication?: boolean;
+  runtimeEnvironments?: string[];
+  hasPythonDeps?: boolean;
+  hasRDeps?: boolean;
 }
 
 export interface PluginInstallConfirmResult {
@@ -103,6 +106,19 @@ export class ConfirmPluginInstallDialog implements OnInit {
       const baseEnvs = this.basePythonEnvironments();
       if (baseEnvs.length > 0) {
         this.form.patchValue({ basePythonPath: baseEnvs[0].path });
+      }
+
+      if (this.data.hasPythonDeps && baseEnvs.length > 0) {
+        this.form.patchValue({ createVenv: true });
+        await this.wails.logToFile(`[ConfirmPluginInstallDialog] Auto-enabled Python venv for plugin with Python dependencies`);
+      }
+
+      if (this.data.hasRDeps && rEnvs.length > 0) {
+        this.form.patchValue({
+          createRenv: true,
+          renvName: `renv-${this.data.id}`
+        });
+        await this.wails.logToFile(`[ConfirmPluginInstallDialog] Auto-enabled R renv for plugin with R dependencies`);
       }
 
       this.form.get('createRenv')?.valueChanges.subscribe((checked: boolean) => {

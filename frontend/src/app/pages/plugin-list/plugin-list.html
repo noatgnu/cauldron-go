@@ -118,15 +118,6 @@
                     Enabled
                   </mat-slide-toggle>
 
-                  @if (plugin.installSource === 'remote' && plugin.repository && hasAvailableUpdate(plugin.id)) {
-                    <button mat-raised-button
-                            color="accent"
-                            (click)="installUpdate(plugin)">
-                      <mat-icon>download</mat-icon>
-                      Install Update
-                    </button>
-                  }
-
                   <button mat-icon-button [matMenuTriggerFor]="pluginMenu" matTooltip="More actions">
                     <mat-icon>more_vert</mat-icon>
                   </button>
@@ -141,16 +132,10 @@
                       <span>Edit Plugin</span>
                     </button>
                     @if (plugin.installSource === 'remote' && plugin.repository) {
-                      @if (!hasAvailableUpdate(plugin.id)) {
-                        <button mat-menu-item (click)="checkForUpdate(plugin)" [disabled]="isCheckingUpdate(plugin.id)">
-                          @if (isCheckingUpdate(plugin.id)) {
-                            <mat-icon class="spin-animation">sync</mat-icon>
-                          } @else {
-                            <mat-icon>update</mat-icon>
-                          }
-                          <span>Check for Updates</span>
-                        </button>
-                      }
+                      <button mat-menu-item (click)="checkForUpdate(plugin)">
+                        <mat-icon>update</mat-icon>
+                        <span>Check for Updates</span>
+                      </button>
                       <button mat-menu-item (click)="reinstallPlugin(plugin)">
                         <mat-icon>restart_alt</mat-icon>
                         <span>Reinstall Plugin</span>

@@ -38,6 +38,12 @@ interface RegistryPlugin {
   created_at: string;
   updated_at: string;
   readme?: string;
+  runtime?: {
+    id: number;
+    plugin: string;
+    type: string;
+    script: string;
+  };
   inputs?: Array<{
     name: string;
     type: string;
@@ -311,6 +317,16 @@ export class PluginRegistryDetail implements OnInit {
 
       await this.wails.logToFile(`[PluginRegistryDetail] Opening install dialog for: ${plugin.name}`);
 
+      const runtimeEnvironments: string[] = [];
+      if (plugin.runtime?.type) {
+        if (plugin.runtime.type.includes('python')) {
+          runtimeEnvironments.push('python');
+        }
+        if (plugin.runtime.type.includes('r') || plugin.runtime.type.includes('R')) {
+          runtimeEnvironments.push('r');
+        }
+      }
+
       const dialogRef = this.dialog.open(ConfirmPluginInstallDialog, {
         width: '600px',
         disableClose: true,
@@ -323,7 +339,8 @@ export class PluginRegistryDetail implements OnInit {
           author: plugin.author?.name || 'Unknown',
           description: plugin.description,
           category: plugin.category?.name || 'Uncategorized',
-          requiresAuthentication: plugin.requires_authentication
+          requiresAuthentication: plugin.requires_authentication,
+          runtimeEnvironments
         }
       });
 

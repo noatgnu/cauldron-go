@@ -1,0 +1,115 @@
+<h2 mat-dialog-title>
+  <mat-icon>system_update</mat-icon>
+  Check for Update
+</h2>
+
+<mat-dialog-content>
+  <div class="plugin-info">
+    <h3>{{ data.plugin.definition.plugin.name }}</h3>
+    <p class="plugin-description">{{ data.plugin.definition.plugin.description }}</p>
+  </div>
+
+  @if (checking()) {
+    <div class="checking-section">
+      <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+      <p class="checking-message">
+        <mat-icon class="spin">sync</mat-icon>
+        Checking for updates...
+      </p>
+    </div>
+  } @else if (updateResult()) {
+    @if (updateResult()!.error) {
+      <mat-card class="error-card">
+        <mat-card-content>
+          <div class="error-content">
+            <mat-icon color="warn">error</mat-icon>
+            <div>
+              <strong>Error</strong>
+              <p>{{ updateResult()!.error }}</p>
+            </div>
+          </div>
+        </mat-card-content>
+      </mat-card>
+    } @else if (updateResult()!.hasUpdate) {
+      <mat-card class="update-available-card">
+        <mat-card-content>
+          <div class="update-header">
+            <mat-icon color="accent">new_releases</mat-icon>
+            <h3>Update Available</h3>
+          </div>
+
+          <div class="commit-info">
+            <div class="commit-row">
+              <span class="commit-label">Current Version:</span>
+              <mat-chip class="commit-chip current">
+                {{ getShortCommit(updateResult()!.currentCommit) }}
+              </mat-chip>
+            </div>
+
+            <div class="arrow-icon">
+              <mat-icon>arrow_downward</mat-icon>
+            </div>
+
+            <div class="commit-row">
+              <span class="commit-label">
+                @if (updateResult()!.recommendedCommit) {
+                  Recommended Version:
+                } @else {
+                  Latest Version:
+                }
+              </span>
+              <mat-chip class="commit-chip new">
+                @if (updateResult()!.recommendedCommit) {
+                  {{ getShortCommit(updateResult()!.recommendedCommit!) }}
+                } @else {
+                  {{ getShortCommit(updateResult()!.latestCommit!) }}
+                }
+              </mat-chip>
+            </div>
+          </div>
+
+          @if (updateResult()!.changelogUrl) {
+            <button mat-stroked-button color="primary" (click)="openChangelog()" class="changelog-button">
+              <mat-icon>description</mat-icon>
+              View Changelog
+            </button>
+          }
+
+          @if (updating()) {
+            <div class="updating-section">
+              <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+              <p class="updating-message">
+                <mat-icon class="spin">sync</mat-icon>
+                Updating plugin...
+              </p>
+            </div>
+          }
+        </mat-card-content>
+      </mat-card>
+    } @else {
+      <mat-card class="up-to-date-card">
+        <mat-card-content>
+          <div class="up-to-date-content">
+            <mat-icon color="primary">check_circle</mat-icon>
+            <div>
+              <strong>Already Up to Date</strong>
+              <p>You are using the latest version ({{ getShortCommit(updateResult()!.currentCommit) }})</p>
+            </div>
+          </div>
+        </mat-card-content>
+      </mat-card>
+    }
+  }
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  @if (!checking() && updateResult() && updateResult()!.hasUpdate && !updating()) {
+    <button mat-button (click)="close()">Cancel</button>
+    <button mat-raised-button color="primary" (click)="proceedWithUpdate()" [disabled]="updating()">
+      <mat-icon>download</mat-icon>
+      Update Plugin
+    </button>
+  } @else if (!updating()) {
+    <button mat-raised-button (click)="close()">Close</button>
+  }
+</mat-dialog-actions>

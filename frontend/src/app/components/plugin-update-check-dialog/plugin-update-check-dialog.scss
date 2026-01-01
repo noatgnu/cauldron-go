@@ -1,0 +1,200 @@
+h2[mat-dialog-title] {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border);
+}
+
+mat-dialog-content {
+  padding: 24px;
+  min-height: 200px;
+}
+
+.plugin-info {
+  margin-bottom: 24px;
+
+  h3 {
+    margin: 0 0 8px 0;
+    font-size: 18px;
+    font-weight: 500;
+  }
+
+  .plugin-description {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+}
+
+.checking-section {
+  text-align: center;
+  padding: 32px 16px;
+
+  mat-progress-bar {
+    margin-bottom: 24px;
+  }
+
+  .checking-message {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin: 0;
+    font-size: 14px;
+    color: var(--text-secondary);
+
+    mat-icon.spin {
+      animation: spin 1s linear infinite;
+    }
+  }
+}
+
+.error-card,
+.update-available-card,
+.up-to-date-card {
+  mat-card-content {
+    padding: 20px;
+  }
+}
+
+.error-content,
+.up-to-date-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+
+  mat-icon {
+    font-size: 32px;
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+  }
+
+  div {
+    flex: 1;
+
+    strong {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 16px;
+    }
+
+    p {
+      margin: 0;
+      font-size: 14px;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+  }
+}
+
+.update-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+
+  mat-icon {
+    font-size: 28px;
+    width: 28px;
+    height: 28px;
+  }
+
+  h3 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 500;
+  }
+}
+
+.commit-info {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 20px;
+
+  .commit-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    background: var(--surface-variant);
+    border-radius: 8px;
+
+    .commit-label {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text-secondary);
+    }
+
+    .commit-chip {
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      font-weight: 600;
+
+      &.current {
+        background: var(--surface);
+        color: var(--text-secondary);
+      }
+
+      &.new {
+        background: var(--primary);
+        color: var(--on-primary);
+      }
+    }
+  }
+
+  .arrow-icon {
+    text-align: center;
+
+    mat-icon {
+      color: var(--primary);
+    }
+  }
+}
+
+.changelog-button {
+  width: 100%;
+  margin-bottom: 16px;
+}
+
+.updating-section {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+
+  mat-progress-bar {
+    margin-bottom: 16px;
+  }
+
+  .updating-message {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin: 0;
+    font-size: 14px;
+    color: var(--text-secondary);
+
+    mat-icon.spin {
+      animation: spin 1s linear infinite;
+    }
+  }
+}
+
+mat-dialog-actions {
+  padding: 16px 24px;
+  border-top: 1px solid var(--border);
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
