@@ -145,9 +145,6 @@ func (s *SettingsService) initializeDefaults() {
 	if s.config.CurtainBackendURL == "" {
 		s.config.CurtainBackendURL = "https://celsus.muttsu.xyz"
 	}
-
-	// Default to false for total isolation
-	s.config.UseRenvCache = false
 }
 
 func (s *SettingsService) DetectPythonPath() (string, error) {

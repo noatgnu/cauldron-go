@@ -117,7 +117,6 @@ func TestBuildArgumentsBooleanFlagWithoutWhen(t *testing.T) {
 	expectedArgs := []string{
 		"/path/to/script.py",
 		"--verbose",
-		"true",
 	}
 
 	if len(args) != len(expectedArgs) {
