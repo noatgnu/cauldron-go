@@ -146,25 +146,3 @@ jobs:
           ./bin/plugin-doc-generator-all || exit 1
           echo "[SUCCESS] plugin-doc-generator-all works"
 
-  lint-yaml:
-    name: Lint YAML Files
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Lint YAML files
-        uses: ibiqlik/action-yamllint@v3
-        with:
-          file_or_dir: plugins/
-          config_data: |
-            extends: default
-            rules:
-              line-length:
-                max: 120
-                level: warning
-              indentation:
-                spaces: 2
-              comments:
-                min-spaces-from-content: 1

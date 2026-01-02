@@ -3,7 +3,6 @@ package services
 import (
 	"context"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -184,20 +183,41 @@ func TestVenvCreationWithExternalPlugin(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create plugins dir: %v", err)
 	}
-	originalWd, _ := os.Getwd()
-	defer os.Chdir(originalWd)
-	os.Chdir(tmpDir)
-	pluginURL := "https://github.com/noatgnu/export_asap_plugin"
-	pluginID := "export_asap_plugin"
+
+	pluginID := "dummy_plugin"
 	pluginPath := filepath.Join(pluginsDir, pluginID)
-	cmd := exec.Command("git", "clone", pluginURL, pluginPath)
-	err = cmd.Run()
+	err = os.MkdirAll(pluginPath, 0755)
 	if err != nil {
-		t.Skipf("Failed to clone plugin for test: %v", err)
+		t.Fatalf("Failed to create dummy plugin dir: %v", err)
 	}
+
+	// Create a dummy plugin.yaml
+	pluginYaml := `
+plugin:
+  id: dummy_plugin
+  name: Dummy Plugin
+execution:
+  requirements:
+    pythonRequirementsFile: requirements.txt
+`
+	err = os.WriteFile(filepath.Join(pluginPath, "plugin.yaml"), []byte(pluginYaml), 0644)
+	if err != nil {
+		t.Fatalf("Failed to write plugin.yaml: %v", err)
+	}
+
+	// Create a dummy requirements.txt with a trivial package that should be installable or effectively no-op if we want
+	// But since we want to avoid network, maybe we skip installation if possible?
+	// However, CreatePythonVirtualEnv logic installs if pluginID is provided.
+	// We'll put a harmless package or empty requirements to test venv creation logic.
+	// Empty requirements.txt should work.
+	err = os.WriteFile(filepath.Join(pluginPath, "requirements.txt"), []byte(""), 0644)
+	if err != nil {
+		t.Fatalf("Failed to write requirements.txt: %v", err)
+	}
+
 	reg := models.PluginRegistry{
 		PluginID:   pluginID,
-		Name:       "Export ASAP",
+		Name:       "Dummy Plugin",
 		FolderPath: pluginPath,
 	}
 	db.GetDB().Create(&reg)

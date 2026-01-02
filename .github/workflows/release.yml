@@ -27,15 +27,19 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
+      - name: Setup Environment for Testing
+        shell: pwsh
+        run: |
+          echo "Setting up portable Python and R for testing..."
+          Invoke-WebRequest -Uri https://github.com/indygreg/python-build-standalone/releases/download/20241016/cpython-3.11.10+20241016-x86_64-pc-windows-msvc-shared-install_only.tar.gz -OutFile python-standalone.tar.gz
+          New-Item -ItemType Directory -Force -Path "${{ github.workspace }}/python"
+          tar -xzf python-standalone.tar.gz -C "${{ github.workspace }}/python"
+          echo "${{ github.workspace }}/python/python" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
-      - name: Setup R
-        uses: r-lib/actions/setup-r@v2
-        with:
-          r-version: '4.3.3'
+          Invoke-WebRequest -Uri https://cran.r-project.org/bin/windows/base/old/4.5.1/R-4.5.1-win.exe -OutFile R-Installer.exe
+          Start-Process -FilePath R-Installer.exe -ArgumentList "/VERYSILENT", "/DIR=${{ github.workspace }}/R" -Wait
+          echo "${{ github.workspace }}/R/bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          echo "R_HOME=${{ github.workspace }}/R" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Install Wails
         run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.11.0
@@ -113,19 +117,21 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
+      - name: Setup Environment for Testing
+        run: |
+          echo "Setting up portable Python and R for testing..."
+          mkdir -p "${{ github.workspace }}/python"
+          curl -sL "https://github.com/indygreg/python-build-standalone/releases/download/20241016/cpython-3.11.10+20241016-x86_64-unknown-linux-gnu-install_only.tar.gz" | tar -xzf - -C "${{ github.workspace }}/python"
+          echo "${{ github.workspace }}/python/bin" >> $GITHUB_PATH
 
-      - name: Setup R
-        uses: r-lib/actions/setup-r@v2
-        with:
-          r-version: '4.3.3'
+          sudo apt-get update
+          sudo apt-get install -y r-base python3-venv
+          echo "R_HOME=/usr/lib/R" >> $GITHUB_ENV # Assuming default R location after apt-get
+          echo "R_LIBS_USER=${{ github.workspace }}/R_libs" >> $GITHUB_ENV # Custom lib path for renv
+          mkdir -p "${{ github.workspace }}/R_libs"
 
       - name: Install dependencies
         run: |
-          sudo apt-get update
           sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
 
       - name: Link WebKitGTK 4.0 for pkg-config
@@ -209,15 +215,18 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
+      - name: Setup Environment for Testing
+        run: |
+          echo "Setting up portable Python and R for testing..."
+          mkdir -p "${{ github.workspace }}/python"
+          curl -sL "https://github.com/indygreg/python-build-standalone/releases/download/20241016/cpython-3.11.10+20241016-x86_64-apple-darwin-install_only.tar.gz" | tar -xzf - -C "${{ github.workspace }}/python"
+          echo "${{ github.workspace }}/python/bin" >> $GITHUB_PATH
 
-      - name: Setup R
-        uses: r-lib/actions/setup-r@v2
-        with:
-          r-version: '4.3.3'
+          brew install r
+          echo "/usr/local/opt/r/bin" >> $GITHUB_PATH # Assuming default brew R location
+          echo "R_HOME=/usr/local/opt/r/lib/R" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          echo "R_LIBS_USER=${{ github.workspace }}/R_libs" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          mkdir -p "${{ github.workspace }}/R_libs"
 
       - name: Install Wails
         run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.11.0
@@ -285,15 +294,18 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
+      - name: Setup Environment for Testing
+        run: |
+          echo "Setting up portable Python and R for testing..."
+          mkdir -p "${{ github.workspace }}/python"
+          curl -sL "https://github.com/indygreg/python-build-standalone/releases/download/20241016/cpython-3.11.10+20241016-aarch64-apple-darwin-install_only.tar.gz" | tar -xzf - -C "${{ github.workspace }}/python"
+          echo "${{ github.workspace }}/python/bin" >> $GITHUB_PATH
 
-      - name: Setup R
-        uses: r-lib/actions/setup-r@v2
-        with:
-          r-version: '4.3.3'
+          brew install r
+          echo "/opt/homebrew/opt/r/bin" >> $GITHUB_PATH # Assuming default brew R location for arm64
+          echo "R_HOME=/opt/homebrew/opt/r/lib/R" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          echo "R_LIBS_USER=${{ github.workspace }}/R_libs" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          mkdir -p "${{ github.workspace }}/R_libs"
 
       - name: Install Wails
         run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.11.0

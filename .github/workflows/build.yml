@@ -77,15 +77,18 @@ jobs:
         with:
           go-version: '1.21'
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
+      - name: Setup Environment for Testing
+        run: |
+          echo "Setting up portable Python and R for testing..."
+          mkdir -p "${{ github.workspace }}/python"
+          curl -sL "https://github.com/indygreg/python-build-standalone/releases/download/20241016/cpython-3.11.10+20241016-x86_64-unknown-linux-gnu-install_only.tar.gz" | tar -xzf - -C "${{ github.workspace }}/python"
+          echo "${{ github.workspace }}/python/bin" >> $GITHUB_PATH
 
-      - name: Setup R
-        uses: r-lib/actions/setup-r@v2
-        with:
-          r-version: '4.3.3'
+          sudo apt-get update
+          sudo apt-get install -y r-base python3-venv
+          echo "R_HOME=/usr/lib/R" >> $GITHUB_ENV # Assuming default R location after apt-get
+          echo "R_LIBS_USER=${{ github.workspace }}/R_libs" >> $GITHUB_ENV # Custom lib path for renv
+          mkdir -p "${{ github.workspace }}/R_libs"
 
       - name: Build developer tools
         run: ./build.sh tools
