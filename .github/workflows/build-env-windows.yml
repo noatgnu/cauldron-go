@@ -51,7 +51,7 @@ jobs:
     - name: Install R packages
       env:
         R_LIBS_USER: ${{ github.workspace }}/bin/win/R-Portable/library
-      run: ${{ github.workspace }}/bin/win/R-Portable/bin/Rscript.exe scripts/r/install_packages.R
+      run: ${{ github.workspace }}/bin/win/R-Portable/bin/Rscript.exe backend/scripts/r/install_packages.R
 
     - name: Download Portable Python 3.11
       run: |

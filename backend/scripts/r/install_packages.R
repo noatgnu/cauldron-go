@@ -10,7 +10,7 @@ if (!requireNamespace("BiocManager", quietly = TRUE)) {
 }
 
 # Read the package list
-packages <- read.table("app/r_requirements.txt", stringsAsFactors = FALSE)
+packages <- read.table("scripts/r_requirements.txt", stringsAsFactors = FALSE)
 
 # Attempt to install all packages using BiocManager
 for (i in 1:nrow(packages)) {

@@ -96,7 +96,7 @@ jobs:
           C_INCLUDE_PATH: /usr/include
           LIBRARY_PATH: /usr/lib
           R_HOME: ${{ github.workspace }}/bin/linux/R-Portable
-        run: ${{ github.workspace }}/bin/linux/R-Portable/bin/Rscript scripts/r/install_packages.R
+        run: ${{ github.workspace }}/bin/linux/R-Portable/bin/Rscript backend/scripts/r/install_packages.R
 
       - name: Download Portable Python
         run: |

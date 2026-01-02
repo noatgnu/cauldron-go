@@ -94,7 +94,7 @@ jobs:
           PKG_CONFIG_PATH: /opt/homebrew/opt/jpeg/lib/pkgconfig
           C_INCLUDE_PATH: /opt/homebrew/Cellar/lzo/2.10/include/lzo:/opt/homebrew/Cellar/lzo/2.10/include/
           LIBRARY_PATH: /opt/homebrew/lib
-        run: ${{ github.workspace }}/bin/darwin/R-Portable/bin/Rscript scripts/r/install_packages.R
+        run: ${{ github.workspace }}/bin/darwin/R-Portable/bin/Rscript backend/scripts/r/install_packages.R
 
       - name: Download Portable Python
         run: |
