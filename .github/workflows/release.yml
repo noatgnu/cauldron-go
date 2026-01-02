@@ -99,7 +99,17 @@ jobs:
           cp -r scripts build/bin/
           cp -r plugins build/bin/
           mkdir -p build/bin/tools
-          cp -r bin/* build/bin/tools/
+          if [ -f bin/plugin-validator.exe ]; then cp bin/plugin-validator.exe build/bin/tools/; fi
+          if [ -f bin/plugin-doc-generator.exe ]; then cp bin/plugin-doc-generator.exe build/bin/tools/; fi
+          if [ -f bin/plugin-doc-generator-all.exe ]; then cp bin/plugin-doc-generator-all.exe build/bin/tools/; fi
+          if [ -f bin/plugin-scaffolder.exe ]; then cp bin/plugin-scaffolder.exe build/bin/tools/; fi
+          if [ -d bin/external ]; then cp -r bin/external build/bin/tools/; fi
+        shell: bash
+
+      - name: Check archive size before compression
+        run: |
+          du -sh build/bin/ || echo "du not available, using dir"
+          if ! command -v du &> /dev/null; then dir build/bin; fi
         shell: bash
 
       - name: Create Archive
@@ -245,13 +255,25 @@ jobs:
           cd ..
           wails build -platform linux/amd64
 
+      - name: Clean up test environments
+        run: |
+          rm -rf R python R-4.5.2 R-4.5.2.tar.gz cpython*.tar.gz
+
       - name: Copy Resources
         run: |
           cp -r examples build/bin/
           cp -r scripts build/bin/
           cp -r plugins build/bin/
           mkdir -p build/bin/tools
-          cp -r bin/* build/bin/tools/
+          if [ -f bin/plugin-validator ]; then cp bin/plugin-validator build/bin/tools/; fi
+          if [ -f bin/plugin-doc-generator ]; then cp bin/plugin-doc-generator build/bin/tools/; fi
+          if [ -f bin/plugin-doc-generator-all ]; then cp bin/plugin-doc-generator-all build/bin/tools/; fi
+          if [ -f bin/plugin-scaffolder ]; then cp bin/plugin-scaffolder build/bin/tools/; fi
+          if [ -d bin/external ]; then cp -r bin/external build/bin/tools/; fi
+
+      - name: Check archive size before compression
+        run: |
+          du -sh build/bin/
 
       - name: Create Archive
         run: |
@@ -371,13 +393,25 @@ jobs:
       - name: Verify Build
         run: ls -l build/bin/
 
+      - name: Clean up test environments
+        run: |
+          rm -rf R python R-4.5.2 R-4.5.2.tar.gz cpython*.tar.gz
+
       - name: Copy Resources
         run: |
           cp -r examples build/bin/
           cp -r scripts build/bin/
           cp -r plugins build/bin/
           mkdir -p build/bin/tools
-          cp -r bin/* build/bin/tools/
+          if [ -f bin/plugin-validator ]; then cp bin/plugin-validator build/bin/tools/; fi
+          if [ -f bin/plugin-doc-generator ]; then cp bin/plugin-doc-generator build/bin/tools/; fi
+          if [ -f bin/plugin-doc-generator-all ]; then cp bin/plugin-doc-generator-all build/bin/tools/; fi
+          if [ -f bin/plugin-scaffolder ]; then cp bin/plugin-scaffolder build/bin/tools/; fi
+          if [ -d bin/external ]; then cp -r bin/external build/bin/tools/; fi
+
+      - name: Check archive size before compression
+        run: |
+          du -sh build/bin/
 
       - name: Create Archive
         run: |
@@ -404,7 +438,6 @@ jobs:
           files: |
             cauldron-windows-amd64/cauldron-windows-amd64.zip
             cauldron-linux-amd64/cauldron-linux-amd64.tar.xz
-            cauldron-darwin-amd64/cauldron-darwin-amd64.tar.xz
             cauldron-darwin-arm64/cauldron-darwin-arm64.tar.xz
           draft: false
           prerelease: false
