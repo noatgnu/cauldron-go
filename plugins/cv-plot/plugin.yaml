@@ -1,3 +1,4 @@
+---
 plugin:
   id: "cv-plot"
   name: "Coefficient of Variation Plot"

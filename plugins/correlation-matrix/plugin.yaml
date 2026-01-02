@@ -1,3 +1,4 @@
+---
 plugin:
   id: "correlation-matrix"
   name: "Correlation Matrix"

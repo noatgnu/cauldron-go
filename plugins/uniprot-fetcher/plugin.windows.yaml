@@ -1,3 +1,4 @@
+---
 plugin:
   id: "uniprot-fetcher"
   name: "UniProt Data Retrieval"

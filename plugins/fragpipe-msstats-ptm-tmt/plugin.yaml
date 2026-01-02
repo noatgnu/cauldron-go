@@ -1,3 +1,4 @@
+---
 plugin:
   id: "fragpipe-msstats-ptm-tmt"
   name: "FragPipe MSstatsPTM TMT Analysis"

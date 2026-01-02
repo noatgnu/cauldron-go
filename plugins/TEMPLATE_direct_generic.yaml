@@ -1,3 +1,4 @@
+---
 plugin:
   id: "template-direct-executable"
   name: "Direct Executable Template"

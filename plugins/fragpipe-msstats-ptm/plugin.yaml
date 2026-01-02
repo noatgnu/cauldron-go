@@ -1,3 +1,4 @@
+---
 plugin:
   id: "fragpipe-msstats-ptm"
   name: "FragPipe MSstatsPTM Analysis"

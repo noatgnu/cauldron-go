@@ -1,3 +1,4 @@
+---
 plugin:
   id: "spectronaut-msstats-ptm-tmt"
   name: "Spectronaut MSstatsPTM TMT Analysis"

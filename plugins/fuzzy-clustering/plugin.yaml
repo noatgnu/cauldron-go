@@ -1,3 +1,4 @@
+---
 plugin:
   id: "fuzzy-clustering"
   name: "Fuzzy C-Means Clustering"

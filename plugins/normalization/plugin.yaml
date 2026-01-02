@@ -1,3 +1,4 @@
+---
 plugin:
   id: "normalization"
   name: "Data Normalization"

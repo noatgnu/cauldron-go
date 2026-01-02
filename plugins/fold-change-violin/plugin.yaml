@@ -1,3 +1,4 @@
+---
 plugin:
   id: "fold-change-violin"
   name: "Fold Change Violin Plot"

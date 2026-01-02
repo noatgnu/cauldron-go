@@ -1,3 +1,4 @@
+---
 plugin:
   id: "batch-correction"
   name: "Batch Effect Correction"

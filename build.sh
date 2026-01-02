@@ -174,28 +174,33 @@ build_dev_tools() {
 
     mkdir -p "$PROJECT_ROOT/bin"
 
-    if go build -o bin/plugin-validator ./cmd/plugin-validator; then
+    local exe_ext=""
+    if [ "$(go env GOOS)" = "windows" ]; then
+        exe_ext=".exe"
+    fi
+
+    if go build -o "bin/plugin-validator$exe_ext" ./cmd/plugin-validator; then
         print_success "Built plugin-validator"
     else
         print_error "Failed to build plugin-validator"
         return 1
     fi
 
-    if go build -o bin/plugin-doc-generator ./cmd/plugin-doc-generator; then
+    if go build -o "bin/plugin-doc-generator$exe_ext" ./cmd/plugin-doc-generator; then
         print_success "Built plugin-doc-generator"
     else
         print_error "Failed to build plugin-doc-generator"
         return 1
     fi
 
-    if go build -o bin/plugin-doc-generator-all ./cmd/plugin-doc-generator-all; then
+    if go build -o "bin/plugin-doc-generator-all$exe_ext" ./cmd/plugin-doc-generator-all; then
         print_success "Built plugin-doc-generator-all"
     else
         print_error "Failed to build plugin-doc-generator-all"
         return 1
     fi
 
-    if go build -o bin/plugin-scaffolder ./cmd/plugin-scaffolder; then
+    if go build -o "bin/plugin-scaffolder$exe_ext" ./cmd/plugin-scaffolder; then
         print_success "Built plugin-scaffolder"
     else
         print_error "Failed to build plugin-scaffolder"

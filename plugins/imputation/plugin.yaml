@@ -1,3 +1,4 @@
+---
 plugin:
   id: "imputation"
   name: "Missing Value Imputation"

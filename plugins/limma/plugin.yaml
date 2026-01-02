@@ -1,3 +1,4 @@
+---
 plugin:
   id: "limma"
   name: "Limma Differential Expression"

@@ -1,3 +1,4 @@
+---
 plugin:
   id: "maxquant-msstats-ptm-tmt"
   name: "MaxQuant MSstatsPTM TMT Analysis"
