@@ -8,7 +8,9 @@ import (
 	"encoding/pem"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
+	"time"
 
 	"golang.org/x/crypto/ssh"
 	"gorm.io/driver/sqlite"
@@ -69,21 +71,48 @@ func createTestDatabaseForGitAuth(t *testing.T) *DatabaseService {
 	tmpDir := t.TempDir()
 	dbPath := filepath.Join(tmpDir, "test.db")
 
-	db, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{
+	db, err := gorm.Open(sqlite.Open(dbPath+"?_journal_mode=DELETE"), &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Silent),
 	})
 	if err != nil {
 		t.Fatalf("failed to create test database: %v", err)
 	}
 
+	sqlDB, err := db.DB()
+	if err != nil {
+		t.Fatalf("Failed to get underlying DB: %v", err)
+	}
+	sqlDB.SetMaxOpenConns(1)
+
 	if err := db.AutoMigrate(&GitAuthConfig{}); err != nil {
 		t.Fatalf("failed to migrate database: %v", err)
 	}
 
-	return &DatabaseService{
+	service := &DatabaseService{
 		ctx: context.Background(),
 		db:  db,
 	}
+
+	t.Cleanup(func() {
+		sqlDB, closeErr := service.db.DB()
+		if closeErr != nil {
+			t.Logf("Error getting underlying DB for cleanup: %v", closeErr)
+			return
+		}
+		if sqlDB != nil {
+			if runtime.GOOS == "windows" {
+				service.db.Exec("PRAGMA wal_checkpoint(TRUNCATE)")
+			}
+			if closeErr := sqlDB.Close(); closeErr != nil {
+				t.Logf("Error closing database in cleanup: %v", closeErr)
+			}
+		}
+		if runtime.GOOS == "windows" {
+			time.Sleep(500 * time.Millisecond)
+		}
+	})
+
+	return service
 }
 
 func TestNewGitAuthService(t *testing.T) {
