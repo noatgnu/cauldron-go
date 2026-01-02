@@ -36,9 +36,14 @@ func NewProgressNotifier(ctx context.Context) *ProgressNotifier {
 }
 
 func (p *ProgressNotifier) Emit(notification ProgressNotification) {
-	if p.ctx.Value("wails-test") != nil {
+	if p.ctx == nil || p.ctx.Value("wails-test") != nil {
 		return
 	}
+	defer func() {
+		if r := recover(); r != nil {
+			return
+		}
+	}()
 	runtime.EventsEmit(p.ctx, "progress", notification)
 }
 

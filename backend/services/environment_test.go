@@ -14,9 +14,10 @@ import (
 
 func createTestEnvironmentService(t *testing.T) (*EnvironmentService, *DatabaseService, *SettingsService) {
 	db := createTestDB(t)
-	settings := NewSettingsService(context.Background(), db)
-	progress := NewProgressNotifier(context.Background())
-	envService := NewEnvironmentService(context.Background(), db, settings, progress)
+	ctx := context.WithValue(context.Background(), "wails-test", true)
+	settings := NewSettingsService(ctx, db)
+	progress := NewProgressNotifier(ctx)
+	envService := NewEnvironmentService(ctx, db, settings, progress)
 	return envService, db, settings
 }
 
