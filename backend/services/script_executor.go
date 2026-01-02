@@ -91,25 +91,34 @@ func (s *ScriptExecutor) ExecutePythonScript(ctx context.Context, jobID string, 
 	// Check for plugin-specific venv binding
 	binding, err := s.db.GetPluginEnvironmentBinding(config.Type, "python")
 	if err != nil {
+		log.Printf("[ExecutePythonScript] No binding found for plugin %s (type: %s): %v", jobID, config.Type, err)
+	} else {
+		log.Printf("[ExecutePythonScript] Found binding for plugin %s: %s", jobID, binding.EnvironmentPath)
 	}
 
 	if binding != nil && binding.EnvironmentPath != "" {
-		// Use bound venv
-		venvPath := binding.EnvironmentPath
-
-		// Construct Python executable path from venv
-		if runtime.GOOS == "windows" {
-			pythonPath = filepath.Join(venvPath, "Scripts", "python.exe")
+		// Check if the bound path is already a file (the executable)
+		fileInfo, err := os.Stat(binding.EnvironmentPath)
+		if err == nil && !fileInfo.IsDir() {
+			pythonPath = binding.EnvironmentPath
+			envInfo = fmt.Sprintf("Python (Bound): %s", pythonPath)
 		} else {
-			pythonPath = filepath.Join(venvPath, "bin", "python")
+			// Assume it's a venv root directory
+			venvPath := binding.EnvironmentPath
+
+			// Construct Python executable path from venv
+			if runtime.GOOS == "windows" {
+				pythonPath = filepath.Join(venvPath, "Scripts", "python.exe")
+			} else {
+				pythonPath = filepath.Join(venvPath, "bin", "python")
+			}
+			envInfo = fmt.Sprintf("Python (Bound venv): %s", venvPath)
 		}
 
 		// Verify the Python executable exists
 		if _, err := os.Stat(pythonPath); err != nil {
-			log.Printf("[ExecutePythonScript] Warning: Bound venv Python not found at %s, falling back to global Python", pythonPath)
+			log.Printf("[ExecutePythonScript] Warning: Bound Python not found at %s, falling back to global Python", pythonPath)
 			pythonPath = ""
-		} else {
-			envInfo = fmt.Sprintf("Python (Bound venv): %s", venvPath)
 		}
 	}
 
@@ -198,6 +207,9 @@ func (s *ScriptExecutor) ExecuteRScript(ctx context.Context, jobID string, confi
 	// Check for plugin-specific renv binding
 	binding, err := s.db.GetPluginEnvironmentBinding(config.Type, "r")
 	if err != nil {
+		log.Printf("[ExecuteRScript] No binding found for plugin %s (type: %s): %v", jobID, config.Type, err)
+	} else {
+		log.Printf("[ExecuteRScript] Found binding for plugin %s: ID=%d", jobID, binding.EnvironmentID)
 	}
 
 	var renvProjectPath string

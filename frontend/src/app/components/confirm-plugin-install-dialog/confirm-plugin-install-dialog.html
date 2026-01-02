@@ -90,7 +90,7 @@
       </div>
     </mat-expansion-panel>
 
-    <mat-expansion-panel class="env-panel">
+    <mat-expansion-panel class="env-panel" [expanded]="data.hasPythonDeps || data.hasRDeps">
       <mat-expansion-panel-header>
         <mat-panel-title>Environment Setup (Optional)</mat-panel-title>
         <mat-panel-description>Create virtual environments for this plugin</mat-panel-description>

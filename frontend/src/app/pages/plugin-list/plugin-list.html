@@ -72,6 +72,9 @@
                   <mat-icon mat-card-avatar>{{ plugin.definition.plugin.icon || 'extension' }}</mat-icon>
                   <mat-card-title>
                     {{ plugin.definition.plugin.name }}
+                    @if (hasCustomBinding(plugin.id)) {
+                      <mat-icon class="binding-indicator" [matTooltip]="getBindingTooltip(plugin.id)" color="accent">link</mat-icon>
+                    }
                   </mat-card-title>
                   <mat-card-subtitle>
                     v{{ plugin.definition.plugin.version }}
@@ -118,6 +121,11 @@
                     Enabled
                   </mat-slide-toggle>
 
+                  <button mat-button color="primary" (click)="navigateToPlugin(plugin.id)">
+                    <mat-icon>play_arrow</mat-icon>
+                    Run
+                  </button>
+
                   <button mat-icon-button [matMenuTriggerFor]="pluginMenu" matTooltip="More actions">
                     <mat-icon>more_vert</mat-icon>
                   </button>
@@ -147,11 +155,6 @@
                       </button>
                     }
                   </mat-menu>
-
-                  <button mat-button color="primary" (click)="navigateToPlugin(plugin.id)">
-                    <mat-icon>play_arrow</mat-icon>
-                    Run
-                  </button>
                 </mat-card-actions>
               </mat-card>
             }

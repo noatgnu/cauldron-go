@@ -211,12 +211,65 @@
       flex-shrink: 0;
     }
 
-    .plugin-name {
+    .name-content {
       flex: 1;
       min-width: 0;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+
+      .plugin-name {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .runtime-chips {
+        display: flex;
+        gap: 4px;
+        flex-wrap: wrap;
+        max-width: 100%;
+        overflow: hidden;
+
+        .runtime-chip-inline {
+          font-size: 10px !important;
+          min-height: 18px !important;
+          height: 18px !important;
+          text-transform: capitalize;
+          flex-shrink: 0;
+
+          ::ng-deep {
+            .mat-mdc-chip-action {
+              padding: 0 6px !important;
+              min-height: 18px !important;
+            }
+
+            .mat-mdc-chip-action-label {
+              font-size: 10px !important;
+              line-height: 18px !important;
+              color: var(--on-surface-variant) !important;
+            }
+
+            .mdc-evolution-chip__graphic,
+            .mdc-evolution-chip__action--primary {
+              padding: 0 !important;
+            }
+
+            .mdc-evolution-chip__cell--primary {
+              padding-left: 6px !important;
+              padding-right: 6px !important;
+            }
+          }
+
+          .runtime-icon-inline {
+            font-size: 12px !important;
+            width: 12px !important;
+            height: 12px !important;
+            color: var(--on-surface-variant) !important;
+            margin-right: 2px !important;
+          }
+        }
+      }
     }
 
     .auth-icon {

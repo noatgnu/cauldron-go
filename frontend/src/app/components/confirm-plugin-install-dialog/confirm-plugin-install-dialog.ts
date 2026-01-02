@@ -90,6 +90,7 @@ export class ConfirmPluginInstallDialog implements OnInit {
   }
 
   async ngOnInit() {
+    await this.wails.logToFile(`[ConfirmPluginInstallDialog] Dialog initialized with data: hasPythonDeps=${this.data.hasPythonDeps}, hasRDeps=${this.data.hasRDeps}`);
     await this.loadEnvironments();
   }
 
@@ -104,21 +105,35 @@ export class ConfirmPluginInstallDialog implements OnInit {
       this.rEnvironments.set(rEnvs || []);
 
       const baseEnvs = this.basePythonEnvironments();
+      await this.wails.logToFile(`[ConfirmPluginInstallDialog] Detected ${baseEnvs.length} base Python environments and ${rEnvs.length} R environments`);
+
       if (baseEnvs.length > 0) {
         this.form.patchValue({ basePythonPath: baseEnvs[0].path });
       }
 
+      await this.wails.logToFile(`[ConfirmPluginInstallDialog] Checking Python deps - hasPythonDeps: ${this.data.hasPythonDeps}, baseEnvsAvailable: ${baseEnvs.length > 0}`);
+
       if (this.data.hasPythonDeps && baseEnvs.length > 0) {
+        await this.wails.logToFile(`[ConfirmPluginInstallDialog] Auto-enabling Python venv`);
         this.form.patchValue({ createVenv: true });
+        await this.wails.logToFile(`[ConfirmPluginInstallDialog] Form value after patch - createVenv: ${this.form.value.createVenv}`);
         await this.wails.logToFile(`[ConfirmPluginInstallDialog] Auto-enabled Python venv for plugin with Python dependencies`);
+      } else if (this.data.hasPythonDeps && baseEnvs.length === 0) {
+        await this.wails.logToFile(`[ConfirmPluginInstallDialog] Python deps detected but no base Python environments available`);
       }
 
+      await this.wails.logToFile(`[ConfirmPluginInstallDialog] Checking R deps - hasRDeps: ${this.data.hasRDeps}, rEnvsAvailable: ${rEnvs.length > 0}`);
+
       if (this.data.hasRDeps && rEnvs.length > 0) {
+        await this.wails.logToFile(`[ConfirmPluginInstallDialog] Auto-enabling R renv`);
         this.form.patchValue({
           createRenv: true,
           renvName: `renv-${this.data.id}`
         });
+        await this.wails.logToFile(`[ConfirmPluginInstallDialog] Form value after R patch - createRenv: ${this.form.value.createRenv}`);
         await this.wails.logToFile(`[ConfirmPluginInstallDialog] Auto-enabled R renv for plugin with R dependencies`);
+      } else if (this.data.hasRDeps && rEnvs.length === 0) {
+        await this.wails.logToFile(`[ConfirmPluginInstallDialog] R deps detected but no R environments available`);
       }
 
       this.form.get('createRenv')?.valueChanges.subscribe((checked: boolean) => {

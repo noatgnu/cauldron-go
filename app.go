@@ -1786,6 +1786,37 @@ func (a *App) GetPluginRequirements(pluginID string) (*PluginRequirementsInfo, e
 	return info, nil
 }
 
+func (a *App) FetchPluginDependencies(repoURL string) (map[string]interface{}, error) {
+	log.Printf("[App] Fetching plugin dependencies from repo: %s", repoURL)
+
+	pluginInfo, err := a.pluginInstaller.FetchPluginInfo(repoURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch plugin info: %w", err)
+	}
+
+	hasPythonDeps := false
+	hasRDeps := false
+
+	hasPythonDeps = pluginInfo.Execution.Requirements.PythonRequirementsFile != "" ||
+		(len(pluginInfo.Execution.Requirements.Packages) > 0 && pluginInfo.Runtime.HasEnvironment("python"))
+	hasRDeps = pluginInfo.Execution.Requirements.RPackagesFile != "" ||
+		(pluginInfo.Execution.Requirements.R != "" && pluginInfo.Runtime.HasEnvironment("r"))
+
+	result := map[string]interface{}{
+		"hasPythonDeps":       hasPythonDeps,
+		"hasRDeps":            hasRDeps,
+		"runtimeEnvironments": pluginInfo.Runtime.Environments,
+		"name":                pluginInfo.Plugin.Name,
+		"id":                  pluginInfo.Plugin.ID,
+		"version":             pluginInfo.Plugin.Version,
+		"author":              pluginInfo.Plugin.Author,
+		"description":         pluginInfo.Plugin.Description,
+		"category":            pluginInfo.Plugin.Category,
+	}
+
+	return result, nil
+}
+
 func (a *App) InstallPluginRequirements(pluginID string) error {
 	log.Printf("[App] Installing requirements for plugin: %s", pluginID)
 

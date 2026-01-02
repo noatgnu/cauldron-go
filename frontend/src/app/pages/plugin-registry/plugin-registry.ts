@@ -46,8 +46,10 @@ interface RegistryPlugin {
     name: string;
   }>;
   runtime?: {
-    type: string;
-    script: string;
+    id: number;
+    plugin: string;
+    environments: string[];
+    entrypoint: string;
   };
   inputs?: any[];
   outputs?: any[];
@@ -234,12 +236,37 @@ export class PluginRegistry implements OnInit {
 
   async installPlugin(plugin: RegistryPlugin): Promise<void> {
     try {
+      await this.wails.logToFile('========================================');
       await this.wails.logToFile(`[PluginRegistry] Install button clicked for: ${plugin.name}`);
 
       if (!plugin.repository) {
         this.notification.showError('This plugin does not have a repository URL');
         return;
       }
+
+      await this.wails.logToFile(`[PluginRegistry] Plugin name: ${plugin.name}, repository: ${plugin.repository}`);
+      await this.wails.logToFile(`[PluginRegistry] Fetching plugin dependencies for: ${plugin.name}`);
+
+      let hasPythonDeps = false;
+      let hasRDeps = false;
+      let runtimeEnvironments: string[] = [];
+
+      try {
+        const deps = await this.wails.fetchPluginDependencies(plugin.repository);
+        await this.wails.logToFile(`[PluginRegistry] Raw deps response: ${JSON.stringify(deps)}`);
+        hasPythonDeps = deps['hasPythonDeps'] === true;
+        hasRDeps = deps['hasRDeps'] === true;
+        runtimeEnvironments = deps['runtimeEnvironments'] || [];
+        await this.wails.logToFile(`[PluginRegistry] After assignment - Python: ${hasPythonDeps}, R: ${hasRDeps}, envs: ${runtimeEnvironments.join(',')}`);
+      } catch (error) {
+        await this.wails.logToFile(`[PluginRegistry] Failed to fetch dependencies: ${error}`);
+        if (plugin.runtime?.environments) {
+          runtimeEnvironments = plugin.runtime.environments;
+        }
+      }
+
+      await this.wails.logToFile(`[PluginRegistry] Opening install dialog for: ${plugin.name}`);
+      await this.wails.logToFile(`[PluginRegistry] Dialog data - hasPythonDeps: ${hasPythonDeps}, hasRDeps: ${hasRDeps}, runtimeEnvs: ${runtimeEnvironments.join(', ')}`);
 
       const dialogRef = this.dialog.open(ConfirmPluginInstallDialog, {
         width: '600px',
@@ -253,7 +280,10 @@ export class PluginRegistry implements OnInit {
           author: plugin.author?.name || 'Unknown',
           description: plugin.description,
           category: plugin.category?.name || 'Uncategorized',
-          requiresAuthentication: plugin.requires_authentication
+          requiresAuthentication: plugin.requires_authentication,
+          runtimeEnvironments,
+          hasPythonDeps,
+          hasRDeps
         }
       });
 
@@ -321,5 +351,32 @@ export class PluginRegistry implements OnInit {
            icon.startsWith('https://') ||
            icon.startsWith('/') ||
            icon.includes('.');
+  }
+
+  getRuntimeEnvironments(plugin: RegistryPlugin): string[] {
+    if (!plugin.runtime?.environments) {
+      return [];
+    }
+
+    return plugin.runtime.environments.map(env =>
+      env.charAt(0).toUpperCase() + env.slice(1)
+    );
+  }
+
+  getRuntimeIcon(env: string): string {
+    switch (env.toLowerCase()) {
+      case 'python':
+        return 'adb';
+      case 'r':
+        return 'functions';
+      case 'julia':
+        return 'code';
+      case 'node':
+        return 'javascript';
+      case 'docker':
+        return 'dock';
+      default:
+        return 'terminal';
+    }
   }
 }

@@ -154,19 +154,11 @@ export class Sidenav implements OnInit {
     }
 
     const query = this.searchQuery().toLowerCase().trim();
-    const staticItems: NavItem[] = [
-      { label: 'Plugin Registry', icon: 'cloud', route: '/plugin-registry' }
-    ];
     const sourceItems = this.pluginNavItems();
-    const allItems = [...staticItems, ...sourceItems];
 
     if (!query) {
-      return allItems;
+      return sourceItems;
     }
-
-    const filteredStatic = staticItems.filter(item =>
-      item.label.toLowerCase().includes(query)
-    );
 
     const filteredPlugins = sourceItems.map(item => {
       if (item.children) {
@@ -188,7 +180,7 @@ export class Sidenav implements OnInit {
       }
     }).filter(item => item !== null) as NavItem[];
 
-    return [...filteredStatic, ...filteredPlugins];
+    return filteredPlugins;
   });
 
   constructor(

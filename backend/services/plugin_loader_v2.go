@@ -235,6 +235,10 @@ func (l *PluginLoaderV2) validateDefinition(def *models.PluginDefinition) error 
 		}
 	}
 
+	if def.Execution.ArgsMapping == nil {
+		def.Execution.ArgsMapping = make(map[string]interface{})
+	}
+
 	inputNames := make(map[string]bool)
 	for _, input := range def.Inputs {
 		if input.Name == "" {
@@ -247,6 +251,10 @@ func (l *PluginLoaderV2) validateDefinition(def *models.PluginDefinition) error 
 
 		if input.Type == "" {
 			return fmt.Errorf("input type is required for: %s", input.Name)
+		}
+
+		if _, exists := def.Execution.ArgsMapping[input.Name]; !exists {
+			def.Execution.ArgsMapping[input.Name] = fmt.Sprintf("--%s", input.Name)
 		}
 	}
 

@@ -1,0 +1,26 @@
+<div class="boiling-progress-container" 
+     role="progressbar" 
+     [attr.aria-valuenow]="mode() === 'determinate' ? value() : null" 
+     aria-valuemin="0" 
+     aria-valuemax="100"
+     [class.indeterminate]="mode() === 'indeterminate'">
+  
+  <div class="progress-track"></div>
+  
+  <div class="progress-fill" [style.width.%]="mode() === 'determinate' ? value() : null">
+    <div class="liquid-surface"></div>
+    <div class="bubbles-container">
+      @for (bubble of bubbles; track $index) {
+        <div class="bubble" 
+             [style.left.%]="bubble.left" 
+             [style.animation-duration]="bubble.duration" 
+             [style.animation-delay]="bubble.delay">
+        </div>
+      }
+    </div>
+  </div>
+
+  @if (displayValue() && mode() === 'determinate') {
+    <div class="progress-label">{{ value() }}%</div>
+  }
+</div>

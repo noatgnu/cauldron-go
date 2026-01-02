@@ -24,6 +24,7 @@ import { PluginPlot } from './plugin-plot/plugin-plot';
 import { GenericPlot } from './generic-plot/generic-plot';
 import { SampleAnnotation, SampleAnnotationData } from '../../components/sample-annotation/sample-annotation';
 import { Annotation, AnnotationService } from '../../core/services/annotation.service';
+import { NotificationService } from '../../core/services/notification.service';
 
 @Component({
   selector: 'app-job-detail',
@@ -101,7 +102,8 @@ export class JobDetail implements OnInit, OnDestroy, AfterViewChecked {
     private router: Router,
     private wails: Wails,
     private dialog: MatDialog,
-    private annotationService: AnnotationService
+    private annotationService: AnnotationService,
+    private notificationService: NotificationService
   ) {}
 
   async ngOnInit() {
@@ -538,6 +540,43 @@ export class JobDetail implements OnInit, OnDestroy, AfterViewChecked {
     const count = this.matchCount();
     if (count > 0) {
       this.currentMatchIndex.update(val => (val - 1 + count) % count);
+    }
+  }
+
+  async cloneJob() {
+    const currentJob = this.job();
+    if (!currentJob) {
+      return;
+    }
+
+    try {
+      await this.wails.logToFile(`[JobDetail] Cloning job ${currentJob.id} (plugin: ${currentJob.type})`);
+
+      const allPlugins = await this.wails.getPluginsV2();
+      await this.wails.logToFile(`[JobDetail] Found ${allPlugins.length} installed plugins`);
+
+      const pluginIds = allPlugins.map((p: any) => p.definition?.plugin?.id || 'unknown');
+      await this.wails.logToFile(`[JobDetail] Available plugin IDs: ${pluginIds.join(', ')}`);
+
+      const plugin = allPlugins.find((p: any) => p.definition?.plugin?.id === currentJob.type);
+
+      if (!plugin) {
+        await this.wails.logToFile(`[JobDetail] Plugin ${currentJob.type} not found in installed plugins`);
+        this.notificationService.showError(
+          `Plugin "${currentJob.type}" is not installed. Please install it from the plugin registry before cloning this job.`
+        );
+        return;
+      }
+
+      await this.wails.logToFile(`[JobDetail] Found plugin: ${plugin.definition.plugin.name} (ID: ${plugin.id})`);
+      await this.wails.logToFile(`[JobDetail] Navigating to plugin ${plugin.id} with job ${currentJob.id}`);
+
+      this.router.navigate(['/plugin', plugin.id], {
+        queryParams: { cloneJobId: currentJob.id }
+      });
+    } catch (error) {
+      await this.wails.logToFile(`[JobDetail] Error cloning job: ${error}`);
+      this.notificationService.showError(`Failed to clone job: ${error}`);
     }
   }
 }

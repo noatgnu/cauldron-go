@@ -68,7 +68,17 @@
               } @else {
                 <mat-icon class="plugin-icon-small">extension</mat-icon>
               }
-              <span class="plugin-name">{{ plugin.name }}</span>
+              <div class="name-content">
+                <span class="plugin-name">{{ plugin.name }}</span>
+                <div class="runtime-chips">
+                  @for (env of getRuntimeEnvironments(plugin); track env) {
+                    <mat-chip class="runtime-chip-inline">
+                      <mat-icon class="runtime-icon-inline">{{ getRuntimeIcon(env) }}</mat-icon>
+                      {{ env }}
+                    </mat-chip>
+                  }
+                </div>
+              </div>
               @if (plugin.requires_authentication) {
                 <mat-icon class="auth-icon" matTooltip="Requires SSH Authentication">lock</mat-icon>
               }

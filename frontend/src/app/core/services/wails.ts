@@ -748,4 +748,9 @@ export class Wails {
     if (!this.isWails) throw new Error('Wails not available');
     return WailsApp.InstallPluginRequirements(pluginId);
   }
+
+  async fetchPluginDependencies(repoURL: string): Promise<Record<string, any>> {
+    if (!this.isWails) throw new Error('Wails not available');
+    return WailsApp.FetchPluginDependencies(repoURL);
+  }
 }

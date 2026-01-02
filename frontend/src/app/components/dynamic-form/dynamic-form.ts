@@ -411,6 +411,59 @@ export class DynamicFormComponent implements OnInit, OnChanges, OnDestroy {
     }
   }
 
+  async loadFromJobParameters(parameters: Record<string, any>) {
+    try {
+      this.loading.set(true);
+      await this.wails.logToFile(`[DynamicForm] Loading parameters from job: ${JSON.stringify(parameters)}`);
+      const valuesToSet: Record<string, any> = {};
+
+      for (const [key, value] of Object.entries(parameters)) {
+        const input = this.plugin.definition.inputs.find(i => i.name === key);
+
+        if (input) {
+          await this.wails.logToFile(`[DynamicForm] Processing parameter ${key}: type=${input.type}, value=${value} (${typeof value})`);
+
+          if (input.type === 'file' && typeof value === 'string') {
+            valuesToSet[key] = value;
+            await this.loadColumnsForDependents(key, value);
+          } else if (input.type === 'column' || input.type === 'column-selector') {
+            const sourceFile = parameters[`${key}_source`];
+            if (sourceFile && typeof sourceFile === 'string') {
+              await this.loadColumns(key, sourceFile);
+            }
+            valuesToSet[key] = value;
+          } else if (input.type === 'boolean' || input.type === 'checkbox') {
+            let boolValue: boolean;
+            if (typeof value === 'string') {
+              boolValue = value === 'true' || value === '1' || value === 'True';
+            } else if (typeof value === 'number') {
+              boolValue = value !== 0;
+            } else {
+              boolValue = !!value;
+            }
+            valuesToSet[key] = boolValue;
+            await this.wails.logToFile(`[DynamicForm] Converted boolean parameter ${key}: ${value} (${typeof value}) -> ${boolValue}`);
+          } else {
+            valuesToSet[key] = value;
+          }
+        } else {
+          await this.wails.logToFile(`[DynamicForm] Skipping parameter ${key}: no matching input found`);
+        }
+      }
+
+      await this.wails.logToFile(`[DynamicForm] Values to set: ${JSON.stringify(valuesToSet)}`);
+      this.form.patchValue(valuesToSet);
+      this.notificationService.showSuccess('Job parameters loaded successfully');
+      await this.wails.logToFile(`[DynamicForm] Successfully loaded job parameters`);
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      await this.wails.logToFile(`[DynamicForm] Error loading job parameters: ${errorMsg}`);
+      this.notificationService.showError(`Failed to load job parameters: ${errorMsg}`);
+    } finally {
+      this.loading.set(false);
+    }
+  }
+
   private getFormValue(): Record<string, any> {
     const value: Record<string, any> = {};
 

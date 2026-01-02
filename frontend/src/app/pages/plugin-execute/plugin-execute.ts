@@ -74,7 +74,7 @@ export class PluginExecute implements OnInit {
     this.wails.bindingsUpdated$.subscribe(() => {
       const p = this.plugin();
       if (p) {
-        this.loadPluginBinding(p.id.toString());
+        this.loadPluginBinding(p.definition.plugin.id);
       }
     });
   }
@@ -85,11 +85,36 @@ export class PluginExecute implements OnInit {
       this.error.set('');
       const plugin = await this.pluginService.getPlugin(id);
       this.plugin.set(plugin);
-      await this.loadPluginBinding(id.toString());
+      await this.loadPluginBinding(plugin.definition.plugin.id);
+
+      const cloneJobId = this.route.snapshot.queryParamMap.get('cloneJobId');
+      if (cloneJobId) {
+        await this.wails.logToFile(`[PluginExecute] Cloning job: ${cloneJobId}`);
+        setTimeout(async () => {
+          await this.loadJobParameters(cloneJobId);
+        }, 500);
+      }
     } catch (err) {
       this.error.set(`Failed to load plugin: ${err}`);
     } finally {
       this.loading.set(false);
+    }
+  }
+
+  async loadJobParameters(jobId: string) {
+    try {
+      await this.wails.logToFile(`[PluginExecute] Fetching job ${jobId} for cloning`);
+      const job = await this.wails.getJob(jobId);
+      if (job && job.parameters) {
+        await this.wails.logToFile(`[PluginExecute] Loading parameters from job ${jobId}`);
+        await this.dynamicForm?.loadFromJobParameters(job.parameters);
+      } else {
+        await this.wails.logToFile(`[PluginExecute] Job ${jobId} has no parameters`);
+        this.notification.showError('Failed to load job parameters');
+      }
+    } catch (err) {
+      await this.wails.logToFile(`[PluginExecute] Error loading job parameters: ${err}`);
+      this.notification.showError(`Failed to load job parameters: ${err}`);
     }
   }
 

@@ -225,6 +225,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
+  min-width: 0;
 }
 
 .status-label {
@@ -232,6 +233,7 @@
   min-width: 60px;
   font-size: 13px;
   color: var(--on-surface);
+  flex-shrink: 0;
 }
 
 .status-chip {
@@ -241,12 +243,16 @@
   padding: 4px 12px !important;
   min-height: 28px !important;
   background: var(--surface-variant) !important;
+  flex: 1;
+  min-width: 0;
+  max-width: 100%;
 
   mat-icon {
     font-size: 16px;
     width: 16px;
     height: 16px;
     color: var(--primary) !important;
+    flex-shrink: 0;
   }
 
   &.warn {
@@ -259,6 +265,10 @@
     font-size: 12px;
     font-weight: 500;
     color: var(--on-surface) !important;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
   }
 }
 

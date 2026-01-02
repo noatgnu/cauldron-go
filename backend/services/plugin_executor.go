@@ -49,17 +49,10 @@ func (e *PluginExecutor) BuildArguments(plugin *models.PluginV2, parameters map[
 			return nil, fmt.Errorf("missing flag for input: %s", inputName)
 		}
 
-		if !hasValue {
-			continue
-		}
+		flag := *mapping.Flag
+		value := mapping.Value
 
-		if mapping.When != nil {
-			shouldInclude := e.evaluateCondition(paramValue, *mapping.When)
-			if !shouldInclude {
-				continue
-			}
-			flag := *mapping.Flag
-			args = append(args, flag)
+		if !hasValue {
 			continue
 		}
 
@@ -67,8 +60,26 @@ func (e *PluginExecutor) BuildArguments(plugin *models.PluginV2, parameters map[
 			paramValue = e.resolveFilePath(paramValue)
 		}
 
-		flag := *mapping.Flag
-		value := mapping.Value
+		if mapping.When != nil {
+			shouldInclude := e.evaluateCondition(paramValue, *mapping.When)
+			if !shouldInclude {
+				continue
+			}
+			args = append(args, flag)
+			continue
+		}
+
+		if input.Type == models.PluginInputTypeBoolean && value == nil {
+			boolVal, ok := paramValue.(bool)
+			if !ok {
+				s := fmt.Sprintf("%v", paramValue)
+				boolVal = s == "true"
+			}
+			if boolVal {
+				args = append(args, flag)
+			}
+			continue
+		}
 
 		if value == nil {
 			transformedValue, err := e.transformValue(paramValue, mapping.Transform)

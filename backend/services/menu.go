@@ -37,7 +37,7 @@ func BuildApplicationMenu(ctx context.Context, appCallbacks AppCallbacks) *menu.
 	viewMenu.AddText("Jobs", keys.CmdOrCtrl("2"), func(_ *menu.CallbackData) {
 		runtime.EventsEmit(ctx, "menu:view-jobs")
 	})
-	viewMenu.AddText("Plugin List", keys.CmdOrCtrl("3"), func(_ *menu.CallbackData) {
+	viewMenu.AddText("Installed Plugins", keys.CmdOrCtrl("3"), func(_ *menu.CallbackData) {
 		runtime.EventsEmit(ctx, "menu:view-plugin-list")
 	})
 

@@ -27,10 +27,10 @@ type Tag struct {
 }
 
 type Runtime struct {
-	ID     int    `json:"id"`
-	Plugin string `json:"plugin"`
-	Type   string `json:"type"`
-	Script string `json:"script"`
+	ID           int      `json:"id"`
+	Plugin       string   `json:"plugin"`
+	Environments []string `json:"environments"`
+	Entrypoint   string   `json:"entrypoint"`
 }
 
 type Input struct {

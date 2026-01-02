@@ -1,13 +1,12 @@
 import { Component, Inject, OnInit, OnDestroy, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef, MatDialog } from '@angular/material/dialog';
+import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { Wails } from '../../core/services/wails';
 import { NotificationService } from '../../core/services/notification.service';
 import { Subscription } from 'rxjs';
-import { PluginRequirementsDialog } from '../plugin-requirements-dialog/plugin-requirements-dialog';
 
 export interface PluginInstallProgressData {
   repoURL: string;
@@ -47,21 +46,35 @@ export class PluginInstallProgress implements OnInit, OnDestroy {
     @Inject(MAT_DIALOG_DATA) public data: PluginInstallProgressData,
     private dialogRef: MatDialogRef<PluginInstallProgress>,
     private wails: Wails,
-    private dialog: MatDialog,
     private notification: NotificationService
   ) {}
 
   ngOnInit() {
     this.startInstallation();
-    
-    const sub = this.wails.listen('plugin:install:progress', (event: any) => {
+
+    const pluginProgressSub = this.wails.listen('plugin:install:progress', (event: any) => {
       if (event.repo === this.data.repoURL) {
         this.currentStatus.set(event.status);
         this.stages.update(s => [...s, event.status]);
         this.updateProgress();
       }
     });
-    this.subscription.add(sub);
+    this.subscription.add(pluginProgressSub);
+
+    const envProgressSub = this.wails.listen('progress', (event: any) => {
+      if (event.type === 'install' &&
+          (event.id === 'python-venv' ||
+           event.id === 'python-packages' ||
+           event.id === 'python-requirements' ||
+           event.id === 'r-packages' ||
+           event.id === 'renv-init')) {
+        this.currentStatus.set(event.message);
+        if (event.percentage) {
+          this.progress.set(event.percentage);
+        }
+      }
+    });
+    this.subscription.add(envProgressSub);
   }
 
   ngOnDestroy() {
@@ -104,9 +117,6 @@ export class PluginInstallProgress implements OnInit, OnDestroy {
   private async createEnvironments(pluginId: string) {
     try {
       if (this.data.createVenv && this.data.basePythonPath) {
-        this.currentStatus.set('Creating Python virtual environment...');
-        this.progress.set(50);
-
         const venvPath = await this.wails.getDefaultVenvPath(pluginId);
         await this.wails.createPythonVirtualEnv(this.data.basePythonPath, venvPath, pluginId);
 
@@ -120,9 +130,6 @@ export class PluginInstallProgress implements OnInit, OnDestroy {
       }
 
       if (this.data.createRenv && this.data.renvName) {
-        this.currentStatus.set('Creating R environment...');
-        this.progress.set(75);
-
         await this.wails.createRenvEnvironment(this.data.renvName, [], pluginId, false);
 
         const renvs = await this.wails.getRenvEnvironments();
@@ -141,25 +148,14 @@ export class PluginInstallProgress implements OnInit, OnDestroy {
 
   private async checkAndPromptForRequirements(pluginId: string) {
     try {
+      if (!this.data.createVenv && !this.data.createRenv) {
+        return;
+      }
+
       const requirements = await this.wails.getPluginRequirements(pluginId);
 
       if (requirements && requirements.requirementsExist) {
-        const dialogRef = this.dialog.open(PluginRequirementsDialog, {
-          width: '500px',
-          disableClose: true,
-          data: {
-            pluginId: requirements.pluginId,
-            pluginName: requirements.pluginName,
-            runtimeEnvironments: requirements.runtimeEnvironments,
-            pythonPackages: requirements.pythonPackages,
-            rPackages: requirements.rPackages
-          }
-        });
-
-        const shouldInstall = await dialogRef.afterClosed().toPromise();
-        if (shouldInstall) {
-          await this.installRequirements(pluginId);
-        }
+        await this.installRequirements(pluginId);
       }
     } catch (err) {
       await this.wails.logToFile(`[PluginInstallProgress] Failed to check requirements: ${err}`);
@@ -167,19 +163,12 @@ export class PluginInstallProgress implements OnInit, OnDestroy {
   }
 
   private async installRequirements(pluginId: string) {
-    this.currentStatus.set('Installing plugin requirements...');
-    this.progress.set(50);
-
     try {
       await this.wails.installPluginRequirements(pluginId);
       this.notification.showSuccess('Requirements installed successfully!');
-      this.currentStatus.set('Plugin and requirements installed successfully!');
     } catch (err: any) {
       await this.wails.logToFile(`[PluginInstallProgress] Failed to install requirements: ${err}`);
       this.notification.showError(`Failed to install requirements: ${err}`);
-      this.currentStatus.set('Plugin installed, but requirements installation failed');
-    } finally {
-      this.progress.set(100);
     }
   }
 

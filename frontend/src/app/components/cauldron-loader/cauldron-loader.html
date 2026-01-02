@@ -1,0 +1,66 @@
+<div class="loader-container">
+  <div class="cauldron-wrapper">
+    <div class="steam-container">
+      <div class="steam steam-1"></div>
+      <div class="steam steam-2"></div>
+      <div class="steam steam-3"></div>
+    </div>
+
+    <svg class="cauldron-svg" viewBox="0 0 100 140" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <clipPath id="tubeClip">
+          <path d="M 35,10 L 35,95 Q 35,110 50,110 Q 65,110 65,95 L 65,10 Z"/>
+        </clipPath>
+      </defs>
+
+      <g clip-path="url(#tubeClip)">
+        <rect class="liquid"
+              x="35"
+              [attr.y]="liquidY()"
+              width="30"
+              [attr.height]="liquidHeight()"
+              fill="var(--primary)"
+              opacity="0.7"/>
+
+        <rect class="liquid-shimmer"
+              x="35"
+              [attr.y]="liquidY()"
+              width="30"
+              height="2"
+              fill="var(--primary)"
+              opacity="0.9">
+          <animate attributeName="opacity" values="0.9;0.5;0.9" dur="2s" repeatCount="indefinite"/>
+        </rect>
+
+        <circle class="bubble bubble-1" r="2" fill="var(--surface)" opacity="0.6">
+          <animate attributeName="cy" [attr.from]="bubbleStartY()" [attr.to]="bubbleEndY()" dur="3s" repeatCount="indefinite"/>
+          <animate attributeName="opacity" values="0;0.6;0" dur="3s" repeatCount="indefinite"/>
+          <animate attributeName="cx" values="43;45;43" dur="3s" repeatCount="indefinite"/>
+        </circle>
+
+        <circle class="bubble bubble-2" r="2.5" fill="var(--surface)" opacity="0.6">
+          <animate attributeName="cy" [attr.from]="bubbleStartY()" [attr.to]="bubbleEndY()" dur="2.5s" repeatCount="indefinite" begin="0.5s"/>
+          <animate attributeName="opacity" values="0;0.6;0" dur="2.5s" repeatCount="indefinite" begin="0.5s"/>
+          <animate attributeName="cx" values="50;48;50" dur="2.5s" repeatCount="indefinite" begin="0.5s"/>
+        </circle>
+
+        <circle class="bubble bubble-3" r="1.8" fill="var(--surface)" opacity="0.6">
+          <animate attributeName="cy" [attr.from]="bubbleStartY()" [attr.to]="bubbleEndY()" dur="2.8s" repeatCount="indefinite" begin="1s"/>
+          <animate attributeName="opacity" values="0;0.6;0" dur="2.8s" repeatCount="indefinite" begin="1s"/>
+          <animate attributeName="cx" values="57;59;57" dur="2.8s" repeatCount="indefinite" begin="1s"/>
+        </circle>
+      </g>
+
+      <g class="test-tube">
+        <path d="M 35,10 L 35,95 Q 35,110 50,110 Q 65,110 65,95 L 65,10"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="3"/>
+      </g>
+    </svg>
+  </div>
+
+  @if (message()) {
+    <p class="loader-message">{{ message() }}</p>
+  }
+</div>

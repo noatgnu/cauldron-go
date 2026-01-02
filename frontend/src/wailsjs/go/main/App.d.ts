@@ -58,6 +58,8 @@ export function ExecutePlugin(arg1:models.PluginExecutionRequest):Promise<string
 
 export function ExecutePluginV2(arg1:models.PluginExecutionRequestV2):Promise<string>;
 
+export function FetchPluginDependencies(arg1:string):Promise<Record<string, any>>;
+
 export function ForceUpdateAllRemotePlugins():Promise<void>;
 
 export function GetActivePythonEnvironment():Promise<services.PythonEnvironment>;

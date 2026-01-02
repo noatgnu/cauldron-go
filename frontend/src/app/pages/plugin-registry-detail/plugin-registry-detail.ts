@@ -41,8 +41,8 @@ interface RegistryPlugin {
   runtime?: {
     id: number;
     plugin: string;
-    type: string;
-    script: string;
+    environments: string[];
+    entrypoint: string;
   };
   inputs?: Array<{
     name: string;
@@ -307,6 +307,7 @@ export class PluginRegistryDetail implements OnInit {
 
   async installPlugin(): Promise<void> {
     try {
+      await this.wails.logToFile('========================================');
       await this.wails.logToFile('[PluginRegistryDetail] Install button clicked');
 
       const plugin = this.plugin();
@@ -315,17 +316,29 @@ export class PluginRegistryDetail implements OnInit {
         return;
       }
 
-      await this.wails.logToFile(`[PluginRegistryDetail] Opening install dialog for: ${plugin.name}`);
+      await this.wails.logToFile(`[PluginRegistryDetail] Plugin name: ${plugin.name}, repository: ${plugin.repository}`);
+      await this.wails.logToFile(`[PluginRegistryDetail] Fetching plugin dependencies for: ${plugin.name}`);
 
-      const runtimeEnvironments: string[] = [];
-      if (plugin.runtime?.type) {
-        if (plugin.runtime.type.includes('python')) {
-          runtimeEnvironments.push('python');
-        }
-        if (plugin.runtime.type.includes('r') || plugin.runtime.type.includes('R')) {
-          runtimeEnvironments.push('r');
+      let hasPythonDeps = false;
+      let hasRDeps = false;
+      let runtimeEnvironments: string[] = [];
+
+      try {
+        const deps = await this.wails.fetchPluginDependencies(plugin.repository);
+        await this.wails.logToFile(`[PluginRegistryDetail] Raw deps response: ${JSON.stringify(deps)}`);
+        hasPythonDeps = deps['hasPythonDeps'] === true;
+        hasRDeps = deps['hasRDeps'] === true;
+        runtimeEnvironments = deps['runtimeEnvironments'] || [];
+        await this.wails.logToFile(`[PluginRegistryDetail] After assignment - Python: ${hasPythonDeps}, R: ${hasRDeps}, envs: ${runtimeEnvironments.join(',')}`);
+      } catch (error) {
+        await this.wails.logToFile(`[PluginRegistryDetail] Failed to fetch dependencies: ${error}`);
+        if (plugin.runtime?.environments) {
+          runtimeEnvironments = plugin.runtime.environments;
         }
       }
+
+      await this.wails.logToFile(`[PluginRegistryDetail] Opening install dialog for: ${plugin.name}`);
+      await this.wails.logToFile(`[PluginRegistryDetail] Dialog data - hasPythonDeps: ${hasPythonDeps}, hasRDeps: ${hasRDeps}, runtimeEnvs: ${runtimeEnvironments.join(', ')}`);
 
       const dialogRef = this.dialog.open(ConfirmPluginInstallDialog, {
         width: '600px',
@@ -340,7 +353,9 @@ export class PluginRegistryDetail implements OnInit {
           description: plugin.description,
           category: plugin.category?.name || 'Uncategorized',
           requiresAuthentication: plugin.requires_authentication,
-          runtimeEnvironments
+          runtimeEnvironments,
+          hasPythonDeps,
+          hasRDeps
         }
       });
 

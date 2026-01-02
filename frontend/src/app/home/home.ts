@@ -13,6 +13,8 @@ import { MatDialog } from '@angular/material/dialog';
 import { Wails, Job, ImportedFile } from '../core/services/wails';
 import { ImportDialog } from '../pages/import-dialog/import-dialog';
 import { NotificationService } from '../core/services/notification.service';
+import {BoilingProgressBarComponent} from '../components/boiling-progress-bar/boiling-progress-bar';
+import {CauldronLoaderComponent} from '../components/cauldron-loader/cauldron-loader';
 
 @Component({
   selector: 'app-home',
@@ -25,7 +27,9 @@ import { NotificationService } from '../core/services/notification.service';
     MatProgressSpinnerModule,
     MatChipsModule,
     MatTableModule,
-    MatTooltipModule
+    MatTooltipModule,
+    BoilingProgressBarComponent,
+    CauldronLoaderComponent
   ],
   templateUrl: './home.html',
   styleUrl: './home.scss'

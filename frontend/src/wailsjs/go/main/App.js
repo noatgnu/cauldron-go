@@ -110,6 +110,10 @@ export function ExecutePluginV2(arg1) {
   return window['go']['main']['App']['ExecutePluginV2'](arg1);
 }
 
+export function FetchPluginDependencies(arg1) {
+  return window['go']['main']['App']['FetchPluginDependencies'](arg1);
+}
+
 export function ForceUpdateAllRemotePlugins() {
   return window['go']['main']['App']['ForceUpdateAllRemotePlugins']();
 }
