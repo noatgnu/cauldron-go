@@ -3,7 +3,9 @@ package services
 import (
 	"context"
 	"path/filepath"
+	"runtime"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/noatgnu/cauldron-go/backend/models"
@@ -31,6 +33,22 @@ func createTestDB(t *testing.T) *DatabaseService {
 	if err := service.autoMigrate(); err != nil {
 		t.Fatalf("Failed to migrate test database: %v", err)
 	}
+
+	t.Cleanup(func() {
+		sqlDB, closeErr := service.db.DB()
+		if closeErr != nil {
+			t.Logf("Error getting underlying DB for cleanup: %v", closeErr)
+			return
+		}
+		if sqlDB != nil {
+			if closeErr := sqlDB.Close(); closeErr != nil {
+				t.Logf("Error closing database in cleanup: %v", closeErr)
+			}
+		}
+		if runtime.GOOS == "windows" {
+			time.Sleep(100 * time.Millisecond)
+		}
+	})
 
 	return service
 }
