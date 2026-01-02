@@ -36,7 +36,7 @@ jobs:
           tar -xzf python-standalone.tar.gz -C "${{ github.workspace }}/python"
           echo "${{ github.workspace }}/python/python" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
-          Invoke-WebRequest -Uri https://cran.r-project.org/bin/windows/base/old/4.5.1/R-4.5.1-win.exe -OutFile R-Installer.exe
+          Invoke-WebRequest -Uri https://cran.r-project.org/bin/windows/base/old/4.5.2/R-4.5.2-win.exe -OutFile R-Installer.exe
           Start-Process -FilePath R-Installer.exe -ArgumentList "/VERYSILENT", "/DIR=${{ github.workspace }}/R" -Wait
           echo "${{ github.workspace }}/R/bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
           echo "R_HOME=${{ github.workspace }}/R" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
@@ -120,14 +120,55 @@ jobs:
       - name: Setup Environment for Testing
         run: |
           echo "Setting up portable Python and R for testing..."
+
+          # Set up Python (from build-env-linux.yml)
           mkdir -p "${{ github.workspace }}/python"
-          curl -sL "https://github.com/indygreg/python-build-standalone/releases/download/20241016/cpython-3.11.10+20241016-x86_64-unknown-linux-gnu-install_only.tar.gz" | tar -xzf - -C "${{ github.workspace }}/python"
+          curl -LO https://github.com/indygreg/python-build-standalone/releases/download/20241016/cpython-3.11.10+20241016-x86_64-unknown-linux-gnu-install_only.tar.gz
+          tar -xzf cpython-3.11.10+20241016-x86_64-unknown-linux-gnu-install_only.tar.gz -C "${{ github.workspace }}/python" --no-same-owner --no-same-permissions
           echo "${{ github.workspace }}/python/bin" >> $GITHUB_PATH
 
+          # Set up R (from build-env-linux.yml)
+          echo "Installing R dependencies with apt-get..."
           sudo apt-get update
-          sudo apt-get install -y r-base python3-venv
-          echo "R_HOME=/usr/lib/R" >> $GITHUB_ENV # Assuming default R location after apt-get
-          echo "R_LIBS_USER=${{ github.workspace }}/R_libs" >> $GITHUB_ENV # Custom lib path for renv
+          sudo apt-get install -y \
+            xorg-dev \
+            gfortran \
+            libpng-dev \
+            libjpeg-dev \
+            liblzma-dev \
+            libpcre2-dev \
+            libcurl4-openssl-dev \
+            libharfbuzz-dev \
+            libfribidi-dev \
+            libx11-dev \
+            libxext-dev \
+            libxrender-dev \
+            libxtst-dev \
+            libcairo2-dev \
+            tcl-dev \
+            tk-dev \
+            libhdf5-dev \
+            libblosc-dev \
+            libhiredis-dev \
+            libopenmpi-dev \
+            liblzo2-dev \
+            libomp-dev \
+            libreadline-dev \
+            bzip2 \
+            python3-venv # Added python3-venv for venv tests
+
+          echo "Compiling R 4.5.2..."
+          curl -O https://cran.r-project.org/src/base/R-4/R-4.5.2.tar.gz
+          tar -xzvf R-4.5.2.tar.gz
+          cd R-4.5.2
+          ./configure --prefix=${{ github.workspace }}/R --enable-R-shlib --with-blas --with-lapack --with-tcltk --with-mpi
+          make -j$(nproc)
+          make install
+          cd .. # Go back to root directory
+
+          echo "${{ github.workspace }}/R/bin" >> $GITHUB_PATH
+          echo "R_HOME=${{ github.workspace }}/R" >> $GITHUB_ENV
+          echo "R_LIBS_USER=${{ github.workspace }}/R_libs" >> $GITHUB_ENV
           mkdir -p "${{ github.workspace }}/R_libs"
 
       - name: Install dependencies
@@ -218,14 +259,52 @@ jobs:
       - name: Setup Environment for Testing
         run: |
           echo "Setting up portable Python and R for testing..."
+
+          # Set up Python (from build-env-darwin-arm64.yml - adjusted for Intel)
           mkdir -p "${{ github.workspace }}/python"
-          curl -sL "https://github.com/indygreg/python-build-standalone/releases/download/20241016/cpython-3.11.10+20241016-x86_64-apple-darwin-install_only.tar.gz" | tar -xzf - -C "${{ github.workspace }}/python"
+          curl -LO https://github.com/indygreg/python-build-standalone/releases/download/20241016/cpython-3.11.10+20241016-x86_64-apple-darwin-install_only.tar.gz
+          tar -xzf cpython-3.11.10+20241016-x86_64-apple-darwin-install_only.tar.gz -C "${{ github.workspace }}/python" --no-same-owner --no-same-permissions
           echo "${{ github.workspace }}/python/bin" >> $GITHUB_PATH
 
-          brew install r
-          echo "/usr/local/opt/r/bin" >> $GITHUB_PATH # Assuming default brew R location
-          echo "R_HOME=/usr/local/opt/r/lib/R" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          echo "R_LIBS_USER=${{ github.workspace }}/R_libs" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          # Set up R (from build-env-darwin-arm64.yml - adjusted for Intel)
+          echo "Installing R dependencies with Homebrew..."
+          /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" || true
+          brew update
+          brew install --cask xquartz || true # xquartz might fail if already installed, or not needed. Make it optional.
+          brew install gfortran pkg-config libpng jpeg xz pcre2 curl harfbuzz fribidi libx11 libxext libxrender libxtst cairo tcl-tk hdf5 c-blosc hiredis open-mpi lzo bzip2
+
+          echo "$(brew --prefix gcc)/bin" >> $GITHUB_PATH
+          echo "$(brew --prefix jpeg)/bin" >> $GITHUB_PATH
+          echo "$(brew --prefix open-mpi)/bin" >> $GITHUB_PATH
+          echo "$(brew --prefix hdf5)/bin" >> $GITHUB_PATH
+          echo "$(brew --prefix lzo)/bin" >> $GITHUB_PATH
+          echo "$(brew --prefix c-blosc)/bin" >> $GITHUB_PATH
+          echo "$(brew --prefix bzip2)/bin" >> $GITHUB_PATH
+
+          echo "Compiling R 4.5.2..."
+          curl -O https://cran.r-project.org/src/base/R-4/R-4.5.2.tar.gz
+          tar -xzvf R-4.5.2.tar.gz
+          cd R-4.5.2
+          CPPFLAGS="-I/usr/local/include -I/opt/X11/include -I/usr/local/opt/jpeg/include -I/usr/local/include" \
+          LDFLAGS="-L/opt/X11/lib -L/usr/local/opt/jpeg/lib -L/usr/local/opt/lzo/lib -L/usr/local/lib" \
+          LZO_DIR="$(brew --prefix lzo)" \
+          BZIP2_DIR="$(brew --prefix bzip2)" \
+          BLOSC_DIR="$(brew --prefix c-blosc)" \
+          HDF5_DIR="$(brew --prefix hdf5)" \
+          CFLAGS="-I/usr/local/opt/lzo/include" \
+          TCL_LIBRARY="$(brew --prefix tcl-tk)/lib" \
+          TK_LIBRARY="$(brew --prefix tcl-tk)/lib" \
+          PKG_CONFIG_PATH="$(brew --prefix jpeg)/lib/pkgconfig" \
+          C_INCLUDE_PATH="/usr/local/Cellar/lzo/2.10/include/lzo:/usr/local/Cellar/lzo/2.10/include/" \
+          LIBRARY_PATH="/usr/local/lib" \
+          ./configure --prefix=${{ github.workspace }}/R --enable-R-shlib --with-blas --with-lapack --with-tcltk --with-mpi
+          make -j$(nproc)
+          make install
+          cd .. # Go back to root directory
+
+          echo "${{ github.workspace }}/R/bin" >> $GITHUB_PATH
+          echo "R_HOME=${{ github.workspace }}/R" >> $GITHUB_ENV
+          echo "R_LIBS_USER=${{ github.workspace }}/R_libs" >> $GITHUB_ENV
           mkdir -p "${{ github.workspace }}/R_libs"
 
       - name: Install Wails
@@ -297,14 +376,52 @@ jobs:
       - name: Setup Environment for Testing
         run: |
           echo "Setting up portable Python and R for testing..."
+
+          # Set up Python (from build-env-darwin-arm64.yml)
           mkdir -p "${{ github.workspace }}/python"
-          curl -sL "https://github.com/indygreg/python-build-standalone/releases/download/20241016/cpython-3.11.10+20241016-aarch64-apple-darwin-install_only.tar.gz" | tar -xzf - -C "${{ github.workspace }}/python"
+          curl -LO https://github.com/indygreg/python-build-standalone/releases/download/20241016/cpython-3.11.10+20241016-aarch64-apple-darwin-install_only.tar.gz
+          tar -xzf cpython-3.11.10+20241016-aarch64-apple-darwin-install_only.tar.gz -C "${{ github.workspace }}/python" --no-same-owner --no-same-permissions
           echo "${{ github.workspace }}/python/bin" >> $GITHUB_PATH
 
-          brew install r
-          echo "/opt/homebrew/opt/r/bin" >> $GITHUB_PATH # Assuming default brew R location for arm64
-          echo "R_HOME=/opt/homebrew/opt/r/lib/R" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          echo "R_LIBS_USER=${{ github.workspace }}/R_libs" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          # Set up R by compiling from source (from build-env-darwin-arm64.yml)
+          echo "Installing R dependencies with Homebrew..."
+          /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" || true
+          brew update
+          brew install --cask xquartz || true # xquartz might fail if already installed, or not needed. Make it optional.
+          brew install gfortran pkg-config libpng jpeg xz pcre2 curl harfbuzz fribidi libx11 libxext libxrender libxtst cairo tcl-tk hdf5 c-blosc hiredis open-mpi lzo bzip2
+          
+          echo "$(brew --prefix gcc)/bin" >> $GITHUB_PATH
+          echo "$(brew --prefix jpeg)/bin" >> $GITHUB_PATH
+          echo "$(brew --prefix open-mpi)/bin" >> $GITHUB_PATH
+          echo "$(brew --prefix hdf5)/bin" >> $GITHUB_PATH
+          echo "$(brew --prefix lzo)/bin" >> $GITHUB_PATH
+          echo "$(brew --prefix c-blosc)/bin" >> $GITHUB_PATH
+          echo "$(brew --prefix bzip2)/bin" >> $GITHUB_PATH
+
+          echo "Compiling R 4.5.2..."
+          curl -O https://cran.r-project.org/src/base/R-4/R-4.5.2.tar.gz
+          tar -xzvf R-4.5.2.tar.gz
+          cd R-4.5.2
+          CPPFLAGS="-I/opt/homebrew/include -I/opt/X11/include -I/opt/homebrew/opt/jpeg/include -I/opt/homebrew/include" \
+          LDFLAGS="-L/opt/X11/lib -L/opt/homebrew/opt/jpeg/lib -L/opt/homebrew/opt/lzo/lib -L/opt/homebrew/lib" \
+          LZO_DIR="$(brew --prefix lzo)" \
+          BZIP2_DIR="$(brew --prefix bzip2)" \
+          BLOSC_DIR="$(brew --prefix c-blosc)" \
+          HDF5_DIR="$(brew --prefix hdf5)" \
+          CFLAGS="-I/opt/homebrew/opt/lzo/include" \
+          TCL_LIBRARY="$(brew --prefix tcl-tk)/lib" \
+          TK_LIBRARY="$(brew --prefix tcl-tk)/lib" \
+          PKG_CONFIG_PATH="$(brew --prefix jpeg)/lib/pkgconfig" \
+          C_INCLUDE_PATH="/opt/homebrew/Cellar/lzo/2.10/include/lzo:/opt/homebrew/Cellar/lzo/2.10/include/" \
+          LIBRARY_PATH="/opt/homebrew/lib" \
+          ./configure --prefix=${{ github.workspace }}/R --enable-R-shlib --with-blas --with-lapack --with-tcltk --with-mpi
+          make -j$(nproc)
+          make install
+          cd .. # Go back to root directory
+
+          echo "${{ github.workspace }}/R/bin" >> $GITHUB_PATH
+          echo "R_HOME=${{ github.workspace }}/R" >> $GITHUB_ENV
+          echo "R_LIBS_USER=${{ github.workspace }}/R_libs" >> $GITHUB_ENV
           mkdir -p "${{ github.workspace }}/R_libs"
 
       - name: Install Wails
