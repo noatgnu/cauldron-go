@@ -18,12 +18,18 @@ func createTestDB(t *testing.T) *DatabaseService {
 	tmpDir := t.TempDir()
 	dbPath := filepath.Join(tmpDir, "test.db")
 
-	db, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{
+	db, err := gorm.Open(sqlite.Open(dbPath+"?_journal_mode=DELETE"), &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Silent),
 	})
 	if err != nil {
 		t.Fatalf("Failed to open test database: %v", err)
 	}
+
+	sqlDB, err := db.DB()
+	if err != nil {
+		t.Fatalf("Failed to get underlying DB: %v", err)
+	}
+	sqlDB.SetMaxOpenConns(1)
 
 	service := &DatabaseService{
 		ctx: context.Background(),
@@ -41,12 +47,15 @@ func createTestDB(t *testing.T) *DatabaseService {
 			return
 		}
 		if sqlDB != nil {
+			if runtime.GOOS == "windows" {
+				service.db.Exec("PRAGMA wal_checkpoint(TRUNCATE)")
+			}
 			if closeErr := sqlDB.Close(); closeErr != nil {
 				t.Logf("Error closing database in cleanup: %v", closeErr)
 			}
 		}
 		if runtime.GOOS == "windows" {
-			time.Sleep(100 * time.Millisecond)
+			time.Sleep(500 * time.Millisecond)
 		}
 	})
 
