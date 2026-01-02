@@ -77,11 +77,8 @@ jobs:
         with:
           go-version: '1.21'
 
-      - name: Setup Environment for Testing
+      - name: Install system dependencies
         run: |
-          echo "Setting up portable Python and R for testing (replicating build-env-linux.yml)..."
-
-          # Install system dependencies (from build-env-linux.yml)
           sudo apt-get update
           sudo apt-get install -y \
             xorg-dev \
@@ -108,9 +105,10 @@ jobs:
             libomp-dev \
             libreadline-dev \
             bzip2 \
-            python3-venv # Added python3-venv for venv tests
+            python3-venv
 
-          echo "Compiling R 4.5.2..."
+      - name: Compile R
+        run: |
           curl -O https://cran.r-project.org/src/base/R-4/R-4.5.2.tar.gz
           tar -xzvf R-4.5.2.tar.gz
           cd R-4.5.2
@@ -125,16 +123,21 @@ jobs:
           ./configure --prefix=${{ github.workspace }}/R --enable-R-shlib --with-blas --with-lapack --with-tcltk --with-mpi
           make -j$(nproc)
           make install
-          cd .. # Go back to root directory
 
+      - name: Set R environment variables
+        run: |
           echo "${{ github.workspace }}/R/bin" >> $GITHUB_PATH
           echo "R_HOME=${{ github.workspace }}/R" >> $GITHUB_ENV
           echo "R_LIBS_USER=${{ github.workspace }}/R_libs" >> $GITHUB_ENV
           mkdir -p "${{ github.workspace }}/R_libs"
 
-          echo "Setting up portable Python..."
-          mkdir -p "${{ github.workspace }}/python"
+      - name: Download Portable Python
+        run: |
           curl -LO https://github.com/indygreg/python-build-standalone/releases/download/20241016/cpython-3.11.10+20241016-x86_64-unknown-linux-gnu-install_only.tar.gz
+
+      - name: Extract Python
+        run: |
+          mkdir -p "${{ github.workspace }}/python"
           tar -xzf cpython-3.11.10+20241016-x86_64-unknown-linux-gnu-install_only.tar.gz -C "${{ github.workspace }}/python" --no-same-owner --no-same-permissions
           echo "${{ github.workspace }}/python/bin" >> $GITHUB_PATH
 
