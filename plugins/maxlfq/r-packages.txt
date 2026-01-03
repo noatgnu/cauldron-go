@@ -1,6 +1,0 @@
-# R packages for MaxLFQ plugin
-iq
-tidyverse
-data.table
-reshape2
-ggplot2

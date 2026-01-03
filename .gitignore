@@ -129,5 +129,14 @@ htmlcov/
 
 # Auto-generated plugin documentation
 plugins/*/README.md
+
+# External third-party plugins (not bundled with application)
+plugins/diann-curtainptm-converter/
+plugins/msfragger-curtainptm-converter/
+plugins/spectronaut-curtainptm-converter/
+plugins/diann-curtainptm-converter-*/
+plugins/msfragger-curtainptm-converter-*/
+plugins/spectronaut-curtainptm-converter-*/
+
 bin
 examples
