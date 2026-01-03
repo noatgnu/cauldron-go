@@ -2,12 +2,15 @@ package main
 
 import (
 	"context"
+	_ "embed"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
 	goruntime "runtime"
+	"sort"
 	"strings"
 	"time"
 
@@ -16,6 +19,12 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 	"gopkg.in/yaml.v3"
 )
+
+//go:embed resources/licenses/go-licenses.json
+var goLicensesJSON []byte
+
+//go:embed resources/licenses/npm-licenses.json
+var npmLicensesJSON []byte
 
 type App struct {
 	ctx                   context.Context
@@ -35,6 +44,7 @@ type App struct {
 	pluginRegistryService *services.PluginRegistryService
 	gitAuthService        *services.GitAuthService
 	ready                 chan bool
+	logFilePath           string
 }
 
 func NewApp() *App {
@@ -1071,48 +1081,172 @@ func (a *App) LogToFile(message string) error {
 	return nil
 }
 
+func (a *App) SetLogFilePath(path string) {
+	a.logFilePath = path
+}
+
 func (a *App) GetLogFilePath() (string, error) {
+	log.Printf("[GetLogFilePath] Stored log file path: '%s'", a.logFilePath)
+
+	if a.logFilePath != "" {
+		log.Printf("[GetLogFilePath] Returning stored path: %s", a.logFilePath)
+		return a.logFilePath, nil
+	}
+
+	log.Printf("[GetLogFilePath] No stored path, searching for latest log file")
+
 	userConfigDir, err := os.UserConfigDir()
 	if err != nil {
+		log.Printf("[GetLogFilePath] Failed to get user config dir: %v", err)
 		return "", fmt.Errorf("failed to get user config dir: %v", err)
 	}
 
 	logDir := filepath.Join(userConfigDir, "cauldron")
-	today := time.Now().Format("2006-01-02")
-	logFileName := fmt.Sprintf("cauldron-%s.log", today)
-	logFilePath := filepath.Join(logDir, logFileName)
+	log.Printf("[GetLogFilePath] Log directory: %s", logDir)
+
+	entries, err := os.ReadDir(logDir)
+	if err != nil {
+		log.Printf("[GetLogFilePath] Failed to read log directory: %v", err)
+		return "", fmt.Errorf("failed to read log directory: %v", err)
+	}
+
+	var logFiles []string
+	for _, entry := range entries {
+		if !entry.IsDir() && strings.HasPrefix(entry.Name(), "cauldron-") && strings.HasSuffix(entry.Name(), ".log") {
+			logFiles = append(logFiles, entry.Name())
+		}
+	}
+
+	log.Printf("[GetLogFilePath] Found %d log files: %v", len(logFiles), logFiles)
+
+	if len(logFiles) == 0 {
+		log.Printf("[GetLogFilePath] No log files found")
+		return "", fmt.Errorf("no log files found in %s", logDir)
+	}
+
+	sort.Strings(logFiles)
+	latestLogFile := logFiles[len(logFiles)-1]
+	logFilePath := filepath.Join(logDir, latestLogFile)
+
+	log.Printf("[GetLogFilePath] Latest log file: %s", logFilePath)
 
 	return logFilePath, nil
 }
 
 func (a *App) OpenLogFile() error {
+	log.Printf("[OpenLogFile] Starting to open log file")
+
 	logFilePath, err := a.GetLogFilePath()
 	if err != nil {
+		log.Printf("[OpenLogFile] Error getting log file path: %v", err)
+		runtime.MessageDialog(a.ctx, runtime.MessageDialogOptions{
+			Type:    runtime.ErrorDialog,
+			Title:   "Error",
+			Message: fmt.Sprintf("Failed to get log file path: %v", err),
+		})
 		return err
 	}
 
+	log.Printf("[OpenLogFile] Log file path: %s", logFilePath)
+
 	if _, err := os.Stat(logFilePath); os.IsNotExist(err) {
+		log.Printf("[OpenLogFile] Log file does not exist: %s", logFilePath)
+		runtime.MessageDialog(a.ctx, runtime.MessageDialogOptions{
+			Type:    runtime.ErrorDialog,
+			Title:   "Error",
+			Message: fmt.Sprintf("Log file does not exist: %s", logFilePath),
+		})
 		return fmt.Errorf("log file does not exist: %s", logFilePath)
 	}
+
+	log.Printf("[OpenLogFile] Log file exists, opening...")
 
 	var cmd *exec.Cmd
 	switch goruntime.GOOS {
 	case "windows":
-		cmd = exec.Command("cmd", "/c", "start", "", logFilePath)
+		cmd = exec.Command("notepad.exe", logFilePath)
+		log.Printf("[OpenLogFile] Windows command: notepad.exe \"%s\"", logFilePath)
 	case "darwin":
 		cmd = exec.Command("open", logFilePath)
+		log.Printf("[OpenLogFile] macOS command: open \"%s\"", logFilePath)
 	case "linux":
 		cmd = exec.Command("xdg-open", logFilePath)
+		log.Printf("[OpenLogFile] Linux command: xdg-open \"%s\"", logFilePath)
 	default:
-		return fmt.Errorf("unsupported operating system: %s", goruntime.GOOS)
+		err := fmt.Errorf("unsupported operating system: %s", goruntime.GOOS)
+		log.Printf("[OpenLogFile] %v", err)
+		runtime.MessageDialog(a.ctx, runtime.MessageDialogOptions{
+			Type:    runtime.ErrorDialog,
+			Title:   "Error",
+			Message: err.Error(),
+		})
+		return err
 	}
 
 	if err := cmd.Start(); err != nil {
+		log.Printf("[OpenLogFile] Failed to execute command: %v", err)
+		runtime.MessageDialog(a.ctx, runtime.MessageDialogOptions{
+			Type:    runtime.ErrorDialog,
+			Title:   "Error",
+			Message: fmt.Sprintf("Failed to open log file: %v", err),
+		})
 		return fmt.Errorf("failed to open log file: %v", err)
 	}
 
-	log.Printf("[OpenLogFile] Opened log file: %s", logFilePath)
+	log.Printf("[OpenLogFile] Successfully opened log file: %s", logFilePath)
 	return nil
+}
+
+type LicenseInfo struct {
+	Name       string  `json:"name"`
+	Version    string  `json:"version"`
+	License    string  `json:"license"`
+	Repository *string `json:"repository,omitempty"`
+}
+
+type LicenseData struct {
+	Go  []LicenseInfo `json:"go"`
+	NPM []LicenseInfo `json:"npm"`
+}
+
+func (a *App) GetLicenseInfo() (LicenseData, error) {
+	var result LicenseData
+
+	goLicenses, err := a.getGoLicenses()
+	if err != nil {
+		log.Printf("[GetLicenseInfo] Failed to get Go licenses: %v", err)
+	} else {
+		result.Go = goLicenses
+	}
+
+	npmLicenses, err := a.getNPMLicenses()
+	if err != nil {
+		log.Printf("[GetLicenseInfo] Failed to get NPM licenses: %v", err)
+	} else {
+		result.NPM = npmLicenses
+	}
+
+	return result, nil
+}
+
+func (a *App) getGoLicenses() ([]LicenseInfo, error) {
+	var licenses []LicenseInfo
+	if err := json.Unmarshal(goLicensesJSON, &licenses); err != nil {
+		log.Printf("[getGoLicenses] Failed to unmarshal Go licenses: %v", err)
+		return []LicenseInfo{}, err
+	}
+
+	return licenses, nil
+}
+
+func (a *App) getNPMLicenses() ([]LicenseInfo, error) {
+	var licenses []LicenseInfo
+	if err := json.Unmarshal(npmLicensesJSON, &licenses); err != nil {
+		log.Printf("[getNPMLicenses] Failed to unmarshal NPM licenses: %v", err)
+		return []LicenseInfo{}, err
+	}
+
+	return licenses, nil
 }
 
 func (a *App) OpenLogDirectory() error {
@@ -1485,6 +1619,39 @@ func (a *App) ForceUpdateAllRemotePlugins() error {
 		return fmt.Errorf("some plugins failed to update: %s", strings.Join(errors, "; "))
 	}
 
+	return nil
+}
+
+func (a *App) GetRemotePlugins() ([]models.PluginRegistry, error) {
+	log.Printf("[App] Getting all remote plugins")
+
+	var registries []models.PluginRegistry
+	if err := a.db.GetDB().Where("install_source = ?", "remote").Find(&registries).Error; err != nil {
+		return nil, fmt.Errorf("failed to fetch remote plugins: %w", err)
+	}
+
+	return registries, nil
+}
+
+func (a *App) ForceUpdateRemotePlugin(pluginID string) error {
+	log.Printf("[App] Force updating remote plugin by ID: %s", pluginID)
+
+	var registry models.PluginRegistry
+	if err := a.db.GetDB().Where("plugin_id = ? AND install_source = ?", pluginID, "remote").First(&registry).Error; err != nil {
+		return fmt.Errorf("remote plugin not found: %w", err)
+	}
+
+	if registry.Repository == "" {
+		return fmt.Errorf("plugin %s: no repository URL", registry.PluginID)
+	}
+
+	log.Printf("[App] Force updating plugin %s from %s", registry.PluginID, registry.Repository)
+	if err := a.pluginInstaller.UpdatePluginWithForce(registry.Repository, true); err != nil {
+		log.Printf("[App] Failed to update %s: %v", registry.PluginID, err)
+		return fmt.Errorf("failed to update %s: %w", registry.PluginID, err)
+	}
+
+	log.Printf("[App] Successfully force updated %s", registry.PluginID)
 	return nil
 }
 

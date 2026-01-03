@@ -168,6 +168,23 @@ copy_resources() {
     return $has_error
 }
 
+generate_licenses() {
+    print_header "Generating License Information"
+    cd "$PROJECT_ROOT"
+
+    mkdir -p resources/licenses
+
+    if command -v node &> /dev/null; then
+        node scripts/generate-go-licenses.js
+        node scripts/generate-npm-licenses.js
+        print_success "License information generated"
+    else
+        echo "Warning: Node.js not found, skipping license generation"
+        echo "[]" > resources/licenses/go-licenses.json
+        echo "[]" > resources/licenses/npm-licenses.json
+    fi
+}
+
 build_dev_tools() {
     print_header "Building Developer Tools"
     cd "$PROJECT_ROOT"
@@ -336,6 +353,7 @@ case "${1:-all}" in
         ;;
     all)
         build_dev_tools
+        generate_licenses
         build_frontend
         build_wails "${2:-windows/amd64}"
         print_header "Build Complete!"
@@ -347,6 +365,7 @@ case "${1:-all}" in
     rebuild)
         clean_build
         build_dev_tools
+        generate_licenses
         build_frontend
         build_wails "${2:-windows/amd64}"
         print_header "Rebuild Complete!"

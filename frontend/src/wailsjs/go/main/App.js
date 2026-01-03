@@ -118,6 +118,10 @@ export function ForceUpdateAllRemotePlugins() {
   return window['go']['main']['App']['ForceUpdateAllRemotePlugins']();
 }
 
+export function ForceUpdateRemotePlugin(arg1) {
+  return window['go']['main']['App']['ForceUpdateRemotePlugin'](arg1);
+}
+
 export function GetActivePythonEnvironment() {
   return window['go']['main']['App']['GetActivePythonEnvironment']();
 }
@@ -176,6 +180,10 @@ export function GetJobExecutionLog(arg1) {
 
 export function GetJobQueueStatus() {
   return window['go']['main']['App']['GetJobQueueStatus']();
+}
+
+export function GetLicenseInfo() {
+  return window['go']['main']['App']['GetLicenseInfo']();
 }
 
 export function GetLogFilePath() {
@@ -248,6 +256,10 @@ export function GetRVersion() {
 
 export function GetRegistryPlugin(arg1) {
   return window['go']['main']['App']['GetRegistryPlugin'](arg1);
+}
+
+export function GetRemotePlugins() {
+  return window['go']['main']['App']['GetRemotePlugins']();
 }
 
 export function GetRenvEnvironments() {
@@ -444,6 +456,10 @@ export function SetActivePythonEnvironment(arg1) {
 
 export function SetActiveREnvironment(arg1) {
   return window['go']['main']['App']['SetActiveREnvironment'](arg1);
+}
+
+export function SetLogFilePath(arg1) {
+  return window['go']['main']['App']['SetLogFilePath'](arg1);
 }
 
 export function SetPluginEnabled(arg1, arg2) {

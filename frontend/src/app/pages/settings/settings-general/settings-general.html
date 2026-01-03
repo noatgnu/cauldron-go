@@ -45,5 +45,40 @@
         Force Update All External Plugins
       }
     </button>
+
+    <div class="warning-box" style="margin-top: 24px;">
+      <mat-icon>info</mat-icon>
+      <div>
+        <strong>Force Update Specific Plugin</strong><br>
+        Use this when you need to force update a specific plugin that has errors or needs to be refreshed.
+        This will update the selected plugin to its latest commit, discarding any local modifications.
+      </div>
+    </div>
+
+    <div style="display: flex; gap: 8px; align-items: flex-start; margin-top: 16px;">
+      <mat-form-field appearance="outline" style="flex: 1;">
+        <mat-label>Select Plugin to Force Update</mat-label>
+        <mat-select [(value)]="selectedPluginID">
+          <mat-option [value]="null">-- Select a plugin --</mat-option>
+          @for (plugin of remotePlugins(); track plugin.pluginId) {
+            <mat-option [value]="plugin.pluginId">
+              {{ plugin.name }} ({{ plugin.pluginId }})
+            </mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+      <button mat-raised-button
+              color="primary"
+              (click)="forceUpdateSinglePlugin()"
+              [disabled]="!selectedPluginID || forceUpdatingSingle()"
+              style="margin-top: 8px;">
+        <mat-icon>sync</mat-icon>
+        @if (forceUpdatingSingle()) {
+          Updating...
+        } @else {
+          Force Update
+        }
+      </button>
+    </div>
   </div>
 </div>

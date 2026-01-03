@@ -9,10 +9,12 @@ import { PluginExecute } from './pages/plugin-execute/plugin-execute';
 import { PluginEditor } from './pages/plugin-editor/plugin-editor';
 import { PluginRegistry } from './pages/plugin-registry/plugin-registry';
 import { PluginRegistryDetail } from './pages/plugin-registry-detail/plugin-registry-detail';
+import { About } from './pages/about/about';
 
 export const routes: Routes = [
   { path: '', redirectTo: 'home', pathMatch: 'full' },
   { path: 'home', component: Home },
+  { path: 'about', component: About },
   { path: 'settings', redirectTo: 'settings/general', pathMatch: 'full' },
   { path: 'settings/:section', component: Settings },
   { path: 'jobs', component: Jobs },

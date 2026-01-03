@@ -53,6 +53,10 @@ export class App implements OnInit {
     window.runtime.EventsOn('menu:settings', () => {
       this.router.navigate(['/settings']);
     });
+
+    window.runtime.EventsOn('menu:about', () => {
+      this.router.navigate(['/about']);
+    });
   }
 
   private setupPluginInstallationListeners(): void {

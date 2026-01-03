@@ -1,0 +1,155 @@
+.about-content {
+  padding: 20px 0;
+  text-align: center;
+}
+
+.app-icon {
+  margin-bottom: 20px;
+
+  .large-icon {
+    font-size: 64px;
+    width: 64px;
+    height: 64px;
+  }
+}
+
+.info-section {
+  margin-bottom: 24px;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.app-name {
+  font-size: 24px;
+  font-weight: 500;
+  margin: 0 0 8px 0;
+  color: var(--primary);
+}
+
+.version {
+  font-size: 14px;
+  margin: 0 0 12px 0;
+  opacity: 0.7;
+}
+
+.description {
+  font-size: 14px;
+  margin: 0;
+  opacity: 0.8;
+}
+
+.info-line {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 8px 0;
+  font-size: 14px;
+
+  mat-icon {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+    opacity: 0.7;
+  }
+}
+
+.licenses-content {
+  padding: 20px 0;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.license-section {
+  margin-bottom: 32px;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+
+  h3 {
+    font-size: 16px;
+    font-weight: 500;
+    margin: 0 0 16px 0;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--outline-variant);
+  }
+}
+
+.license-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.license-item {
+  padding: 12px;
+  border: 1px solid var(--outline-variant);
+  border-radius: 4px;
+  background: var(--surface-container);
+
+  .license-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+
+    .package-name {
+      font-weight: 500;
+      font-size: 13px;
+      word-break: break-all;
+    }
+
+    .package-version {
+      font-size: 12px;
+      opacity: 0.7;
+      flex-shrink: 0;
+      margin-left: 8px;
+    }
+  }
+
+  .license-info {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 12px;
+
+    .license-type {
+      opacity: 0.8;
+    }
+
+    .repo-link {
+      display: flex;
+      align-items: center;
+      color: var(--primary);
+      text-decoration: none;
+
+      mat-icon {
+        font-size: 16px;
+        width: 16px;
+        height: 16px;
+      }
+
+      &:hover {
+        opacity: 0.8;
+      }
+    }
+  }
+}
+
+.loading-state, .no-data {
+  text-align: center;
+  padding: 32px;
+  opacity: 0.7;
+}
+
+mat-dialog-actions {
+  padding: 16px 24px;
+}
+
+mat-dialog-content {
+  padding: 0 24px;
+}

@@ -9,7 +9,7 @@
       <div class="queue-status">
         <div class="status-item">
           <mat-icon>queue</mat-icon>
-          <span>Status: <strong>{{ queueStatus().paused ? 'Paused' : 'Running' }}</strong></span>
+          <span>Status: <strong>{{ getQueueStatusText() }}</strong></span>
         </div>
         <div class="status-item">
           <mat-icon>pending_actions</mat-icon>

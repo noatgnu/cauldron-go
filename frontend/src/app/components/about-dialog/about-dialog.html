@@ -1,0 +1,100 @@
+<h2 mat-dialog-title>About Cauldron</h2>
+
+<mat-dialog-content>
+  <mat-tab-group>
+    <mat-tab label="About">
+      <div class="about-content">
+        <div class="app-icon">
+          <mat-icon color="primary" class="large-icon">science</mat-icon>
+        </div>
+
+        <div class="info-section">
+          <h3 class="app-name">Cauldron</h3>
+          <p class="version">Version {{ version }}</p>
+          <p class="description">{{ description }}</p>
+        </div>
+
+        <div class="info-section">
+          <p class="info-line">
+            <mat-icon>person</mat-icon>
+            <span>{{ author }}</span>
+          </p>
+          <p class="info-line">
+            <mat-icon>email</mat-icon>
+            <span>{{ email }}</span>
+          </p>
+          <p class="info-line">
+            <mat-icon>copyright</mat-icon>
+            <span>{{ copyright }}</span>
+          </p>
+        </div>
+      </div>
+    </mat-tab>
+
+    <mat-tab label="Licenses">
+      <div class="licenses-content">
+        @if (loading()) {
+          <div class="loading-state">
+            <p>Loading license information...</p>
+          </div>
+        } @else {
+          <div class="license-section">
+            <h3>Go Dependencies ({{ licenses().go.length }})</h3>
+            @if (licenses().go.length > 0) {
+              <div class="license-list">
+                @for (dep of licenses().go; track dep.name) {
+                  <div class="license-item">
+                    <div class="license-header">
+                      <span class="package-name">{{ dep.name }}</span>
+                      <span class="package-version">{{ dep.version }}</span>
+                    </div>
+                    <div class="license-info">
+                      <span class="license-type">{{ dep.license }}</span>
+                      @if (dep.repository) {
+                        <a [href]="dep.repository" target="_blank" class="repo-link">
+                          <mat-icon>open_in_new</mat-icon>
+                        </a>
+                      }
+                    </div>
+                  </div>
+                }
+              </div>
+            } @else {
+              <p class="no-data">No Go dependencies found</p>
+            }
+          </div>
+
+          <div class="license-section">
+            <h3>NPM Dependencies ({{ licenses().npm.length }})</h3>
+            @if (licenses().npm.length > 0) {
+              <div class="license-list">
+                @for (dep of licenses().npm; track dep.name) {
+                  <div class="license-item">
+                    <div class="license-header">
+                      <span class="package-name">{{ dep.name }}</span>
+                      <span class="package-version">{{ dep.version }}</span>
+                    </div>
+                    <div class="license-info">
+                      <span class="license-type">{{ dep.license }}</span>
+                      @if (dep.repository) {
+                        <a [href]="dep.repository" target="_blank" class="repo-link">
+                          <mat-icon>open_in_new</mat-icon>
+                        </a>
+                      }
+                    </div>
+                  </div>
+                }
+              </div>
+            } @else {
+              <p class="no-data">No NPM dependencies found</p>
+            }
+          </div>
+        }
+      </div>
+    </mat-tab>
+  </mat-tab-group>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button mat-dialog-close>Close</button>
+</mat-dialog-actions>

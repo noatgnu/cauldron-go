@@ -271,6 +271,20 @@ export class Jobs implements OnInit {
     return !!job.outputPath && (job.status === 'completed' || job.status === 'failed');
   }
 
+  getQueueStatusText(): string {
+    const status = this.queueStatus();
+    if (status.paused) {
+      return 'Paused';
+    }
+    if (status.inProgressCount > 0) {
+      return 'Running';
+    }
+    if (status.pendingCount > 0) {
+      return 'Idle (Pending)';
+    }
+    return 'Idle';
+  }
+
   async loadQueueStatus(): Promise<void> {
     try {
       const status = await this.wails.getJobQueueStatus();

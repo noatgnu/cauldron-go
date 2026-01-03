@@ -271,6 +271,11 @@ export class Wails {
     return WailsApp.SetActiveREnvironment(path);
   }
 
+  async getLicenseInfo(): Promise<any> {
+    if (!this.isWails) throw new Error('Wails not available');
+    return WailsApp.GetLicenseInfo();
+  }
+
   async openDirectoryInExplorer(path: string): Promise<void> {
     if (!this.isWails) throw new Error('Wails not available');
     return WailsApp.OpenDirectoryInExplorer(path);
@@ -615,6 +620,16 @@ export class Wails {
   async forceUpdateAllRemotePlugins(): Promise<void> {
     if (!this.isWails) throw new Error('Wails not available');
     return WailsApp.ForceUpdateAllRemotePlugins();
+  }
+
+  async getRemotePlugins(): Promise<models.PluginRegistry[]> {
+    if (!this.isWails) throw new Error('Wails not available');
+    return WailsApp.GetRemotePlugins();
+  }
+
+  async forceUpdateRemotePlugin(pluginID: string): Promise<void> {
+    if (!this.isWails) throw new Error('Wails not available');
+    return WailsApp.ForceUpdateRemotePlugin(pluginID);
   }
 
   async uninstallPluginFromRepo(repoURL: string, removeGitAuth: boolean, deleteJobHistory: boolean, deleteEnvironments: boolean): Promise<void> {

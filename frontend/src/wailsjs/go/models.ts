@@ -1,3 +1,41 @@
+export namespace gorm {
+	
+	export class DeletedAt {
+	    // Go type: time
+	    Time: any;
+	    Valid: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new DeletedAt(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.Time = this.convertValues(source["Time"], null);
+	        this.Valid = source["Valid"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+
+}
+
 export namespace main {
 	
 	export class GitAuthConfigResponse {
@@ -22,6 +60,57 @@ export namespace main {
 	        this.updatedAt = source["updatedAt"];
 	    }
 	}
+	export class LicenseInfo {
+	    name: string;
+	    version: string;
+	    license: string;
+	    repository?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new LicenseInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.version = source["version"];
+	        this.license = source["license"];
+	        this.repository = source["repository"];
+	    }
+	}
+	export class LicenseData {
+	    go: LicenseInfo[];
+	    npm: LicenseInfo[];
+	
+	    static createFrom(source: any = {}) {
+	        return new LicenseData(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.go = this.convertValues(source["go"], LicenseInfo);
+	        this.npm = this.convertValues(source["npm"], LicenseInfo);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
 	export class PluginInstallResult {
 	    pluginId: string;
 	
@@ -829,6 +918,64 @@ export namespace models {
 	
 	
 	
+	export class PluginRegistry {
+	    id: number;
+	    pluginId: string;
+	    name: string;
+	    version: string;
+	    repository: string;
+	    commitHash: string;
+	    folderPath: string;
+	    installSource: string;
+	    registrySource?: string;
+	    updatePolicy: string;
+	    pinnedVersion?: string;
+	    enabled: boolean;
+	    // Go type: time
+	    installedAt: any;
+	    // Go type: time
+	    updatedAt: any;
+	
+	    static createFrom(source: any = {}) {
+	        return new PluginRegistry(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.pluginId = source["pluginId"];
+	        this.name = source["name"];
+	        this.version = source["version"];
+	        this.repository = source["repository"];
+	        this.commitHash = source["commitHash"];
+	        this.folderPath = source["folderPath"];
+	        this.installSource = source["installSource"];
+	        this.registrySource = source["registrySource"];
+	        this.updatePolicy = source["updatePolicy"];
+	        this.pinnedVersion = source["pinnedVersion"];
+	        this.enabled = source["enabled"];
+	        this.installedAt = this.convertValues(source["installedAt"], null);
+	        this.updatedAt = this.convertValues(source["updatedAt"], null);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	
 	
 	export class PluginV2 {

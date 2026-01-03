@@ -142,3 +142,6 @@ example:
     annotation_file: "diann/annotation.txt"
     data_completeness: 0.7
     use_log2: true
+
+citation:
+  enabled: false

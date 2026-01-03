@@ -71,9 +71,11 @@ func main() {
 	logDir := filepath.Join(userConfigDir, "cauldron")
 
 	logFile, err := setupLogRotation(logDir)
+	var logFilePath string
 	if err == nil {
 		log.SetOutput(logFile)
 		defer logFile.Close()
+		logFilePath = logFile.Name()
 	}
 
 	log.Println("========================================")
@@ -83,6 +85,10 @@ func main() {
 
 	// Create an instance of the app structure
 	app := NewApp()
+	if logFilePath != "" {
+		app.SetLogFilePath(logFilePath)
+		log.Printf("Log file path set to: %s\n", logFilePath)
+	}
 
 	log.Println("Creating Wails application...")
 

@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/extension"
@@ -167,6 +168,10 @@ type DiagramConfig struct {
 	Enabled bool `yaml:"enabled"`
 }
 
+type CitationConfig struct {
+	Enabled bool `yaml:"enabled"`
+}
+
 type PluginConfig struct {
 	Plugin     PluginMetadata    `yaml:"plugin"`
 	Runtime    PluginRuntime     `yaml:"runtime"`
@@ -177,6 +182,7 @@ type PluginConfig struct {
 	Execution  PluginExecution   `yaml:"execution"`
 	Example    *ExampleData      `yaml:"example,omitempty"`
 	Diagram    *DiagramConfig    `yaml:"diagram,omitempty"`
+	Citation   *CitationConfig   `yaml:"citation,omitempty"`
 }
 
 func formatType(input PluginInput) string {
@@ -830,6 +836,60 @@ func generateDiagramSection(plugin PluginConfig, pluginDir string) string {
 	return "\n## Workflow Diagram\n\n" + mermaidDiagram + "\n"
 }
 
+func generateCitationCFF(plugin PluginConfig) string {
+	currentDate := time.Now().Format("2006-01-02")
+	author := plugin.Plugin.Author
+	if author == "" {
+		author = "Unknown Author"
+	}
+
+	pluginName := plugin.Plugin.Name
+	version := plugin.Plugin.Version
+	repository := plugin.Plugin.Repository
+
+	lines := []string{
+		"cff-version: 1.2.0",
+		fmt.Sprintf("message: \"If you use this plugin, please cite it as below.\""),
+		fmt.Sprintf("title: %s", pluginName),
+	}
+
+	if strings.Contains(author, " ") {
+		parts := strings.Split(author, " ")
+		if len(parts) >= 2 {
+			familyName := parts[len(parts)-1]
+			givenNames := strings.Join(parts[:len(parts)-1], " ")
+			lines = append(lines, "authors:")
+			lines = append(lines, "  - family-names: "+familyName)
+			lines = append(lines, "    given-names: "+givenNames)
+		} else {
+			lines = append(lines, "authors:")
+			lines = append(lines, "  - name: "+author)
+		}
+	} else {
+		lines = append(lines, "authors:")
+		lines = append(lines, "  - name: "+author)
+	}
+
+	lines = append(lines, fmt.Sprintf("version: %s", version))
+	lines = append(lines, fmt.Sprintf("date-released: %s", currentDate))
+
+	if repository != "" {
+		lines = append(lines, fmt.Sprintf("url: %s", repository))
+		lines = append(lines, fmt.Sprintf("repository-code: %s", repository))
+	}
+
+	lines = append(lines, "type: software")
+	lines = append(lines, fmt.Sprintf("abstract: %s", plugin.Plugin.Description))
+
+	if plugin.Plugin.Category != "" {
+		lines = append(lines, fmt.Sprintf("keywords:"))
+		lines = append(lines, fmt.Sprintf("  - proteomics"))
+		lines = append(lines, fmt.Sprintf("  - %s", plugin.Plugin.Category))
+	}
+
+	return strings.Join(lines, "\n")
+}
+
 func generateExampleSection(example *ExampleData) string {
 	if example == nil || !example.Enabled {
 		return ""
@@ -1103,6 +1163,17 @@ func main() {
 	fmt.Printf("[SUCCESS] Documentation generated:\n")
 	fmt.Printf("  - Markdown (HTTP protocol): %s\n", mdOutputPath)
 	fmt.Printf("  - HTML (custom protocol):   %s\n", htmlOutputPath)
+
+	if plugin.Citation != nil && plugin.Citation.Enabled {
+		cffContent := generateCitationCFF(plugin)
+		cffOutputPath := filepath.Join(pluginDir, "CITATION.cff")
+		if err := os.WriteFile(cffOutputPath, []byte(cffContent), 0644); err != nil {
+			fmt.Printf("[ERROR] Failed to write CITATION.cff: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("  - Citation (CFF format):    %s\n", cffOutputPath)
+	}
+
 	fmt.Println()
 	fmt.Println(strings.Repeat("=", 80))
 	fmt.Println()

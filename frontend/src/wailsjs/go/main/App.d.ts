@@ -62,6 +62,8 @@ export function FetchPluginDependencies(arg1:string):Promise<Record<string, any>
 
 export function ForceUpdateAllRemotePlugins():Promise<void>;
 
+export function ForceUpdateRemotePlugin(arg1:string):Promise<void>;
+
 export function GetActivePythonEnvironment():Promise<services.PythonEnvironment>;
 
 export function GetActiveREnvironment():Promise<services.REnvironment>;
@@ -91,6 +93,8 @@ export function GetJob(arg1:string):Promise<models.Job>;
 export function GetJobExecutionLog(arg1:string):Promise<string>;
 
 export function GetJobQueueStatus():Promise<Record<string, any>>;
+
+export function GetLicenseInfo():Promise<main.LicenseData>;
 
 export function GetLogFilePath():Promise<string>;
 
@@ -127,6 +131,8 @@ export function GetPythonVersion():Promise<string>;
 export function GetRVersion():Promise<string>;
 
 export function GetRegistryPlugin(arg1:string):Promise<any>;
+
+export function GetRemotePlugins():Promise<Array<models.PluginRegistry>>;
 
 export function GetRenvEnvironments():Promise<Array<services.RenvEnvironment>>;
 
@@ -225,6 +231,8 @@ export function SaveTempFile(arg1:string,arg2:string):Promise<string>;
 export function SetActivePythonEnvironment(arg1:string):Promise<void>;
 
 export function SetActiveREnvironment(arg1:string):Promise<void>;
+
+export function SetLogFilePath(arg1:string):Promise<void>;
 
 export function SetPluginEnabled(arg1:number,arg2:boolean):Promise<void>;
 
