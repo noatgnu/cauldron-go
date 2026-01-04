@@ -509,34 +509,41 @@ func (e *EnvironmentService) detectDefaultR() (REnvironment, error) {
 func (e *EnvironmentService) detectRenvEnvironments() []RenvEnvironment {
 	var environments []RenvEnvironment
 
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return environments
+	var renvDir string
+	globalConfig := e.settingsService.GetConfig()
+	if globalConfig.RenvStoragePath != "" {
+		renvDir = globalConfig.RenvStoragePath
+	} else {
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			return environments
+		}
+
+		var appFolder string
+		switch runtime.GOOS {
+		case "windows":
+			localAppData := os.Getenv("LOCALAPPDATA")
+			if localAppData != "" {
+				appFolder = filepath.Join(localAppData, "cauldron")
+			} else {
+				appFolder = filepath.Join(homeDir, "AppData", "Local", "cauldron")
+			}
+		case "darwin":
+			appFolder = filepath.Join(homeDir, "Library", "Application Support", "cauldron")
+		case "linux":
+			xdgDataHome := os.Getenv("XDG_DATA_HOME")
+			if xdgDataHome != "" {
+				appFolder = filepath.Join(xdgDataHome, "cauldron")
+			} else {
+				appFolder = filepath.Join(homeDir, ".local", "share", "cauldron")
+			}
+		default:
+			appFolder = filepath.Join(homeDir, ".cauldron")
+		}
+
+		renvDir = filepath.Join(appFolder, "renv-projects")
 	}
 
-	var appFolder string
-	switch runtime.GOOS {
-	case "windows":
-		localAppData := os.Getenv("LOCALAPPDATA")
-		if localAppData != "" {
-			appFolder = filepath.Join(localAppData, "cauldron")
-		} else {
-			appFolder = filepath.Join(homeDir, "AppData", "Local", "cauldron")
-		}
-	case "darwin":
-		appFolder = filepath.Join(homeDir, "Library", "Application Support", "cauldron")
-	case "linux":
-		xdgDataHome := os.Getenv("XDG_DATA_HOME")
-		if xdgDataHome != "" {
-			appFolder = filepath.Join(xdgDataHome, "cauldron")
-		} else {
-			appFolder = filepath.Join(homeDir, ".local", "share", "cauldron")
-		}
-	default:
-		appFolder = filepath.Join(homeDir, ".cauldron")
-	}
-
-	renvDir := filepath.Join(appFolder, "renv-projects")
 	if _, err := os.Stat(renvDir); err == nil {
 		dirs, _ := os.ReadDir(renvDir)
 		for _, dir := range dirs {
@@ -1034,34 +1041,40 @@ func (e *EnvironmentService) CreateRenvEnvironment(name string, packages []strin
 		cacheDir, _ = e.getRenvCachePath()
 	}
 
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return fmt.Errorf("failed to get user home directory: %w", err)
+	var renvDir string
+	if globalConfig.RenvStoragePath != "" {
+		renvDir = globalConfig.RenvStoragePath
+	} else {
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			return fmt.Errorf("failed to get user home directory: %w", err)
+		}
+
+		var appFolder string
+		switch runtime.GOOS {
+		case "windows":
+			localAppData := os.Getenv("LOCALAPPDATA")
+			if localAppData != "" {
+				appFolder = filepath.Join(localAppData, "cauldron")
+			} else {
+				appFolder = filepath.Join(homeDir, "AppData", "Local", "cauldron")
+			}
+		case "darwin":
+			appFolder = filepath.Join(homeDir, "Library", "Application Support", "cauldron")
+		case "linux":
+			xdgDataHome := os.Getenv("XDG_DATA_HOME")
+			if xdgDataHome != "" {
+				appFolder = filepath.Join(xdgDataHome, "cauldron")
+			} else {
+				appFolder = filepath.Join(homeDir, ".local", "share", "cauldron")
+			}
+		default:
+			appFolder = filepath.Join(homeDir, ".cauldron")
+		}
+
+		renvDir = filepath.Join(appFolder, "renv-projects")
 	}
 
-	var appFolder string
-	switch runtime.GOOS {
-	case "windows":
-		localAppData := os.Getenv("LOCALAPPDATA")
-		if localAppData != "" {
-			appFolder = filepath.Join(localAppData, "cauldron")
-		} else {
-			appFolder = filepath.Join(homeDir, "AppData", "Local", "cauldron")
-		}
-	case "darwin":
-		appFolder = filepath.Join(homeDir, "Library", "Application Support", "cauldron")
-	case "linux":
-		xdgDataHome := os.Getenv("XDG_DATA_HOME")
-		if xdgDataHome != "" {
-			appFolder = filepath.Join(xdgDataHome, "cauldron")
-		} else {
-			appFolder = filepath.Join(homeDir, ".local", "share", "cauldron")
-		}
-	default:
-		appFolder = filepath.Join(homeDir, ".cauldron")
-	}
-
-	renvDir := filepath.Join(appFolder, "renv-projects")
 	if err := os.MkdirAll(renvDir, 0755); err != nil {
 		return fmt.Errorf("failed to create renv projects directory: %w", err)
 	}
@@ -1355,7 +1368,7 @@ func (e *EnvironmentService) GetRenvLibPath(projectPath string) string {
 	return renvLibPath
 }
 
-func (e *EnvironmentService) getRenvCachePath() (string, error) {
+func (e *EnvironmentService) getDefaultAppFolder() (string, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return "", err
@@ -1383,9 +1396,46 @@ func (e *EnvironmentService) getRenvCachePath() (string, error) {
 		appFolder = filepath.Join(homeDir, ".cauldron")
 	}
 
+	return appFolder, nil
+}
+
+func (e *EnvironmentService) getRenvCachePath() (string, error) {
+	appFolder, err := e.getDefaultAppFolder()
+	if err != nil {
+		return "", err
+	}
+
 	cacheDir := filepath.Join(appFolder, "renv-cache")
 	if err := os.MkdirAll(cacheDir, 0755); err != nil {
 		return "", err
 	}
 	return cacheDir, nil
+}
+
+func (e *EnvironmentService) getRenvStorageDir() (string, error) {
+	globalConfig := e.settingsService.GetConfig()
+	if globalConfig.RenvStoragePath != "" {
+		return globalConfig.RenvStoragePath, nil
+	}
+
+	appFolder, err := e.getDefaultAppFolder()
+	if err != nil {
+		return "", err
+	}
+
+	return filepath.Join(appFolder, "renv-projects"), nil
+}
+
+func (e *EnvironmentService) getVenvStorageDir() (string, error) {
+	globalConfig := e.settingsService.GetConfig()
+	if globalConfig.VenvStoragePath != "" {
+		return globalConfig.VenvStoragePath, nil
+	}
+
+	appFolder, err := e.getDefaultAppFolder()
+	if err != nil {
+		return "", err
+	}
+
+	return filepath.Join(appFolder, "venv-projects"), nil
 }

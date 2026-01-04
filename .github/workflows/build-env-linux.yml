@@ -124,21 +124,31 @@ jobs:
       - name: Compress Python directory
         run: XZ_OPT=-9 tar -cJf python-linux-x86_64.tar.xz bin/linux/python
 
+      - name: Generate Python checksum
+        run: sha256sum python-linux-x86_64.tar.xz > python-linux-x86_64.tar.xz.sha256
+
       - name: Compress R-Portable directory
         run: XZ_OPT=-9 tar -cJf r-portable-linux-x86_64.tar.xz bin/linux/R-Portable
+
+      - name: Generate R-Portable checksum
+        run: sha256sum r-portable-linux-x86_64.tar.xz > r-portable-linux-x86_64.tar.xz.sha256
 
       - name: Upload Python Archive
         uses: actions/upload-artifact@v4
         with:
           name: python-linux-x86_64
-          path: python-linux-x86_64.tar.xz
+          path: |
+            python-linux-x86_64.tar.xz
+            python-linux-x86_64.tar.xz.sha256
           retention-days: 30
 
       - name: Upload R-Portable Archive
         uses: actions/upload-artifact@v4
         with:
           name: r-portable-linux-x86_64
-          path: r-portable-linux-x86_64.tar.xz
+          path: |
+            r-portable-linux-x86_64.tar.xz
+            r-portable-linux-x86_64.tar.xz.sha256
           retention-days: 30
 
       - name: Upload Python to Release
@@ -152,6 +162,17 @@ jobs:
           asset_name: python-linux-x86_64.tar.xz
           asset_content_type: application/x-xz
 
+      - name: Upload Python Checksum to Release
+        if: github.event_name == 'release'
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: python-linux-x86_64.tar.xz.sha256
+          asset_name: python-linux-x86_64.tar.xz.sha256
+          asset_content_type: text/plain
+
       - name: Upload R to Release
         if: github.event_name == 'release'
         uses: actions/upload-release-asset@v1
@@ -162,3 +183,14 @@ jobs:
           asset_path: r-portable-linux-x86_64.tar.xz
           asset_name: r-portable-linux-x86_64.tar.xz
           asset_content_type: application/x-xz
+
+      - name: Upload R Checksum to Release
+        if: github.event_name == 'release'
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: r-portable-linux-x86_64.tar.xz.sha256
+          asset_name: r-portable-linux-x86_64.tar.xz.sha256
+          asset_content_type: text/plain

@@ -2,6 +2,8 @@ package services
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -138,6 +140,7 @@ func (p *PortableEnvService) DownloadPortableEnvironment(url, environment string
 	}
 
 	tempFilePath := filepath.Join(tempFolder, fileName)
+	checksumFilePath := filepath.Join(tempFolder, fileName+".sha256")
 	log.Printf("[DownloadPortableEnvironment] Downloading to: %s", tempFilePath)
 
 	p.progressNotifier.EmitStart(ProgressTypeDownload, fileName, fmt.Sprintf("Downloading %s", fileName))
@@ -218,6 +221,33 @@ func (p *PortableEnvService) DownloadPortableEnvironment(url, environment string
 	// Final progress update
 	log.Printf("[DownloadPortableEnvironment] Download complete: %d bytes", downloadedSize)
 	p.progressNotifier.EmitComplete(ProgressTypeDownload, fileName, fmt.Sprintf("Downloaded %s", fileName))
+
+	// Download and verify checksum
+	checksumURL := url + ".sha256"
+	log.Printf("[DownloadPortableEnvironment] Downloading checksum from: %s", checksumURL)
+
+	expectedHash, err := p.downloadChecksum(checksumURL, checksumFilePath)
+	if err != nil {
+		log.Printf("[DownloadPortableEnvironment] Warning: Failed to download checksum: %v", err)
+		log.Printf("[DownloadPortableEnvironment] Proceeding without hash verification")
+	} else {
+		log.Printf("[DownloadPortableEnvironment] Verifying file integrity...")
+		p.progressNotifier.EmitStart(ProgressTypeInstall, "verify-"+fileName, "Verifying download integrity")
+
+		actualHash, err := calculateSHA256(tempFilePath)
+		if err != nil {
+			p.progressNotifier.EmitError(ProgressTypeInstall, "verify-"+fileName, fmt.Sprintf("Hash calculation failed: %v", err), "")
+			return fmt.Errorf("failed to calculate file hash: %w", err)
+		}
+
+		if actualHash != expectedHash {
+			p.progressNotifier.EmitError(ProgressTypeInstall, "verify-"+fileName, "Hash verification failed", "")
+			return fmt.Errorf("hash verification failed: expected %s, got %s", expectedHash, actualHash)
+		}
+
+		log.Printf("[DownloadPortableEnvironment] Hash verification successful: %s", actualHash)
+		p.progressNotifier.EmitComplete(ProgressTypeInstall, "verify-"+fileName, "Integrity verified")
+	}
 
 	log.Printf("[DownloadPortableEnvironment] Starting extraction...")
 
@@ -321,12 +351,96 @@ func (p *PortableEnvService) DownloadPortableEnvironment(url, environment string
 	log.Printf("[DownloadPortableEnvironment] Cleaning up temporary files...")
 	os.RemoveAll(filepath.Join(tempFolder, "bin"))
 	os.Remove(tempFilePath)
+	os.Remove(checksumFilePath)
 
 	p.progressNotifier.EmitComplete(ProgressTypeInstall, fileName, "Installation completed")
 
 	log.Printf("[DownloadPortableEnvironment] Installation completed successfully")
 
 	return nil
+}
+
+func (p *PortableEnvService) downloadChecksum(url, filePath string) (string, error) {
+	client := &http.Client{}
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Accept", "text/plain")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("checksum download failed with status %d", resp.StatusCode)
+	}
+
+	out, err := os.Create(filePath)
+	if err != nil {
+		return "", err
+	}
+	defer out.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	_, err = out.Write(body)
+	if err != nil {
+		return "", err
+	}
+
+	// Parse checksum file (format: "hash  filename" or just "hash")
+	checksumContent := strings.TrimSpace(string(body))
+	parts := strings.Fields(checksumContent)
+	if len(parts) == 0 {
+		return "", fmt.Errorf("invalid checksum file format")
+	}
+
+	// Take the first field as the hash
+	hash := parts[0]
+
+	// Validate hash format (SHA256 is 64 hex characters)
+	if len(hash) != 64 {
+		return "", fmt.Errorf("invalid hash length: expected 64, got %d", len(hash))
+	}
+
+	// Validate all characters are hex
+	if _, err := hex.DecodeString(hash); err != nil {
+		return "", fmt.Errorf("invalid hash format: %w", err)
+	}
+
+	return hash, nil
+}
+
+func calculateSHA256(filePath string) (string, error) {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+
+	hash := sha256.New()
+	buf := make([]byte, 1024*1024) // 1MB buffer
+
+	for {
+		n, err := file.Read(buf)
+		if n > 0 {
+			hash.Write(buf[:n])
+		}
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return "", err
+		}
+	}
+
+	return hex.EncodeToString(hash.Sum(nil)), nil
 }
 
 func (p *PortableEnvService) GetPortableEnvironmentPath(environment string) (string, error) {

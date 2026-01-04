@@ -1,4 +1,4 @@
-import {Component, Inject} from '@angular/core';
+import {Component, Inject, inject} from '@angular/core';
 import {MAT_DIALOG_DATA, MatDialogModule, MatDialogRef} from "@angular/material/dialog";
 import {FormsModule, ReactiveFormsModule} from "@angular/forms";
 import {IDataFrame} from "data-forge";
@@ -13,6 +13,7 @@ import {MatDividerModule} from "@angular/material/divider";
 import {MatTooltipModule} from "@angular/material/tooltip";
 import {MatMenuModule} from "@angular/material/menu";
 import {NotificationService} from "../../core/services/notification.service";
+import { ThemeService } from '../../core/services/theme.service';
 
 export interface SampleAnnotationData {
   samples?: string[];
@@ -52,10 +53,11 @@ export class SampleAnnotation {
   _annotation: {Sample: string, Condition: string, BioReplicate: string, Batch: string, Color: string, selected?: boolean}[] = [];
   mode: 'edit' | 'create' = 'edit';
   displayedColumns: string[] = ['Sample', 'Condition', 'BioReplicate', 'Color', 'Batch'];
-  private readonly defaultColorList: string[] = [
-    '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
-    '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'
-  ];
+  private themeService = inject(ThemeService);
+
+  private get defaultColorList(): string[] {
+    return this.themeService.colorPalette();
+  }
 
   regexRules: RegexRule[] = [];
   batchCondition: string = '';

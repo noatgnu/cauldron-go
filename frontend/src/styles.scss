@@ -9,6 +9,7 @@ html {
     typography: Roboto,
     density: -1,
   ));
+  font-size: var(--base-font-size, 100%);
 }
 
 :root {
@@ -906,4 +907,95 @@ pre code,
   --mdc-snackbar-container-color: #ff9800;
   --mat-snack-bar-button-color: #fff;
   --mdc-snackbar-supporting-text-color: #fff;
+}
+
+body.high-contrast {
+  --background: #000000;
+  --surface: #1a1a1a;
+  --surface-variant: #2a2a2a;
+  --surface-container: #0a0a0a;
+  --on-background: #ffffff;
+  --on-surface: #ffffff;
+  --on-surface-variant: #e0e0e0;
+  --on-surface-muted: #cccccc;
+  --border: #ffffff;
+  --divider: #ffffff;
+  --hover: rgba(255, 255, 255, 0.1);
+  --selected: rgba(255, 255, 255, 0.2);
+  --disabled: rgba(255, 255, 255, 0.5);
+  --overlay: rgba(255, 255, 255, 0.9);
+
+  --primary: #00bfff;
+  --primary-light: #4dd0ff;
+  --primary-dark: #0099cc;
+  --primary-container: #003d4d;
+  --primary-hover: rgba(0, 191, 255, 0.2);
+  --on-primary: #000000;
+
+  --error: #ff0000;
+  --error-light: #ff4444;
+  --error-dark: #cc0000;
+  --error-container: #4d0000;
+  --error-subtle: #330000;
+  --on-error: #ffffff;
+  --on-error-container: #ff4444;
+
+  --success: #00ff00;
+  --success-light: #44ff44;
+  --success-dark: #00cc00;
+  --success-container: #004d00;
+  --on-success: #000000;
+  --on-success-container: #44ff44;
+
+  --warning: #ffff00;
+  --warning-light: #ffff44;
+  --warning-dark: #cccc00;
+  --warning-container: #4d4d00;
+  --on-warning: #000000;
+  --on-warning-container: #ffff44;
+
+  --info: #00ffff;
+  --info-light: #44ffff;
+  --info-dark: #00cccc;
+  --info-container: #004d4d;
+  --on-info: #000000;
+  --on-info-container: #44ffff;
+}
+
+body.high-contrast.dark-theme {
+  --background: #000000;
+  --surface: #1a1a1a;
+  --on-background: #ffffff;
+  --on-surface: #ffffff;
+}
+
+body.high-contrast.light-theme {
+  --background: #ffffff;
+  --surface: #f0f0f0;
+  --on-background: #000000;
+  --on-surface: #000000;
+  --primary: #0000ff;
+  --error: #ff0000;
+  --success: #008000;
+  --warning: #ff8c00;
+  --info: #0080ff;
+}
+
+body.reduced-motion,
+body.reduced-motion * {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

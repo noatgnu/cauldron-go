@@ -61,6 +61,24 @@ func (s *SettingsService) Load() error {
 	if val, ok := settings["useRenvCache"]; ok {
 		s.config.UseRenvCache = val == "true"
 	}
+	if val, ok := settings["venvStoragePath"]; ok {
+		s.config.VenvStoragePath = val
+	}
+	if val, ok := settings["renvStoragePath"]; ok {
+		s.config.RenvStoragePath = val
+	}
+	if val, ok := settings["accessibility.fontScale"]; ok {
+		s.config.AccessibilityFontScale = val
+	}
+	if val, ok := settings["accessibility.highContrast"]; ok {
+		s.config.AccessibilityHighContrast = val == "true"
+	}
+	if val, ok := settings["accessibility.reducedMotion"]; ok {
+		s.config.AccessibilityReducedMotion = val == "true"
+	}
+	if val, ok := settings["accessibility.colorblindPalette"]; ok {
+		s.config.AccessibilityColorblindPalette = val
+	}
 
 	return nil
 }
@@ -73,6 +91,12 @@ func (s *SettingsService) Save() error {
 	s.db.SaveSetting("rLibPath", s.config.RLibPath)
 	s.db.SaveSetting("curtainBackendUrl", s.config.CurtainBackendURL)
 	s.db.SaveSetting("useRenvCache", fmt.Sprintf("%v", s.config.UseRenvCache))
+	s.db.SaveSetting("venvStoragePath", s.config.VenvStoragePath)
+	s.db.SaveSetting("renvStoragePath", s.config.RenvStoragePath)
+	s.db.SaveSetting("accessibility.fontScale", s.config.AccessibilityFontScale)
+	s.db.SaveSetting("accessibility.highContrast", fmt.Sprintf("%v", s.config.AccessibilityHighContrast))
+	s.db.SaveSetting("accessibility.reducedMotion", fmt.Sprintf("%v", s.config.AccessibilityReducedMotion))
+	s.db.SaveSetting("accessibility.colorblindPalette", s.config.AccessibilityColorblindPalette)
 	return nil
 }
 
@@ -92,6 +116,18 @@ func (s *SettingsService) Get(key string) interface{} {
 		return s.config.CurtainBackendURL
 	case "useRenvCache":
 		return s.config.UseRenvCache
+	case "venvStoragePath":
+		return s.config.VenvStoragePath
+	case "renvStoragePath":
+		return s.config.RenvStoragePath
+	case "accessibility.fontScale":
+		return s.config.AccessibilityFontScale
+	case "accessibility.highContrast":
+		return s.config.AccessibilityHighContrast
+	case "accessibility.reducedMotion":
+		return s.config.AccessibilityReducedMotion
+	case "accessibility.colorblindPalette":
+		return s.config.AccessibilityColorblindPalette
 	}
 	return nil
 }
@@ -113,6 +149,24 @@ func (s *SettingsService) Set(key string, value interface{}) error {
 		s.config.CurtainBackendURL = value.(string)
 	case "useRenvCache":
 		s.config.UseRenvCache = value.(bool)
+	case "venvStoragePath":
+		s.config.VenvStoragePath = value.(string)
+		if s.config.VenvStoragePath != "" {
+			os.MkdirAll(s.config.VenvStoragePath, 0755)
+		}
+	case "renvStoragePath":
+		s.config.RenvStoragePath = value.(string)
+		if s.config.RenvStoragePath != "" {
+			os.MkdirAll(s.config.RenvStoragePath, 0755)
+		}
+	case "accessibility.fontScale":
+		s.config.AccessibilityFontScale = value.(string)
+	case "accessibility.highContrast":
+		s.config.AccessibilityHighContrast = value.(bool)
+	case "accessibility.reducedMotion":
+		s.config.AccessibilityReducedMotion = value.(bool)
+	case "accessibility.colorblindPalette":
+		s.config.AccessibilityColorblindPalette = value.(string)
 	}
 	return s.Save()
 }
@@ -144,6 +198,13 @@ func (s *SettingsService) initializeDefaults() {
 
 	if s.config.CurtainBackendURL == "" {
 		s.config.CurtainBackendURL = "https://celsus.muttsu.xyz"
+	}
+
+	if s.config.AccessibilityFontScale == "" {
+		s.config.AccessibilityFontScale = "100"
+	}
+	if s.config.AccessibilityColorblindPalette == "" {
+		s.config.AccessibilityColorblindPalette = "default"
 	}
 }
 

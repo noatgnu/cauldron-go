@@ -141,6 +141,7 @@ export class Sidenav implements OnInit {
     { label: 'Back to Plugins', icon: 'arrow_back', route: '/home' },
     { label: 'General', icon: 'settings', route: '/settings/general' },
     { label: 'Appearance', icon: 'palette', route: '/settings/appearance' },
+    { label: 'Accessibility', icon: 'accessibility_new', route: '/settings/accessibility' },
     { label: 'Python', icon: 'language', route: '/settings/python' },
     { label: 'R', icon: 'analytics', route: '/settings/r' },
     { label: 'Environment Variables', icon: 'tune', route: '/settings/env' },

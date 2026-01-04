@@ -1,0 +1,123 @@
+<div class="settings-accessibility">
+  <mat-card>
+    <mat-card-header>
+      <mat-card-title>
+        <mat-icon>accessibility_new</mat-icon>
+        Font Size
+      </mat-card-title>
+    </mat-card-header>
+    <mat-card-content>
+      <div class="font-scale-section">
+        <p>Adjust the global font size for better readability</p>
+        <div class="slider-container">
+          <mat-slider
+            min="75"
+            max="200"
+            step="25"
+            discrete
+            [displayWith]="formatLabel">
+            <input matSliderThumb [(ngModel)]="fontScaleValue">
+          </mat-slider>
+          <div class="font-scale-preview">
+            Current size: {{ fontScaleValue }}%
+          </div>
+        </div>
+      </div>
+    </mat-card-content>
+  </mat-card>
+
+  <mat-card>
+    <mat-card-header>
+      <mat-card-title>
+        <mat-icon>palette</mat-icon>
+        Color Palette
+      </mat-card-title>
+    </mat-card-header>
+    <mat-card-content>
+      <div class="palette-section">
+        <p>Select a color palette optimized for different types of color vision</p>
+        <mat-form-field>
+          <mat-label>Color Palette</mat-label>
+          <mat-select [(ngModel)]="colorblindPalette">
+            @for (palette of themeService.availablePalettes(); track palette.name) {
+              <mat-option [value]="palette.name">
+                <div class="palette-option">
+                  <div class="palette-swatches">
+                    @for (color of palette.colors.slice(0, 5); track color) {
+                      <span class="swatch" [style.background-color]="color"></span>
+                    }
+                  </div>
+                  <div class="palette-info">
+                    <div class="palette-name">{{ palette.displayName }}</div>
+                    <div class="palette-description">{{ palette.description }}</div>
+                  </div>
+                </div>
+              </mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+        <div class="current-palette-preview">
+          <div class="preview-label">Current palette:</div>
+          <div class="palette-swatches">
+            @for (color of themeService.colorPalette(); track color) {
+              <span class="swatch" [style.background-color]="color"></span>
+            }
+          </div>
+        </div>
+      </div>
+    </mat-card-content>
+  </mat-card>
+
+  <mat-card>
+    <mat-card-header>
+      <mat-card-title>
+        <mat-icon>contrast</mat-icon>
+        High Contrast Mode
+      </mat-card-title>
+    </mat-card-header>
+    <mat-card-content>
+      <div class="high-contrast-section">
+        <p>Increase contrast for improved visibility</p>
+        <mat-slide-toggle [(ngModel)]="highContrast">
+          Enable high contrast mode
+        </mat-slide-toggle>
+        @if (highContrast) {
+          <div class="warning-message">
+            <mat-icon>info</mat-icon>
+            <span>High contrast mode uses bright colors that may affect the appearance of some UI elements</span>
+          </div>
+        }
+      </div>
+    </mat-card-content>
+  </mat-card>
+
+  <mat-card>
+    <mat-card-header>
+      <mat-card-title>
+        <mat-icon>motion_photos_off</mat-icon>
+        Reduced Motion
+      </mat-card-title>
+    </mat-card-header>
+    <mat-card-content>
+      <div class="reduced-motion-section">
+        <p>Minimize animations and transitions</p>
+        <mat-slide-toggle [(ngModel)]="reducedMotion">
+          Enable reduced motion
+        </mat-slide-toggle>
+        @if (prefersReducedMotion) {
+          <div class="info-message">
+            <mat-icon>info</mat-icon>
+            <span>Your system preference is set to reduce motion</span>
+          </div>
+        }
+      </div>
+    </mat-card-content>
+  </mat-card>
+
+  <div class="reset-section">
+    <button mat-raised-button color="primary" (click)="resetAll()">
+      <mat-icon>restore</mat-icon>
+      Reset All Accessibility Settings
+    </button>
+  </div>
+</div>

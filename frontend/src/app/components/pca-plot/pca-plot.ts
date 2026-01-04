@@ -1,8 +1,9 @@
-import {AfterViewInit, Component, Input} from '@angular/core';
+import {AfterViewInit, Component, Input, inject, effect} from '@angular/core';
 import { PlotlyModule } from 'angular-plotly.js';
 import {DataFrame, IDataFrame} from "data-forge";
 import {FormBuilder, FormControl, FormGroup, ReactiveFormsModule} from "@angular/forms";
 import {MatButtonModule} from "@angular/material/button";
+import { ThemeService } from '../../core/services/theme.service';
 
 @Component({
   selector: 'app-pca-plot',
@@ -108,13 +109,20 @@ export class PcaPlot implements AfterViewInit {
 
   form!: FormGroup;
 
-  defaultColorList: string[] = [
-    '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
-    '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'
-  ];
+  private themeService = inject(ThemeService);
+
+  get defaultColorList(): string[] {
+    return this.themeService.colorPalette();
+  }
 
   constructor(private fb: FormBuilder) {
     this.form = this.fb.group({});
+    effect(() => {
+      this.themeService.colorblindPalette();
+      if (this._data.count() > 0) {
+        this.drawPlot();
+      }
+    });
   }
 
   ngAfterViewInit() {

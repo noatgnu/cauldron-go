@@ -360,11 +360,11 @@ export class SettingsR implements OnInit {
   showBoundPlugins(renvId: number, envName: string): void {
     const pluginIds = this.getBoundPlugins(renvId);
     const boundPlugins: BoundPlugin[] = pluginIds.map(id => {
-      const plugin = this.plugins().find(p => 
-        p.id.toString() === id || 
+      const plugin = this.plugins().find(p =>
+        p.id.toString() === id ||
         p.definition?.plugin?.id === id
       );
-      
+
       if (plugin) {
         return {
           id: id,
@@ -372,7 +372,7 @@ export class SettingsR implements OnInit {
           description: plugin.definition?.plugin?.description || 'No description available'
         };
       }
-      
+
       return {
         id: id,
         name: `Plugin ID: ${id}`,
@@ -388,5 +388,28 @@ export class SettingsR implements OnInit {
       width: '500px',
       disableClose: true
     });
+  }
+
+  async browseRenvStorage(): Promise<void> {
+    try {
+      const path = await this.wails.openDirectoryDialog('Select R Environments Storage Directory');
+      if (path) {
+        this.config.update(c => ({ ...c, renvStoragePath: path }));
+        await this.saveSetting('renvStoragePath', path);
+        this.notification.showSuccess('Renv storage path updated');
+      }
+    } catch (error) {
+      await this.wails.logToFile(`[SettingsR] Failed to browse for renv storage: ${error}`);
+    }
+  }
+
+  async clearRenvStorage(): Promise<void> {
+    try {
+      this.config.update(c => ({ ...c, renvStoragePath: '' }));
+      await this.saveSetting('renvStoragePath', '');
+      this.notification.showSuccess('Using default renv storage location');
+    } catch (error) {
+      await this.wails.logToFile(`[SettingsR] Failed to clear renv storage: ${error}`);
+    }
   }
 }

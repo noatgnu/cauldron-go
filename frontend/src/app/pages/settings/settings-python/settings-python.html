@@ -102,6 +102,36 @@
     <h3>Virtual Environments</h3>
     <p class="section-description">Create isolated Python environments with project-specific packages using venv</p>
 
+    <mat-form-field appearance="outline" class="full-width-field">
+      <mat-label>Virtual Environments Storage Path</mat-label>
+      <input matInput [value]="config().venvStoragePath || ''" readonly placeholder="Default location">
+      <button mat-icon-button matSuffix (click)="browseVenvStorage()" matTooltip="Select venv storage directory">
+        <mat-icon>folder_open</mat-icon>
+      </button>
+      @if (config().venvStoragePath) {
+        <button mat-icon-button matSuffix (click)="clearVenvStorage()" matTooltip="Use default location">
+          <mat-icon>clear</mat-icon>
+        </button>
+      }
+    </mat-form-field>
+    @if (config().venvStoragePath) {
+      <div class="info-box">
+        <mat-icon>info</mat-icon>
+        <div>
+          <strong>Custom storage:</strong><br>
+          <code>{{ config().venvStoragePath }}</code>
+        </div>
+      </div>
+    } @else {
+      <div class="info-box">
+        <mat-icon>info</mat-icon>
+        <div>
+          <strong>Using default location</strong><br>
+          Virtual environments will be stored in the application data folder
+        </div>
+      </div>
+    }
+
     @if (virtualEnvironments().length > 0) {
       <mat-list>
         @for (venv of virtualEnvironments(); track venv.ID) {

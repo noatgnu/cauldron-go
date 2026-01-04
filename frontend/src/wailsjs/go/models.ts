@@ -177,6 +177,12 @@ export namespace models {
 	    curtainBackendUrl: string;
 	    pluginRegistryUrl: string;
 	    useRenvCache: boolean;
+	    venvStoragePath: string;
+	    renvStoragePath: string;
+	    accessibilityFontScale: string;
+	    accessibilityHighContrast: boolean;
+	    accessibilityReducedMotion: boolean;
+	    accessibilityColorblindPalette: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new Config(source);
@@ -192,6 +198,12 @@ export namespace models {
 	        this.curtainBackendUrl = source["curtainBackendUrl"];
 	        this.pluginRegistryUrl = source["pluginRegistryUrl"];
 	        this.useRenvCache = source["useRenvCache"];
+	        this.venvStoragePath = source["venvStoragePath"];
+	        this.renvStoragePath = source["renvStoragePath"];
+	        this.accessibilityFontScale = source["accessibilityFontScale"];
+	        this.accessibilityHighContrast = source["accessibilityHighContrast"];
+	        this.accessibilityReducedMotion = source["accessibilityReducedMotion"];
+	        this.accessibilityColorblindPalette = source["accessibilityColorblindPalette"];
 	    }
 	}
 	export class DockerConfig {

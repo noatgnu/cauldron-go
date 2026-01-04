@@ -390,11 +390,11 @@ export class SettingsPython implements OnInit {
   showBoundPlugins(venvId: number, envName: string): void {
     const pluginIds = this.getBoundPlugins(venvId);
     const boundPlugins: BoundPlugin[] = pluginIds.map(id => {
-      const plugin = this.plugins().find(p => 
-        p.id.toString() === id || 
+      const plugin = this.plugins().find(p =>
+        p.id.toString() === id ||
         p.definition?.plugin?.id === id
       );
-      
+
       if (plugin) {
         return {
           id: id,
@@ -402,7 +402,7 @@ export class SettingsPython implements OnInit {
           description: plugin.definition?.plugin?.description || 'No description available'
         };
       }
-      
+
       return {
         id: id,
         name: `Plugin ID: ${id}`,
@@ -418,5 +418,28 @@ export class SettingsPython implements OnInit {
       width: '500px',
       disableClose: true
     });
+  }
+
+  async browseVenvStorage(): Promise<void> {
+    try {
+      const path = await this.wails.openDirectoryDialog('Select Python Virtual Environments Storage Directory');
+      if (path) {
+        this.config.update(c => ({ ...c, venvStoragePath: path }));
+        await this.saveSetting('venvStoragePath', path);
+        this.notification.showSuccess('Venv storage path updated');
+      }
+    } catch (error) {
+      await this.wails.logToFile(`[SettingsPython] Failed to browse for venv storage: ${error}`);
+    }
+  }
+
+  async clearVenvStorage(): Promise<void> {
+    try {
+      this.config.update(c => ({ ...c, venvStoragePath: '' }));
+      await this.saveSetting('venvStoragePath', '');
+      this.notification.showSuccess('Using default venv storage location');
+    } catch (error) {
+      await this.wails.logToFile(`[SettingsPython] Failed to clear venv storage: ${error}`);
+    }
   }
 }

@@ -4,6 +4,27 @@ set -e
 
 PROJECT_ROOT=$(cd "$(dirname "$0")" && pwd)
 FRONTEND_DIR="$PROJECT_ROOT/frontend"
+SKIP_LICENSES=false
+COMMAND=""
+PLATFORM=""
+
+for arg in "$@"; do
+    if [ "$arg" = "--skip-licenses" ]; then
+        SKIP_LICENSES=true
+    elif [ -z "$COMMAND" ]; then
+        COMMAND="$arg"
+    elif [ -z "$PLATFORM" ]; then
+        PLATFORM="$arg"
+    fi
+done
+
+if [ -z "$COMMAND" ]; then
+    COMMAND="all"
+fi
+
+if [ -z "$PLATFORM" ]; then
+    PLATFORM="windows/amd64"
+fi
 
 print_header() {
     echo ""
@@ -320,6 +341,9 @@ Commands:
   rebuild [PLATFORM]    Clean and rebuild everything
   help                  Show this help message
 
+Options:
+  --skip-licenses       Skip license generation (faster builds)
+
 Platforms:
   windows/amd64    Windows 64-bit (default)
   linux/amd64      Linux 64-bit
@@ -327,18 +351,19 @@ Platforms:
   darwin/arm64     macOS 64-bit (Apple Silicon)
 
 Examples:
-  ./build.sh                       # Build everything for Windows
-  ./build.sh frontend              # Build only frontend
-  ./build.sh tools                 # Build developer tools
-  ./build.sh external linux/amd64  # Build external utilities for Linux
-  ./build.sh wails linux/amd64     # Build Wails app for Linux
-  ./build.sh rebuild               # Clean and rebuild everything
-  ./build.sh clean                 # Clean build artifacts
+  ./build.sh                          # Build everything for Windows
+  ./build.sh --skip-licenses          # Build without regenerating licenses
+  ./build.sh frontend                 # Build only frontend
+  ./build.sh tools                    # Build developer tools
+  ./build.sh external linux/amd64     # Build external utilities for Linux
+  ./build.sh wails linux/amd64        # Build Wails app for Linux
+  ./build.sh rebuild --skip-licenses  # Clean and rebuild without licenses
+  ./build.sh clean                    # Clean build artifacts
 
 EOF
 }
 
-case "${1:-all}" in
+case "$COMMAND" in
     frontend)
         build_frontend
         ;;
@@ -346,16 +371,20 @@ case "${1:-all}" in
         build_dev_tools
         ;;
     external)
-        build_external_tools "${2:-linux/amd64}"
+        build_external_tools "$PLATFORM"
         ;;
     wails)
-        build_wails "${2:-windows/amd64}"
+        build_wails "$PLATFORM"
         ;;
     all)
         build_dev_tools
-        generate_licenses
+        if [ "$SKIP_LICENSES" = false ]; then
+            generate_licenses
+        else
+            echo "Skipping license generation (--skip-licenses flag provided)"
+        fi
         build_frontend
-        build_wails "${2:-windows/amd64}"
+        build_wails "$PLATFORM"
         print_header "Build Complete!"
         print_success "Application ready to run"
         ;;
@@ -365,9 +394,13 @@ case "${1:-all}" in
     rebuild)
         clean_build
         build_dev_tools
-        generate_licenses
+        if [ "$SKIP_LICENSES" = false ]; then
+            generate_licenses
+        else
+            echo "Skipping license generation (--skip-licenses flag provided)"
+        fi
         build_frontend
-        build_wails "${2:-windows/amd64}"
+        build_wails "$PLATFORM"
         print_header "Rebuild Complete!"
         print_success "Application ready to run"
         ;;
@@ -375,7 +408,7 @@ case "${1:-all}" in
         show_help
         ;;
     *)
-        print_error "Unknown command: $1"
+        print_error "Unknown command: $COMMAND"
         echo ""
         show_help
         exit 1
