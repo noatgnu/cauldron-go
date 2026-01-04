@@ -1,5 +1,8 @@
 <div class="settings-container">
   <div class="section-header">
+    <button mat-icon-button (click)="goBack()" class="back-button">
+      <mat-icon>arrow_back</mat-icon>
+    </button>
     <h1>
       <mat-icon>{{ getSectionIcon() }}</mat-icon>
       {{ getSectionTitle() }}

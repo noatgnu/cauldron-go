@@ -1,6 +1,8 @@
 import { Component, OnInit, signal } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
+import { Location } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
+import { MatButtonModule } from '@angular/material/button';
 import { SettingsPython } from './settings-python/settings-python';
 import { SettingsR } from './settings-r/settings-r';
 import { SettingsRegistry } from './settings-registry/settings-registry';
@@ -16,6 +18,7 @@ type SettingsSection = 'general' | 'appearance' | 'accessibility' | 'python' | '
   selector: 'app-settings',
   imports: [
     MatIconModule,
+    MatButtonModule,
     SettingsPython,
     SettingsR,
     SettingsRegistry,
@@ -31,7 +34,10 @@ type SettingsSection = 'general' | 'appearance' | 'accessibility' | 'python' | '
 export class Settings implements OnInit {
   protected currentSection = signal<SettingsSection>('general');
 
-  constructor(private route: ActivatedRoute) {}
+  constructor(
+    private route: ActivatedRoute,
+    private location: Location
+  ) {}
 
   ngOnInit(): void {
     this.route.params.subscribe(params => {
@@ -68,5 +74,9 @@ export class Settings implements OnInit {
       case 'git': return 'key';
       default: return 'settings';
     }
+  }
+
+  goBack(): void {
+    this.location.back();
   }
 }

@@ -138,7 +138,6 @@ export class Sidenav implements OnInit {
   });
 
   settingsNavItems: NavItem[] = [
-    { label: 'Back to Plugins', icon: 'arrow_back', route: '/home' },
     { label: 'General', icon: 'settings', route: '/settings/general' },
     { label: 'Appearance', icon: 'palette', route: '/settings/appearance' },
     { label: 'Accessibility', icon: 'accessibility_new', route: '/settings/accessibility' },

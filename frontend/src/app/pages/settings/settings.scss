@@ -3,6 +3,32 @@
   padding: 16px;
   overflow-y: auto;
 
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 24px;
+
+    .back-button {
+      flex-shrink: 0;
+    }
+
+    h1 {
+      font-size: 24px;
+      font-weight: 500;
+      margin: 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+
+      mat-icon {
+        font-size: 28px;
+        width: 28px;
+        height: 28px;
+      }
+    }
+  }
+
   h1 {
     font-size: 24px;
     font-weight: 500;
