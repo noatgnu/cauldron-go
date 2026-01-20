@@ -711,22 +711,31 @@ func (e *EnvironmentService) GetExampleFilePath(exampleType string, fileName str
 	}
 	log.Printf("[GetExampleFilePath] Executable path: %s", execPath)
 
-	examplePath := filepath.Join(filepath.Dir(execPath), "examples", exampleType, fileName)
-	log.Printf("[GetExampleFilePath] Trying path 1: %s", examplePath)
-	if _, err := os.Stat(examplePath); os.IsNotExist(err) {
-		log.Printf("[GetExampleFilePath] Path 1 not found, trying fallback")
-		examplePath = filepath.Join("examples", exampleType, fileName)
-		log.Printf("[GetExampleFilePath] Trying path 2: %s", examplePath)
+	// Path 1: Relative to executable
+	examplePath1 := filepath.Join(filepath.Dir(execPath), "examples", exampleType, fileName)
+	log.Printf("[GetExampleFilePath] Trying path 1: %s", examplePath1)
+	if _, err := os.Stat(examplePath1); err == nil {
+		log.Printf("[GetExampleFilePath] Found file at path 1: %s", examplePath1)
+		return examplePath1, nil
+	} else if !os.IsNotExist(err) {
+		log.Printf("[GetExampleFilePath] Error accessing path 1: %v", err)
+		return "", err
 	}
 
-	fileInfo, err := os.Stat(examplePath)
-	if os.IsNotExist(err) {
-		log.Printf("[GetExampleFilePath] ERROR: example file not found")
-		return "", fmt.Errorf("example file not found: %s/%s", exampleType, fileName)
+	// Path 2: Relative to CWD (fallback for development)
+	log.Printf("[GetExampleFilePath] Path 1 not found, trying fallback path")
+	examplePath2 := filepath.Join("examples", exampleType, fileName)
+	log.Printf("[GetExampleFilePath] Trying path 2: %s", examplePath2)
+	if _, err := os.Stat(examplePath2); err == nil {
+		log.Printf("[GetExampleFilePath] Found file at path 2: %s", examplePath2)
+		return examplePath2, nil
+	} else if !os.IsNotExist(err) {
+		log.Printf("[GetExampleFilePath] Error accessing path 2: %v", err)
+		return "", err
 	}
-	log.Printf("[GetExampleFilePath] Found file: %s (size: %d bytes)", examplePath, fileInfo.Size())
 
-	return examplePath, nil
+	log.Printf("[GetExampleFilePath] ERROR: example file not found in any path")
+	return "", fmt.Errorf("example file not found: %s/%s", exampleType, fileName)
 }
 
 func (e *EnvironmentService) LoadRPackagesFromFile(filePath string) ([]string, error) {

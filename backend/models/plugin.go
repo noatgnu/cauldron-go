@@ -12,6 +12,7 @@ type PluginInputType string
 
 const (
 	PluginInputTypeFile           PluginInputType = "file"
+	PluginInputTypeDirectory      PluginInputType = "directory"
 	PluginInputTypeText           PluginInputType = "text"
 	PluginInputTypeNumber         PluginInputType = "number"
 	PluginInputTypeBoolean        PluginInputType = "boolean"

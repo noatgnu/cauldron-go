@@ -505,6 +505,11 @@
         "value": {
           "type": "string",
           "description": "Value to pass instead of actual value"
+        },
+        "passAsValue": {
+          "type": "boolean",
+          "description": "For boolean inputs, pass the value as a string ('true' or 'false') after the flag instead of just including the flag.",
+          "default": false
         }
       }
     },

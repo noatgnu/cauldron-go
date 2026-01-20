@@ -39,7 +39,7 @@
               <mat-icon matPrefix>key</mat-icon>
               <mat-hint>Select your SSH private key file</mat-hint>
             </mat-form-field>
-            <button mat-raised-button type="button" (click)="browseSSHKey()" class="browse-btn">
+            <button mat-raised-button type="button" (click)="browseSSHKey()" class="button-icon-text">
               <mat-icon>folder_open</mat-icon>
               Browse
             </button>
@@ -56,7 +56,7 @@
           </mat-form-field>
 
           <div class="validate-row">
-            <button mat-stroked-button type="button" (click)="validateKey()" [disabled]="!form.value.sshKeyPath || validatingKey()">
+            <button mat-stroked-button type="button" (click)="validateKey()" [disabled]="!form.value.sshKeyPath || validatingKey()" class="button-icon-text">
               @if (validatingKey()) {
                 <mat-spinner diameter="16"></mat-spinner>
                 <span>Validating...</span>

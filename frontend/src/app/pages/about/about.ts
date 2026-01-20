@@ -35,7 +35,7 @@ interface LicenseData {
 export class About implements OnInit {
   protected readonly version = '1.0.0';
   protected readonly copyright = 'Copyright 2025';
-  protected readonly author = 'Toan K. Phung';
+  protected readonly author = 'University of Dundee';
   protected readonly email = 'tphung001@dundee.ac.uk';
   protected readonly description = 'Task Runner and Automation Tool';
   protected licenses = signal<LicenseData>({ go: [], npm: [] });

@@ -687,7 +687,8 @@ func (a *App) GetPluginExampleFilePath(pluginID string, filePath string) (string
 		log.Printf("[GetPluginExampleFilePath] Plugin not found: %s", pluginID)
 	}
 
-	parts := strings.Split(filePath, string(filepath.Separator))
+	normalizedPath := filepath.ToSlash(filePath)
+	parts := strings.Split(normalizedPath, "/")
 	if len(parts) >= 2 {
 		exampleType := parts[0]
 		fileName := filepath.Join(parts[1:]...)

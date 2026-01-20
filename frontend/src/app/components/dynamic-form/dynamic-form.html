@@ -50,6 +50,21 @@
               }
             </div>
           }
+          @case ('directory') {
+            <mat-form-field appearance="outline" class="full-width">
+              <mat-label>{{ input.label }}</mat-label>
+              <input matInput readonly [formControlName]="input.name">
+              @if (input.description) {
+                <mat-hint>{{ input.description }}</mat-hint>
+              }
+            </mat-form-field>
+            <div class="file-buttons">
+              <button mat-raised-button color="primary" type="button" (click)="openDirectory(input.name)" [disabled]="disabled">
+                <mat-icon>folder_open</mat-icon>
+                Browse Directory
+              </button>
+            </div>
+          }
           @case ('text') {
             <mat-form-field appearance="outline" class="full-width">
               <mat-label>{{ input.label }}</mat-label>

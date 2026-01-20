@@ -120,23 +120,6 @@
     .license-type {
       opacity: 0.8;
     }
-
-    .repo-link {
-      display: flex;
-      align-items: center;
-      color: var(--primary);
-      text-decoration: none;
-
-      mat-icon {
-        font-size: 16px;
-        width: 16px;
-        height: 16px;
-      }
-
-      &:hover {
-        opacity: 0.8;
-      }
-    }
   }
 }
 

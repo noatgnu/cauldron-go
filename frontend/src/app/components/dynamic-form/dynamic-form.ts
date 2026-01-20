@@ -153,6 +153,13 @@ export class DynamicFormComponent implements OnInit, OnChanges, OnDestroy {
     }
   }
 
+  async openDirectory(inputName: string) {
+    const directoryPath = await this.wails.openDirectoryDialog('Select Directory');
+    if (directoryPath) {
+      this.form.patchValue({ [inputName]: directoryPath });
+    }
+  }
+
   async openImportedFileSelector(inputName: string) {
     const dialogRef = this.dialog.open(ImportedFileSelectionDialog, {
       width: '600px',
@@ -483,30 +490,24 @@ export class DynamicFormComponent implements OnInit, OnChanges, OnDestroy {
 
     if (!control) return;
 
-    const currentValue: string[] = Array.isArray(control.value) ? [...control.value] : [];
-
+    // Only handle shift-click for range selection
     if (event.shiftKey && this.lastSelectedIndex.has(fieldName)) {
+      const currentValue: string[] = Array.isArray(control.value) ? [...control.value] : [];
       const lastIndex = this.lastSelectedIndex.get(fieldName)!;
       const start = Math.min(lastIndex, currentIndex);
       const end = Math.max(lastIndex, currentIndex);
 
       const rangeValues = allOptions.slice(start, end + 1);
-
       const newValue = [...new Set([...currentValue, ...rangeValues])];
       control.setValue(newValue);
-    } else {
-      if (currentValue.includes(optionValue)) {
-        const newValue = currentValue.filter(v => v !== optionValue);
-        control.setValue(newValue);
-      } else {
-        control.setValue([...currentValue, optionValue]);
-      }
+
+      // Prevent default Material behavior only for shift-click
+      event.preventDefault();
+      event.stopPropagation();
     }
 
+    // Always update last selected index for next shift-click
     this.lastSelectedIndex.set(fieldName, currentIndex);
-
-    event.preventDefault();
-    event.stopPropagation();
   }
 
   isAnnotationFileInput(input: models.PluginInputV2): boolean {

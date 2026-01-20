@@ -350,15 +350,3 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-
-.delete-btn {
-  flex-shrink: 0;
-  width: 24px;
-  height: 24px;
-
-  mat-icon {
-    font-size: 16px;
-    width: 16px;
-    height: 16px;
-  }
-}

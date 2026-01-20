@@ -69,19 +69,6 @@
   display: flex;
   gap: 8px;
   margin-bottom: 16px;
-
-  button {
-    height: 40px;
-    font-size: 13px;
-    padding: 0 16px;
-
-    mat-icon {
-      margin-right: 4px;
-      font-size: 18px;
-      width: 18px;
-      height: 18px;
-    }
-  }
 }
 
 .version-info {
@@ -107,20 +94,6 @@
 
   .env-selector {
     flex: 1;
-  }
-
-  button {
-    height: 40px;
-    margin-top: 8px;
-    padding: 0 12px;
-    font-size: 13px;
-
-    mat-icon {
-      margin-right: 4px;
-      font-size: 18px;
-      width: 18px;
-      height: 18px;
-    }
   }
 }
 
@@ -334,19 +307,6 @@ mat-divider {
     align-items: center;
     gap: 12px;
     margin-bottom: 12px;
-
-    button {
-      height: 40px;
-      font-size: 13px;
-      padding: 0 16px;
-
-      mat-icon {
-        margin-right: 4px;
-        font-size: 18px;
-        width: 18px;
-        height: 18px;
-      }
-    }
   }
 
   .install-progress {

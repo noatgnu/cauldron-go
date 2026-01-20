@@ -107,10 +107,11 @@ type PluginPlot struct {
 }
 
 type ArgMapping struct {
-	Flag      *string         `yaml:"flag,omitempty" json:"flag,omitempty"`
-	Transform *InputTransform `yaml:"transform,omitempty" json:"transform,omitempty"`
-	When      *string         `yaml:"when,omitempty" json:"when,omitempty"`
-	Value     *string         `yaml:"value,omitempty" json:"value,omitempty"`
+	Flag        *string         `yaml:"flag,omitempty" json:"flag,omitempty"`
+	Transform   *InputTransform `yaml:"transform,omitempty" json:"transform,omitempty"`
+	When        *string         `yaml:"when,omitempty" json:"when,omitempty"`
+	Value       *string         `yaml:"value,omitempty" json:"value,omitempty"`
+	PassAsValue bool            `yaml:"passAsValue,omitempty" json:"passAsValue,omitempty"`
 }
 
 type Requirements struct {

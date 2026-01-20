@@ -75,8 +75,15 @@ func (e *PluginExecutor) BuildArguments(plugin *models.PluginV2, parameters map[
 				s := fmt.Sprintf("%v", paramValue)
 				boolVal = s == "true"
 			}
-			if boolVal {
-				args = append(args, flag)
+
+			log.Printf("[BuildArguments] Boolean Input '%s': PassAsValue=%v, Value=%v", inputName, mapping.PassAsValue, boolVal)
+
+			if mapping.PassAsValue {
+				args = append(args, flag, fmt.Sprintf("%v", boolVal))
+			} else {
+				if boolVal {
+					args = append(args, flag)
+				}
 			}
 			continue
 		}
