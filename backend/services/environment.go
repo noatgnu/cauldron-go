@@ -423,6 +423,7 @@ func (e *EnvironmentService) InstallPythonRequirements(pythonPath string, requir
 		e.progressNotifier.EmitError(ProgressTypeInstall, "python-requirements", "Failed to create stdout pipe", err.Error())
 		return err
 	}
+	cmd.Stderr = cmd.Stdout
 
 	if err := cmd.Start(); err != nil {
 		e.progressNotifier.EmitError(ProgressTypeInstall, "python-requirements", "Failed to start pip install", err.Error())

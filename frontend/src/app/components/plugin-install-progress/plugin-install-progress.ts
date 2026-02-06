@@ -108,6 +108,10 @@ export class PluginInstallProgress implements OnInit, OnDestroy {
       this.completed.set(true);
       this.currentStatus.set('Installation completed successfully!');
       this.progress.set(100);
+
+      if (window.runtime) {
+        window.runtime.EventsEmit('plugin:install:success');
+      }
     } catch (err: any) {
       this.error.set(err.toString() || 'An unknown error occurred during installation');
       this.currentStatus.set('Installation failed');

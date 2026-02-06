@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	goruntime "runtime"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -513,6 +514,13 @@ func (a *App) CreatePythonVirtualEnv(basePythonPath string, venvPath string, plu
 	var pluginFolderPath string
 	if pluginID != "" {
 		plugin, err := a.pluginLoaderV2.GetPluginByStringID(pluginID)
+		if err != nil {
+			// Try to convert pluginID to uint and get by numeric ID
+			if id, convErr := strconv.ParseUint(pluginID, 10, 64); convErr == nil {
+				plugin, err = a.pluginLoaderV2.GetPlugin(uint(id))
+			}
+		}
+
 		if err == nil {
 			pluginFolderPath = plugin.FolderPath
 			log.Printf("[App] CreatePythonVirtualEnv: Found plugin folder path: %s", pluginFolderPath)
