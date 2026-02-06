@@ -30,6 +30,7 @@ type JobQueueService struct {
 	stopImmediate  bool
 	currentJobID   string
 	cancelFuncs    map[string]context.CancelFunc
+	shutdownChan   chan struct{}
 }
 
 func getScriptName(plugin *models.PluginV2) string {
@@ -41,12 +42,13 @@ func getScriptName(plugin *models.PluginV2) string {
 
 func NewJobQueueService(ctx context.Context, db *DatabaseService) *JobQueueService {
 	service := &JobQueueService{
-		ctx:         ctx,
-		db:          db,
-		jobs:        make(map[string]*models.Job),
-		queue:       make(chan *models.Job, 100),
-		workers:     2,
-		cancelFuncs: make(map[string]context.CancelFunc),
+		ctx:          ctx,
+		db:           db,
+		jobs:         make(map[string]*models.Job),
+		queue:        make(chan *models.Job, 100),
+		workers:      2,
+		cancelFuncs:  make(map[string]context.CancelFunc),
+		shutdownChan: make(chan struct{}),
 	}
 
 	service.loadFromDatabase()
@@ -108,6 +110,10 @@ func (j *JobQueueService) worker() {
 
 			// Process the job
 			j.processJob(job)
+
+		case <-j.shutdownChan:
+			// Shutdown signal received
+			return
 
 		case <-time.After(1 * time.Second):
 			// Timeout - just loop back to check paused status
@@ -657,6 +663,11 @@ func (j *JobQueueService) loadFromDatabase() error {
 
 func (j *JobQueueService) Shutdown() {
 	log.Println("[Shutdown] Closing job queue...")
+
+	// Signal all workers to shut down immediately
+	close(j.shutdownChan)
+
+	// Close the queue channel
 	close(j.queue)
 
 	log.Println("[Shutdown] Waiting for workers to finish (max 10 seconds)...")
