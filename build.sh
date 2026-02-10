@@ -197,6 +197,13 @@ generate_licenses() {
 
     if command -v node &> /dev/null; then
         node scripts/generate-go-licenses.js
+
+        if [ ! -d "$FRONTEND_DIR/node_modules" ]; then
+            echo "Installing frontend dependencies for license generation..."
+            cd "$FRONTEND_DIR"
+            npm install --silent
+            cd "$PROJECT_ROOT"
+        fi
         node scripts/generate-npm-licenses.js
         print_success "License information generated"
     else

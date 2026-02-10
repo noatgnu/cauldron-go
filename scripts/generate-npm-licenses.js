@@ -33,13 +33,31 @@ try {
   const frontendDir = path.join(__dirname, '..', 'frontend');
   const nodeModulesDir = path.join(frontendDir, 'node_modules');
 
-  const output = execSync('npm list --json --all', {
-    cwd: frontendDir,
-    encoding: 'utf8',
-    stdio: ['pipe', 'pipe', 'ignore']
-  });
+  if (!fs.existsSync(nodeModulesDir)) {
+    console.error('Error: node_modules not found. Run "npm install" in frontend/ first.');
+    fs.writeFileSync(OUTPUT_FILE, '[]');
+    process.exit(1);
+  }
 
-  const data = JSON.parse(output);
+  let output;
+  try {
+    output = execSync('npm list --json --depth=0', {
+      cwd: frontendDir,
+      encoding: 'utf8',
+      maxBuffer: 50 * 1024 * 1024
+    });
+  } catch (execError) {
+    output = execError.stdout || '{}';
+  }
+
+  let data;
+  try {
+    data = JSON.parse(output);
+  } catch (parseError) {
+    console.error('Failed to parse npm list output, using empty list');
+    data = { dependencies: {} };
+  }
+
   const dependencies = data.dependencies || {};
 
   const licenses = Object.entries(dependencies).map(([name, info]) => {
@@ -63,5 +81,4 @@ try {
 } catch (error) {
   console.error('Error generating NPM licenses:', error.message);
   fs.writeFileSync(OUTPUT_FILE, '[]');
-  process.exit(0);
 }
