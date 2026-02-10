@@ -8,9 +8,14 @@ import (
 	"syscall"
 )
 
+const (
+	createNoWindow        = 0x08000000
+	createNewProcessGroup = 0x00000200
+)
+
 func hideConsoleWindow(cmd *exec.Cmd) {
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		HideWindow:    true,
-		CreationFlags: 0x08000000,
+		CreationFlags: createNoWindow | createNewProcessGroup,
 	}
 }

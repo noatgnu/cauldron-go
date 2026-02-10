@@ -154,6 +154,7 @@ func (s *ScriptExecutor) ExecutePythonScript(ctx context.Context, jobID string, 
 	log.Printf("[ExecutePythonScript] Script name: %s", config.ScriptName)
 
 	env := s.prepareEnv(config.PluginID)
+	env = append(env, "PYTHONUNBUFFERED=1")
 
 	hasR := false
 	for _, e := range config.Environments {
