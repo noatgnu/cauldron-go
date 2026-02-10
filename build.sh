@@ -297,6 +297,11 @@ prepare_icons() {
 build_wails() {
     PLATFORM="${1:-windows/amd64}"
 
+    # Ensure license files exist for go:embed
+    if [ ! -f "$PROJECT_ROOT/resources/licenses/go-licenses.json" ] || [ ! -f "$PROJECT_ROOT/resources/licenses/npm-licenses.json" ]; then
+        generate_licenses
+    fi
+
     build_external_tools "$PLATFORM"
     prepare_icons
     print_header "Building Wails Application"
