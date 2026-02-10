@@ -84,6 +84,12 @@ jobs:
         run: go test -v ./backend/... ./cmd/...
         shell: bash
 
+      - name: Generate Licenses
+        run: |
+          node scripts/generate-go-licenses.js
+          node scripts/generate-npm-licenses.js
+        shell: bash
+
       - name: Build Application
         run: |
           cd frontend
@@ -247,6 +253,11 @@ jobs:
       - name: Run Backend Tests
         run: go test -v ./backend/... ./cmd/...
 
+      - name: Generate Licenses
+        run: |
+          node scripts/generate-go-licenses.js
+          node scripts/generate-npm-licenses.js
+
       - name: Build Application
         run: |
           cd frontend
@@ -386,6 +397,11 @@ jobs:
 
       - name: Run Backend Tests
         run: go test -v ./backend/... ./cmd/...
+
+      - name: Generate Licenses
+        run: |
+          node scripts/generate-go-licenses.js
+          node scripts/generate-npm-licenses.js
 
       - name: Build Application
         run: wails build -platform darwin/arm64
