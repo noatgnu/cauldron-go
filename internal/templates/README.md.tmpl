@@ -11,9 +11,26 @@ This pipeline was automatically generated from a CauldronGO plugin.
 
 ## Usage
 
-### Run with Docker
+### Run with Docker (Local)
 ```bash
 nextflow run main.nf -profile docker --input 'path/to/samplesheet.csv'
+```
+
+### Run without cloning (Remote)
+If this plugin is hosted on GitHub, you can run it directly:
+```bash
+nextflow run <github_user>/<repo_name> -r nextflow -profile docker --input 'path/to/samplesheet.csv'
+```
+
+## Integration as a Module
+You can include this plugin as a step in your own custom Nextflow pipeline:
+
+```nextflow
+include { {{ .ProcessName | upper }} } from './path/to/{{ .ProcessName }}/modules/local/{{ .ProcessName }}/main'
+
+workflow {
+    {{ .ProcessName | upper }}(ch_input, ...)
+}
 ```
 
 ### Parameters

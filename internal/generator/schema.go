@@ -41,26 +41,6 @@ func GenerateSchema(definition *models.PluginDefinition) (string, error) {
 		Properties:  make(map[string]interface{}),
 	}
 
-	inputOutputGroup := SchemaGroup{
-		Title:       "Input/output options",
-		Description: "Define where the pipeline should find input data and save output data.",
-		Type:        "object",
-		Properties: map[string]SchemaProperty{
-			"input": {
-				Type:        "string",
-				Description: "Path to samplesheet.csv",
-				Format:      "file-path",
-			},
-			"outdir": {
-				Type:        "string",
-				Description: "Path to output directory",
-				Format:      "directory-path",
-				Default:     "./results",
-			},
-		},
-		Required: []string{"input"},
-	}
-
 	pluginParamsGroup := SchemaGroup{
 		Title:       "Plugin parameters",
 		Description: fmt.Sprintf("Parameters for the %s plugin.", definition.Plugin.Name),
@@ -69,30 +49,26 @@ func GenerateSchema(definition *models.PluginDefinition) (string, error) {
 	}
 
 	for _, input := range definition.Inputs {
-		if input.Name == "input_file" {
-			continue
-		}
-
 		propType := "string"
+		format := ""
 		switch input.Type {
 		case models.PluginInputTypeNumber:
 			propType = "number"
 		case models.PluginInputTypeBoolean:
 			propType = "boolean"
+		case models.PluginInputTypeFile:
+			format = "file-path"
 		}
 
 		pluginParamsGroup.Properties[input.Name] = SchemaProperty{
 			Type:        propType,
 			Description: input.Description,
 			Default:     input.Default,
+			Format:      format,
 		}
 	}
 
-	schema.Definitions["input_output_options"] = inputOutputGroup
 	schema.Definitions["plugin_parameters"] = pluginParamsGroup
-
-	schema.Properties["input"] = map[string]string{"$ref": "#/definitions/input_output_options/properties/input"}
-	schema.Properties["outdir"] = map[string]string{"$ref": "#/definitions/input_output_options/properties/outdir"}
 
 	for name := range pluginParamsGroup.Properties {
 		schema.Properties[name] = map[string]string{"$ref": fmt.Sprintf("#/definitions/plugin_parameters/properties/%s", name)}

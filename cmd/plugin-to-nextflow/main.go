@@ -115,14 +115,6 @@ func convertPlugin(path, outDir string) error {
 		os.WriteFile(filepath.Join(outDir, "nextflow_schema.json"), []byte(schemaContent), 0644)
 	}
 
-	// Generate Samplesheet Schema
-	samplesheetSchema, err := generator.GenerateSamplesheetSchema(definition)
-	if err == nil {
-		assetsDir := filepath.Join(outDir, "assets")
-		os.MkdirAll(assetsDir, 0755)
-		os.WriteFile(filepath.Join(assetsDir, "samplesheet_schema.json"), []byte(samplesheetSchema), 0644)
-	}
-
 	// Generate Dockerfile
 	dockerTmpl, _ := templates.GetTemplate("Dockerfile.tmpl")
 	dockerContent, err := generator.GenerateContainer(definition, dockerTmpl)

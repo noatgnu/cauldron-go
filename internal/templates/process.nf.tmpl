@@ -1,5 +1,4 @@
 process {{ .ProcessName | upper }} {
-    tag "$meta.id"
     label '{{ .Label }}'
 
     container "${ workflow.containerEngine == 'singularity' ?
@@ -7,32 +6,81 @@ process {{ .ProcessName | upper }} {
         '{{ .ContainerImageDocker }}' }"
 
     input:
-    tuple val(meta), path(input_file)
-    {{ range .Inputs }}
+    {{- range .Inputs }}
     {{- if eq .Type "file" }}
-    path({{ .Name }})
+    path {{ .Name }}
     {{- else }}
-    val({{ .Name }})
+    val {{ .Name }}
     {{- end }}
     {{- end }}
 
     output:
     {{ range .Outputs }}
-    tuple val(meta), path("{{ .Path }}"), emit: {{ .Name }}
+    path "{{ .Path }}", emit: {{ .Name }}
     {{- end }}
     path "versions.yml", emit: versions
 
-    when:
-    task.ext.when == null || task.ext.when
-
     script:
     def args = task.ext.args ?: ''
-    def prefix = task.ext.prefix ?: "${meta.id}"
     """
-    {{ .Entrypoint }} 
-        {{ range .Args }}
-        {{ .Flag }} {{ .Value }} 
+    # Build arguments dynamically to match CauldronGO PluginExecutor logic
+    ARG_LIST=()
+
+    {{ range .Args }}
+    # Mapping for {{ .InputName }}
+    VAL=${ {{ .InputName }} }
+    if [ ! -z "\$VAL" ] && [ "\$VAL" != "null" ]; then
+        {{- if eq .InputType "boolean" }}
+        {{- if .PassAsValue }}
+        ARG_LIST+=("{{ .Flag }}" "\$VAL")
+        {{- else }}
+        if [ "\$VAL" == "true" ]; then
+            ARG_LIST+=("{{ .Flag }}")
+        fi
         {{- end }}
+        {{- else if .When }}
+        # Condition: {{ .When }}
+        {{- if eq .When "true" }}
+        if [ "\$VAL" == "true" ]; then ARG_LIST+=("{{ .Flag }}"); fi
+        {{- else if eq .When "false" }}
+        if [ "\$VAL" == "false" ]; then ARG_LIST+=("{{ .Flag }}"); fi
+        {{- else if eq .When "not-empty" }}
+        if [ ! -z "\$VAL" ]; then ARG_LIST+=("{{ .Flag }}"); fi
+        {{- else if eq .When "empty" }}
+        if [ -z "\$VAL" ]; then ARG_LIST+=("{{ .Flag }}"); fi
+        {{- else }}
+        if [ "\$VAL" == "{{ .When }}" ]; then ARG_LIST+=("{{ .Flag }}"); fi
+        {{- end }}
+        {{- else }}
+        {{- if .StaticValue }}
+        ARG_LIST+=("{{ .Flag }}" "{{ .StaticValue }}")
+        {{- else }}
+        {{- if eq .Transform "comma-join" }}
+        # Transform: comma-join
+        JOINED_VAL=$(echo "\$VAL" | sed 's/\[//g' | sed 's/\]//g' | sed 's/ //g')
+        ARG_LIST+=("{{ .Flag }}" "\$JOINED_VAL")
+        {{- else if eq .Transform "space-join" }}
+        # Transform: space-join
+        JOINED_VAL=$(echo "\$VAL" | sed 's/\[//g' | sed 's/\]//g')
+        ARG_LIST+=("{{ .Flag }}" "\$JOINED_VAL")
+        {{- else if eq .Transform "json-encode" }}
+        # Transform: json-encode (Nextflow passes as string, so use as is)
+        ARG_LIST+=("{{ .Flag }}" "\$VAL")
+        {{- else }}
+        ARG_LIST+=("{{ .Flag }}" "\$VAL")
+        {{- end }}
+        {{- end }}
+        {{- end }}
+    fi
+    {{ end }}
+
+    {{- if eq .PrimaryEnv "r" }}
+    Rscript --vanilla --slave {{ .Entrypoint }} --args \
+    {{- else }}
+    {{ .Entrypoint }} \
+    {{- end }}
+        "\${ARG_LIST[@]}" \
+        {{ if .OutputDirFlag }}{{ .OutputDirFlag }} .{{ end }} \
         $args
 
     cat <<-END_VERSIONS > versions.yml

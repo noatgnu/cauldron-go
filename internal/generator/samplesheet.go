@@ -12,11 +12,25 @@ func GenerateSamplesheetSchema(definition *models.PluginDefinition) (string, err
 			"type": "object",
 			"properties": map[string]interface{}{
 				"sample": map[string]interface{}{
-					"type": "string",
+					"type":        "string",
+					"description": "Unique sample identifier",
 				},
 				"input_file": map[string]interface{}{
-					"type":   "string",
-					"format": "file-path",
+					"type":        "string",
+					"format":      "file-path",
+					"description": "Path to the primary input file for this sample",
+				},
+				"condition": map[string]interface{}{
+					"type":        "string",
+					"description": "Experimental condition/group",
+				},
+				"bioreplicate": map[string]interface{}{
+					"type":        "string",
+					"description": "Biological replicate identifier",
+				},
+				"batch": map[string]interface{}{
+					"type":        "string",
+					"description": "Batch identifier for batch correction",
 				},
 			},
 			"required": []string{"sample", "input_file"},

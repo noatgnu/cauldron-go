@@ -22,16 +22,25 @@ type ProcessData struct {
 	Version                   string
 	Description               string
 	Author                    string
+	OutputDirFlag             string
+	PrimaryEnv                string
 }
 
 type ArgData struct {
-	Flag  string
-	Value string
+	InputName   string
+	InputType   string
+	Flag        string
+	Transform   string
+	When        string
+	StaticValue string
+	PassAsValue bool
+	IsMultiple  bool
 }
 
 func GenerateProcess(definition *models.PluginDefinition, tmplStr string) (string, error) {
 	tmpl, err := template.New("process").Funcs(template.FuncMap{
-		"upper": strings.ToUpper,
+		"upper":   strings.ToUpper,
+		"replace": strings.ReplaceAll,
 	}).Parse(tmplStr)
 	if err != nil {
 		return "", fmt.Errorf("failed to parse process template: %w", err)
@@ -48,43 +57,50 @@ func GenerateProcess(definition *models.PluginDefinition, tmplStr string) (strin
 		Version:                   definition.Plugin.Version,
 		Description:               definition.Plugin.Description,
 		Author:                    definition.Plugin.Author,
-	}
-
-	// Filter inputs to avoid duplicating input_file which is handled by tuple
-	for _, input := range definition.Inputs {
-		if input.Name == "input_file" {
-			continue
-		}
-		data.Inputs = append(data.Inputs, input)
+		OutputDirFlag:             definition.Execution.OutputDir,
+		Inputs:                    definition.Inputs,
+		PrimaryEnv:                definition.Runtime.GetPrimaryEnvironment(),
 	}
 
 	// Map ArgsMapping to ArgData
-	for name, mapping := range definition.Execution.ArgsMapping {
-		// This is a simplification, need to handle complex mappings
-		flag := ""
-		switch v := mapping.(type) {
-		case string:
-			flag = v
-		case map[string]interface{}:
-			if f, ok := v["flag"].(string); ok {
-				flag = f
+	for inputName, mapping := range definition.Execution.ArgsMapping {
+		arg := ArgData{
+			InputName: inputName,
+		}
+
+		// Find the corresponding input definition
+		for _, input := range definition.Inputs {
+			if input.Name == inputName {
+				arg.InputType = string(input.Type)
+				arg.IsMultiple = input.Multiple
+				break
 			}
 		}
 
-		if flag != "" {
-			data.Args = append(data.Args, ArgData{
-				Flag:  flag,
-				Value: fmt.Sprintf("${%s}", name),
-			})
+		switch v := mapping.(type) {
+		case string:
+			arg.Flag = v
+		case map[string]interface{}:
+			if f, ok := v["flag"].(string); ok {
+				arg.Flag = f
+			}
+			if t, ok := v["transform"].(string); ok {
+				arg.Transform = t
+			}
+			if w, ok := v["when"].(string); ok {
+				arg.When = w
+			}
+			if sv, ok := v["value"].(string); ok {
+				arg.StaticValue = sv
+			}
+			if pav, ok := v["passAsValue"].(bool); ok {
+				arg.PassAsValue = pav
+			}
 		}
-	}
 
-	// Add outputDir
-	if definition.Execution.OutputDir != "" {
-		data.Args = append(data.Args, ArgData{
-			Flag:  definition.Execution.OutputDir,
-			Value: ".",
-		})
+		if arg.Flag != "" || arg.StaticValue != "" {
+			data.Args = append(data.Args, arg)
+		}
 	}
 
 	var buf bytes.Buffer

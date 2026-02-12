@@ -5,24 +5,18 @@ nextflow.enable.dsl = 2
 include { {{ .ProcessName | upper }} } from './modules/local/{{ .ProcessName }}/main'
 
 workflow {{ .WorkflowName | upper }} {
-    take:
-    ch_input
-
     main:
     {{ .ProcessName | upper }} (
-        ch_input,
-        {{- range .Inputs }}
+        {{- range $i, $input := .Inputs }}
+        {{- if eq .Type "file" }}
+        params.{{ .Name }} ? Channel.fromPath(params.{{ .Name }}).collect() : Channel.of([]),
+        {{- else }}
         params.{{ .Name }},
         {{- end }}
+        {{- end }}
     )
-
-    emit:
-    versions = {{ .ProcessName | upper }}.out.versions
 }
 
 workflow {
-    ch_input = Channel.fromPath(params.input)
-        .map { it -> [ [id: it.baseName], it ] }
-
-    {{ .WorkflowName | upper }} (ch_input)
+    {{ .WorkflowName | upper }} ()
 }
