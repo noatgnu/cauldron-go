@@ -1,0 +1,44 @@
+name: Export to Nextflow
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - 'plugin.yaml'
+      - '**.py'
+      - '**.R'
+      - 'requirements.txt'
+
+jobs:
+  export-nextflow:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Plugin Repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Install Cauldron CLI
+        run: |
+          go install github.com/noatgnu/cauldron-go/cmd/plugin-to-nextflow@latest
+
+      - name: Generate Nextflow Pipeline
+        run: |
+          plugin-to-nextflow --plugin plugin.yaml --output nextflow-export
+
+      - name: Deploy to Nextflow Branch
+        run: |
+          cd nextflow-export
+          git init
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .
+          git commit -m "Auto-generate Nextflow pipeline from plugin metadata"
+          git push --force https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:nextflow
