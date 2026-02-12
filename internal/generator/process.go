@@ -20,6 +20,8 @@ type ProcessData struct {
 	Args                      []ArgData
 	ToolName                  string
 	Version                   string
+	Description               string
+	Author                    string
 }
 
 type ArgData struct {
@@ -44,6 +46,8 @@ func GenerateProcess(definition *models.PluginDefinition, tmplStr string) (strin
 		Entrypoint:                definition.Runtime.GetEntrypoint(),
 		ToolName:                  definition.Plugin.Name,
 		Version:                   definition.Plugin.Version,
+		Description:               definition.Plugin.Description,
+		Author:                    definition.Plugin.Author,
 	}
 
 	// Filter inputs to avoid duplicating input_file which is handled by tuple
@@ -86,6 +90,43 @@ func GenerateProcess(definition *models.PluginDefinition, tmplStr string) (strin
 	var buf bytes.Buffer
 	if err := tmpl.Execute(&buf, data); err != nil {
 		return "", fmt.Errorf("failed to execute process template: %w", err)
+	}
+
+	return buf.String(), nil
+}
+
+func GenerateREADME(definition *models.PluginDefinition, tmplStr string) (string, error) {
+	tmpl, err := template.New("readme").Parse(tmplStr)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse readme template: %w", err)
+	}
+
+	data := ProcessData{
+		ProcessName: definition.Plugin.ID,
+		ToolName:    definition.Plugin.Name,
+		Version:     definition.Plugin.Version,
+		Description: definition.Plugin.Description,
+		Author:      definition.Plugin.Author,
+		Inputs:      definition.Inputs,
+	}
+
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, data); err != nil {
+		return "", fmt.Errorf("failed to execute readme template: %w", err)
+	}
+
+	return buf.String(), nil
+}
+
+func GenerateGithubAction(tmplStr string) (string, error) {
+	tmpl, err := template.New("github-action").Delims("[[", "]]").Parse(tmplStr)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse github-action template: %w", err)
+	}
+
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, nil); err != nil {
+		return "", fmt.Errorf("failed to execute github-action template: %w", err)
 	}
 
 	return buf.String(), nil

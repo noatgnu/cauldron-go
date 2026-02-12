@@ -109,6 +109,7 @@ jobs:
           if [ -f bin/plugin-doc-generator.exe ]; then cp bin/plugin-doc-generator.exe build/bin/tools/; fi
           if [ -f bin/plugin-doc-generator-all.exe ]; then cp bin/plugin-doc-generator-all.exe build/bin/tools/; fi
           if [ -f bin/plugin-scaffolder.exe ]; then cp bin/plugin-scaffolder.exe build/bin/tools/; fi
+          if [ -f bin/plugin-to-nextflow.exe ]; then cp bin/plugin-to-nextflow.exe build/bin/tools/; fi
           if [ -d bin/external ]; then cp -r bin/external build/bin/tools/; fi
         shell: bash
 
@@ -280,6 +281,7 @@ jobs:
           if [ -f bin/plugin-doc-generator ]; then cp bin/plugin-doc-generator build/bin/tools/; fi
           if [ -f bin/plugin-doc-generator-all ]; then cp bin/plugin-doc-generator-all build/bin/tools/; fi
           if [ -f bin/plugin-scaffolder ]; then cp bin/plugin-scaffolder build/bin/tools/; fi
+          if [ -f bin/plugin-to-nextflow ]; then cp bin/plugin-to-nextflow build/bin/tools/; fi
           if [ -d bin/external ]; then cp -r bin/external build/bin/tools/; fi
 
       - name: Check archive size before compression
@@ -423,6 +425,7 @@ jobs:
           if [ -f bin/plugin-doc-generator ]; then cp bin/plugin-doc-generator build/bin/tools/; fi
           if [ -f bin/plugin-doc-generator-all ]; then cp bin/plugin-doc-generator-all build/bin/tools/; fi
           if [ -f bin/plugin-scaffolder ]; then cp bin/plugin-scaffolder build/bin/tools/; fi
+          if [ -f bin/plugin-to-nextflow ]; then cp bin/plugin-to-nextflow build/bin/tools/; fi
           if [ -d bin/external ]; then cp -r bin/external build/bin/tools/; fi
 
       - name: Check archive size before compression

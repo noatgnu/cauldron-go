@@ -252,6 +252,13 @@ build_dev_tools() {
         return 1
     fi
 
+    if go build -o "bin/plugin-to-nextflow$exe_ext" ./cmd/plugin-to-nextflow; then
+        print_success "Built plugin-to-nextflow"
+    else
+        print_error "Failed to build plugin-to-nextflow"
+        return 1
+    fi
+
     print_success "All developer tools built successfully"
 }
 

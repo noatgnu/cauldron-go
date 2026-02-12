@@ -37,6 +37,9 @@ jobs:
       - name: Test plugin-validator
         run: ./bin/plugin-validator plugins/pca-analysis
 
+      - name: Test plugin-to-nextflow
+        run: ./bin/plugin-to-nextflow --plugin plugins/pca-analysis --output /tmp/nf-pca
+
       - name: Test doc generator
         run: ./bin/plugin-doc-generator plugins/pca-analysis
 

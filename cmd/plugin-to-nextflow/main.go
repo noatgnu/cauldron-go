@@ -135,6 +135,22 @@ func convertPlugin(path, outDir string) error {
 		return err
 	}
 
+	// Generate README
+	if readmeTmpl, err := templates.GetTemplate("README.md.tmpl"); err == nil {
+		if readmeContent, err := generator.GenerateREADME(definition, readmeTmpl); err == nil {
+			os.WriteFile(filepath.Join(outDir, "README.md"), []byte(readmeContent), 0644)
+		}
+	}
+
+	// Generate GitHub Action for the plugin
+	if actionTmpl, err := templates.GetTemplate("plugin-github-action.yml.tmpl"); err == nil {
+		if actionContent, err := generator.GenerateGithubAction(actionTmpl); err == nil {
+			githubDir := filepath.Join(outDir, ".github", "workflows")
+			os.MkdirAll(githubDir, 0755)
+			os.WriteFile(filepath.Join(githubDir, "nextflow-export.yml"), []byte(actionContent), 0644)
+		}
+	}
+
 	fmt.Printf("Successfully generated Nextflow pipeline in: %s\n", outDir)
 	return nil
 }
