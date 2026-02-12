@@ -1,0 +1,43 @@
+process {{ .ProcessName | upper }} {
+    tag "$meta.id"
+    label '{{ .Label }}'
+
+    container "${ workflow.containerEngine == 'singularity' ?
+        '{{ .ContainerImageSingularity }}' :
+        '{{ .ContainerImageDocker }}' }"
+
+    input:
+    tuple val(meta), path(input_file)
+    {{ range .Inputs }}
+    {{- if eq .Type "file" }}
+    path({{ .Name }})
+    {{- else }}
+    val({{ .Name }})
+    {{- end }}
+    {{- end }}
+
+    output:
+    {{ range .Outputs }}
+    tuple val(meta), path("{{ .Path }}"), emit: {{ .Name }}
+    {{- end }}
+    path "versions.yml", emit: versions
+
+    when:
+    task.ext.when == null || task.ext.when
+
+    script:
+    def args = task.ext.args ?: ''
+    def prefix = task.ext.prefix ?: "${meta.id}"
+    """
+    {{ .Entrypoint }} 
+        {{ range .Args }}
+        {{ .Flag }} {{ .Value }} 
+        {{- end }}
+        $args
+
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        {{ .ToolName }}: {{ .Version }}
+    END_VERSIONS
+    """
+}

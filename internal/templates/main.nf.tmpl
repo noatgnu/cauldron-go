@@ -1,0 +1,28 @@
+#!/usr/bin/env nextflow
+
+nextflow.enable.dsl = 2
+
+include { {{ .ProcessName | upper }} } from './modules/local/{{ .ProcessName }}/main'
+
+workflow {{ .WorkflowName | upper }} {
+    take:
+    ch_input
+
+    main:
+    {{ .ProcessName | upper }} (
+        ch_input,
+        {{- range .Inputs }}
+        params.{{ .Name }},
+        {{- end }}
+    )
+
+    emit:
+    versions = {{ .ProcessName | upper }}.out.versions
+}
+
+workflow {
+    ch_input = Channel.fromPath(params.input)
+        .map { it -> [ [id: it.baseName], it ] }
+
+    {{ .WorkflowName | upper }} (ch_input)
+}

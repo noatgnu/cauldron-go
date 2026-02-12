@@ -1,0 +1,23 @@
+FROM {{ .BaseImage }}
+
+{{ if .HasPython }}
+RUN apt-get update && apt-get install -y python3-pip && rm -rf /var/lib/apt/lists/*
+{{ end }}
+
+WORKDIR /app
+
+COPY . /app
+
+{{ if .HasPython }}
+{{ if .Requirements }}
+RUN pip install {{ range .Requirements }}{{ . }} {{ end }}
+{{ end }}
+{{ end }}
+
+{{ if .HasR }}
+{{ if .Requirements }}
+RUN R -e "install.packages(c({{ range $i, $e := .Requirements }}{{ if $i }}, {{ end }}'{{ $e }}'{{ end }}))"
+{{ end }}
+{{ end }}
+
+LABEL tool="{{ .Entrypoint }}"
