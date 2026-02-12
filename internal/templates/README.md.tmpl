@@ -13,7 +13,13 @@ This pipeline was automatically generated from a CauldronGO plugin.
 
 ### Run with Docker (Local)
 ```bash
-nextflow run main.nf -profile docker --input 'path/to/samplesheet.csv'
+nextflow run main.nf -profile docker --input 'path/to/data.tsv'
+```
+
+### Build from Dockerfile (Optional)
+If you want to build the container locally instead of pulling it:
+```bash
+docker build -t {{ .ContainerImageDocker }} -f containers/Dockerfile .
 ```
 
 ### Run without cloning (Remote)

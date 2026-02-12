@@ -24,6 +24,8 @@ type ProcessData struct {
 	Author                    string
 	OutputDirFlag             string
 	PrimaryEnv                string
+	DockerPlatform            string
+	BuildArgs                 map[string]string
 }
 
 type ArgData struct {
@@ -46,11 +48,18 @@ func GenerateProcess(definition *models.PluginDefinition, tmplStr string) (strin
 		return "", fmt.Errorf("failed to parse process template: %w", err)
 	}
 
+	imageName := discoverImage(definition)
+	singularityImage := imageName
+	if !strings.Contains(imageName, "://") && strings.Contains(imageName, "/") {
+		// If it looks like a full registry path, help Singularity with the protocol
+		singularityImage = "docker://" + imageName
+	}
+
 	data := ProcessData{
 		ProcessName:               definition.Plugin.ID,
 		Label:                     "process_medium",
-		ContainerImageSingularity: fmt.Sprintf("oras://ghcr.io/noatgnu/%s:%s", definition.Plugin.ID, definition.Plugin.Version),
-		ContainerImageDocker:      fmt.Sprintf("ghcr.io/noatgnu/%s:%s", definition.Plugin.ID, definition.Plugin.Version),
+		ContainerImageSingularity: singularityImage,
+		ContainerImageDocker:      imageName,
 		Outputs:                   definition.Outputs,
 		Entrypoint:                definition.Runtime.GetEntrypoint(),
 		ToolName:                  definition.Plugin.Name,
@@ -60,6 +69,11 @@ func GenerateProcess(definition *models.PluginDefinition, tmplStr string) (strin
 		OutputDirFlag:             definition.Execution.OutputDir,
 		Inputs:                    definition.Inputs,
 		PrimaryEnv:                definition.Runtime.GetPrimaryEnvironment(),
+	}
+
+	if definition.Runtime.Docker != nil {
+		data.DockerPlatform = definition.Runtime.Docker.Platform
+		data.BuildArgs = definition.Runtime.Docker.BuildArgs
 	}
 
 	// Map ArgsMapping to ArgData
@@ -109,6 +123,16 @@ func GenerateProcess(definition *models.PluginDefinition, tmplStr string) (strin
 	}
 
 	return buf.String(), nil
+}
+
+func discoverImage(definition *models.PluginDefinition) string {
+	// 1. If explicit docker image is provided in YAML, use it exactly as defined
+	if definition.Runtime.Docker != nil && definition.Runtime.Docker.Image != "" {
+		return definition.Runtime.Docker.Image
+	}
+
+	// 2. Fallback to a local tag (no hardcoded registry)
+	return definition.Plugin.ID + ":" + definition.Plugin.Version
 }
 
 func GenerateREADME(definition *models.PluginDefinition, tmplStr string) (string, error) {
