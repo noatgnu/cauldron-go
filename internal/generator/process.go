@@ -158,14 +158,25 @@ func GenerateREADME(definition *models.PluginDefinition, tmplStr string) (string
 	return buf.String(), nil
 }
 
-func GenerateGithubAction(tmplStr string) (string, error) {
+func GenerateGithubAction(definition *models.PluginDefinition, tmplStr string) (string, error) {
 	tmpl, err := template.New("github-action").Delims("[[", "]]").Parse(tmplStr)
 	if err != nil {
 		return "", fmt.Errorf("failed to parse github-action template: %w", err)
 	}
 
+	data := ProcessData{
+		DockerPlatform: "linux/amd64",
+	}
+
+	if definition.Runtime.Docker != nil {
+		if definition.Runtime.Docker.Platform != "" {
+			data.DockerPlatform = definition.Runtime.Docker.Platform
+		}
+		data.BuildArgs = definition.Runtime.Docker.BuildArgs
+	}
+
 	var buf bytes.Buffer
-	if err := tmpl.Execute(&buf, nil); err != nil {
+	if err := tmpl.Execute(&buf, data); err != nil {
 		return "", fmt.Errorf("failed to execute github-action template: %w", err)
 	}
 
