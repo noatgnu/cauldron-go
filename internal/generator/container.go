@@ -9,11 +9,13 @@ import (
 )
 
 type ContainerData struct {
-	BaseImage    string
-	Requirements []string
-	Entrypoint   string
-	HasR         bool
-	HasPython    bool
+	BaseImage              string
+	Requirements           []string
+	PythonRequirementsFile string
+	RPackagesFile          string
+	Entrypoint             string
+	HasR                   bool
+	HasPython              bool
 }
 
 func GenerateContainer(definition *models.PluginDefinition, tmplStr string) (string, error) {
@@ -60,6 +62,8 @@ func GenerateContainer(definition *models.PluginDefinition, tmplStr string) (str
 	}
 
 	data.Requirements = definition.Execution.Requirements.Packages
+	data.PythonRequirementsFile = definition.Execution.Requirements.PythonRequirementsFile
+	data.RPackagesFile = definition.Execution.Requirements.RPackagesFile
 
 	var buf bytes.Buffer
 	if err := tmpl.Execute(&buf, data); err != nil {

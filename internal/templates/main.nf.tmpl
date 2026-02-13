@@ -2,21 +2,24 @@
 
 nextflow.enable.dsl = 2
 
-include { {{ .ProcessName | upper }} } from './modules/local/{{ .ProcessName }}/main'
+include { {{ .ProcessName | upper }} } from './modules/local/{{ .ModulePath }}/main'
 
-workflow {{ .WorkflowName | upper }} {
+workflow PIPELINE {
     main:
     {{ .ProcessName | upper }} (
+        {{- if .HasInputFile }}
+        params.input_file ? Channel.fromPath(params.input_file).collect() : Channel.of([]),
+        {{- end }}
         {{- range $i, $input := .Inputs }}
         {{- if eq .Type "file" }}
         params.{{ .Name }} ? Channel.fromPath(params.{{ .Name }}).collect() : Channel.of([]),
         {{- else }}
-        params.{{ .Name }},
+        Channel.value(params.{{ .Name }} ?: ''),
         {{- end }}
         {{- end }}
     )
 }
 
 workflow {
-    {{ .WorkflowName | upper }} ()
+    PIPELINE ()
 }

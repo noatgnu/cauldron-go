@@ -26,6 +26,7 @@ type ProcessData struct {
 	PrimaryEnv                string
 	DockerPlatform            string
 	BuildArgs                 map[string]string
+	UseAppPrefix              bool
 }
 
 type ArgData struct {
@@ -39,10 +40,17 @@ type ArgData struct {
 	IsMultiple  bool
 }
 
+func toNextflowID(id string) string {
+	result := strings.ReplaceAll(id, "-", "_")
+	result = strings.ReplaceAll(result, ".", "_")
+	return result
+}
+
 func GenerateProcess(definition *models.PluginDefinition, tmplStr string) (string, error) {
 	tmpl, err := template.New("process").Funcs(template.FuncMap{
-		"upper":   strings.ToUpper,
-		"replace": strings.ReplaceAll,
+		"upper":      strings.ToUpper,
+		"replace":    strings.ReplaceAll,
+		"nextflowID": toNextflowID,
 	}).Parse(tmplStr)
 	if err != nil {
 		return "", fmt.Errorf("failed to parse process template: %w", err)
@@ -55,13 +63,22 @@ func GenerateProcess(definition *models.PluginDefinition, tmplStr string) (strin
 		singularityImage = "docker://" + imageName
 	}
 
+	entrypoint := definition.Runtime.GetEntrypoint()
+	useAppPrefix := true
+	if definition.Runtime.Docker != nil && definition.Runtime.Docker.Image != "" {
+		useAppPrefix = false
+	}
+	if strings.HasPrefix(entrypoint, "/") {
+		useAppPrefix = false
+	}
+
 	data := ProcessData{
-		ProcessName:               definition.Plugin.ID,
+		ProcessName:               toNextflowID(definition.Plugin.ID),
 		Label:                     "process_medium",
 		ContainerImageSingularity: singularityImage,
 		ContainerImageDocker:      imageName,
 		Outputs:                   definition.Outputs,
-		Entrypoint:                definition.Runtime.GetEntrypoint(),
+		Entrypoint:                entrypoint,
 		ToolName:                  definition.Plugin.Name,
 		Version:                   definition.Plugin.Version,
 		Description:               definition.Plugin.Description,
@@ -69,6 +86,7 @@ func GenerateProcess(definition *models.PluginDefinition, tmplStr string) (strin
 		OutputDirFlag:             definition.Execution.OutputDir,
 		Inputs:                    definition.Inputs,
 		PrimaryEnv:                definition.Runtime.GetPrimaryEnvironment(),
+		UseAppPrefix:              useAppPrefix,
 	}
 
 	if definition.Runtime.Docker != nil {
@@ -131,8 +149,8 @@ func discoverImage(definition *models.PluginDefinition) string {
 		return definition.Runtime.Docker.Image
 	}
 
-	// 2. Fallback to a local tag (no hardcoded registry)
-	return definition.Plugin.ID + ":" + definition.Plugin.Version
+	// 2. Fallback to cauldron namespace to avoid clashing
+	return "cauldron/" + definition.Plugin.ID + ":" + definition.Plugin.Version
 }
 
 func GenerateREADME(definition *models.PluginDefinition, tmplStr string) (string, error) {
@@ -158,13 +176,25 @@ func GenerateREADME(definition *models.PluginDefinition, tmplStr string) (string
 	return buf.String(), nil
 }
 
+type GithubActionData struct {
+	PluginID       string
+	Version        string
+	DockerPlatform string
+	BuildArgs      map[string]string
+	HasExample     bool
+	ExampleArgs    string
+	ExampleDirs    []string
+}
+
 func GenerateGithubAction(definition *models.PluginDefinition, tmplStr string) (string, error) {
 	tmpl, err := template.New("github-action").Delims("[[", "]]").Parse(tmplStr)
 	if err != nil {
 		return "", fmt.Errorf("failed to parse github-action template: %w", err)
 	}
 
-	data := ProcessData{
+	data := GithubActionData{
+		PluginID:       definition.Plugin.ID,
+		Version:        definition.Plugin.Version,
 		DockerPlatform: "linux/amd64",
 	}
 
@@ -173,6 +203,26 @@ func GenerateGithubAction(definition *models.PluginDefinition, tmplStr string) (
 			data.DockerPlatform = definition.Runtime.Docker.Platform
 		}
 		data.BuildArgs = definition.Runtime.Docker.BuildArgs
+	}
+
+	if definition.Example != nil && definition.Example.Enabled {
+		data.HasExample = true
+		exampleDirsMap := make(map[string]bool)
+		var args []string
+		for key, value := range definition.Example.Values {
+			strVal := fmt.Sprintf("%v", value)
+			if strings.Contains(strVal, "/") && !strings.HasPrefix(strVal, "-") {
+				dir := strings.Split(strVal, "/")[0]
+				exampleDirsMap[dir] = true
+				args = append(args, fmt.Sprintf("--%s examples/%s", key, strVal))
+			} else {
+				args = append(args, fmt.Sprintf("--%s '%v'", key, value))
+			}
+		}
+		data.ExampleArgs = strings.Join(args, " \\\n          ")
+		for dir := range exampleDirsMap {
+			data.ExampleDirs = append(data.ExampleDirs, dir)
+		}
 	}
 
 	var buf bytes.Buffer

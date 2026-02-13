@@ -11,10 +11,89 @@ on:
       - '**.R'
       - 'requirements.txt'
       - 'Dockerfile'
+  pull_request:
+    paths:
+      - 'plugin.yaml'
+      - '**.py'
+      - '**.R'
+      - 'requirements.txt'
+      - 'Dockerfile'
 
 jobs:
+  validate-nextflow:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Plugin Repo
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Setup Nextflow
+        uses: nf-core/setup-nextflow@v2
+
+      - name: Install Cauldron CLI
+        run: |
+          go install github.com/noatgnu/cauldron-go/cmd/plugin-to-nextflow@latest
+
+      - name: Generate Nextflow Pipeline
+        run: |
+          plugin-to-nextflow --plugin plugin.yaml --output .
+
+      - name: Validate Nextflow Syntax
+        run: |
+          nextflow run main.nf -preview
+[[ if .HasExample ]]
+  test-with-examples:
+    runs-on: ubuntu-latest
+    needs: validate-nextflow
+    steps:
+      - name: Checkout Plugin Repo
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Setup Nextflow
+        uses: nf-core/setup-nextflow@v2
+
+      - name: Install Cauldron CLI
+        run: |
+          go install github.com/noatgnu/cauldron-go/cmd/plugin-to-nextflow@latest
+
+      - name: Generate Nextflow Pipeline
+        run: |
+          plugin-to-nextflow --plugin plugin.yaml --output .
+
+      - name: Check Example Data
+        run: |
+          [[ range .ExampleDirs ]]
+          if [ ! -d "examples/[[ . ]]" ]; then
+            echo "Warning: examples/[[ . ]] directory not found"
+            exit 1
+          fi
+          [[ end ]]
+          echo "All example directories found"
+
+      - name: Build Container
+        run: |
+          docker build -t cauldron/[[ .PluginID ]]:[[ .Version ]] -f containers/Dockerfile .
+
+      - name: Run Nextflow with Examples
+        run: |
+          nextflow run main.nf \
+          [[ .ExampleArgs ]] \
+          -profile docker \
+          --outdir results
+[[ end ]]
   export-nextflow:
     runs-on: ubuntu-latest
+    needs: [validate-nextflow[[ if .HasExample ]], test-with-examples[[ end ]]]
+    if: github.event_name == 'push'
     steps:
       - name: Checkout Plugin Repo
         uses: actions/checkout@v4
@@ -32,14 +111,12 @@ jobs:
 
       - name: Generate Nextflow Pipeline
         run: |
-          plugin-to-nextflow --plugin plugin.yaml --output nextflow-export
+          plugin-to-nextflow --plugin plugin.yaml --output .
 
-      - name: Deploy to Nextflow Branch
+      - name: Commit and Push Nextflow Files
         run: |
-          cd nextflow-export
-          git init
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add .
-          git commit -m "Auto-generate Nextflow pipeline from plugin metadata"
-          git push --force https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:nextflow
+          git add main.nf nextflow.config nextflow_schema.json modules/ containers/ README.md .github/
+          git diff --staged --quiet || git commit -m "Auto-generate Nextflow pipeline from plugin metadata"
+          git push

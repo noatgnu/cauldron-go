@@ -1,23 +1,32 @@
 FROM {{ .BaseImage }}
+{{- if .HasPython }}
 
-{{ if .HasPython }}
 RUN apt-get update && apt-get install -y python3-pip && rm -rf /var/lib/apt/lists/*
-{{ end }}
+{{- end }}
 
 WORKDIR /app
 
 COPY . /app
+{{- if .HasPython }}
+{{- if .PythonRequirementsFile }}
 
-{{ if .HasPython }}
-{{ if .Requirements }}
-RUN pip install {{ range .Requirements }}{{ . }} {{ end }}
-{{ end }}
-{{ end }}
+RUN pip install --no-cache-dir -r {{ .PythonRequirementsFile }}
+{{- else if .Requirements }}
 
-{{ if .HasR }}
-{{ if .Requirements }}
-RUN R -e "install.packages(c({{ range $i, $e := .Requirements }}{{ if $i }}, {{ end }}'{{ $e }}'{{ end }}))"
-{{ end }}
-{{ end }}
+RUN pip install --no-cache-dir {{ range .Requirements }}{{ . }} {{ end }}
+{{- end }}
+
+RUN chmod +x /app/{{ .Entrypoint }}
+ENV PATH="/app:${PATH}"
+{{- end }}
+{{- if .HasR }}
+{{- if .RPackagesFile }}
+
+RUN R -e "if (!requireNamespace('BiocManager', quietly = TRUE)) install.packages('BiocManager', repos='https://cloud.r-project.org'); pkgs <- trimws(readLines('{{ .RPackagesFile }}')); pkgs <- pkgs[pkgs != '' & !startsWith(pkgs, '#')]; BiocManager::install(pkgs)"
+{{- else if .Requirements }}
+
+RUN R -e "if (!requireNamespace('BiocManager', quietly = TRUE)) install.packages('BiocManager', repos='https://cloud.r-project.org'); BiocManager::install(c({{ range $i, $e := .Requirements }}{{ if $i }}, {{ end }}'{{ $e }}'{{ end }}))"
+{{- end }}
+{{- end }}
 
 LABEL tool="{{ .Entrypoint }}"

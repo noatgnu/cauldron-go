@@ -16,7 +16,7 @@ process {{ .ProcessName | upper }} {
 
     output:
     {{ range .Outputs }}
-    path "{{ .Path }}", emit: {{ .Name }}
+    path "{{ .Path }}", emit: {{ .Name | nextflowID }}, optional: true
     {{- end }}
     path "versions.yml", emit: versions
 
@@ -28,28 +28,28 @@ process {{ .ProcessName | upper }} {
 
     {{ range .Args }}
     # Mapping for {{ .InputName }}
-    VAL=${ {{ .InputName }} }
-    if [ ! -z "\$VAL" ] && [ "\$VAL" != "null" ]; then
+    VAL="${{ .InputName }}"
+    if [ -n "\$VAL" ] && [ "\$VAL" != "null" ] && [ "\$VAL" != "[]" ]; then
         {{- if eq .InputType "boolean" }}
         {{- if .PassAsValue }}
         ARG_LIST+=("{{ .Flag }}" "\$VAL")
         {{- else }}
-        if [ "\$VAL" == "true" ]; then
+        if [ "\$VAL" = "true" ]; then
             ARG_LIST+=("{{ .Flag }}")
         fi
         {{- end }}
         {{- else if .When }}
         # Condition: {{ .When }}
         {{- if eq .When "true" }}
-        if [ "\$VAL" == "true" ]; then ARG_LIST+=("{{ .Flag }}"); fi
+        if [ "\$VAL" = "true" ]; then ARG_LIST+=("{{ .Flag }}"); fi
         {{- else if eq .When "false" }}
-        if [ "\$VAL" == "false" ]; then ARG_LIST+=("{{ .Flag }}"); fi
+        if [ "\$VAL" = "false" ]; then ARG_LIST+=("{{ .Flag }}"); fi
         {{- else if eq .When "not-empty" }}
-        if [ ! -z "\$VAL" ]; then ARG_LIST+=("{{ .Flag }}"); fi
+        if [ -n "\$VAL" ]; then ARG_LIST+=("{{ .Flag }}"); fi
         {{- else if eq .When "empty" }}
         if [ -z "\$VAL" ]; then ARG_LIST+=("{{ .Flag }}"); fi
         {{- else }}
-        if [ "\$VAL" == "{{ .When }}" ]; then ARG_LIST+=("{{ .Flag }}"); fi
+        if [ "\$VAL" = "{{ .When }}" ]; then ARG_LIST+=("{{ .Flag }}"); fi
         {{- end }}
         {{- else }}
         {{- if .StaticValue }}
@@ -57,11 +57,11 @@ process {{ .ProcessName | upper }} {
         {{- else }}
         {{- if eq .Transform "comma-join" }}
         # Transform: comma-join
-        JOINED_VAL=$(echo "\$VAL" | sed 's/\[//g' | sed 's/\]//g' | sed 's/ //g')
+        JOINED_VAL=\$(echo "\$VAL" | sed 's/\\[//g' | sed 's/\\]//g' | sed 's/ //g')
         ARG_LIST+=("{{ .Flag }}" "\$JOINED_VAL")
         {{- else if eq .Transform "space-join" }}
         # Transform: space-join
-        JOINED_VAL=$(echo "\$VAL" | sed 's/\[//g' | sed 's/\]//g')
+        JOINED_VAL=\$(echo "\$VAL" | sed 's/\\[//g' | sed 's/\\]//g')
         ARG_LIST+=("{{ .Flag }}" "\$JOINED_VAL")
         {{- else if eq .Transform "json-encode" }}
         # Transform: json-encode (Nextflow passes as string, so use as is)
@@ -75,13 +75,15 @@ process {{ .ProcessName | upper }} {
     {{ end }}
 
     {{- if eq .PrimaryEnv "r" }}
-    Rscript --vanilla --slave {{ .Entrypoint }} --args \
+    Rscript --vanilla --slave {{ if .UseAppPrefix }}/app/{{ end }}{{ .Entrypoint }} --args \
+    {{- else if eq .PrimaryEnv "python" }}
+    python {{ if .UseAppPrefix }}/app/{{ end }}{{ .Entrypoint }} \
     {{- else }}
-    {{ .Entrypoint }} \
+    {{ if .UseAppPrefix }}/app/{{ end }}{{ .Entrypoint }} \
     {{- end }}
         "\${ARG_LIST[@]}" \
         {{ if .OutputDirFlag }}{{ .OutputDirFlag }} .{{ end }} \
-        $args
+        \${args:-}
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

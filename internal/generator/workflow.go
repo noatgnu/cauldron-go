@@ -10,9 +10,12 @@ import (
 )
 
 type WorkflowData struct {
-	WorkflowName string
-	ProcessName  string
-	Inputs       []models.PluginInputV2
+	WorkflowName   string
+	ProcessName    string
+	ModulePath     string
+	Inputs         []models.PluginInputV2
+	HasInputFile   bool
+	InputFileInput *models.PluginInputV2
 }
 
 func GenerateWorkflow(definition *models.PluginDefinition, tmplStr string) (string, error) {
@@ -24,12 +27,16 @@ func GenerateWorkflow(definition *models.PluginDefinition, tmplStr string) (stri
 	}
 
 	data := WorkflowData{
-		WorkflowName: definition.Plugin.ID,
-		ProcessName:  definition.Plugin.ID,
+		WorkflowName: toNextflowID(definition.Plugin.ID),
+		ProcessName:  toNextflowID(definition.Plugin.ID),
+		ModulePath:   definition.Plugin.ID,
 	}
 
 	for _, input := range definition.Inputs {
+		inputCopy := input
 		if input.Name == "input_file" {
+			data.HasInputFile = true
+			data.InputFileInput = &inputCopy
 			continue
 		}
 		data.Inputs = append(data.Inputs, input)
