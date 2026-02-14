@@ -29,14 +29,16 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.21'
+          go-version: '1.24'
 
       - name: Setup Nextflow
         uses: nf-core/setup-nextflow@v2
 
-      - name: Install Cauldron CLI
+      - name: Build Cauldron CLI
         run: |
-          go install github.com/noatgnu/cauldron-go/cmd/plugin-to-nextflow@latest
+          git clone https://github.com/noatgnu/cauldron-go.git /tmp/cauldron-go
+          cd /tmp/cauldron-go
+          go build -o /usr/local/bin/plugin-to-nextflow ./cmd/plugin-to-nextflow
 
       - name: Generate Nextflow Pipeline
         run: |
@@ -56,14 +58,16 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.21'
+          go-version: '1.24'
 
       - name: Setup Nextflow
         uses: nf-core/setup-nextflow@v2
 
-      - name: Install Cauldron CLI
+      - name: Build Cauldron CLI
         run: |
-          go install github.com/noatgnu/cauldron-go/cmd/plugin-to-nextflow@latest
+          git clone https://github.com/noatgnu/cauldron-go.git /tmp/cauldron-go
+          cd /tmp/cauldron-go
+          go build -o /usr/local/bin/plugin-to-nextflow ./cmd/plugin-to-nextflow
 
       - name: Generate Nextflow Pipeline
         run: |
@@ -103,11 +107,13 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.21'
+          go-version: '1.24'
 
-      - name: Install Cauldron CLI
+      - name: Build Cauldron CLI
         run: |
-          go install github.com/noatgnu/cauldron-go/cmd/plugin-to-nextflow@latest
+          git clone https://github.com/noatgnu/cauldron-go.git /tmp/cauldron-go
+          cd /tmp/cauldron-go
+          go build -o /usr/local/bin/plugin-to-nextflow ./cmd/plugin-to-nextflow
 
       - name: Generate Nextflow Pipeline
         run: |

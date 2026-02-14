@@ -29,7 +29,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.21'
+          go-version: '1.24'
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -40,9 +40,11 @@ jobs:
         run: |
           pip install slivka
 
-      - name: Install Cauldron CLI
+      - name: Build Cauldron CLI
         run: |
-          go install github.com/noatgnu/cauldron-go/cmd/plugin-to-slivka@latest
+          git clone https://github.com/noatgnu/cauldron-go.git /tmp/cauldron-go
+          cd /tmp/cauldron-go
+          go build -o /usr/local/bin/plugin-to-slivka ./cmd/plugin-to-slivka
 
       - name: Generate Slivka Service
         run: |
@@ -79,7 +81,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.21'
+          go-version: '1.24'
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -90,9 +92,11 @@ jobs:
         run: |
           pip install slivka
 
-      - name: Install Cauldron CLI
+      - name: Build Cauldron CLI
         run: |
-          go install github.com/noatgnu/cauldron-go/cmd/plugin-to-slivka@latest
+          git clone https://github.com/noatgnu/cauldron-go.git /tmp/cauldron-go
+          cd /tmp/cauldron-go
+          go build -o /usr/local/bin/plugin-to-slivka ./cmd/plugin-to-slivka
 
       - name: Generate Slivka Service
         run: |
