@@ -32,7 +32,10 @@ jobs:
           go-version: '1.24'
 
       - name: Setup Nextflow
-        uses: nf-core/setup-nextflow@v2
+        run: |
+          curl -s https://get.nextflow.io | bash
+          sudo mv nextflow /usr/local/bin/
+          nextflow -version
 
       - name: Build Cauldron CLI
         run: |
@@ -61,7 +64,10 @@ jobs:
           go-version: '1.24'
 
       - name: Setup Nextflow
-        uses: nf-core/setup-nextflow@v2
+        run: |
+          curl -s https://get.nextflow.io | bash
+          sudo mv nextflow /usr/local/bin/
+          nextflow -version
 
       - name: Build Cauldron CLI
         run: |
