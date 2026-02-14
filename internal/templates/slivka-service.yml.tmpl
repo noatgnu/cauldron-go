@@ -1,0 +1,93 @@
+# Slivka service configuration for {{ .Name }}
+# Generated from Cauldron plugin format
+#
+# For file inputs that reference large databases (e.g., FASTA databases),
+# consider configuring them as environment variables pointing to shared storage:
+#   env:
+#     DATABASE_PATH: "${SLIVKA_HOME}/databases/uniref90.fasta"
+# Then reference in args as: arg: "--db=${DATABASE_PATH}"
+
+slivka-version: "0.8"
+name: {{ .Name }}
+description: {{ .Description }}
+author: {{ .Author }}
+version: "{{ .Version }}"
+license: MIT
+classifiers:
+  - "Topic :: Scientific/Engineering :: Bio-Informatics"
+
+parameters:
+{{- range .Parameters }}
+  {{ .Name }}:
+    name: "{{ .Label }}"
+    description: "{{ .Description }}"
+    type: {{ .Type }}
+{{- if .Required }}
+    required: true
+{{- end }}
+{{- if .Default }}
+    default: {{ .Default }}
+{{- end }}
+{{- if .MediaType }}
+    media-type: {{ .MediaType }}
+{{- end }}
+{{- if .Min }}
+    min: {{ .Min }}
+{{- end }}
+{{- if .Max }}
+    max: {{ .Max }}
+{{- end }}
+{{- if .Options }}
+    choices:
+{{- range .Options }}
+      - {{ . }}
+{{- end }}
+{{- end }}
+{{- end }}
+
+command:
+{{- range .Command }}
+  - {{ . }}
+{{- end }}
+
+args:
+{{- range .Args }}
+  {{ .Name }}:
+    arg: "{{ .Arg }}"
+{{- if .Symlink }}
+    symlink: "{{ .Symlink }}"
+{{- end }}
+{{- if .Condition }}
+    condition: "{{ .Condition }}"
+{{- end }}
+{{- end }}
+
+outputs:
+{{- range .Outputs }}
+  {{ .Name }}:
+    path: "{{ .Path }}"
+{{- if .MediaType }}
+    media-type: {{ .MediaType }}
+{{- end }}
+{{- end }}
+
+{{- if .EnvVars }}
+env:
+{{- range .EnvVars }}
+  {{ .Name }}: "{{ .Value }}"  # {{ .Description }}
+{{- end }}
+{{- end }}
+
+execution:
+  runners:
+    default:
+      type: SlivkaQueueRunner
+{{- if .HasExample }}
+
+tests:
+  - applicable-runners: ["default"]
+    parameters:
+{{- range .TestParams }}
+      {{ .Name }}: {{ .Value }}
+{{- end }}
+{{- end }}

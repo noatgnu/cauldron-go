@@ -1,0 +1,175 @@
+name: Test Slivka Service
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - 'plugin.yaml'
+      - '**.py'
+      - '**.R'
+      - 'requirements.txt'
+      - 'Dockerfile'
+  pull_request:
+    paths:
+      - 'plugin.yaml'
+      - '**.py'
+      - '**.R'
+      - 'requirements.txt'
+      - 'Dockerfile'
+
+jobs:
+  validate-slivka:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Plugin Repo
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Slivka
+        run: |
+          pip install slivka
+
+      - name: Install Cauldron CLI
+        run: |
+          go install github.com/noatgnu/cauldron-go/cmd/plugin-to-slivka@latest
+
+      - name: Generate Slivka Service
+        run: |
+          plugin-to-slivka --plugin plugin.yaml --output slivka-services
+
+      - name: Validate Slivka YAML
+        run: |
+          python -c "
+          import yaml
+          import sys
+          with open('slivka-services/[[ .PluginID ]].service.yaml', 'r') as f:
+              config = yaml.safe_load(f)
+          required = ['slivka-version', 'name', 'description', 'parameters', 'command', 'args', 'outputs', 'execution']
+          missing = [k for k in required if k not in config]
+          if missing:
+              print(f'Missing required fields: {missing}')
+              sys.exit(1)
+          print('Slivka service YAML is valid')
+          "
+[[ if .HasExample ]]
+  test-with-docker:
+    runs-on: ubuntu-latest
+    needs: validate-slivka
+    services:
+      mongodb:
+        image: mongo:6
+        ports:
+          - 27017:27017
+
+    steps:
+      - name: Checkout Plugin Repo
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Slivka
+        run: |
+          pip install slivka
+
+      - name: Install Cauldron CLI
+        run: |
+          go install github.com/noatgnu/cauldron-go/cmd/plugin-to-slivka@latest
+
+      - name: Generate Slivka Service
+        run: |
+          plugin-to-slivka --plugin plugin.yaml --output slivka-services
+
+      - name: Build Plugin Container
+        run: |
+          docker build -t cauldron/[[ .PluginID ]]:[[ .Version ]] -f Dockerfile .
+
+      - name: Setup Slivka Project
+        run: |
+          mkdir -p slivka-project/services
+          cp slivka-services/[[ .PluginID ]].service.yaml slivka-project/services/
+
+          cat > slivka-project/settings.yml << 'EOF'
+          version: "0.8"
+          directory:
+            jobs: ./jobs
+            logs: ./logs
+            uploads: ./uploads
+          server:
+            host: 127.0.0.1
+            port: 8000
+          mongodb:
+            host: 127.0.0.1
+            port: 27017
+            database: slivka_test
+          EOF
+
+          mkdir -p slivka-project/jobs slivka-project/logs slivka-project/uploads
+          [[ range .ExampleDirs ]]
+          mkdir -p slivka-project/testdata
+          cp -r examples/[[ . ]]/* slivka-project/testdata/ 2>/dev/null || true
+          [[ end ]]
+
+      - name: Start Slivka Server
+        run: |
+          cd slivka-project
+          slivka start server &
+          slivka start scheduler &
+          slivka start local-queue &
+          sleep 10
+
+      - name: Verify Service is Running
+        run: |
+          curl -s http://localhost:8000/api/services | python -c "
+          import sys, json
+          data = json.load(sys.stdin)
+          services = [s['name'] for s in data.get('services', [])]
+          if '[[ .PluginID ]]' not in services:
+              print(f'Service not found. Available: {services}')
+              sys.exit(1)
+          print('Service [[ .PluginID ]] is running')
+          "
+
+      - name: Submit Test Job
+        run: |
+          cd slivka-project
+          JOB_RESPONSE=$(curl -s -X POST http://localhost:8000/api/services/[[ .PluginID ]]/jobs \
+            [[ .SlivkaTestArgs ]])
+
+          JOB_ID=$(echo $JOB_RESPONSE | python -c "import sys,json; print(json.load(sys.stdin)['id'])")
+          echo "Job ID: $JOB_ID"
+
+          for i in {1..30}; do
+            STATUS=$(curl -s http://localhost:8000/api/jobs/$JOB_ID | python -c "import sys,json; print(json.load(sys.stdin)['status'])")
+            echo "Status: $STATUS"
+            if [ "$STATUS" = "COMPLETED" ]; then
+              echo "Job completed successfully"
+              exit 0
+            elif [ "$STATUS" = "FAILED" ] || [ "$STATUS" = "ERROR" ]; then
+              echo "Job failed"
+              curl -s http://localhost:8000/api/jobs/$JOB_ID
+              exit 1
+            fi
+            sleep 5
+          done
+          echo "Job timed out"
+          exit 1
+[[ end ]]

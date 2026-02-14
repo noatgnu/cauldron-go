@@ -23,6 +23,12 @@ process {{ .ProcessName | upper }} {
     script:
     def args = task.ext.args ?: ''
     """
+    {{- if .EnvVars }}
+    # Set environment variables
+    {{- range .EnvVars }}
+    export {{ .Name }}="{{ .Value }}"
+    {{- end }}
+    {{ end }}
     # Build arguments dynamically to match CauldronGO PluginExecutor logic
     ARG_LIST=()
 

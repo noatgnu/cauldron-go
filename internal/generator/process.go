@@ -9,6 +9,12 @@ import (
 	"github.com/noatgnu/cauldron-go/backend/models"
 )
 
+type EnvVarData struct {
+	Name        string
+	Value       string
+	Description string
+}
+
 type ProcessData struct {
 	ProcessName               string
 	Label                     string
@@ -18,6 +24,7 @@ type ProcessData struct {
 	Outputs                   []models.PluginOutputV2
 	Entrypoint                string
 	Args                      []ArgData
+	EnvVars                   []EnvVarData
 	ToolName                  string
 	Version                   string
 	Description               string
@@ -92,6 +99,18 @@ func GenerateProcess(definition *models.PluginDefinition, tmplStr string) (strin
 	if definition.Runtime.Docker != nil {
 		data.DockerPlatform = definition.Runtime.Docker.Platform
 		data.BuildArgs = definition.Runtime.Docker.BuildArgs
+	}
+
+	for _, envVar := range definition.Execution.EnvVariables {
+		defaultVal := ""
+		if envVar.Default != nil {
+			defaultVal = fmt.Sprintf("%v", envVar.Default)
+		}
+		data.EnvVars = append(data.EnvVars, EnvVarData{
+			Name:        envVar.Name,
+			Value:       defaultVal,
+			Description: envVar.Description,
+		})
 	}
 
 	// Map ArgsMapping to ArgData
