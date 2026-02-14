@@ -47,6 +47,61 @@ type ArgData struct {
 	IsMultiple  bool
 }
 
+func findFormatOptionsFromInputs(inputs []models.PluginInputV2) []string {
+	formatKeywords := []string{"format", "file_format", "output_format", "plot_format"}
+	imageFormats := []string{"svg", "png", "pdf", "jpg", "jpeg", "tiff"}
+
+	for _, input := range inputs {
+		nameLC := strings.ToLower(input.Name)
+		for _, keyword := range formatKeywords {
+			if strings.Contains(nameLC, keyword) && len(input.Options) > 0 {
+				hasImageFormat := false
+				for _, opt := range input.Options {
+					optLC := strings.ToLower(opt)
+					for _, imgFmt := range imageFormats {
+						if optLC == imgFmt {
+							hasImageFormat = true
+							break
+						}
+					}
+				}
+				if hasImageFormat {
+					return input.Options
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func replaceFormatExtensionInPath(path string, formatOptions []string) string {
+	for _, ext := range formatOptions {
+		extWithDot := "." + strings.ToLower(ext)
+		if strings.HasSuffix(strings.ToLower(path), extWithDot) {
+			return path[:len(path)-len(extWithDot)] + ".*"
+		}
+		wildcardExt := "*" + extWithDot
+		if strings.HasSuffix(strings.ToLower(path), wildcardExt) {
+			return path[:len(path)-len(wildcardExt)] + "*.*"
+		}
+	}
+	return path
+}
+
+func processOutputsForDynamicFormat(outputs []models.PluginOutputV2, inputs []models.PluginInputV2) []models.PluginOutputV2 {
+	formatOptions := findFormatOptionsFromInputs(inputs)
+	if len(formatOptions) == 0 {
+		return outputs
+	}
+
+	processed := make([]models.PluginOutputV2, len(outputs))
+	for i, output := range outputs {
+		processed[i] = output
+		processed[i].Path = replaceFormatExtensionInPath(output.Path, formatOptions)
+	}
+	return processed
+}
+
 func toNextflowID(id string) string {
 	result := strings.ReplaceAll(id, "-", "_")
 	result = strings.ReplaceAll(result, ".", "_")
@@ -79,12 +134,14 @@ func GenerateProcess(definition *models.PluginDefinition, tmplStr string) (strin
 		useAppPrefix = false
 	}
 
+	processedOutputs := processOutputsForDynamicFormat(definition.Outputs, definition.Inputs)
+
 	data := ProcessData{
 		ProcessName:               toNextflowID(definition.Plugin.ID),
 		Label:                     "process_medium",
 		ContainerImageSingularity: singularityImage,
 		ContainerImageDocker:      imageName,
-		Outputs:                   definition.Outputs,
+		Outputs:                   processedOutputs,
 		Entrypoint:                entrypoint,
 		ToolName:                  definition.Plugin.Name,
 		Version:                   definition.Plugin.Version,

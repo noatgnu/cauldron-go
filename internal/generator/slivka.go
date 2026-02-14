@@ -127,6 +127,47 @@ func getSlivkaArgCondition(when string) string {
 	}
 }
 
+func findFormatOptions(inputs []models.PluginInputV2) []string {
+	formatKeywords := []string{"format", "file_format", "output_format", "plot_format"}
+	imageFormats := []string{"svg", "png", "pdf", "jpg", "jpeg", "tiff"}
+
+	for _, input := range inputs {
+		nameLC := strings.ToLower(input.Name)
+		for _, keyword := range formatKeywords {
+			if strings.Contains(nameLC, keyword) && len(input.Options) > 0 {
+				hasImageFormat := false
+				for _, opt := range input.Options {
+					optLC := strings.ToLower(opt)
+					for _, imgFmt := range imageFormats {
+						if optLC == imgFmt {
+							hasImageFormat = true
+							break
+						}
+					}
+				}
+				if hasImageFormat {
+					return input.Options
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func replaceFormatExtension(path string, formatOptions []string) string {
+	for _, ext := range formatOptions {
+		extWithDot := "." + strings.ToLower(ext)
+		if strings.HasSuffix(strings.ToLower(path), extWithDot) {
+			return path[:len(path)-len(extWithDot)] + ".*"
+		}
+		wildcardExt := "*" + extWithDot
+		if strings.HasSuffix(strings.ToLower(path), wildcardExt) {
+			return path[:len(path)-len(wildcardExt)] + "*.*"
+		}
+	}
+	return path
+}
+
 func parseArgMappingForSlivka(mappingInterface interface{}) (*models.ArgMapping, error) {
 	switch v := mappingInterface.(type) {
 	case string:
@@ -257,6 +298,8 @@ func GenerateSlivka(definition *models.PluginDefinition, tmplStr string) (string
 		})
 	}
 
+	formatOptions := findFormatOptions(definition.Inputs)
+
 	for _, output := range definition.Outputs {
 		mediaType := ""
 		switch output.Format {
@@ -276,9 +319,17 @@ func GenerateSlivka(definition *models.PluginDefinition, tmplStr string) (string
 			mediaType = "text/plain"
 		}
 
+		outputPath := output.Path
+		if len(formatOptions) > 0 {
+			outputPath = replaceFormatExtension(outputPath, formatOptions)
+			if outputPath != output.Path {
+				mediaType = ""
+			}
+		}
+
 		data.Outputs = append(data.Outputs, SlivkaOutput{
 			Name:      output.Name,
-			Path:      output.Path,
+			Path:      outputPath,
 			MediaType: mediaType,
 		})
 	}
