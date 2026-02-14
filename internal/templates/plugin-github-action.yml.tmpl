@@ -31,6 +31,12 @@ jobs:
         with:
           go-version: '1.24'
 
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
       - name: Setup Nextflow
         run: |
           curl -s https://get.nextflow.io | bash
@@ -62,6 +68,12 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: '1.24'
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
 
       - name: Setup Nextflow
         run: |
