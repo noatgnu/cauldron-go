@@ -90,6 +90,13 @@ jobs:
           node scripts/generate-npm-licenses.js
         shell: bash
 
+      - name: Prepare Icons
+        run: |
+          mkdir -p build/windows
+          cp resources/appicon.png build/appicon.png
+          cp resources/icon.ico build/windows/icon.ico
+        shell: bash
+
       - name: Build Application
         run: |
           cd frontend
@@ -259,6 +266,11 @@ jobs:
           node scripts/generate-go-licenses.js
           node scripts/generate-npm-licenses.js
 
+      - name: Prepare Icons
+        run: |
+          mkdir -p build
+          cp resources/appicon.png build/appicon.png
+
       - name: Build Application
         run: |
           cd frontend
@@ -404,6 +416,11 @@ jobs:
         run: |
           node scripts/generate-go-licenses.js
           node scripts/generate-npm-licenses.js
+
+      - name: Prepare Icons
+        run: |
+          mkdir -p build
+          cp resources/appicon.png build/appicon.png
 
       - name: Build Application
         run: wails build -platform darwin/arm64
