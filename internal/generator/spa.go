@@ -112,6 +112,10 @@ func (g *SPAGenerator) Generate() error {
 		return fmt.Errorf("failed to generate lock script: %w", err)
 	}
 
+	if err := g.copyExampleFiles(); err != nil {
+		return fmt.Errorf("failed to copy example files: %w", err)
+	}
+
 	if g.config.GithubAction {
 		if err := g.generateGithubWorkflow(); err != nil {
 			return fmt.Errorf("failed to generate GitHub workflow: %w", err)
@@ -555,6 +559,40 @@ export class AppComponent implements OnInit {
     a.click();
     URL.revokeObjectURL(url);
   }
+
+  hasExample(): boolean {
+    return this.plugin.example?.enabled === true;
+  }
+
+  async loadExample() {
+    if (!this.plugin.example?.values) return;
+
+    const values = this.plugin.example.values;
+    const formValues: Record<string, any> = {};
+
+    for (const [key, value] of Object.entries(values)) {
+      if (key.endsWith('_source')) continue;
+
+      if (typeof value === 'string' && value.startsWith('examples/')) {
+        const assetPath = 'assets/' + value;
+        try {
+          const response = await fetch(assetPath);
+          if (response.ok) {
+            const content = await response.text();
+            const fileName = value.split('/').pop() || 'example.txt';
+            this.fileData.set(key, { name: fileName, content });
+            formValues[key] = fileName;
+          }
+        } catch (e) {
+          this.error.set('Failed to load example file: ' + value);
+        }
+      } else {
+        formValues[key] = value;
+      }
+    }
+
+    this.form.patchValue(formValues);
+  }
 }
 `
 
@@ -674,6 +712,12 @@ export class AppComponent implements OnInit {
     </mat-card-content>
 
     <mat-card-actions>
+      @if (hasExample()) {
+        <button mat-stroked-button (click)="loadExample()" [disabled]="!pyodideReady() || loading()">
+          <mat-icon>folder_open</mat-icon>
+          Load Example
+        </button>
+      }
       <button mat-raised-button color="primary"
               [disabled]="!pyodideReady() || !form.valid || loading()"
               (click)="run()">
@@ -749,6 +793,8 @@ export class AppComponent implements OnInit {
 
 mat-card-actions {
   padding: 16px;
+  display: flex;
+  gap: 8px;
 }
 `
 
@@ -1313,6 +1359,46 @@ async function generateLock() {
 generateLock().catch(console.error);
 `
 	return os.WriteFile(filepath.Join(scriptsDir, "generate-lock.mjs"), []byte(content), 0644)
+}
+
+func (g *SPAGenerator) copyExampleFiles() error {
+	if g.definition.Example == nil || !g.definition.Example.Enabled {
+		return nil
+	}
+
+	assetsExamplesDir := filepath.Join(g.config.OutputDir, "src", "assets", "examples")
+
+	for _, value := range g.definition.Example.Values {
+		strVal, ok := value.(string)
+		if !ok {
+			continue
+		}
+
+		if strings.HasPrefix(strVal, "examples/") {
+			srcPath := filepath.Join(g.pluginDir, strVal)
+			if _, err := os.Stat(srcPath); err != nil {
+				continue
+			}
+
+			relPath := strings.TrimPrefix(strVal, "examples/")
+			dstPath := filepath.Join(assetsExamplesDir, relPath)
+
+			if err := os.MkdirAll(filepath.Dir(dstPath), 0755); err != nil {
+				return err
+			}
+
+			srcContent, err := os.ReadFile(srcPath)
+			if err != nil {
+				return err
+			}
+
+			if err := os.WriteFile(dstPath, srcContent, 0644); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }
 
 func toJSONArray(items []string) string {
