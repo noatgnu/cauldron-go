@@ -149,7 +149,7 @@ plugins/phate-analysis-*/
 bin
 examples
 
-# Plugin-to-SPA CLI
-plugin-to-spa
-plugin-to-spa.exe
+# Plugin-to-SPA CLI (binary only, not source)
+/plugin-to-spa
+/plugin-to-spa.exe
 spa-output/

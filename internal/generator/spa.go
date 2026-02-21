@@ -432,6 +432,7 @@ export class AppComponent implements OnInit {
   outputs = signal<{name: string, content: string, type: string}[]>([]);
   logs = signal<string[]>([]);
   error = signal<string | null>(null);
+  fileData = new Map<string, {name: string, content: string}>();
 
   constructor(
     private fb: FormBuilder,
@@ -473,7 +474,8 @@ export class AppComponent implements OnInit {
   async openFile(inputName: string) {
     const file = await this.fileHandler.openFileDialog('Select File');
     if (file) {
-      this.form.patchValue({ [inputName]: file });
+      this.fileData.set(inputName, file);
+      this.form.patchValue({ [inputName]: file.name });
     }
   }
 
@@ -486,7 +488,10 @@ export class AppComponent implements OnInit {
     this.logs.set([]);
 
     try {
-      const params = this.form.value;
+      const params = { ...this.form.value };
+      for (const [key, fileInfo] of this.fileData.entries()) {
+        params[key] = fileInfo;
+      }
       const result = await this.pyodide.execute(PLUGIN_SCRIPT, params, PLUGIN_MODULES);
       this.outputs.set(result.outputs);
     } catch (err: any) {
@@ -831,7 +836,9 @@ export class PyodideService {
 
     this.pyodide.globals.set('__params__', this.pyodide.toPy(params));
 
-    const wrappedScript = 'import sys\\nsys.argv = ["script.py"]\\n' + script;
+    const wrappedScript = ` + "`" + `import sys
+sys.argv = ["script.py"]
+` + "`" + ` + script;
 
     await this.pyodide.runPythonAsync(wrappedScript);
 
