@@ -162,7 +162,10 @@ export class GenericPlot implements OnInit {
       const markerSize = settings.markerSize || 10;
       const showGrid = settings.showGrid !== false;
 
-      if (useAnnotations && this.plotConfig.config?.axes?.colorBy) {
+      const colorByField = this.plotConfig.config?.axes?.colorBy;
+      const useAnnotationColoring = useAnnotations && colorByField === 'condition';
+
+      if (useAnnotationColoring) {
         const dataWithAnnotations = data.text.map((sample, index) => {
           const annotation = this._annotations.find(a => a.sample === sample);
           return {
@@ -254,7 +257,7 @@ export class GenericPlot implements OnInit {
       const xLabel = axes.x || 'X';
       const yLabel = axes.y || 'Y';
       const zLabel = axes.z || 'Z';
-      const showLegend = useAnnotations || (data.colorBy && data.colorBy.length > 0);
+      const showLegend = useAnnotationColoring || (data.colorBy && data.colorBy.length > 0);
 
       let newLayout: any;
       if (is3D) {

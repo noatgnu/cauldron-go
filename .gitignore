@@ -32,6 +32,12 @@ frontend/dist/
 frontend/.nx/
 .nx/
 
+# Shared library
+shared-lib/node_modules/
+shared-lib/dist/
+shared-lib/.angular/
+shared-lib/out-tsc/
+
 # IDE and Editor directories
 .idea/
 .vscode/
@@ -137,6 +143,13 @@ plugins/spectronaut-curtainptm-converter/
 plugins/diann-curtainptm-converter-*/
 plugins/msfragger-curtainptm-converter-*/
 plugins/spectronaut-curtainptm-converter-*/
+plugins/phate-analysis/
+plugins/phate-analysis-*/
 
 bin
 examples
+
+# Plugin-to-SPA CLI
+plugin-to-spa
+plugin-to-spa.exe
+spa-output/

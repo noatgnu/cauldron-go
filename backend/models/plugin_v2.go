@@ -1,5 +1,11 @@
 package models
 
+import (
+	"fmt"
+
+	"gopkg.in/yaml.v3"
+)
+
 type PluginCategory string
 
 const (
@@ -29,6 +35,31 @@ type FieldOption struct {
 	Label string `yaml:"label" json:"label"`
 }
 
+type SelectOption struct {
+	Value string `json:"value"`
+	Label string `json:"label"`
+}
+
+func (s *SelectOption) UnmarshalYAML(value *yaml.Node) error {
+	if value.Kind == yaml.ScalarNode {
+		s.Value = value.Value
+		s.Label = value.Value
+		return nil
+	}
+
+	if value.Kind == yaml.MappingNode {
+		var fo FieldOption
+		if err := value.Decode(&fo); err != nil {
+			return err
+		}
+		s.Value = fo.Value
+		s.Label = fo.Label
+		return nil
+	}
+
+	return fmt.Errorf("invalid option format")
+}
+
 type FieldGroup struct {
 	Name    string        `yaml:"name" json:"name"`
 	Options []FieldOption `yaml:"options" json:"options"`
@@ -48,7 +79,7 @@ type PluginInputV2 struct {
 	Type                        PluginInputType      `yaml:"type" json:"type"`
 	Required                    bool                 `yaml:"required" json:"required"`
 	Default                     interface{}          `yaml:"default,omitempty" json:"default,omitempty"`
-	Options                     []string             `yaml:"options,omitempty" json:"options,omitempty"`
+	Options                     []SelectOption       `yaml:"options,omitempty" json:"options,omitempty"`
 	OptionsFromFile             string               `yaml:"optionsFromFile,omitempty" json:"optionsFromFile,omitempty"`
 	Groups                      []FieldGroup         `yaml:"groups,omitempty" json:"groups,omitempty"`
 	GroupsFromFile              string               `yaml:"groupsFromFile,omitempty" json:"groupsFromFile,omitempty"`

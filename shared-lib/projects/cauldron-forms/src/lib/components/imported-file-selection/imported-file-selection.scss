@@ -1,0 +1,15 @@
+.file-select {
+  width: 100%;
+  margin: 0;
+}
+
+.no-files {
+  padding: 16px;
+  text-align: center;
+  color: var(--on-surface-variant, rgba(0, 0, 0, 0.6));
+  font-size: 14px;
+
+  p {
+    margin: 0;
+  }
+}

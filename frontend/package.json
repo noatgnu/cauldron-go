@@ -24,6 +24,7 @@
   "private": true,
   "packageManager": "npm@10.9.2",
   "dependencies": {
+    "@cauldron/forms": "file:../shared-lib/dist/cauldron-forms",
     "@angular/cdk": "^21.0.1",
     "@angular/common": "^21.0.0",
     "@angular/compiler": "^21.0.0",

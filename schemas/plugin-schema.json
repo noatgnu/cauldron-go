@@ -270,9 +270,12 @@
         },
         "options": {
           "type": "array",
-          "description": "Available options (for select inputs)",
+          "description": "Available options (for select inputs). Can be simple strings or objects with value/label.",
           "items": {
-            "type": "string"
+            "oneOf": [
+              { "type": "string" },
+              { "$ref": "#/definitions/fieldOption" }
+            ]
           },
           "minItems": 2
         },

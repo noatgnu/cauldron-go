@@ -1,0 +1,253 @@
+<div class="annotation-dialog">
+  <h2 mat-dialog-title>Sample Annotation</h2>
+
+  <mat-dialog-content>
+    <mat-expansion-panel class="tools-panel">
+      <mat-expansion-panel-header>
+        <mat-panel-title>
+          <mat-icon>auto_fix_high</mat-icon>
+          <span>Automation Tools</span>
+        </mat-panel-title>
+      </mat-expansion-panel-header>
+
+      <div class="tools-content">
+        <section class="tool-section">
+          <h3>Regex-based Auto-Grouping</h3>
+          <p class="help-text">Apply conditions and batches to samples matching regex patterns</p>
+
+          @for (rule of regexRules; track $index) {
+            <div class="regex-rule-row">
+              <mat-form-field appearance="outline" class="pattern-field">
+                <mat-label>Pattern</mat-label>
+                <input matInput [(ngModel)]="rule.pattern">
+              </mat-form-field>
+
+              <mat-form-field appearance="outline" class="condition-field">
+                <mat-label>Condition</mat-label>
+                <input matInput [(ngModel)]="rule.condition">
+              </mat-form-field>
+
+              <mat-form-field appearance="outline" class="batch-field">
+                <mat-label>BioReplicate</mat-label>
+                <input matInput [(ngModel)]="rule.bioreplicate">
+              </mat-form-field>
+
+              <mat-form-field appearance="outline" class="batch-field">
+                <mat-label>Batch</mat-label>
+                <input matInput [(ngModel)]="rule.batch">
+              </mat-form-field>
+
+              <button mat-icon-button color="warn" (click)="removeRegexRule($index)" matTooltip="Remove rule">
+                <mat-icon>delete</mat-icon>
+              </button>
+            </div>
+          }
+
+          <div class="tool-actions">
+            <button mat-stroked-button (click)="addRegexRule()">
+              <mat-icon>add</mat-icon>
+              Add Rule
+            </button>
+            <button mat-raised-button color="primary" (click)="applyRegexRules()" [disabled]="regexRules.length === 0">
+              <mat-icon>play_arrow</mat-icon>
+              Apply Rules
+            </button>
+          </div>
+        </section>
+
+        <mat-divider></mat-divider>
+
+        <section class="tool-section">
+          <h3>Batch Assignment</h3>
+          <p class="help-text">Select samples and assign condition/batch to multiple samples at once</p>
+
+          <div class="batch-controls">
+            <div class="selection-buttons">
+              <button mat-stroked-button (click)="selectAll()">
+                <mat-icon>select_all</mat-icon>
+                Select All
+              </button>
+              <button mat-stroked-button (click)="deselectAll()">
+                <mat-icon>deselect</mat-icon>
+                Clear Selection
+              </button>
+            </div>
+
+            <div class="batch-inputs">
+              <mat-form-field appearance="outline" class="batch-input-field">
+                <mat-label>Condition</mat-label>
+                <input matInput [(ngModel)]="batchCondition">
+              </mat-form-field>
+
+              <mat-form-field appearance="outline" class="batch-input-field">
+                <mat-label>BioReplicate</mat-label>
+                <input matInput [(ngModel)]="batchBioReplicate">
+              </mat-form-field>
+
+              <mat-form-field appearance="outline" class="batch-input-field">
+                <mat-label>Batch</mat-label>
+                <input matInput [(ngModel)]="batchBatch">
+              </mat-form-field>
+
+              <button mat-raised-button color="primary" (click)="applyBatchAssignment()">
+                <mat-icon>check</mat-icon>
+                Apply to Selected
+              </button>
+            </div>
+          </div>
+        </section>
+      </div>
+    </mat-expansion-panel>
+
+    <div class="batch-operations">
+      <h3>Batch Operations</h3>
+      <div class="operation-buttons">
+        <button mat-button [matMenuTriggerFor]="conditionMenu">
+          <mat-icon>palette</mat-icon>
+          Color by Condition
+        </button>
+        <mat-menu #conditionMenu="matMenu">
+          @for (condition of getUniqueConditions(); track condition) {
+            <button mat-menu-item (click)="replaceColorForCondition(condition)">
+              {{ condition }}
+            </button>
+          }
+          @if (getUniqueConditions().length === 0) {
+            <button mat-menu-item disabled>No conditions defined</button>
+          }
+        </mat-menu>
+
+        <button mat-button [matMenuTriggerFor]="batchMenu">
+          <mat-icon>palette</mat-icon>
+          Color by Batch
+        </button>
+        <mat-menu #batchMenu="matMenu">
+          @for (batch of getUniqueBatches(); track batch) {
+            <button mat-menu-item (click)="replaceColorForBatch(batch)">
+              {{ batch }}
+            </button>
+          }
+          @if (getUniqueBatches().length === 0) {
+            <button mat-menu-item disabled>No batches defined</button>
+          }
+        </mat-menu>
+
+        <button mat-button (click)="assignColorToSelected()">
+          <mat-icon>format_color_fill</mat-icon>
+          Color Selected
+        </button>
+
+        <button mat-button [matMenuTriggerFor]="selectMenu">
+          <mat-icon>check_box</mat-icon>
+          Select By
+        </button>
+        <mat-menu #selectMenu="matMenu">
+          <div class="submenu-header">By Condition</div>
+          @for (condition of getUniqueConditions(); track condition) {
+            <button mat-menu-item (click)="selectByCondition(condition)">
+              {{ condition }}
+            </button>
+          }
+          @if (getUniqueConditions().length > 0) {
+            <mat-divider></mat-divider>
+          }
+          <div class="submenu-header">By Batch</div>
+          @for (batch of getUniqueBatches(); track batch) {
+            <button mat-menu-item (click)="selectByBatch(batch)">
+              {{ batch }}
+            </button>
+          }
+          @if (getUniqueConditions().length === 0 && getUniqueBatches().length === 0) {
+            <button mat-menu-item disabled>No groups defined</button>
+          }
+        </mat-menu>
+
+        <button mat-button color="warn" [matMenuTriggerFor]="clearMenu">
+          <mat-icon>clear_all</mat-icon>
+          Clear
+        </button>
+        <mat-menu #clearMenu="matMenu">
+          <button mat-menu-item (click)="clearAllConditions()">
+            <mat-icon>clear</mat-icon>
+            Clear All Conditions
+          </button>
+          <button mat-menu-item (click)="clearAllBatches()">
+            <mat-icon>clear</mat-icon>
+            Clear All Batches
+          </button>
+        </mat-menu>
+      </div>
+    </div>
+
+    <div class="table-container">
+      <table class="annotation-table">
+        <thead>
+          <tr>
+            <th class="checkbox-col">
+              <mat-checkbox [(ngModel)]="selectAllCheckbox" (change)="toggleSelectAll()"></mat-checkbox>
+            </th>
+            <th class="sample-col">Sample</th>
+            <th class="condition-col">Condition</th>
+            <th class="bioreplicate-col">BioReplicate</th>
+            <th class="color-col">Color</th>
+            <th class="batch-col">Batch</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (s of annotation; track $index) {
+            <tr [class.selected]="s.selected">
+              <td class="checkbox-col">
+                <mat-checkbox [(ngModel)]="s.selected"></mat-checkbox>
+              </td>
+              <td class="sample-col">
+                <input type="text" [(ngModel)]="s.sample" [readonly]="mode==='edit'" class="table-input">
+              </td>
+              <td class="condition-col">
+                <input type="text" [(ngModel)]="s.condition" (ngModelChange)="onConditionChange(s)" class="table-input">
+              </td>
+              <td class="bioreplicate-col">
+                <input type="text" [(ngModel)]="s.bioreplicate" class="table-input">
+              </td>
+              <td class="color-col">
+                <input type="color" [(ngModel)]="s.color" class="color-input">
+              </td>
+              <td class="batch-col">
+                <input type="text" [(ngModel)]="s.batch" class="table-input">
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </mat-dialog-content>
+
+  <mat-dialog-actions>
+    <div class="actions-left">
+      @if (mode === 'create') {
+        <button mat-stroked-button color="primary" (click)="addSample()">
+          <mat-icon>add</mat-icon>
+          Add Sample
+        </button>
+        <button mat-stroked-button (click)="parseFromClipboard('sample')">
+          <mat-icon>content_paste</mat-icon>
+          Paste Samples
+        </button>
+      }
+      <button mat-stroked-button (click)="parseFromClipboard('condition')">
+        <mat-icon>content_paste</mat-icon>
+        Paste Conditions
+      </button>
+      <button mat-stroked-button (click)="parseFromClipboard('bioreplicate')">
+        <mat-icon>content_paste</mat-icon>
+        Paste BioReplicates
+      </button>
+      <button mat-stroked-button (click)="parseFromClipboard('batch')">
+        <mat-icon>content_paste</mat-icon>
+        Paste Batches
+      </button>
+    </div>
+    <span class="spacer"></span>
+    <button mat-button (click)="close()">Cancel</button>
+    <button mat-raised-button color="primary" (click)="save()">Save</button>
+  </mat-dialog-actions>
+</div>

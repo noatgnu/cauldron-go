@@ -719,13 +719,27 @@ export namespace models {
 	        this.equalsAny = source["equalsAny"];
 	    }
 	}
+	export class SelectOption {
+	    value: string;
+	    label: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SelectOption(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.value = source["value"];
+	        this.label = source["label"];
+	    }
+	}
 	export class PluginInputV2 {
 	    name: string;
 	    label: string;
 	    type: string;
 	    required: boolean;
 	    default?: any;
-	    options?: string[];
+	    options?: SelectOption[];
 	    optionsFromFile?: string;
 	    groups?: FieldGroup[];
 	    groupsFromFile?: string;
@@ -752,7 +766,7 @@ export namespace models {
 	        this.type = source["type"];
 	        this.required = source["required"];
 	        this.default = source["default"];
-	        this.options = source["options"];
+	        this.options = this.convertValues(source["options"], SelectOption);
 	        this.optionsFromFile = source["optionsFromFile"];
 	        this.groups = this.convertValues(source["groups"], FieldGroup);
 	        this.groupsFromFile = source["groupsFromFile"];
@@ -1034,6 +1048,7 @@ export namespace models {
 		    return a;
 		}
 	}
+	
 	
 	
 

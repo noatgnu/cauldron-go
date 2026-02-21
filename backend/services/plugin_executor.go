@@ -253,13 +253,17 @@ func (e *PluginExecutor) validateInputType(input models.PluginInputV2, value int
 			valueStr := fmt.Sprintf("%v", value)
 			valid := false
 			for _, option := range input.Options {
-				if option == valueStr {
+				if option.Value == valueStr {
 					valid = true
 					break
 				}
 			}
 			if !valid {
-				return fmt.Errorf("value must be one of: %v", input.Options)
+				var validValues []string
+				for _, opt := range input.Options {
+					validValues = append(validValues, opt.Value)
+				}
+				return fmt.Errorf("value must be one of: %v", validValues)
 			}
 		}
 	}

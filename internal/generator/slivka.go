@@ -137,7 +137,7 @@ func findFormatOptions(inputs []models.PluginInputV2) []string {
 			if strings.Contains(nameLC, keyword) && len(input.Options) > 0 {
 				hasImageFormat := false
 				for _, opt := range input.Options {
-					optLC := strings.ToLower(opt)
+					optLC := strings.ToLower(opt.Value)
 					for _, imgFmt := range imageFormats {
 						if optLC == imgFmt {
 							hasImageFormat = true
@@ -146,7 +146,11 @@ func findFormatOptions(inputs []models.PluginInputV2) []string {
 					}
 				}
 				if hasImageFormat {
-					return input.Options
+					var values []string
+					for _, opt := range input.Options {
+						values = append(values, opt.Value)
+					}
+					return values
 				}
 			}
 		}
@@ -247,7 +251,9 @@ func GenerateSlivka(definition *models.PluginDefinition, tmplStr string) (string
 		}
 
 		if len(input.Options) > 0 {
-			param.Options = input.Options
+			for _, opt := range input.Options {
+				param.Options = append(param.Options, opt.Value)
+			}
 		}
 
 		data.Parameters = append(data.Parameters, param)

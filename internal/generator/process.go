@@ -57,7 +57,7 @@ func findFormatOptionsFromInputs(inputs []models.PluginInputV2) []string {
 			if strings.Contains(nameLC, keyword) && len(input.Options) > 0 {
 				hasImageFormat := false
 				for _, opt := range input.Options {
-					optLC := strings.ToLower(opt)
+					optLC := strings.ToLower(opt.Value)
 					for _, imgFmt := range imageFormats {
 						if optLC == imgFmt {
 							hasImageFormat = true
@@ -66,7 +66,11 @@ func findFormatOptionsFromInputs(inputs []models.PluginInputV2) []string {
 					}
 				}
 				if hasImageFormat {
-					return input.Options
+					var values []string
+					for _, opt := range input.Options {
+						values = append(values, opt.Value)
+					}
+					return values
 				}
 			}
 		}

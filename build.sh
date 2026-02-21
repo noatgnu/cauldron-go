@@ -4,6 +4,7 @@ set -e
 
 PROJECT_ROOT=$(cd "$(dirname "$0")" && pwd)
 FRONTEND_DIR="$PROJECT_ROOT/frontend"
+SHARED_LIB_DIR="$PROJECT_ROOT/shared-lib"
 SKIP_LICENSES=false
 COMMAND=""
 PLATFORM=""
@@ -62,6 +63,25 @@ generate_bindings() {
     else
         print_error "Bindings generation failed"
         echo "Check /tmp/bindings-gen.log for details"
+        return 1
+    fi
+}
+
+build_shared_lib() {
+    print_header "Building Shared Library"
+    cd "$SHARED_LIB_DIR"
+
+    if [ ! -d "$SHARED_LIB_DIR/node_modules" ]; then
+        echo "Installing shared library dependencies..."
+        npm install --silent
+    fi
+
+    if npm run build 2>&1 | tee /tmp/shared-lib-build.log; then
+        print_success "Shared library built successfully"
+        return 0
+    else
+        print_error "Shared library build failed"
+        echo "Check /tmp/shared-lib-build.log for details"
         return 1
     fi
 }
@@ -259,6 +279,13 @@ build_dev_tools() {
         return 1
     fi
 
+    if go build -o "bin/plugin-to-spa$exe_ext" ./cmd/plugin-to-spa; then
+        print_success "Built plugin-to-spa"
+    else
+        print_error "Failed to build plugin-to-spa"
+        return 1
+    fi
+
     print_success "All developer tools built successfully"
 }
 
@@ -338,6 +365,7 @@ clean_build() {
     print_header "Cleaning Build Artifacts"
     cd "$PROJECT_ROOT"
 
+    rm -rf "$SHARED_LIB_DIR/dist"
     rm -rf "$FRONTEND_DIR/dist"
     rm -rf "$PROJECT_ROOT/build"
 
@@ -351,11 +379,12 @@ Cauldron Build Script
 Usage: ./build.sh [COMMAND] [OPTIONS]
 
 Commands:
-  frontend              Build only the frontend
+  shared-lib            Build only the shared Angular library
+  frontend              Build shared library and frontend
   wails [PLATFORM]      Build the Wails application (default: windows/amd64)
   tools                 Build developer tools (plugin-validator, etc.)
   external [PLATFORM]   Build external utility programs (uniprot-fetcher, etc.)
-  all [PLATFORM]        Build frontend, tools, and Wails app (default)
+  all [PLATFORM]        Build shared-lib, frontend, tools, and Wails app (default)
   clean                 Clean all build artifacts
   rebuild [PLATFORM]    Clean and rebuild everything
   help                  Show this help message
@@ -383,7 +412,11 @@ EOF
 }
 
 case "$COMMAND" in
+    shared-lib)
+        build_shared_lib
+        ;;
     frontend)
+        build_shared_lib
         build_frontend
         ;;
     tools)
@@ -402,6 +435,7 @@ case "$COMMAND" in
         else
             echo "Skipping license generation (--skip-licenses flag provided)"
         fi
+        build_shared_lib
         build_frontend
         build_wails "$PLATFORM"
         print_header "Build Complete!"
@@ -418,6 +452,7 @@ case "$COMMAND" in
         else
             echo "Skipping license generation (--skip-licenses flag provided)"
         fi
+        build_shared_lib
         build_frontend
         build_wails "$PLATFORM"
         print_header "Rebuild Complete!"

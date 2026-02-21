@@ -1,4 +1,16 @@
-import { Component, Input, Output, EventEmitter, OnInit, OnChanges, OnDestroy, SimpleChanges, signal, computed } from '@angular/core';
+import {
+  Component,
+  Input,
+  Output,
+  EventEmitter,
+  OnInit,
+  OnChanges,
+  OnDestroy,
+  SimpleChanges,
+  signal,
+  Inject,
+  Optional
+} from '@angular/core';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -8,18 +20,34 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { MatDialog } from '@angular/material/dialog';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { models } from '../../../wailsjs/go/models';
-import { Wails } from '../../core/services/wails';
-import { NotificationService } from '../../core/services/notification.service';
-import { SampleAnnotation } from '../sample-annotation/sample-annotation';
-import { GenericTableEditor, TableColumn } from '../generic-table-editor/generic-table-editor';
-import { ImportedFileSelectionDialog } from '../imported-file-selection/imported-file-selection-dialog';
 import { Subscription } from 'rxjs';
+import {
+  PluginV2,
+  PluginInputV2,
+  FieldGroup,
+  FieldOption,
+  SelectOption,
+  TableColumn
+} from '../../models/plugin.models';
+import { FileHandler, ImportedFile } from '../../interfaces/file-handler.interface';
+import { NotificationHandler } from '../../interfaces/notification.interface';
+import { LogHandler } from '../../interfaces/log.interface';
+import { FILE_HANDLER, NOTIFICATION_HANDLER, LOG_HANDLER } from '../../tokens/injection-tokens';
+import { SampleAnnotation } from '../sample-annotation/sample-annotation';
+import { GenericTableEditor } from '../generic-table-editor/generic-table-editor';
+import { ImportedFileSelectionDialog } from '../imported-file-selection/imported-file-selection-dialog';
+
+export interface ExampleFilePathResolver {
+  getPluginExampleFilePath(pluginId: string, filename: string): Promise<string>;
+}
+
+export const EXAMPLE_FILE_PATH_RESOLVER = Symbol('EXAMPLE_FILE_PATH_RESOLVER');
 
 @Component({
-  selector: 'app-dynamic-form',
+  selector: 'cld-dynamic-form',
+  standalone: true,
   imports: [
     CommonModule,
     ReactiveFormsModule,
@@ -30,32 +58,35 @@ import { Subscription } from 'rxjs';
     MatButtonModule,
     MatIconModule,
     MatProgressSpinnerModule,
-    MatTooltipModule
+    MatTooltipModule,
+    MatDialogModule
   ],
   templateUrl: './dynamic-form.html',
   styleUrl: './dynamic-form.scss'
 })
 export class DynamicFormComponent implements OnInit, OnChanges, OnDestroy {
-  @Input() plugin!: models.PluginV2;
+  @Input() plugin!: PluginV2;
   @Input() disabled = false;
-  @Output() formSubmit = new EventEmitter<Record<string, any>>();
-  @Output() formChange = new EventEmitter<Record<string, any>>();
+  @Input() exampleFilePathResolver?: ExampleFilePathResolver;
+  @Output() formSubmit = new EventEmitter<Record<string, unknown>>();
+  @Output() formChange = new EventEmitter<Record<string, unknown>>();
 
   form!: FormGroup;
   formKey = signal(0);
   columnOptions = new Map<string, string[]>();
-  selectOptions = new Map<string, models.SelectOption[]>();
-  groupedOptions = new Map<string, models.FieldGroup[]>();
+  selectOptions = new Map<string, SelectOption[]>();
+  groupedOptions = new Map<string, FieldGroup[]>();
   loading = signal(false);
-  formValues = signal<Record<string, any>>({});
+  formValues = signal<Record<string, unknown>>({});
   validationErrors = signal<string[]>([]);
   lastSelectedIndex = new Map<string, number>();
   private valueChangesSubscription?: Subscription;
 
   constructor(
     private fb: FormBuilder,
-    private wails: Wails,
-    private notificationService: NotificationService,
+    @Inject(FILE_HANDLER) private fileHandler: FileHandler,
+    @Inject(NOTIFICATION_HANDLER) private notification: NotificationHandler,
+    @Optional() @Inject(LOG_HANDLER) private logger: LogHandler | null,
     private dialog: MatDialog
   ) {}
 
@@ -65,7 +96,7 @@ export class DynamicFormComponent implements OnInit, OnChanges, OnDestroy {
 
   async ngOnChanges(changes: SimpleChanges) {
     if (changes['plugin'] && !changes['plugin'].firstChange) {
-      await this.wails.logToFile(`[DynamicForm] Plugin changed from ${changes['plugin'].previousValue?.definition.plugin.id} to ${changes['plugin'].currentValue?.definition.plugin.id}`);
+      await this.log(`[DynamicForm] Plugin changed from ${changes['plugin'].previousValue?.definition.plugin.id} to ${changes['plugin'].currentValue?.definition.plugin.id}`);
       this.formKey.update(k => k + 1);
       await this.initializeForm();
     }
@@ -73,6 +104,18 @@ export class DynamicFormComponent implements OnInit, OnChanges, OnDestroy {
 
   ngOnDestroy() {
     this.valueChangesSubscription?.unsubscribe();
+  }
+
+  private async log(message: string): Promise<void> {
+    if (this.logger) {
+      await this.logger.log(message);
+    }
+  }
+
+  private async logError(message: string): Promise<void> {
+    if (this.logger) {
+      await this.logger.error(message);
+    }
   }
 
   private async initializeForm() {
@@ -97,7 +140,7 @@ export class DynamicFormComponent implements OnInit, OnChanges, OnDestroy {
   }
 
   private buildForm() {
-    const group: any = {};
+    const group: Record<string, unknown[]> = {};
 
     for (const input of this.plugin.definition.inputs) {
       const validators = [];
@@ -122,7 +165,7 @@ export class DynamicFormComponent implements OnInit, OnChanges, OnDestroy {
     this.form = this.fb.group(group);
   }
 
-  private getDefaultValue(input: models.PluginInputV2): any {
+  private getDefaultValue(input: PluginInputV2): unknown {
     if (input.default !== undefined && input.default !== null) {
       return input.default;
     }
@@ -142,7 +185,7 @@ export class DynamicFormComponent implements OnInit, OnChanges, OnDestroy {
   }
 
   async openFile(inputName: string) {
-    const filePath = await this.wails.openFileDialog('Select File');
+    const filePath = await this.fileHandler.openFileDialog('Select File');
     if (filePath) {
       this.form.patchValue({ [inputName]: filePath });
 
@@ -154,7 +197,7 @@ export class DynamicFormComponent implements OnInit, OnChanges, OnDestroy {
   }
 
   async openDirectory(inputName: string) {
-    const directoryPath = await this.wails.openDirectoryDialog('Select Directory');
+    const directoryPath = await this.fileHandler.openDirectoryDialog('Select Directory');
     if (directoryPath) {
       this.form.patchValue({ [inputName]: directoryPath });
     }
@@ -166,7 +209,7 @@ export class DynamicFormComponent implements OnInit, OnChanges, OnDestroy {
       disableClose: false
     });
 
-    dialogRef.afterClosed().subscribe(async (result) => {
+    dialogRef.afterClosed().subscribe(async (result: { filePath?: string; columns?: string[] } | undefined) => {
       if (result && result.filePath) {
         this.form.patchValue({ [inputName]: result.filePath });
 
@@ -186,7 +229,7 @@ export class DynamicFormComponent implements OnInit, OnChanges, OnDestroy {
     );
 
     for (const input of dependentInputs) {
-      await this.wails.logToFile(`[DynamicForm] Setting columns for ${input.name} from imported file headers`);
+      await this.log(`[DynamicForm] Setting columns for ${input.name} from imported file headers`);
       this.columnOptions.set(input.name, headers);
     }
   }
@@ -204,22 +247,15 @@ export class DynamicFormComponent implements OnInit, OnChanges, OnDestroy {
   private async loadColumns(inputName: string, filePath: string) {
     try {
       this.loading.set(true);
-      const content = await this.wails.readFile(filePath);
-      if (!content) return;
-
-      const lines = content.split('\n');
-      if (lines.length === 0) return;
-
-      const firstLine = lines[0].trim();
-      const delimiter = firstLine.includes('\t') ? '\t' : ',';
-      const headers = firstLine.split(delimiter).map(h => h.trim());
-
-      await this.wails.logToFile(`[DynamicForm] Loaded ${headers.length} columns for ${inputName}: ${headers.join(', ')}`);
-      this.columnOptions.set(inputName, headers);
+      const headers = await this.fileHandler.getFileHeaders(filePath);
+      if (headers && headers.length > 0) {
+        await this.log(`[DynamicForm] Loaded ${headers.length} columns for ${inputName}: ${headers.join(', ')}`);
+        this.columnOptions.set(inputName, headers);
+      }
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
-      await this.wails.logToFile(`Error loading columns: ${errorMsg}`);
-      this.notificationService.showError(`Failed to load columns: ${errorMsg}`);
+      await this.logError(`Error loading columns: ${errorMsg}`);
+      this.notification.showError(`Failed to load columns: ${errorMsg}`);
     } finally {
       this.loading.set(false);
     }
@@ -247,28 +283,21 @@ export class DynamicFormComponent implements OnInit, OnChanges, OnDestroy {
         ? `${this.plugin.folderPath}/${filePath}`
         : filePath;
 
-      await this.wails.logToFile(`[DynamicForm] Loading options from: ${fullPath}`);
-      const content = await this.wails.readFile(fullPath);
+      await this.log(`[DynamicForm] Loading options from: ${fullPath}`);
+      const content = await this.fileHandler.readFile(fullPath);
       if (!content) return;
 
-      const lines = content
+      const options = content
         .split('\n')
         .map(line => line.trim())
         .filter(line => line.length > 0);
 
-      const options = lines.map(line => {
-        const opt = new models.SelectOption();
-        opt.value = line;
-        opt.label = line;
-        return opt;
-      });
-
       this.selectOptions.set(inputName, options);
-      await this.wails.logToFile(`[DynamicForm] Loaded ${options.length} options for ${inputName}`);
+      await this.log(`[DynamicForm] Loaded ${options.length} options for ${inputName}`);
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
-      await this.wails.logToFile(`[DynamicForm] Error loading options from file: ${errorMsg}`);
-      this.notificationService.showError(`Failed to load options: ${errorMsg}`);
+      await this.logError(`[DynamicForm] Error loading options from file: ${errorMsg}`);
+      this.notification.showError(`Failed to load options: ${errorMsg}`);
     } finally {
       this.loading.set(false);
     }
@@ -282,38 +311,52 @@ export class DynamicFormComponent implements OnInit, OnChanges, OnDestroy {
         ? `${this.plugin.folderPath}/${filePath}`
         : filePath;
 
-      await this.wails.logToFile(`[DynamicForm] Loading groups from: ${fullPath}`);
-      const content = await this.wails.readFile(fullPath);
+      await this.log(`[DynamicForm] Loading groups from: ${fullPath}`);
+      const content = await this.fileHandler.readFile(fullPath);
       if (!content) return;
 
-      const groups: models.FieldGroup[] = JSON.parse(content);
+      const groups: FieldGroup[] = JSON.parse(content);
       this.groupedOptions.set(inputName, groups);
-      await this.wails.logToFile(`[DynamicForm] Loaded ${groups.length} groups for ${inputName}`);
+      await this.log(`[DynamicForm] Loaded ${groups.length} groups for ${inputName}`);
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
-      await this.wails.logToFile(`[DynamicForm] Error loading groups from file: ${errorMsg}`);
-      this.notificationService.showError(`Failed to load grouped options: ${errorMsg}`);
+      await this.logError(`[DynamicForm] Error loading groups from file: ${errorMsg}`);
+      this.notification.showError(`Failed to load grouped options: ${errorMsg}`);
     } finally {
       this.loading.set(false);
     }
   }
 
-  getSelectOptions(input: models.PluginInputV2): models.SelectOption[] {
+  getSelectOptions(input: PluginInputV2): FieldOption[] {
+    let rawOptions: SelectOption[];
+
     if (input.optionsFromFile) {
-      return this.selectOptions.get(input.name) || [];
+      rawOptions = this.selectOptions.get(input.name) || [];
+    } else {
+      rawOptions = input.options || [];
     }
-    return input.options || [];
+
+    return this.normalizeOptions(rawOptions);
   }
 
-  getGroupedOptions(inputName: string): models.FieldGroup[] {
+  private normalizeOptions(options: SelectOption[]): FieldOption[] {
+    return options.map(opt => {
+      if (typeof opt === 'string') {
+        return { value: opt, label: opt };
+      }
+      return opt;
+    });
+  }
+
+  getGroupedOptions(inputName: string): FieldGroup[] {
     return this.groupedOptions.get(inputName) || [];
   }
 
-  getInputsByType(type: string): models.PluginInputV2[] {
+  getInputsByType(type: string): PluginInputV2[] {
     return this.plugin.definition.inputs.filter(i => i.type === type);
   }
 
-  isInputVisible(input: models.PluginInputV2): boolean {
+  isInputVisible(input: PluginInputV2): boolean {
     if (!input.visibleWhen) {
       return true;
     }
@@ -356,7 +399,7 @@ export class DynamicFormComponent implements OnInit, OnChanges, OnDestroy {
         }
       });
       this.validationErrors.set(errors);
-      this.notificationService.showError('Please fix validation errors before submitting');
+      this.notification.showError('Please fix validation errors before submitting');
     }
   }
 
@@ -371,13 +414,18 @@ export class DynamicFormComponent implements OnInit, OnChanges, OnDestroy {
   async loadExample() {
     const example = this.plugin.definition.example;
     if (!example || !example.enabled) {
-      this.notificationService.showError('No example data available for this plugin');
+      this.notification.showError('No example data available for this plugin');
+      return;
+    }
+
+    if (!this.exampleFilePathResolver) {
+      this.notification.showError('Example file path resolver not configured');
       return;
     }
 
     try {
       this.loading.set(true);
-      const valuesToSet: Record<string, any> = {};
+      const valuesToSet: Record<string, unknown> = {};
 
       for (const [key, value] of Object.entries(example.values)) {
         if (key.endsWith('_source')) {
@@ -385,11 +433,14 @@ export class DynamicFormComponent implements OnInit, OnChanges, OnDestroy {
           const input = this.plugin.definition.inputs.find(i => i.name === targetField);
 
           if (input && input.type === 'column-selector') {
-            const filePath = await this.wails.getPluginExampleFilePath(this.plugin.definition.plugin.id, value as string);
+            const filePath = await this.exampleFilePathResolver.getPluginExampleFilePath(
+              this.plugin.definition.plugin.id,
+              value as string
+            );
             await this.loadColumns(targetField, filePath);
 
             if (!example.values[targetField]) {
-              const content = await this.wails.readFile(filePath);
+              const content = await this.fileHandler.readFile(filePath);
               if (content) {
                 const lines = content.split('\n');
                 if (lines.length > 0) {
@@ -404,7 +455,10 @@ export class DynamicFormComponent implements OnInit, OnChanges, OnDestroy {
           const input = this.plugin.definition.inputs.find(i => i.name === key);
 
           if (input && input.type === 'file') {
-            const filePath = await this.wails.getPluginExampleFilePath(this.plugin.definition.plugin.id, value as string);
+            const filePath = await this.exampleFilePathResolver.getPluginExampleFilePath(
+              this.plugin.definition.plugin.id,
+              value as string
+            );
             valuesToSet[key] = filePath;
 
             await this.loadColumnsForDependents(key, filePath);
@@ -415,27 +469,27 @@ export class DynamicFormComponent implements OnInit, OnChanges, OnDestroy {
       }
 
       this.form.patchValue(valuesToSet);
-      this.notificationService.showSuccess('Example data loaded successfully');
+      this.notification.showSuccess('Example data loaded successfully');
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
-      await this.wails.logToFile(`Error loading example: ${errorMsg}`);
-      this.notificationService.showError(`Failed to load example data: ${errorMsg}`);
+      await this.logError(`Error loading example: ${errorMsg}`);
+      this.notification.showError(`Failed to load example data: ${errorMsg}`);
     } finally {
       this.loading.set(false);
     }
   }
 
-  async loadFromJobParameters(parameters: Record<string, any>) {
+  async loadFromJobParameters(parameters: Record<string, unknown>) {
     try {
       this.loading.set(true);
-      await this.wails.logToFile(`[DynamicForm] Loading parameters from job: ${JSON.stringify(parameters)}`);
-      const valuesToSet: Record<string, any> = {};
+      await this.log(`[DynamicForm] Loading parameters from job: ${JSON.stringify(parameters)}`);
+      const valuesToSet: Record<string, unknown> = {};
 
       for (const [key, value] of Object.entries(parameters)) {
         const input = this.plugin.definition.inputs.find(i => i.name === key);
 
         if (input) {
-          await this.wails.logToFile(`[DynamicForm] Processing parameter ${key}: type=${input.type}, value=${value} (${typeof value})`);
+          await this.log(`[DynamicForm] Processing parameter ${key}: type=${input.type}, value=${value} (${typeof value})`);
 
           if (input.type === 'file' && typeof value === 'string') {
             valuesToSet[key] = value;
@@ -456,30 +510,30 @@ export class DynamicFormComponent implements OnInit, OnChanges, OnDestroy {
               boolValue = !!value;
             }
             valuesToSet[key] = boolValue;
-            await this.wails.logToFile(`[DynamicForm] Converted boolean parameter ${key}: ${value} (${typeof value}) -> ${boolValue}`);
+            await this.log(`[DynamicForm] Converted boolean parameter ${key}: ${value} (${typeof value}) -> ${boolValue}`);
           } else {
             valuesToSet[key] = value;
           }
         } else {
-          await this.wails.logToFile(`[DynamicForm] Skipping parameter ${key}: no matching input found`);
+          await this.log(`[DynamicForm] Skipping parameter ${key}: no matching input found`);
         }
       }
 
-      await this.wails.logToFile(`[DynamicForm] Values to set: ${JSON.stringify(valuesToSet)}`);
+      await this.log(`[DynamicForm] Values to set: ${JSON.stringify(valuesToSet)}`);
       this.form.patchValue(valuesToSet);
-      this.notificationService.showSuccess('Job parameters loaded successfully');
-      await this.wails.logToFile(`[DynamicForm] Successfully loaded job parameters`);
+      this.notification.showSuccess('Job parameters loaded successfully');
+      await this.log(`[DynamicForm] Successfully loaded job parameters`);
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
-      await this.wails.logToFile(`[DynamicForm] Error loading job parameters: ${errorMsg}`);
-      this.notificationService.showError(`Failed to load job parameters: ${errorMsg}`);
+      await this.logError(`[DynamicForm] Error loading job parameters: ${errorMsg}`);
+      this.notification.showError(`Failed to load job parameters: ${errorMsg}`);
     } finally {
       this.loading.set(false);
     }
   }
 
-  private getFormValue(): Record<string, any> {
-    const value: Record<string, any> = {};
+  private getFormValue(): Record<string, unknown> {
+    const value: Record<string, unknown> = {};
 
     for (const key of Object.keys(this.form.value)) {
       const val = this.form.value[key];
@@ -497,7 +551,6 @@ export class DynamicFormComponent implements OnInit, OnChanges, OnDestroy {
 
     if (!control) return;
 
-    // Only handle shift-click for range selection
     if (event.shiftKey && this.lastSelectedIndex.has(fieldName)) {
       const currentValue: string[] = Array.isArray(control.value) ? [...control.value] : [];
       const lastIndex = this.lastSelectedIndex.get(fieldName)!;
@@ -508,18 +561,16 @@ export class DynamicFormComponent implements OnInit, OnChanges, OnDestroy {
       const newValue = [...new Set([...currentValue, ...rangeValues])];
       control.setValue(newValue);
 
-      // Prevent default Material behavior only for shift-click
       event.preventDefault();
       event.stopPropagation();
     }
 
-    // Always update last selected index for next shift-click
     this.lastSelectedIndex.set(fieldName, currentIndex);
   }
 
-  isAnnotationFileInput(input: models.PluginInputV2): boolean {
+  isAnnotationFileInput(input: PluginInputV2): boolean {
     if (input.type !== 'file') return false;
-    if ((input as any).disableAnnotationManagement === true) return false;
+    if (input.disableAnnotationManagement === true) return false;
     const name = input.name.toLowerCase();
     const label = input.label?.toLowerCase() || '';
     return name.includes('annotation') ||
@@ -529,26 +580,26 @@ export class DynamicFormComponent implements OnInit, OnChanges, OnDestroy {
            label.includes('sample annotation');
   }
 
-  hasTableColumns(input: models.PluginInputV2): boolean {
+  hasTableColumns(input: PluginInputV2): boolean {
     return input.type === 'file' && !!input.tableColumns && input.tableColumns.length > 0;
   }
 
   async openAnnotationManager(inputName: string) {
     const sampleNames = this.getSampleNamesForAnnotation();
     if (!sampleNames || sampleNames.length === 0) {
-      this.notificationService.showWarning('Please select sample columns first to create an annotation file');
+      this.notification.showWarning('Please select sample columns first to create an annotation file');
       return;
     }
 
     const currentFilePath = this.form.get(inputName)?.value;
-    let existingAnnotation: any[] | undefined;
+    let existingAnnotation: Record<string, string>[] | undefined;
 
     if (currentFilePath) {
       try {
-        const content = await this.wails.readFile(currentFilePath);
+        const content = await this.fileHandler.readFile(currentFilePath);
         existingAnnotation = this.parseAnnotationFile(content, sampleNames);
       } catch (error) {
-        await this.wails.logToFile(`Error reading annotation file: ${error}`);
+        await this.logError(`Error reading annotation file: ${error}`);
       }
     }
 
@@ -569,11 +620,11 @@ export class DynamicFormComponent implements OnInit, OnChanges, OnDestroy {
         try {
           const filePath = await this.saveAnnotationFile(result);
           this.form.patchValue({ [inputName]: filePath });
-          this.notificationService.showSuccess('Annotation file saved successfully');
+          this.notification.showSuccess('Annotation file saved successfully');
         } catch (error) {
           const errorMsg = error instanceof Error ? error.message : String(error);
-          await this.wails.logToFile(`Error saving annotation file: ${errorMsg}`);
-          this.notificationService.showError(`Failed to save annotation file: ${errorMsg}`);
+          await this.logError(`Error saving annotation file: ${errorMsg}`);
+          this.notification.showError(`Failed to save annotation file: ${errorMsg}`);
         }
       }
     });
@@ -594,15 +645,13 @@ export class DynamicFormComponent implements OnInit, OnChanges, OnDestroy {
     return [];
   }
 
-  private parseAnnotationFile(content: string, sampleNames: string[]): any[] {
+  private parseAnnotationFile(content: string, sampleNames: string[]): Record<string, string>[] {
     const lines = content.trim().split('\n');
     if (lines.length < 2) {
-      console.log('[DynamicForm] Annotation file has less than 2 lines');
       return [];
     }
 
     const headers = lines[0].split('\t').map(h => h.trim());
-    console.log('[DynamicForm] Annotation headers:', headers);
     const sampleIdx = headers.findIndex(h => h.toLowerCase().includes('sample'));
     const conditionIdx = headers.findIndex(h => h.toLowerCase().includes('condition') || h.toLowerCase().includes('group'));
     const bioreplicateIdx = headers.findIndex(h => h.toLowerCase().includes('bioreplicate') || h.toLowerCase().includes('replicate'));
@@ -610,7 +659,6 @@ export class DynamicFormComponent implements OnInit, OnChanges, OnDestroy {
     const colorIdx = headers.findIndex(h => h.toLowerCase().includes('color'));
 
     if (sampleIdx === -1) {
-      console.log('[DynamicForm] No Sample column found in annotation file');
       return [];
     }
 
@@ -626,20 +674,19 @@ export class DynamicFormComponent implements OnInit, OnChanges, OnDestroy {
       });
     }
 
-    console.log('[DynamicForm] Parsed annotations:', annotations.length);
     return annotations;
   }
 
-  private async saveAnnotationFile(annotations: any[]): Promise<string> {
+  private async saveAnnotationFile(annotations: Record<string, string>[]): Promise<string> {
     const headers = ['Sample', 'Condition', 'BioReplicate', 'Batch', 'Color'];
     const rows = annotations.map(a =>
-      [a.Sample || '', a.Condition || '', a.BioReplicate || '', a.Batch || '', a.Color || ''].join('\t')
+      [a['Sample'] || '', a['Condition'] || '', a['BioReplicate'] || '', a['Batch'] || '', a['Color'] || ''].join('\t')
     );
     const content = [headers.join('\t'), ...rows].join('\n');
 
     const timestamp = Date.now();
     const filename = `annotation_${timestamp}.txt`;
-    const filePath = await this.wails.saveTempFile(filename, content);
+    const filePath = await this.fileHandler.saveTempFile(filename, content);
 
     return filePath;
   }
@@ -649,14 +696,14 @@ export class DynamicFormComponent implements OnInit, OnChanges, OnDestroy {
     if (!input || !input.tableColumns) return;
 
     const currentFilePath = this.form.get(inputName)?.value;
-    let existingData: any[] | undefined;
+    let existingData: Record<string, unknown>[] | undefined;
 
     if (currentFilePath) {
       try {
-        const content = await this.wails.readFile(currentFilePath);
+        const content = await this.fileHandler.readFile(currentFilePath);
         existingData = this.parseTableFile(content, input.tableColumns);
       } catch (error) {
-        await this.wails.logToFile(`Error reading table file: ${error}`);
+        await this.logError(`Error reading table file: ${error}`);
       }
     }
 
@@ -678,30 +725,30 @@ export class DynamicFormComponent implements OnInit, OnChanges, OnDestroy {
         try {
           const filePath = await this.saveTableFile(result, input.tableColumns, inputName);
           this.form.patchValue({ [inputName]: filePath });
-          this.notificationService.showSuccess('Table file saved successfully');
+          this.notification.showSuccess('Table file saved successfully');
         } catch (error) {
           const errorMsg = error instanceof Error ? error.message : String(error);
-          await this.wails.logToFile(`Error saving table file: ${errorMsg}`);
-          this.notificationService.showError(`Failed to save table file: ${errorMsg}`);
+          await this.logError(`Error saving table file: ${errorMsg}`);
+          this.notification.showError(`Failed to save table file: ${errorMsg}`);
         }
       }
     });
   }
 
-  private parseTableFile(content: string, columns: models.TableColumn[]): any[] {
+  private parseTableFile(content: string, columns: TableColumn[]): Record<string, unknown>[] {
     const lines = content.trim().split('\n');
     if (lines.length < 2) return [];
 
     const headers = lines[0].split('\t').map(h => h.trim());
-    const data: any[] = [];
+    const data: Record<string, unknown>[] = [];
 
     for (let i = 1; i < lines.length; i++) {
       const line = lines[i].trim();
       if (!line) continue;
 
       const values = lines[i].split('\t');
-      const row: any = {};
-      columns.forEach((col, idx) => {
+      const row: Record<string, unknown> = {};
+      columns.forEach((col) => {
         const headerIdx = headers.findIndex(h => h.toLowerCase() === col.name.toLowerCase());
         row[col.name] = headerIdx !== -1 ? (values[headerIdx] || '').trim() : '';
       });
@@ -719,7 +766,7 @@ export class DynamicFormComponent implements OnInit, OnChanges, OnDestroy {
     return data;
   }
 
-  private async saveTableFile(data: any[], columns: models.TableColumn[], inputName: string): Promise<string> {
+  private async saveTableFile(data: Record<string, unknown>[], columns: TableColumn[], inputName: string): Promise<string> {
     const headers = columns.map(c => c.name);
 
     const filteredData = data.filter(row => {
@@ -730,13 +777,13 @@ export class DynamicFormComponent implements OnInit, OnChanges, OnDestroy {
     });
 
     const rows = filteredData.map(row =>
-      columns.map(col => row[col.name] || '').join('\t')
+      columns.map(col => String(row[col.name] || '')).join('\t')
     );
     const content = [headers.join('\t'), ...rows].join('\n');
 
     const timestamp = Date.now();
     const filename = `${inputName}_${timestamp}.txt`;
-    const filePath = await this.wails.saveTempFile(filename, content);
+    const filePath = await this.fileHandler.saveTempFile(filename, content);
 
     return filePath;
   }

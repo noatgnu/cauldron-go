@@ -460,19 +460,19 @@ func (l *PluginLoaderV2) loadOptionsFromFiles(pluginDir string, def *models.Plug
 	return nil
 }
 
-func (l *PluginLoaderV2) loadOptionsFromTextFile(filePath string) ([]string, error) {
+func (l *PluginLoaderV2) loadOptionsFromTextFile(filePath string) ([]models.SelectOption, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
 		return nil, err
 	}
 	defer file.Close()
 
-	var options []string
+	var options []models.SelectOption
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		if line != "" {
-			options = append(options, line)
+			options = append(options, models.SelectOption{Value: line, Label: line})
 		}
 	}
 
