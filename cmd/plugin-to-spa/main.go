@@ -65,6 +65,18 @@ func main() {
 }
 
 func getPluginDir(pluginPath string) string {
+	info, err := os.Stat(pluginPath)
+	if err != nil {
+		for i := len(pluginPath) - 1; i >= 0; i-- {
+			if pluginPath[i] == '/' || pluginPath[i] == '\\' {
+				return pluginPath[:i]
+			}
+		}
+		return "."
+	}
+	if info.IsDir() {
+		return pluginPath
+	}
 	for i := len(pluginPath) - 1; i >= 0; i-- {
 		if pluginPath[i] == '/' || pluginPath[i] == '\\' {
 			return pluginPath[:i]
