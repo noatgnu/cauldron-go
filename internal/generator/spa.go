@@ -948,7 +948,8 @@ func (g *SPAGenerator) embedPluginScript() error {
 		return fmt.Errorf("failed to read plugin script: %w", err)
 	}
 
-	escapedContent := strings.ReplaceAll(string(scriptContent), "`", "\\`")
+	escapedContent := strings.ReplaceAll(string(scriptContent), "\\", "\\\\")
+	escapedContent = strings.ReplaceAll(escapedContent, "`", "\\`")
 	escapedContent = strings.ReplaceAll(escapedContent, "${", "\\${")
 
 	content := "export const PLUGIN_SCRIPT = `" + escapedContent + "`;\n"
@@ -1038,7 +1039,8 @@ func (g *SPAGenerator) embedAdditionalModules(modules map[string]string) error {
 	builder.WriteString("export const PLUGIN_MODULES: Record<string, string> = {\n")
 
 	for name, content := range modules {
-		escapedContent := strings.ReplaceAll(content, "`", "\\`")
+		escapedContent := strings.ReplaceAll(content, "\\", "\\\\")
+		escapedContent = strings.ReplaceAll(escapedContent, "`", "\\`")
 		escapedContent = strings.ReplaceAll(escapedContent, "${", "\\${")
 		builder.WriteString(fmt.Sprintf("  '%s': `%s`,\n", name, escapedContent))
 	}
