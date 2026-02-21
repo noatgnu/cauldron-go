@@ -158,10 +158,29 @@ func CheckPyodideCompatibility(definition *models.PluginDefinition, pluginDir st
 }
 
 func getRequiredPackages(definition *models.PluginDefinition, pluginDir string) []string {
+	seen := make(map[string]bool)
 	var packages []string
 
-	if len(definition.Execution.Requirements.Packages) > 0 {
-		packages = append(packages, definition.Execution.Requirements.Packages...)
+	addPackage := func(pkg string) {
+		pkgName := strings.Split(pkg, "==")[0]
+		pkgName = strings.Split(pkgName, ">=")[0]
+		pkgName = strings.Split(pkgName, "<=")[0]
+		pkgName = strings.Split(pkgName, "<")[0]
+		pkgName = strings.Split(pkgName, ">")[0]
+		pkgName = strings.TrimSpace(pkgName)
+		pkgLower := strings.ToLower(pkgName)
+
+		if !seen[pkgLower] {
+			seen[pkgLower] = true
+			packages = append(packages, pkg)
+		}
+	}
+
+	defaultReqPath := filepath.Join(pluginDir, "requirements.txt")
+	if pkgs, err := parseRequirementsFile(defaultReqPath); err == nil {
+		for _, pkg := range pkgs {
+			addPackage(pkg)
+		}
 	}
 
 	if definition.Execution.Requirements.PythonRequirementsFile != "" {
@@ -170,15 +189,15 @@ func getRequiredPackages(definition *models.PluginDefinition, pluginDir string) 
 			reqPath = filepath.Join(pluginDir, reqPath)
 		}
 
-		pkgs, err := parseRequirementsFile(reqPath)
-		if err == nil {
-			packages = append(packages, pkgs...)
+		if pkgs, err := parseRequirementsFile(reqPath); err == nil {
+			for _, pkg := range pkgs {
+				addPackage(pkg)
+			}
 		}
-	} else if len(packages) == 0 {
-		defaultReqPath := filepath.Join(pluginDir, "requirements.txt")
-		if pkgs, err := parseRequirementsFile(defaultReqPath); err == nil {
-			packages = append(packages, pkgs...)
-		}
+	}
+
+	for _, pkg := range definition.Execution.Requirements.Packages {
+		addPackage(pkg)
 	}
 
 	return packages

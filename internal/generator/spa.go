@@ -208,6 +208,23 @@ func (g *SPAGenerator) generateAngularJSON() error {
             }
           },
           "defaultConfiguration": "development"
+        },
+        "test": {
+          "builder": "@angular/build:karma",
+          "options": {
+            "polyfills": [],
+            "tsConfig": "tsconfig.spec.json",
+            "karmaConfig": "karma.conf.js",
+            "assets": [
+              "src/favicon.ico",
+              "src/assets"
+            ],
+            "styles": [
+              "@angular/material/prebuilt-themes/azure-blue.css",
+              "src/styles.scss"
+            ],
+            "scripts": []
+          }
         }
       }
     }
@@ -228,7 +245,8 @@ func (g *SPAGenerator) generatePackageJSON() error {
     "build": "ng build",
     "build:ci": "node scripts/generate-lock.mjs && ng build",
     "generate-lock": "node scripts/generate-lock.mjs",
-    "test": "ng test"
+    "test": "ng test --no-watch --no-progress --browsers=ChromeHeadless",
+    "test:ci": "node scripts/generate-lock.mjs && ng test --no-watch --no-progress --browsers=ChromeHeadless"
   },
   "private": true,
   "dependencies": {
@@ -249,6 +267,13 @@ func (g *SPAGenerator) generatePackageJSON() error {
     "@angular/build": "^21.0.1",
     "@angular/cli": "^21.0.1",
     "@angular/compiler-cli": "^21.0.0",
+    "@types/jasmine": "~5.1.0",
+    "jasmine-core": "~5.1.0",
+    "karma": "~6.4.0",
+    "karma-chrome-launcher": "~3.2.0",
+    "karma-coverage": "~2.2.0",
+    "karma-jasmine": "~5.1.0",
+    "karma-jasmine-html-reporter": "~2.1.0",
     "pyodide": "` + g.config.PyodideVersion + `",
     "typescript": "~5.9.2"
   },
@@ -294,7 +319,19 @@ func (g *SPAGenerator) generateTsConfig() error {
   "include": ["src/**/*.ts"],
   "exclude": ["src/**/*.spec.ts"]
 }`
-	return os.WriteFile(filepath.Join(g.config.OutputDir, "tsconfig.app.json"), []byte(appConfig), 0644)
+	if err := os.WriteFile(filepath.Join(g.config.OutputDir, "tsconfig.app.json"), []byte(appConfig), 0644); err != nil {
+		return err
+	}
+
+	specConfig := `{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./out-tsc/spec",
+    "types": ["jasmine"]
+  },
+  "include": ["src/**/*.spec.ts", "src/**/*.d.ts"]
+}`
+	return os.WriteFile(filepath.Join(g.config.OutputDir, "tsconfig.spec.json"), []byte(specConfig), 0644)
 }
 
 func (g *SPAGenerator) generateSrcFiles() error {
@@ -339,6 +376,14 @@ func (g *SPAGenerator) generateSrcFiles() error {
 	}
 
 	if err := g.embedPluginScript(); err != nil {
+		return err
+	}
+
+	if err := g.generateKarmaConfig(); err != nil {
+		return err
+	}
+
+	if err := g.generateAppSpec(); err != nil {
 		return err
 	}
 
@@ -1190,6 +1235,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Run tests
+        run: npm run test:ci
+
       - name: Generate lock file and build
         run: npm run build:ci -- --base-href /${{ github.event.repository.name }}/
 
@@ -1281,6 +1329,10 @@ jobs:
       - name: Install SPA dependencies
         working-directory: spa
         run: npm install
+
+      - name: Run tests
+        working-directory: spa
+        run: npm run test:ci
 
       - name: Generate lock file and build SPA
         working-directory: spa
@@ -1399,6 +1451,194 @@ func (g *SPAGenerator) copyExampleFiles() error {
 	}
 
 	return nil
+}
+
+func (g *SPAGenerator) generateKarmaConfig() error {
+	content := `module.exports = function (config) {
+  config.set({
+    basePath: '',
+    frameworks: ['jasmine', '@angular-devkit/build-angular'],
+    plugins: [
+      require('karma-jasmine'),
+      require('karma-chrome-launcher'),
+      require('karma-jasmine-html-reporter'),
+      require('karma-coverage'),
+      require('@angular/build/private')
+    ],
+    client: {
+      jasmine: {},
+      clearContext: false
+    },
+    jasmineHtmlReporter: {
+      suppressAll: true
+    },
+    coverageReporter: {
+      dir: require('path').join(__dirname, './coverage'),
+      subdir: '.',
+      reporters: [
+        { type: 'html' },
+        { type: 'text-summary' }
+      ]
+    },
+    reporters: ['progress', 'kjhtml'],
+    browsers: ['Chrome'],
+    restartOnFileChange: true
+  });
+};
+`
+	return os.WriteFile(filepath.Join(g.config.OutputDir, "karma.conf.js"), []byte(content), 0644)
+}
+
+func (g *SPAGenerator) generateAppSpec() error {
+	hasExample := g.definition.Example != nil && g.definition.Example.Enabled
+
+	exampleTest := ""
+	if hasExample {
+		exampleTest = `
+  describe('Example Loading', () => {
+    it('should have example enabled', () => {
+      expect(component.hasExample()).toBeTrue();
+    });
+
+    it('should load example data', async () => {
+      spyOn(window, 'fetch').and.returnValue(Promise.resolve({
+        ok: true,
+        text: () => Promise.resolve('col1\tcol2\nval1\tval2')
+      } as Response));
+
+      await component.loadExample();
+
+      expect(component.form.valid || component.fileData.size > 0).toBeTrue();
+    });
+  });
+`
+	} else {
+		exampleTest = `
+  describe('Example Loading', () => {
+    it('should not have example enabled', () => {
+      expect(component.hasExample()).toBeFalse();
+    });
+  });
+`
+	}
+
+	content := `import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
+import { provideAnimationsAsync } from '@angular/platform-browser/animations/async';
+import { AppComponent } from './app';
+import { PyodideService } from './services/pyodide.service';
+import { BrowserFileHandler } from './services/browser-file-handler';
+import { PLUGIN_DEFINITION } from './embedded/plugin-config';
+import { Subject } from 'rxjs';
+
+describe('AppComponent', () => {
+  let component: AppComponent;
+  let fixture: ComponentFixture<AppComponent>;
+  let mockPyodideService: jasmine.SpyObj<PyodideService>;
+
+  beforeEach(async () => {
+    mockPyodideService = jasmine.createSpyObj('PyodideService', ['initialize', 'execute'], {
+      progress$: new Subject(),
+      output$: new Subject()
+    });
+    mockPyodideService.initialize.and.returnValue(Promise.resolve());
+
+    await TestBed.configureTestingModule({
+      imports: [AppComponent],
+      providers: [
+        provideAnimationsAsync(),
+        { provide: PyodideService, useValue: mockPyodideService },
+        BrowserFileHandler
+      ]
+    }).compileComponents();
+
+    fixture = TestBed.createComponent(AppComponent);
+    component = fixture.componentInstance;
+  });
+
+  it('should create the app', () => {
+    expect(component).toBeTruthy();
+  });
+
+  it('should have plugin definition', () => {
+    expect(component.plugin).toBeDefined();
+    expect(component.plugin.plugin.id).toBe('` + g.definition.Plugin.ID + `');
+  });
+
+  describe('Form Building', () => {
+    it('should build form with all inputs', () => {
+      fixture.detectChanges();
+      expect(component.form).toBeDefined();
+
+      for (const input of PLUGIN_DEFINITION.inputs) {
+        expect(component.form.contains(input.name)).toBeTrue();
+      }
+    });
+
+    it('should set default values', () => {
+      fixture.detectChanges();
+
+      for (const input of PLUGIN_DEFINITION.inputs) {
+        if (input.default !== undefined) {
+          const control = component.form.get(input.name);
+          expect(control?.value).toBe(input.default);
+        }
+      }
+    });
+
+    it('should mark required fields', () => {
+      fixture.detectChanges();
+
+      for (const input of PLUGIN_DEFINITION.inputs) {
+        if (input.required) {
+          const control = component.form.get(input.name);
+          control?.setValue('');
+          expect(control?.valid).toBeFalse();
+        }
+      }
+    });
+  });
+
+  describe('Pyodide Initialization', () => {
+    it('should initialize pyodide on init', fakeAsync(() => {
+      fixture.detectChanges();
+      tick();
+
+      expect(mockPyodideService.initialize).toHaveBeenCalled();
+    }));
+
+    it('should set pyodideReady after initialization', fakeAsync(() => {
+      fixture.detectChanges();
+      tick();
+
+      expect(component.pyodideReady()).toBeTrue();
+    }));
+  });
+
+  describe('Option Normalization', () => {
+    it('should normalize string options', () => {
+      const options = ['opt1', 'opt2'];
+      const normalized = component.normalizeOptions(options);
+
+      expect(normalized).toEqual([
+        { value: 'opt1', label: 'opt1' },
+        { value: 'opt2', label: 'opt2' }
+      ]);
+    });
+
+    it('should pass through object options', () => {
+      const options = [
+        { value: 'v1', label: 'Label 1' },
+        { value: 'v2', label: 'Label 2' }
+      ];
+      const normalized = component.normalizeOptions(options);
+
+      expect(normalized).toEqual(options);
+    });
+  });
+` + exampleTest + `
+});
+`
+	return os.WriteFile(filepath.Join(g.config.OutputDir, "src", "app", "app.spec.ts"), []byte(content), 0644)
 }
 
 func toJSONArray(items []string) string {
