@@ -11,7 +11,7 @@ import (
 func main() {
 	pluginPath := flag.String("plugin", "", "Path to plugin.yaml")
 	outputDir := flag.String("output", "./spa-output", "Output directory")
-	pyodideVersion := flag.String("pyodide-version", "0.27.0", "Pyodide version to use")
+	pyodideVersion := flag.String("pyodide-version", "0.29.3", "Pyodide version to use")
 	skipCheck := flag.Bool("skip-check", false, "Skip Pyodide compatibility check")
 	noBuild := flag.Bool("no-build", false, "Skip npm install and build")
 	generateWorkflow := flag.Bool("generate-workflow", false, "Generate GitHub Actions workflow for plugin repo")
@@ -22,7 +22,7 @@ func main() {
 		fmt.Println("")
 		fmt.Println("Options:")
 		fmt.Println("  --output <dir>          Output directory (default: ./spa-output)")
-		fmt.Println("  --pyodide-version <ver> Pyodide version (default: 0.27.0)")
+		fmt.Println("  --pyodide-version <ver> Pyodide version (default: 0.29.3)")
 		fmt.Println("  --skip-check            Skip Pyodide compatibility check")
 		fmt.Println("  --no-build              Skip npm install and build")
 		fmt.Println("  --generate-workflow     Generate GitHub Actions workflow for deployment")

@@ -174,6 +174,11 @@ func getRequiredPackages(definition *models.PluginDefinition, pluginDir string) 
 		if err == nil {
 			packages = append(packages, pkgs...)
 		}
+	} else if len(packages) == 0 {
+		defaultReqPath := filepath.Join(pluginDir, "requirements.txt")
+		if pkgs, err := parseRequirementsFile(defaultReqPath); err == nil {
+			packages = append(packages, pkgs...)
+		}
 	}
 
 	return packages

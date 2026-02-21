@@ -38,13 +38,24 @@ func NewSPAGenerator(config SPAConfig) *SPAGenerator {
 	}
 }
 
+func (g *SPAGenerator) getPluginDir() string {
+	info, err := os.Stat(g.config.PluginPath)
+	if err != nil {
+		return filepath.Dir(g.config.PluginPath)
+	}
+	if info.IsDir() {
+		return g.config.PluginPath
+	}
+	return filepath.Dir(g.config.PluginPath)
+}
+
 func (g *SPAGenerator) CheckCompatibility() (bool, []string) {
 	definition, err := parser.ParsePlugin(g.config.PluginPath)
 	if err != nil {
 		return false, []string{fmt.Sprintf("Failed to parse plugin: %v", err)}
 	}
 
-	pluginDir := filepath.Dir(g.config.PluginPath)
+	pluginDir := g.getPluginDir()
 	compat := CheckPyodideCompatibility(definition, pluginDir)
 
 	return compat.Compatible, compat.Issues
@@ -57,7 +68,7 @@ func (g *SPAGenerator) Generate() error {
 	}
 
 	g.definition = definition
-	g.pluginDir = filepath.Dir(g.config.PluginPath)
+	g.pluginDir = g.getPluginDir()
 
 	if !g.config.SkipCheck {
 		compat := CheckPyodideCompatibility(definition, g.pluginDir)
@@ -95,6 +106,10 @@ func (g *SPAGenerator) Generate() error {
 
 	if err := g.generateSrcFiles(); err != nil {
 		return fmt.Errorf("failed to generate source files: %w", err)
+	}
+
+	if err := g.generateLockScript(); err != nil {
+		return fmt.Errorf("failed to generate lock script: %w", err)
 	}
 
 	if g.config.GithubAction {
@@ -207,6 +222,8 @@ func (g *SPAGenerator) generatePackageJSON() error {
     "ng": "ng",
     "start": "ng serve",
     "build": "ng build",
+    "build:ci": "node scripts/generate-lock.mjs && ng build",
+    "generate-lock": "node scripts/generate-lock.mjs",
     "test": "ng test"
   },
   "private": true,
@@ -228,6 +245,7 @@ func (g *SPAGenerator) generatePackageJSON() error {
     "@angular/build": "^21.0.1",
     "@angular/cli": "^21.0.1",
     "@angular/compiler-cli": "^21.0.0",
+    "pyodide": "` + g.config.PyodideVersion + `",
     "typescript": "~5.9.2"
   },
   "pyodidePackages": ` + toJSONArray(packages) + `
@@ -601,7 +619,7 @@ export class AppComponent implements OnInit {
                   <mat-form-field appearance="outline" class="full-width">
                     <mat-label>{{ input.label }}</mat-label>
                     <mat-select [formControlName]="input.name">
-                      @for (opt of normalizeOptions(input.options || []); track opt.value) {
+                      @for (opt of normalizeOptions($any(input).options || []); track opt.value) {
                         <mat-option [value]="opt.value">{{ opt.label }}</mat-option>
                       }
                     </mat-select>
@@ -756,6 +774,10 @@ export interface ExecutionResult {
   stderr: string;
 }
 
+const PYODIDE_VERSION = '` + g.config.PyodideVersion + `';
+const PYODIDE_CDN = 'https://cdn.jsdelivr.net/pyodide/v' + PYODIDE_VERSION + '/full/';
+const LOCK_FILE_URL = 'assets/pyodide-lock.json';
+
 @Injectable({ providedIn: 'root' })
 export class PyodideService {
   private pyodide: any = null;
@@ -767,15 +789,36 @@ export class PyodideService {
     this.progress$.next({ stage: 'Loading Pyodide...', percent: 10 });
 
     const script = document.createElement('script');
-    script.src = 'https://cdn.jsdelivr.net/pyodide/v` + g.config.PyodideVersion + `/full/pyodide.js';
+    script.src = PYODIDE_CDN + 'pyodide.js';
     document.head.appendChild(script);
 
     await new Promise<void>((resolve) => {
       script.onload = () => resolve();
     });
 
+    const lockFileExists = await this.checkLockFile();
+
+    if (lockFileExists) {
+      this.progress$.next({ stage: 'Loading packages from lock file...', percent: 30 });
+      try {
+        this.pyodide = await (window as any).loadPyodide({
+          indexURL: PYODIDE_CDN,
+          lockFileURL: LOCK_FILE_URL
+        });
+
+        this.progress$.next({ stage: 'Loading packages...', percent: 60 });
+        const packageNames = packages.map(p => p.split(/[<>=]/)[0]);
+        await this.pyodide.loadPackage(packageNames);
+
+        this.progress$.next({ stage: 'Ready', percent: 100 });
+        return;
+      } catch (e) {
+        console.warn('Failed to load from lock file, installing fresh:', e);
+      }
+    }
+
     this.pyodide = await (window as any).loadPyodide({
-      indexURL: 'https://cdn.jsdelivr.net/pyodide/v` + g.config.PyodideVersion + `/full/'
+      indexURL: PYODIDE_CDN
     });
 
     this.progress$.next({ stage: 'Installing packages...', percent: 40 });
@@ -786,8 +829,9 @@ export class PyodideService {
     const total = packages.length;
     for (let i = 0; i < packages.length; i++) {
       const pkg = packages[i];
+      const pkgName = pkg.split(/[<>=]/)[0];
       this.progress$.next({
-        stage: 'Installing ' + pkg + '...',
+        stage: 'Installing ' + pkgName + '...',
         percent: 40 + (i / total) * 50
       });
       try {
@@ -798,6 +842,15 @@ export class PyodideService {
     }
 
     this.progress$.next({ stage: 'Ready', percent: 100 });
+  }
+
+  private async checkLockFile(): Promise<boolean> {
+    try {
+      const response = await fetch(LOCK_FILE_URL, { method: 'HEAD' });
+      return response.ok;
+    } catch {
+      return false;
+    }
   }
 
   async execute(script: string, params: Record<string, any>, modules: Record<string, string> = {}): Promise<ExecutionResult> {
@@ -1091,8 +1144,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build
-        run: npm run build -- --base-href /${{ github.event.repository.name }}/
+      - name: Generate lock file and build
+        run: npm run build:ci -- --base-href /${{ github.event.repository.name }}/
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
@@ -1183,9 +1236,9 @@ jobs:
         working-directory: spa
         run: npm install
 
-      - name: Build SPA
+      - name: Generate lock file and build SPA
         working-directory: spa
-        run: npm run build -- --base-href /${{ github.event.repository.name }}/
+        run: npm run build:ci -- --base-href /${{ github.event.repository.name }}/
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
@@ -1207,6 +1260,59 @@ jobs:
         uses: actions/deploy-pages@v4
 `
 	return os.WriteFile(filepath.Join(workflowDir, "deploy-spa.yml"), []byte(content), 0644)
+}
+
+func (g *SPAGenerator) generateLockScript() error {
+	scriptsDir := filepath.Join(g.config.OutputDir, "scripts")
+	if err := os.MkdirAll(scriptsDir, 0755); err != nil {
+		return err
+	}
+
+	packages := getRequiredPackages(g.definition, g.pluginDir)
+	packagesJSON, _ := json.Marshal(packages)
+
+	content := `import { loadPyodide } from 'pyodide';
+import { writeFileSync, mkdirSync, existsSync } from 'fs';
+import { dirname, join } from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const PACKAGES = ` + string(packagesJSON) + `;
+const LOCK_FILE = join(__dirname, '..', 'src', 'assets', 'pyodide-lock.json');
+
+async function generateLock() {
+  console.log('Loading Pyodide...');
+  const pyodide = await loadPyodide();
+
+  console.log('Loading micropip...');
+  await pyodide.loadPackage('micropip');
+  const micropip = pyodide.pyimport('micropip');
+
+  console.log('Installing packages:', PACKAGES);
+  for (const pkg of PACKAGES) {
+    console.log('  Installing ' + pkg + '...');
+    try {
+      await micropip.install(pkg);
+    } catch (e) {
+      console.warn('  Warning: Failed to install ' + pkg + ':', e.message);
+    }
+  }
+
+  console.log('Generating lock file...');
+  const lockJson = micropip.freeze();
+
+  const assetsDir = dirname(LOCK_FILE);
+  if (!existsSync(assetsDir)) {
+    mkdirSync(assetsDir, { recursive: true });
+  }
+
+  writeFileSync(LOCK_FILE, lockJson);
+  console.log('Lock file generated:', LOCK_FILE);
+}
+
+generateLock().catch(console.error);
+`
+	return os.WriteFile(filepath.Join(scriptsDir, "generate-lock.mjs"), []byte(content), 0644)
 }
 
 func toJSONArray(items []string) string {
