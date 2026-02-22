@@ -2379,7 +2379,8 @@ jobs:
             --output ./spa \
             --skip-check \
             --no-build \
-            --webr-version ${{ env.WEBR_VERSION }}
+            --webr-version ${{ env.WEBR_VERSION }} \
+            --examples-dir ./examples:./cauldron-go/examples
 
       - name: Install SPA dependencies
         working-directory: spa
@@ -2477,7 +2478,8 @@ jobs:
             --output ./spa \
             --skip-check \
             --no-build \
-            --pyodide-version ${{ env.PYODIDE_VERSION }}
+            --pyodide-version ${{ env.PYODIDE_VERSION }} \
+            --examples-dir ./examples:./cauldron-go/examples
 
       - name: Install SPA dependencies
         working-directory: spa
@@ -2628,6 +2630,19 @@ func (g *SPAGenerator) resolveExampleFilePath(filePath string) string {
 	pluginExamplesPath := filepath.Join(g.pluginDir, "examples", filePath)
 	if _, err := os.Stat(pluginExamplesPath); err == nil {
 		return pluginExamplesPath
+	}
+
+	if g.config.ExamplesDir != "" {
+		for _, dir := range strings.Split(g.config.ExamplesDir, ":") {
+			dir = strings.TrimSpace(dir)
+			if dir == "" {
+				continue
+			}
+			configExamplesPath := filepath.Join(dir, filePath)
+			if _, err := os.Stat(configExamplesPath); err == nil {
+				return configExamplesPath
+			}
+		}
 	}
 
 	execPath, err := os.Executable()
@@ -3062,7 +3077,7 @@ describe('Integration: Example Execution', () => {
 
       if (typeof value === 'string' && fileInputs.has(key)) {
         const fileName = value.split('/').pop() || 'example.txt';
-        const assetPath = value.startsWith('examples/') ? 'assets/' + value : 'assets/' + fileName;
+        const assetPath = value.startsWith('examples/') ? 'assets/' + value.substring(9) : 'assets/' + value;
         const response = await fetch(assetPath);
         if (response.ok) {
           const content = await response.text();
@@ -3159,7 +3174,7 @@ describe('Integration: Example Execution', () => {
 
       if (typeof value === 'string' && fileInputs.has(key)) {
         const fileName = value.split('/').pop() || 'example.txt';
-        const assetPath = value.startsWith('examples/') ? 'assets/' + value : 'assets/' + fileName;
+        const assetPath = value.startsWith('examples/') ? 'assets/' + value.substring(9) : 'assets/' + value;
         const response = await fetch(assetPath);
         if (response.ok) {
           const content = await response.text();
