@@ -2237,6 +2237,18 @@ func (g *SPAGenerator) generateGithubWorkflow() error {
 		return err
 	}
 
+	hasExample := g.definition.Example != nil && g.definition.Example.Enabled
+	integrationTestStep := ""
+	if hasExample {
+		integrationTestStep = `
+      - name: Run integration tests with example
+        run: npm run test:ci:integration
+        continue-on-error: false
+        env:
+          CHROME_BIN: /usr/bin/google-chrome
+`
+	}
+
 	content := `name: Deploy to GitHub Pages
 
 on:
@@ -2272,13 +2284,7 @@ jobs:
         run: npm run test:ci
         env:
           CHROME_BIN: /usr/bin/google-chrome
-
-      - name: Run integration tests with example
-        run: npm run test:ci:integration
-        continue-on-error: false
-        env:
-          CHROME_BIN: /usr/bin/google-chrome
-
+` + integrationTestStep + `
       - name: Generate lock file and build
         run: npm run build:ci -- --base-href /${{ github.event.repository.name }}/
 
