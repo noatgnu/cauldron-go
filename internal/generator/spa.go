@@ -2316,10 +2316,23 @@ func GeneratePluginWorkflowWithVersions(pluginDir string, pyodideVersion string,
 	}
 
 	isR := definition.Runtime.HasEnvironment("r") && !definition.Runtime.HasEnvironment("python")
+	hasExample := definition.Example != nil && definition.Example.Enabled
 
 	workflowDir := filepath.Join(pluginDir, ".github", "workflows")
 	if err := os.MkdirAll(workflowDir, 0755); err != nil {
 		return err
+	}
+
+	integrationTestStep := ""
+	if hasExample {
+		integrationTestStep = `
+      - name: Run integration tests with example
+        working-directory: spa
+        run: npm run test:ci:integration
+        continue-on-error: false
+        env:
+          CHROME_BIN: /usr/bin/google-chrome
+`
 	}
 
 	var content string
@@ -2391,14 +2404,7 @@ jobs:
         run: npm run test:ci
         env:
           CHROME_BIN: /usr/bin/google-chrome
-
-      - name: Run integration tests with example
-        working-directory: spa
-        run: npm run test:ci:integration
-        continue-on-error: false
-        env:
-          CHROME_BIN: /usr/bin/google-chrome
-
+` + integrationTestStep + `
       - name: Build SPA
         working-directory: spa
         run: npm run build:ci -- --base-href /${{ github.event.repository.name }}/
@@ -2490,14 +2496,7 @@ jobs:
         run: npm run test:ci
         env:
           CHROME_BIN: /usr/bin/google-chrome
-
-      - name: Run integration tests with example
-        working-directory: spa
-        run: npm run test:ci:integration
-        continue-on-error: false
-        env:
-          CHROME_BIN: /usr/bin/google-chrome
-
+` + integrationTestStep + `
       - name: Generate lock file and build SPA
         working-directory: spa
         run: npm run build:ci -- --base-href /${{ github.event.repository.name }}/
