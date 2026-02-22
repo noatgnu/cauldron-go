@@ -6,15 +6,20 @@ import (
 	"os"
 
 	"github.com/noatgnu/cauldron-go/internal/generator"
+	"github.com/noatgnu/cauldron-go/internal/parser"
 )
 
 func main() {
 	pluginPath := flag.String("plugin", "", "Path to plugin.yaml")
 	outputDir := flag.String("output", "./spa-output", "Output directory")
 	pyodideVersion := flag.String("pyodide-version", "0.29.3", "Pyodide version to use")
-	skipCheck := flag.Bool("skip-check", false, "Skip Pyodide compatibility check")
+	webrVersion := flag.String("webr-version", "0.4.2", "WebR version to use")
+	skipCheck := flag.Bool("skip-check", false, "Skip compatibility check")
 	noBuild := flag.Bool("no-build", false, "Skip npm install and build")
 	generateWorkflow := flag.Bool("generate-workflow", false, "Generate GitHub Actions workflow for plugin repo")
+	checkWebR := flag.Bool("check-webr", false, "Check WebR compatibility for R plugins")
+	checkOnline := flag.Bool("check-online", false, "Check package availability online (slower)")
+	examplesDir := flag.String("examples-dir", "", "Global examples directory (for shared example files)")
 	flag.Parse()
 
 	if *pluginPath == "" {
@@ -23,14 +28,90 @@ func main() {
 		fmt.Println("Options:")
 		fmt.Println("  --output <dir>          Output directory (default: ./spa-output)")
 		fmt.Println("  --pyodide-version <ver> Pyodide version (default: 0.29.3)")
-		fmt.Println("  --skip-check            Skip Pyodide compatibility check")
+		fmt.Println("  --webr-version <ver>    WebR version (default: 0.4.2)")
+		fmt.Println("  --skip-check            Skip compatibility check")
 		fmt.Println("  --no-build              Skip npm install and build")
 		fmt.Println("  --generate-workflow     Generate GitHub Actions workflow for deployment")
+		fmt.Println("  --check-webr            Check WebR compatibility for R plugins")
+		fmt.Println("  --check-online          Check package availability online (slower)")
+		fmt.Println("  --examples-dir <dir>    Global examples directory (for shared example files)")
 		os.Exit(1)
 	}
 
+	pluginDir := getPluginDir(*pluginPath)
+
+	if *checkWebR {
+		definition, err := parser.ParsePlugin(*pluginPath)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error parsing plugin: %v\n", err)
+			os.Exit(1)
+		}
+
+		fmt.Printf("Checking WebR compatibility for: %s\n", definition.Plugin.Name)
+		fmt.Println("")
+
+		compat := generator.CheckWebRCompatibility(definition, pluginDir)
+
+		fmt.Println("Required R packages:")
+		for _, pkg := range compat.Packages {
+			fmt.Printf("  - %s\n", pkg)
+		}
+		fmt.Println("")
+
+		if len(compat.BiocPackages) > 0 {
+			fmt.Println("Bioconductor packages (may need R-Universe):")
+			for _, pkg := range compat.BiocPackages {
+				fmt.Printf("  - %s\n", pkg)
+			}
+			fmt.Println("")
+		}
+
+		if len(compat.MaybeSupport) > 0 {
+			fmt.Println("Packages requiring verification:")
+			for _, pkg := range compat.MaybeSupport {
+				fmt.Printf("  - %s\n", pkg)
+			}
+			fmt.Println("")
+		}
+
+		if *checkOnline && len(compat.Packages) > 0 {
+			fmt.Println("Checking online availability...")
+			available, unavailable := generator.CheckWebRPackageAvailability(compat.Packages)
+
+			if len(available) > 0 {
+				fmt.Println("\n✓ Available packages:")
+				for _, pkg := range available {
+					fmt.Printf("  - %s\n", pkg)
+				}
+			}
+
+			if len(unavailable) > 0 {
+				fmt.Println("\n✗ Potentially unavailable packages:")
+				for _, pkg := range unavailable {
+					fmt.Printf("  - %s\n", pkg)
+				}
+			}
+			fmt.Println("")
+		}
+
+		if len(compat.Issues) > 0 {
+			fmt.Println("Issues found:")
+			for _, issue := range compat.Issues {
+				fmt.Printf("  ✗ %s\n", issue)
+			}
+			fmt.Println("")
+		}
+
+		if compat.Compatible {
+			fmt.Println("✓ Plugin appears compatible with WebR")
+		} else {
+			fmt.Println("✗ Plugin has compatibility issues with WebR")
+			os.Exit(1)
+		}
+		return
+	}
+
 	if *generateWorkflow {
-		pluginDir := getPluginDir(*pluginPath)
 		if err := generator.GeneratePluginWorkflow(pluginDir, *pyodideVersion); err != nil {
 			fmt.Fprintf(os.Stderr, "Error generating workflow: %v\n", err)
 			os.Exit(1)
@@ -46,8 +127,10 @@ func main() {
 		PluginPath:     *pluginPath,
 		OutputDir:      *outputDir,
 		PyodideVersion: *pyodideVersion,
+		WebRVersion:    *webrVersion,
 		SkipCheck:      *skipCheck,
 		NoBuild:        *noBuild,
+		ExamplesDir:    *examplesDir,
 	}
 
 	gen := generator.NewSPAGenerator(config)
