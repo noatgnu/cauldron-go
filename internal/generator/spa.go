@@ -2600,7 +2600,12 @@ func (g *SPAGenerator) copyExampleFiles() error {
 			continue
 		}
 
-		dstPath := filepath.Join(assetsDir, strVal)
+		normalizedPath := strVal
+		if strings.HasPrefix(strVal, "examples/") || strings.HasPrefix(strVal, "examples\\") {
+			normalizedPath = strVal[9:]
+		}
+
+		dstPath := filepath.Join(assetsDir, normalizedPath)
 
 		if err := os.MkdirAll(filepath.Dir(dstPath), 0755); err != nil {
 			return err
@@ -2627,7 +2632,12 @@ func (g *SPAGenerator) resolveExampleFilePath(filePath string) string {
 		return ""
 	}
 
-	pluginExamplesPath := filepath.Join(g.pluginDir, "examples", filePath)
+	normalizedPath := filePath
+	if strings.HasPrefix(filePath, "examples/") || strings.HasPrefix(filePath, "examples\\") {
+		normalizedPath = filePath[9:]
+	}
+
+	pluginExamplesPath := filepath.Join(g.pluginDir, "examples", normalizedPath)
 	if _, err := os.Stat(pluginExamplesPath); err == nil {
 		return pluginExamplesPath
 	}
@@ -2638,7 +2648,7 @@ func (g *SPAGenerator) resolveExampleFilePath(filePath string) string {
 			if dir == "" {
 				continue
 			}
-			configExamplesPath := filepath.Join(dir, filePath)
+			configExamplesPath := filepath.Join(dir, normalizedPath)
 			if _, err := os.Stat(configExamplesPath); err == nil {
 				return configExamplesPath
 			}
@@ -2648,7 +2658,7 @@ func (g *SPAGenerator) resolveExampleFilePath(filePath string) string {
 	execPath, err := os.Executable()
 	if err == nil {
 		execDir := filepath.Dir(execPath)
-		execExamplesPath := filepath.Join(execDir, "examples", filePath)
+		execExamplesPath := filepath.Join(execDir, "examples", normalizedPath)
 		if _, err := os.Stat(execExamplesPath); err == nil {
 			return execExamplesPath
 		}
@@ -2656,7 +2666,7 @@ func (g *SPAGenerator) resolveExampleFilePath(filePath string) string {
 
 	cwd, err := os.Getwd()
 	if err == nil {
-		cwdExamplesPath := filepath.Join(cwd, "examples", filePath)
+		cwdExamplesPath := filepath.Join(cwd, "examples", normalizedPath)
 		if _, err := os.Stat(cwdExamplesPath); err == nil {
 			return cwdExamplesPath
 		}
