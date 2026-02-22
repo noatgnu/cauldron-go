@@ -565,7 +565,8 @@ export class AppComponent implements OnInit {
       }
       const argsMapping = this.plugin.execution?.argsMapping || {};
       const outputDirFlag = this.plugin.execution?.outputDir;
-      const result = await this.pyodide.execute(PLUGIN_SCRIPT, params, PLUGIN_MODULES, argsMapping, outputDirFlag);
+      const inputs = this.plugin.inputs || [];
+      const result = await this.pyodide.execute(PLUGIN_SCRIPT, params, PLUGIN_MODULES, argsMapping, outputDirFlag, inputs);
       this.outputs.set(result.outputs);
     } catch (err: any) {
       this.error.set('Execution failed: ' + err.message);
@@ -959,7 +960,7 @@ export class PyodideService {
     }
   }
 
-  async execute(script: string, params: Record<string, any>, modules: Record<string, string> = {}, argsMapping?: Record<string, any>, outputDirFlag?: string): Promise<ExecutionResult> {
+  async execute(script: string, params: Record<string, any>, modules: Record<string, string> = {}, argsMapping?: Record<string, any>, outputDirFlag?: string, inputs?: any[]): Promise<ExecutionResult> {
     const outputs: {name: string, content: string, type: string}[] = [];
     let stdout = '';
     let stderr = '';
@@ -995,7 +996,7 @@ export class PyodideService {
       }
     }
 
-    const args = this.buildArgs(params, argsMapping || {}, outputDirFlag);
+    const args = this.buildArgs(params, argsMapping || {}, outputDirFlag, inputs);
 
     this.pyodide.globals.set('__params__', this.pyodide.toPy(params));
 
@@ -1029,32 +1030,67 @@ export class PyodideService {
     return { outputs, stdout, stderr };
   }
 
-  private buildArgs(params: Record<string, any>, argsMapping: Record<string, any>, outputDirFlag?: string): string[] {
+  private buildArgs(params: Record<string, any>, argsMapping: Record<string, any>, outputDirFlag?: string, inputs?: any[]): string[] {
     const args: string[] = [];
 
-    for (const [paramName, value] of Object.entries(params)) {
-      if (value === undefined || value === null || value === '') continue;
+    const inputMap = new Map<string, any>();
+    if (inputs) {
+      for (const input of inputs) {
+        inputMap.set(input.name, input);
+      }
+    }
 
+    for (const [paramName, value] of Object.entries(params)) {
       const mapping = argsMapping[paramName];
       if (!mapping) continue;
 
-      if (typeof mapping === 'string') {
-        args.push(mapping, String(value));
-      } else if (typeof mapping === 'object') {
-        const flag = mapping.flag;
-        const transform = mapping.transform;
-        const when = mapping.when;
+      const input = inputMap.get(paramName);
+      const inputType = input?.type;
 
-        if (when === 'true' && value === true) {
-          args.push(flag);
-        } else if (when === 'true' && value !== true) {
-          continue;
-        } else if (transform === 'comma-join' && Array.isArray(value)) {
-          args.push(flag, value.join(','));
-        } else {
-          args.push(flag, String(value));
-        }
+      let flag: string;
+      let transform: string | undefined;
+      let when: string | undefined;
+      let fixedValue: string | undefined;
+      let passAsValue = false;
+
+      if (typeof mapping === 'string') {
+        flag = mapping;
+      } else {
+        flag = mapping.flag;
+        transform = mapping.transform;
+        when = mapping.when;
+        fixedValue = mapping.value;
+        passAsValue = mapping.passAsValue === true;
       }
+
+      if (!flag) continue;
+
+      if (when !== undefined) {
+        const shouldInclude = this.evaluateCondition(value, when);
+        if (!shouldInclude) continue;
+        args.push(flag);
+        continue;
+      }
+
+      if (inputType === 'boolean' && fixedValue === undefined) {
+        const boolVal = value === true || value === 'true';
+        if (passAsValue) {
+          args.push(flag, String(boolVal));
+        } else if (boolVal) {
+          args.push(flag);
+        }
+        continue;
+      }
+
+      if (value === undefined || value === null || value === '') continue;
+
+      if (fixedValue !== undefined) {
+        args.push(flag, fixedValue);
+        continue;
+      }
+
+      const transformedValue = this.transformValue(value, transform);
+      args.push(flag, transformedValue);
     }
 
     if (outputDirFlag) {
@@ -1062,6 +1098,49 @@ export class PyodideService {
     }
 
     return args;
+  }
+
+  private evaluateCondition(value: any, condition: string): boolean {
+    const valueStr = String(value ?? '');
+
+    switch (condition) {
+      case 'true':
+        return value === true || valueStr === 'true' || valueStr === '1';
+      case 'false':
+        return value === false || valueStr === 'false' || valueStr === '0';
+      case 'not-empty':
+        return valueStr !== '';
+      case 'empty':
+        return valueStr === '';
+      default:
+        return valueStr === condition;
+    }
+  }
+
+  private transformValue(value: any, transform?: string): string {
+    if (!transform) {
+      return String(value);
+    }
+
+    switch (transform) {
+      case 'comma-join':
+        if (Array.isArray(value)) {
+          return value.join(',');
+        }
+        return String(value);
+
+      case 'space-join':
+        if (Array.isArray(value)) {
+          return value.join(' ');
+        }
+        return String(value);
+
+      case 'json-encode':
+        return JSON.stringify(value);
+
+      default:
+        return String(value);
+    }
   }
 
   private getFileType(filename: string): string {
@@ -1298,10 +1377,14 @@ jobs:
 
       - name: Run unit tests
         run: npm run test:ci
+        env:
+          CHROME_BIN: /usr/bin/google-chrome
 
       - name: Run integration tests with example
         run: npm run test:ci:integration
         continue-on-error: false
+        env:
+          CHROME_BIN: /usr/bin/google-chrome
 
       - name: Generate lock file and build
         run: npm run build:ci -- --base-href /${{ github.event.repository.name }}/
@@ -1398,11 +1481,15 @@ jobs:
       - name: Run unit tests
         working-directory: spa
         run: npm run test:ci
+        env:
+          CHROME_BIN: /usr/bin/google-chrome
 
       - name: Run integration tests with example
         working-directory: spa
         run: npm run test:ci:integration
         continue-on-error: false
+        env:
+          CHROME_BIN: /usr/bin/google-chrome
 
       - name: Generate lock file and build SPA
         working-directory: spa
@@ -1789,7 +1876,8 @@ describe('Integration: Example Execution', () => {
     console.log('Running plugin with example data...');
     const argsMapping = PLUGIN_DEFINITION.execution?.argsMapping || {};
     const outputDirFlag = PLUGIN_DEFINITION.execution?.outputDir;
-    const result = await pyodideService.execute(PLUGIN_SCRIPT, params, PLUGIN_MODULES, argsMapping, outputDirFlag);
+    const inputs = PLUGIN_DEFINITION.inputs || [];
+    const result = await pyodideService.execute(PLUGIN_SCRIPT, params, PLUGIN_MODULES, argsMapping, outputDirFlag, inputs);
     console.log('Plugin execution completed');
 
     expect(result).toBeDefined();
