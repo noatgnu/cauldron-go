@@ -1718,22 +1718,39 @@ export class WebRService {
     }
 
     const defaultRepos = ['https://repo.r-wasm.org'];
-    const total = packages.length;
-    for (let i = 0; i < packages.length; i++) {
-      const pkg = packages[i];
-      this.progress$.next({
-        stage: 'Installing ' + pkg + '...',
-        percent: 40 + (i / total) * 50
-      });
+    const installed = new Set<string>();
+    let toInstall = [...packages];
+    let pass = 0;
+    const maxPasses = 5;
 
-      const pkgRepo = repoMap.get(pkg);
-      const repos = pkgRepo ? [pkgRepo, ...defaultRepos] : defaultRepos;
+    while (toInstall.length > 0 && pass < maxPasses) {
+      pass++;
+      this.progress$.next({ stage: 'Installation pass ' + pass + '...', percent: 40 + (pass / maxPasses) * 40 });
 
-      try {
-        await this.webR.installPackages([pkg], { repos: repos, quiet: false });
-      } catch (e) {
-        console.warn('Failed to install ' + pkg + ':', e);
+      const failed: string[] = [];
+      for (const pkg of toInstall) {
+        if (installed.has(pkg)) continue;
+
+        this.progress$.next({ stage: 'Installing ' + pkg + '...', percent: 40 + (pass / maxPasses) * 40 });
+
+        const pkgRepo = repoMap.get(pkg);
+        const repos = pkgRepo ? [pkgRepo, ...defaultRepos] : defaultRepos;
+
+        try {
+          await this.webR.installPackages([pkg], { repos: repos, quiet: false });
+          installed.add(pkg);
+        } catch (e) {
+          console.warn('Pass ' + pass + ': Failed to install ' + pkg + ':', e);
+          failed.push(pkg);
+        }
       }
+
+      if (failed.length === toInstall.length) {
+        console.warn('No progress made in pass ' + pass + ', stopping');
+        break;
+      }
+
+      toInstall = failed;
     }
 
     this.progress$.next({ stage: 'Ready', percent: 100 });
