@@ -3142,7 +3142,7 @@ describe('Integration: Example Execution', () => {
 
       if (typeof value === 'string' && fileInputs.has(key)) {
         const fileName = value.split('/').pop() || 'example.txt';
-        const assetPath = value.startsWith('examples/') ? 'assets/examples/' + value.substring(9) : 'assets/examples/' + value;
+        const assetPath = value.startsWith('examples/') ? '/assets/examples/' + value.substring(9) : '/assets/examples/' + value;
         const response = await fetch(assetPath);
         if (response.ok) {
           const content = await response.text();
@@ -3239,7 +3239,7 @@ describe('Integration: Example Execution', () => {
 
       if (typeof value === 'string' && fileInputs.has(key)) {
         const fileName = value.split('/').pop() || 'example.txt';
-        const assetPath = value.startsWith('examples/') ? 'assets/examples/' + value.substring(9) : 'assets/examples/' + value;
+        const assetPath = value.startsWith('examples/') ? '/assets/examples/' + value.substring(9) : '/assets/examples/' + value;
         const response = await fetch(assetPath);
         if (response.ok) {
           const content = await response.text();
