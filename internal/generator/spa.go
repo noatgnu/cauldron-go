@@ -2698,8 +2698,10 @@ module.exports = function (config) {
       { pattern: 'src/assets/**/*', watched: false, included: false, served: true, nocache: false }
     ],
     proxies: {
-      '/assets/': '/base/src/assets/'
+      '/assets/': '/base/src/assets/',
+      '/base/assets/': '/base/src/assets/'
     },
+    urlRoot: '/',
     client: {
       jasmine: {
         timeoutInterval: 300000
@@ -3142,7 +3144,7 @@ describe('Integration: Example Execution', () => {
 
       if (typeof value === 'string' && fileInputs.has(key)) {
         const fileName = value.split('/').pop() || 'example.txt';
-        const assetPath = value.startsWith('examples/') ? '/assets/examples/' + value.substring(9) : '/assets/examples/' + value;
+        const assetPath = value.startsWith('examples/') ? 'assets/examples/' + value.substring(9) : 'assets/examples/' + value;
         const response = await fetch(assetPath);
         if (response.ok) {
           const content = await response.text();
@@ -3239,7 +3241,7 @@ describe('Integration: Example Execution', () => {
 
       if (typeof value === 'string' && fileInputs.has(key)) {
         const fileName = value.split('/').pop() || 'example.txt';
-        const assetPath = value.startsWith('examples/') ? '/assets/examples/' + value.substring(9) : '/assets/examples/' + value;
+        const assetPath = value.startsWith('examples/') ? 'assets/examples/' + value.substring(9) : 'assets/examples/' + value;
         const response = await fetch(assetPath);
         if (response.ok) {
           const content = await response.text();
