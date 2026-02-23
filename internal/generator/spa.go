@@ -3192,11 +3192,16 @@ describe('Integration: Example Execution', () => {
     }
 
     console.log('Running plugin with example data...');
+    console.log('Params:', JSON.stringify(Object.keys(params)));
     const argsMapping = PLUGIN_DEFINITION.execution?.argsMapping || {};
     const outputDirFlag = PLUGIN_DEFINITION.execution?.outputDir;
+    console.log('Output dir flag:', outputDirFlag);
     const inputs = PLUGIN_DEFINITION.inputs || [];
     const result = await pyodideService.execute(PLUGIN_SCRIPT, params, PLUGIN_MODULES, argsMapping, outputDirFlag, inputs);
     console.log('Plugin execution completed');
+    console.log('Stdout:', result.stdout);
+    console.log('Stderr:', result.stderr);
+    console.log('Outputs count:', result.outputs.length);
 
     expect(result).toBeDefined();
     expect(result.outputs).toBeDefined();
@@ -3289,11 +3294,16 @@ describe('Integration: Example Execution', () => {
     }
 
     console.log('Running plugin with example data...');
+    console.log('Params:', JSON.stringify(Object.keys(params)));
     const argsMapping = PLUGIN_DEFINITION.execution?.argsMapping || {};
     const outputDirFlag = PLUGIN_DEFINITION.execution?.outputDir;
+    console.log('Output dir flag:', outputDirFlag);
     const inputs = PLUGIN_DEFINITION.inputs || [];
     const result = await webrService.execute(PLUGIN_SCRIPT, params, PLUGIN_MODULES, argsMapping, outputDirFlag, inputs);
     console.log('Plugin execution completed');
+    console.log('Stdout:', result.stdout);
+    console.log('Stderr:', result.stderr);
+    console.log('Outputs count:', result.outputs.length);
 
     expect(result).toBeDefined();
     expect(result.outputs).toBeDefined();
