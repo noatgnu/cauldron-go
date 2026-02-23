@@ -2311,7 +2311,7 @@ jobs:
 }
 
 func GeneratePluginWorkflow(pluginDir string, pyodideVersion string) error {
-	return GeneratePluginWorkflowWithVersions(pluginDir, pyodideVersion, "0.4.2")
+	return GeneratePluginWorkflowWithVersions(pluginDir, pyodideVersion, "0.5.0")
 }
 
 func GeneratePluginWorkflowWithVersions(pluginDir string, pyodideVersion string, webrVersion string) error {
@@ -2694,6 +2694,12 @@ module.exports = function (config) {
       require('karma-coverage'),
       require('@angular/build/private')
     ],
+    files: [
+      { pattern: 'src/assets/**/*', watched: false, included: false, served: true, nocache: false }
+    ],
+    proxies: {
+      '/assets/': '/base/src/assets/'
+    },
     client: {
       jasmine: {
         timeoutInterval: 300000
