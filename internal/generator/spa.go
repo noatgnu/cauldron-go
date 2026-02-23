@@ -2592,7 +2592,7 @@ func (g *SPAGenerator) copyExampleFiles() error {
 		return nil
 	}
 
-	assetsDir := filepath.Join(g.config.OutputDir, "src", "assets")
+	examplesDir := filepath.Join(g.config.OutputDir, "src", "assets", "examples")
 
 	for _, value := range g.definition.Example.Values {
 		strVal, ok := value.(string)
@@ -2610,7 +2610,7 @@ func (g *SPAGenerator) copyExampleFiles() error {
 			normalizedPath = strVal[9:]
 		}
 
-		dstPath := filepath.Join(assetsDir, normalizedPath)
+		dstPath := filepath.Join(examplesDir, normalizedPath)
 
 		if err := os.MkdirAll(filepath.Dir(dstPath), 0755); err != nil {
 			return err
@@ -3092,7 +3092,7 @@ describe('Integration: Example Execution', () => {
 
       if (typeof value === 'string' && fileInputs.has(key)) {
         const fileName = value.split('/').pop() || 'example.txt';
-        const assetPath = value.startsWith('examples/') ? 'assets/' + value.substring(9) : 'assets/' + value;
+        const assetPath = value.startsWith('examples/') ? 'assets/examples/' + value.substring(9) : 'assets/examples/' + value;
         const response = await fetch(assetPath);
         if (response.ok) {
           const content = await response.text();
@@ -3189,7 +3189,7 @@ describe('Integration: Example Execution', () => {
 
       if (typeof value === 'string' && fileInputs.has(key)) {
         const fileName = value.split('/').pop() || 'example.txt';
-        const assetPath = value.startsWith('examples/') ? 'assets/' + value.substring(9) : 'assets/' + value;
+        const assetPath = value.startsWith('examples/') ? 'assets/examples/' + value.substring(9) : 'assets/examples/' + value;
         const response = await fetch(assetPath);
         if (response.ok) {
           const content = await response.text();
