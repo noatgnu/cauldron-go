@@ -1,4 +1,0 @@
-QFeatures
-limma
-MsCoreUtils
-impute

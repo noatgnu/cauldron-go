@@ -1,5 +1,0 @@
-# Python requirements for limma plugin
-pandas>=2.0.0
-click
-coral
-rpy2>=3.5.0

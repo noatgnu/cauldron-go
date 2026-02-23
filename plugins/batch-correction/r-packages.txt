@@ -1,4 +1,0 @@
-# R packages for batch correction plugin
-sva
-limma
-RUVSeq
