@@ -2237,7 +2237,7 @@ func (g *SPAGenerator) generateGithubWorkflow() error {
 		return err
 	}
 
-	hasExample := g.definition.Example != nil && g.definition.Example.Enabled
+	hasExample := g.definition.Example != nil && g.definition.Example.Enabled && g.hasExampleFileInputs()
 	integrationTestStep := ""
 	if hasExample {
 		integrationTestStep = `
@@ -2322,7 +2322,7 @@ func GeneratePluginWorkflowWithVersions(pluginDir string, pyodideVersion string,
 	}
 
 	isR := definition.Runtime.HasEnvironment("r") && !definition.Runtime.HasEnvironment("python")
-	hasExample := definition.Example != nil && definition.Example.Enabled
+	hasExample := definition.Example != nil && definition.Example.Enabled && hasExampleFileInputs(definition)
 
 	workflowDir := filepath.Join(pluginDir, ".github", "workflows")
 	if err := os.MkdirAll(workflowDir, 0755); err != nil {
@@ -2723,7 +2723,7 @@ module.exports = function (config) {
 }
 
 func (g *SPAGenerator) generateAppSpec() error {
-	hasExample := g.definition.Example != nil && g.definition.Example.Enabled
+	hasExample := g.definition.Example != nil && g.definition.Example.Enabled && g.hasExampleFileInputs()
 
 	if err := g.generateIntegrationSpec(hasExample); err != nil {
 		return err
@@ -2733,6 +2733,50 @@ func (g *SPAGenerator) generateAppSpec() error {
 		return g.generateAppSpecR(hasExample)
 	}
 	return g.generateAppSpecPython(hasExample)
+}
+
+func (g *SPAGenerator) hasExampleFileInputs() bool {
+	if g.definition.Example == nil || g.definition.Example.Values == nil {
+		return false
+	}
+
+	fileInputs := make(map[string]bool)
+	for _, input := range g.definition.Inputs {
+		if input.Type == "file" {
+			fileInputs[input.Name] = true
+		}
+	}
+
+	for key, value := range g.definition.Example.Values {
+		if fileInputs[key] {
+			if strVal, ok := value.(string); ok && strVal != "" {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func hasExampleFileInputs(definition *models.PluginDefinition) bool {
+	if definition.Example == nil || definition.Example.Values == nil {
+		return false
+	}
+
+	fileInputs := make(map[string]bool)
+	for _, input := range definition.Inputs {
+		if input.Type == "file" {
+			fileInputs[input.Name] = true
+		}
+	}
+
+	for key, value := range definition.Example.Values {
+		if fileInputs[key] {
+			if strVal, ok := value.(string); ok && strVal != "" {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (g *SPAGenerator) generateAppSpecPython(hasExample bool) error {
