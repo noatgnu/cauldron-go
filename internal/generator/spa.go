@@ -875,11 +875,10 @@ export class AppComponent implements OnInit {
                         <mat-option [value]="col">{{ col }}</mat-option>
                       }
                     </mat-select>
-                    @if (input.description) {
-                      <mat-hint>{{ input.description }}</mat-hint>
-                    }
                     @if (getColumnsForInput($any(input).sourceFile).length === 0) {
                       <mat-hint class="warning-hint">Upload {{ $any(input).sourceFile }} first to see columns</mat-hint>
+                    } @else if (input.description) {
+                      <mat-hint>{{ input.description }}</mat-hint>
                     }
                   </mat-form-field>
                 }
@@ -1369,11 +1368,10 @@ export class AppComponent implements OnInit {
                         <mat-option [value]="col">{{ col }}</mat-option>
                       }
                     </mat-select>
-                    @if (input.description) {
-                      <mat-hint>{{ input.description }}</mat-hint>
-                    }
                     @if (getColumnsForInput($any(input).sourceFile).length === 0) {
                       <mat-hint class="warning-hint">Upload {{ $any(input).sourceFile }} first to see columns</mat-hint>
+                    } @else if (input.description) {
+                      <mat-hint>{{ input.description }}</mat-hint>
                     }
                   </mat-form-field>
                 }
