@@ -82,16 +82,7 @@ func isWebrRepoPackage(pkg string) bool {
 	return webrPackageCache.repoPackages[pkg]
 }
 
-var webrIncompatiblePackages = map[string]string{
-	"RCurl":     "RCurl requires libcurl which has limited support in WebR",
-	"rgdal":     "rgdal requires GDAL libraries not available in WebR",
-	"rgeos":     "rgeos requires GEOS libraries not available in WebR",
-	"rJava":     "rJava requires JVM which is not available in browsers",
-	"RODBC":     "RODBC requires ODBC drivers not available in browsers",
-	"RMySQL":    "RMySQL requires MySQL client libraries",
-	"RPostgres": "RPostgres requires PostgreSQL client libraries",
-	"odbc":      "odbc requires ODBC drivers not available in browsers",
-}
+var webrIncompatiblePackages = map[string]string{}
 
 type WebRCompatibility struct {
 	Compatible        bool
@@ -131,16 +122,14 @@ func CheckWebRCompatibility(definition *models.PluginDefinition, pluginDir strin
 	packages := getRRequiredPackages(definition, pluginDir)
 	result.Packages = packages
 
-	for _, pkg := range packages {
-		pkgName := strings.TrimSpace(pkg)
+	available, unavailable := CheckWebRPackageAvailability(packages)
+	result.AvailableOnline = available
+	result.UnavailableOnline = unavailable
 
-		if reason, found := webrIncompatiblePackages[pkgName]; found {
-			result.Issues = append(result.Issues, fmt.Sprintf("%s: %s", pkgName, reason))
-			result.Unsupported = append(result.Unsupported, pkgName)
-			result.Compatible = false
-		} else if !isBaseRPackage(pkgName) {
-			result.MaybeSupport = append(result.MaybeSupport, pkgName)
-		}
+	for _, pkg := range unavailable {
+		result.Issues = append(result.Issues, fmt.Sprintf("%s: package not available in WebR repositories", pkg))
+		result.Unsupported = append(result.Unsupported, pkg)
+		result.Compatible = false
 	}
 
 	for _, input := range definition.Inputs {
