@@ -28,6 +28,31 @@ type FieldOption struct {
 	Label string `yaml:"label"`
 }
 
+type SelectOption struct {
+	Value string
+	Label string
+}
+
+func (s *SelectOption) UnmarshalYAML(value *yaml.Node) error {
+	if value.Kind == yaml.ScalarNode {
+		s.Value = value.Value
+		s.Label = value.Value
+		return nil
+	}
+
+	if value.Kind == yaml.MappingNode {
+		var fo FieldOption
+		if err := value.Decode(&fo); err != nil {
+			return err
+		}
+		s.Value = fo.Value
+		s.Label = fo.Label
+		return nil
+	}
+
+	return fmt.Errorf("invalid option format")
+}
+
 type FieldGroup struct {
 	Name    string        `yaml:"name"`
 	Options []FieldOption `yaml:"options"`
@@ -47,7 +72,7 @@ type PluginInput struct {
 	Type                        string               `yaml:"type"`
 	Required                    bool                 `yaml:"required"`
 	Default                     interface{}          `yaml:"default,omitempty"`
-	Options                     []string             `yaml:"options,omitempty"`
+	Options                     []SelectOption       `yaml:"options,omitempty"`
 	OptionsFromFile             string               `yaml:"optionsFromFile,omitempty"`
 	Groups                      []FieldGroup         `yaml:"groups,omitempty"`
 	GroupsFromFile              string               `yaml:"groupsFromFile,omitempty"`
@@ -205,7 +230,11 @@ func formatType(input PluginInput) string {
 
 	case "select":
 		if len(input.Options) > 0 {
-			return fmt.Sprintf("select (%s)", strings.Join(input.Options, ", "))
+			labels := make([]string, len(input.Options))
+			for i, opt := range input.Options {
+				labels[i] = opt.Label
+			}
+			return fmt.Sprintf("select (%s)", strings.Join(labels, ", "))
 		}
 		if input.OptionsFromFile != "" {
 			return fmt.Sprintf("select (from %s)", input.OptionsFromFile)
@@ -326,7 +355,11 @@ func generateInputDetails(inputs []PluginInput) string {
 		if len(input.Options) > 0 {
 			optList := []string{}
 			for _, opt := range input.Options {
-				optList = append(optList, fmt.Sprintf("`%s`", opt))
+				if opt.Value != opt.Label {
+					optList = append(optList, fmt.Sprintf("`%s` (%s)", opt.Value, opt.Label))
+				} else {
+					optList = append(optList, fmt.Sprintf("`%s`", opt.Value))
+				}
 			}
 			lines = append(lines, fmt.Sprintf("- **Options**: %s", strings.Join(optList, ", ")))
 		}

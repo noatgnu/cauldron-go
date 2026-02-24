@@ -747,7 +747,7 @@ export class AppComponent implements OnInit {
       if (key.endsWith('_source')) continue;
 
       if (typeof value === 'string' && fileInputs.has(key)) {
-        const assetPath = 'assets/' + value;
+        const assetPath = 'assets/examples/' + value;
         try {
           const response = await fetch(assetPath);
           if (response.ok) {
@@ -1181,7 +1181,7 @@ export class AppComponent implements OnInit {
       if (key.endsWith('_source')) continue;
 
       if (typeof value === 'string' && fileInputs.has(key)) {
-        const assetPath = 'assets/' + value;
+        const assetPath = 'assets/examples/' + value;
         try {
           const response = await fetch(assetPath);
           if (response.ok) {
