@@ -605,6 +605,7 @@ export class AppComponent implements OnInit {
   logs = signal<string[]>([]);
   error = signal<string | null>(null);
   fileData = new Map<string, {name: string, content: string}>();
+  fileHeaders = signal<Record<string, string[]>>({});
 
   constructor(
     private fb: FormBuilder,
@@ -649,7 +650,21 @@ export class AppComponent implements OnInit {
     if (file) {
       this.fileData.set(inputName, file);
       this.form.patchValue({ [inputName]: file.name });
+      this.parseFileHeaders(inputName, file.content);
     }
+  }
+
+  private parseFileHeaders(inputName: string, content: string) {
+    if (!content) return;
+    const firstLine = content.split('\n')[0];
+    if (!firstLine) return;
+    const delimiter = firstLine.includes('\t') ? '\t' : ',';
+    const headers = firstLine.split(delimiter).map(h => h.trim().replace(/^["']|["']$/g, ''));
+    this.fileHeaders.update(current => ({ ...current, [inputName]: headers }));
+  }
+
+  getColumnsForInput(sourceFile: string): string[] {
+    return this.fileHeaders()[sourceFile] || [];
   }
 
   async run() {
@@ -755,6 +770,7 @@ export class AppComponent implements OnInit {
             const fileName = value.split('/').pop() || 'example.txt';
             this.fileData.set(key, { name: fileName, content });
             formValues[key] = fileName;
+            this.parseFileHeaders(key, content);
           }
         } catch (e) {
           this.error.set('Failed to load example file: ' + value);
@@ -848,6 +864,22 @@ export class AppComponent implements OnInit {
                     </mat-select>
                     @if (input.description) {
                       <mat-hint>{{ input.description }}</mat-hint>
+                    }
+                  </mat-form-field>
+                }
+                @case ('column-selector') {
+                  <mat-form-field appearance="outline" class="full-width">
+                    <mat-label>{{ input.label }}</mat-label>
+                    <mat-select [formControlName]="input.name" [multiple]="$any(input).multiple || false">
+                      @for (col of getColumnsForInput($any(input).sourceFile); track col) {
+                        <mat-option [value]="col">{{ col }}</mat-option>
+                      }
+                    </mat-select>
+                    @if (input.description) {
+                      <mat-hint>{{ input.description }}</mat-hint>
+                    }
+                    @if (getColumnsForInput($any(input).sourceFile).length === 0) {
+                      <mat-hint class="warning-hint">Upload {{ $any(input).sourceFile }} first to see columns</mat-hint>
                     }
                   </mat-form-field>
                 }
@@ -950,6 +982,10 @@ export class AppComponent implements OnInit {
   color: rgba(0, 0, 0, 0.6);
   margin-top: 4px;
   margin-left: 32px;
+}
+
+.warning-hint {
+  color: #f57c00;
 }
 
 .full-width {
@@ -1063,6 +1099,7 @@ export class AppComponent implements OnInit {
   logs = signal<string[]>([]);
   error = signal<string | null>(null);
   fileData = new Map<string, {name: string, content: string}>();
+  fileHeaders = signal<Record<string, string[]>>({});
 
   constructor(
     private fb: FormBuilder,
@@ -1107,7 +1144,21 @@ export class AppComponent implements OnInit {
     if (file) {
       this.fileData.set(inputName, file);
       this.form.patchValue({ [inputName]: file.name });
+      this.parseFileHeaders(inputName, file.content);
     }
+  }
+
+  private parseFileHeaders(inputName: string, content: string) {
+    if (!content) return;
+    const firstLine = content.split('\n')[0];
+    if (!firstLine) return;
+    const delimiter = firstLine.includes('\t') ? '\t' : ',';
+    const headers = firstLine.split(delimiter).map(h => h.trim().replace(/^["']|["']$/g, ''));
+    this.fileHeaders.update(current => ({ ...current, [inputName]: headers }));
+  }
+
+  getColumnsForInput(sourceFile: string): string[] {
+    return this.fileHeaders()[sourceFile] || [];
   }
 
   async run() {
@@ -1213,6 +1264,7 @@ export class AppComponent implements OnInit {
             const fileName = value.split('/').pop() || 'example.txt';
             this.fileData.set(key, { name: fileName, content });
             formValues[key] = fileName;
+            this.parseFileHeaders(key, content);
           }
         } catch (e) {
           this.error.set('Failed to load example file: ' + value);
@@ -1306,6 +1358,22 @@ export class AppComponent implements OnInit {
                     </mat-select>
                     @if (input.description) {
                       <mat-hint>{{ input.description }}</mat-hint>
+                    }
+                  </mat-form-field>
+                }
+                @case ('column-selector') {
+                  <mat-form-field appearance="outline" class="full-width">
+                    <mat-label>{{ input.label }}</mat-label>
+                    <mat-select [formControlName]="input.name" [multiple]="$any(input).multiple || false">
+                      @for (col of getColumnsForInput($any(input).sourceFile); track col) {
+                        <mat-option [value]="col">{{ col }}</mat-option>
+                      }
+                    </mat-select>
+                    @if (input.description) {
+                      <mat-hint>{{ input.description }}</mat-hint>
+                    }
+                    @if (getColumnsForInput($any(input).sourceFile).length === 0) {
+                      <mat-hint class="warning-hint">Upload {{ $any(input).sourceFile }} first to see columns</mat-hint>
                     }
                   </mat-form-field>
                 }
@@ -1408,6 +1476,10 @@ export class AppComponent implements OnInit {
   color: rgba(0, 0, 0, 0.6);
   margin-top: 4px;
   margin-left: 32px;
+}
+
+.warning-hint {
+  color: #f57c00;
 }
 
 .full-width {
