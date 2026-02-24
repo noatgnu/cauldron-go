@@ -11,6 +11,7 @@ import (
 
 	"github.com/noatgnu/cauldron-go/backend/models"
 	"github.com/noatgnu/cauldron-go/internal/parser"
+	"github.com/noatgnu/cauldron-go/internal/webrpkg"
 )
 
 //go:embed templates/spa/*
@@ -676,14 +677,22 @@ export class AppComponent implements OnInit {
     }
   }
 
-  downloadOutput(output: {name: string, content: string}) {
-    const blob = new Blob([output.content], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
+  downloadOutput(output: {name: string, content: string, type?: string}) {
+    let url: string;
+    if (output.content.startsWith('data:')) {
+      url = output.content;
+    } else {
+      const mimeType = output.type === 'image' ? 'image/png' : 'text/plain';
+      const blob = new Blob([output.content], { type: mimeType });
+      url = URL.createObjectURL(blob);
+    }
     const a = document.createElement('a');
     a.href = url;
     a.download = output.name;
     a.click();
-    URL.revokeObjectURL(url);
+    if (!output.content.startsWith('data:')) {
+      URL.revokeObjectURL(url);
+    }
   }
 
   normalizeOptions(options: (string | {value: string, label: string})[]): {value: string, label: string}[] {
@@ -701,7 +710,17 @@ export class AppComponent implements OnInit {
     const zip = new JSZip();
 
     for (const output of this.outputs()) {
-      zip.file(output.name, output.content);
+      if (output.content.startsWith('data:')) {
+        const base64Data = output.content.split(',')[1];
+        const binaryString = atob(base64Data);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        zip.file(output.name, bytes);
+      } else {
+        zip.file(output.name, output.content);
+      }
     }
 
     const content = await zip.generateAsync({ type: 'blob' });
@@ -1092,14 +1111,22 @@ export class AppComponent implements OnInit {
     }
   }
 
-  downloadOutput(output: {name: string, content: string}) {
-    const blob = new Blob([output.content], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
+  downloadOutput(output: {name: string, content: string, type?: string}) {
+    let url: string;
+    if (output.content.startsWith('data:')) {
+      url = output.content;
+    } else {
+      const mimeType = output.type === 'image' ? 'image/png' : 'text/plain';
+      const blob = new Blob([output.content], { type: mimeType });
+      url = URL.createObjectURL(blob);
+    }
     const a = document.createElement('a');
     a.href = url;
     a.download = output.name;
     a.click();
-    URL.revokeObjectURL(url);
+    if (!output.content.startsWith('data:')) {
+      URL.revokeObjectURL(url);
+    }
   }
 
   normalizeOptions(options: (string | {value: string, label: string})[]): {value: string, label: string}[] {
@@ -1117,7 +1144,17 @@ export class AppComponent implements OnInit {
     const zip = new JSZip();
 
     for (const output of this.outputs()) {
-      zip.file(output.name, output.content);
+      if (output.content.startsWith('data:')) {
+        const base64Data = output.content.split(',')[1];
+        const binaryString = atob(base64Data);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        zip.file(output.name, bytes);
+      } else {
+        zip.file(output.name, output.content);
+      }
     }
 
     const content = await zip.generateAsync({ type: 'blob' });
@@ -1738,7 +1775,18 @@ export class WebRService {
 
         try {
           await this.webR.installPackages([pkg], { repos: repos, quiet: false });
-          installed.add(pkg);
+
+          const isInstalled = await this.webR.evalRBoolean(
+            'requireNamespace("' + pkg + '", quietly = TRUE)'
+          );
+
+          if (isInstalled) {
+            installed.add(pkg);
+            console.log('Successfully installed and verified: ' + pkg);
+          } else {
+            console.warn('Pass ' + pass + ': Package ' + pkg + ' installed but verification failed');
+            failed.push(pkg);
+          }
         } catch (e) {
           console.warn('Pass ' + pass + ': Failed to install ' + pkg + ':', e);
           failed.push(pkg);
@@ -1751,6 +1799,10 @@ export class WebRService {
       }
 
       toInstall = failed;
+    }
+
+    if (toInstall.length > 0) {
+      console.warn('Failed to install packages after ' + maxPasses + ' passes:', toInstall);
     }
 
     this.progress$.next({ stage: 'Ready', percent: 100 });
@@ -1783,9 +1835,16 @@ export class WebRService {
 
     await this.webR.FS.writeFile('/plugin_script.R', encoder.encode(script));
 
-    const argsVector = 'c("Rscript", ' + args.map(a => '"' + a.replace(/"/g, '\\\\"') + '"').join(', ') + ')';
-    const wrappedScript = 'commandArgs <- function(trailingOnly = FALSE) { ' +
-      'args <- ' + argsVector + '; ' +
+    await this.webR.objs.globalEnv.bind('webrArgs', ['Rscript', ...args]);
+
+    const wrappedScript = 'options(webr = TRUE); ' +
+      'Sys.setenv(WEBR = "1"); ' +
+      'options(device = webr::canvas); ' +
+      'pdf <- function(file = NULL, ...) { webr::canvas(...) }; ' +
+      'svg <- function(filename = NULL, ...) { webr::canvas(...) }; ' +
+      'png <- function(filename = NULL, ...) { webr::canvas(...) }; ' +
+      'commandArgs <- function(trailingOnly = FALSE) { ' +
+      'args <- get("webrArgs", envir = globalenv()); ' +
       'if (trailingOnly) args[-1] else args ' +
       '}; ' +
       'tryCatch({ ' +
@@ -1798,7 +1857,12 @@ export class WebRService {
     const result = await shelter.captureR(wrappedScript, {
       withAutoprint: true,
       captureStreams: true,
-      captureConditions: false
+      captureConditions: false,
+      captureGraphics: {
+        width: 800,
+        height: 600,
+        bg: 'white'
+      }
     });
 
     if (result.output) {
@@ -1809,6 +1873,30 @@ export class WebRService {
         } else if (item.type === 'stderr') {
           stderr += item.data + '\n';
           this.output$.next('[stderr] ' + item.data);
+        }
+      }
+    }
+
+    if (result.images && result.images.length > 0) {
+      for (let i = 0; i < result.images.length; i++) {
+        const img = result.images[i];
+        try {
+          const canvas = new OffscreenCanvas(img.width, img.height);
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0);
+            const blob = await canvas.convertToBlob({ type: 'image/png' });
+            const arrayBuffer = await blob.arrayBuffer();
+            const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+            const filename = result.images.length === 1 ? 'plot.png' : 'plot_' + (i + 1) + '.png';
+            outputs.push({
+              name: filename,
+              content: 'data:image/png;base64,' + base64,
+              type: 'image'
+            });
+          }
+        } catch (e) {
+          console.warn('Failed to convert plot image:', e);
         }
       }
     }
@@ -2021,16 +2109,55 @@ func (g *SPAGenerator) generatePluginConfig() error {
 	var packages []string
 	var packageRepos []map[string]string
 	if g.isRPlugin() {
-		packages = getRRequiredPackages(g.definition, g.pluginDir)
-		availability := CheckWebRPackageAvailabilityWithRepos(packages)
-		for _, pkg := range availability {
-			if pkg.Available {
-				packageRepos = append(packageRepos, map[string]string{
-					"name": pkg.Name,
-					"repo": pkg.RepoURL,
-				})
-			} else {
-				fmt.Printf("  Warning: Package %s has no WebR binary available\n", pkg.Name)
+		basePackages := getRRequiredPackages(g.definition, g.pluginDir)
+		fmt.Printf("  Resolving R package dependencies for: %v\n", basePackages)
+
+		resolver, err := webrpkg.NewResolver(g.config.WebRVersion)
+		if err != nil {
+			return fmt.Errorf("failed to create WebR package resolver: %w", err)
+		}
+
+		fmt.Printf("  Using R version: %s\n", resolver.GetRVersion())
+		result, err := resolver.Resolve(basePackages)
+		if err != nil {
+			return fmt.Errorf("failed to resolve package dependencies: %w", err)
+		}
+
+		fmt.Printf("  Resolved %d packages (including dependencies)\n", len(result.InstallOrder))
+
+		unavailableSet := make(map[string]bool)
+		for _, unavail := range result.Unavailable {
+			unavailableSet[unavail] = true
+		}
+
+		var unavailableRequired []string
+		for _, reqPkg := range basePackages {
+			if unavailableSet[reqPkg] {
+				unavailableRequired = append(unavailableRequired, reqPkg)
+			}
+		}
+
+		if len(unavailableRequired) > 0 {
+			fmt.Printf("\n  Error: The following required packages cannot be installed in WebR:\n")
+			for _, pkg := range unavailableRequired {
+				fmt.Printf("    - %s\n", pkg)
+			}
+			fmt.Printf("\n  These packages (or their dependencies) do not have WebR/WASM binaries available.\n")
+			fmt.Printf("  This plugin cannot run in a browser-based SPA.\n")
+			fmt.Printf("  Use the desktop CauldronGO application instead.\n\n")
+			return fmt.Errorf("cannot generate WebR SPA: %d required packages unavailable: %v", len(unavailableRequired), unavailableRequired)
+		}
+
+		for _, pkgName := range result.InstallOrder {
+			for _, pkgInfo := range result.ResolvedPkgs {
+				if pkgInfo.Name == pkgName && pkgInfo.Available {
+					packages = append(packages, pkgInfo.Name)
+					packageRepos = append(packageRepos, map[string]string{
+						"name": pkgInfo.Name,
+						"repo": pkgInfo.Repository,
+					})
+					break
+				}
 			}
 		}
 	} else {
