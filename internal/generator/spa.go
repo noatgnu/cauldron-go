@@ -805,6 +805,9 @@ export class AppComponent implements OnInit {
                   <mat-form-field appearance="outline" class="full-width">
                     <mat-label>{{ input.label }}</mat-label>
                     <input matInput readonly [formControlName]="input.name">
+                    @if (input.description) {
+                      <mat-hint>{{ input.description }}</mat-hint>
+                    }
                   </mat-form-field>
                   <button mat-stroked-button type="button" (click)="openFile(input.name)">
                     <mat-icon>upload_file</mat-icon>
@@ -815,16 +818,25 @@ export class AppComponent implements OnInit {
                   <mat-form-field appearance="outline" class="full-width">
                     <mat-label>{{ input.label }}</mat-label>
                     <input matInput [formControlName]="input.name">
+                    @if (input.description) {
+                      <mat-hint>{{ input.description }}</mat-hint>
+                    }
                   </mat-form-field>
                 }
                 @case ('number') {
                   <mat-form-field appearance="outline" class="full-width">
                     <mat-label>{{ input.label }}</mat-label>
                     <input matInput type="number" [formControlName]="input.name">
+                    @if (input.description) {
+                      <mat-hint>{{ input.description }}</mat-hint>
+                    }
                   </mat-form-field>
                 }
                 @case ('boolean') {
                   <mat-checkbox [formControlName]="input.name">{{ input.label }}</mat-checkbox>
+                  @if (input.description) {
+                    <div class="checkbox-hint">{{ input.description }}</div>
+                  }
                 }
                 @case ('select') {
                   <mat-form-field appearance="outline" class="full-width">
@@ -834,6 +846,9 @@ export class AppComponent implements OnInit {
                         <mat-option [value]="opt.value">{{ opt.label }}</mat-option>
                       }
                     </mat-select>
+                    @if (input.description) {
+                      <mat-hint>{{ input.description }}</mat-hint>
+                    }
                   </mat-form-field>
                 }
               }
@@ -926,6 +941,15 @@ export class AppComponent implements OnInit {
   display: flex;
   gap: 8px;
   align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.checkbox-hint {
+  width: 100%;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.6);
+  margin-top: 4px;
+  margin-left: 32px;
 }
 
 .full-width {
@@ -1239,6 +1263,9 @@ export class AppComponent implements OnInit {
                   <mat-form-field appearance="outline" class="full-width">
                     <mat-label>{{ input.label }}</mat-label>
                     <input matInput readonly [formControlName]="input.name">
+                    @if (input.description) {
+                      <mat-hint>{{ input.description }}</mat-hint>
+                    }
                   </mat-form-field>
                   <button mat-stroked-button type="button" (click)="openFile(input.name)">
                     <mat-icon>upload_file</mat-icon>
@@ -1249,16 +1276,25 @@ export class AppComponent implements OnInit {
                   <mat-form-field appearance="outline" class="full-width">
                     <mat-label>{{ input.label }}</mat-label>
                     <input matInput [formControlName]="input.name">
+                    @if (input.description) {
+                      <mat-hint>{{ input.description }}</mat-hint>
+                    }
                   </mat-form-field>
                 }
                 @case ('number') {
                   <mat-form-field appearance="outline" class="full-width">
                     <mat-label>{{ input.label }}</mat-label>
                     <input matInput type="number" [formControlName]="input.name">
+                    @if (input.description) {
+                      <mat-hint>{{ input.description }}</mat-hint>
+                    }
                   </mat-form-field>
                 }
                 @case ('boolean') {
                   <mat-checkbox [formControlName]="input.name">{{ input.label }}</mat-checkbox>
+                  @if (input.description) {
+                    <div class="checkbox-hint">{{ input.description }}</div>
+                  }
                 }
                 @case ('select') {
                   <mat-form-field appearance="outline" class="full-width">
@@ -1268,6 +1304,9 @@ export class AppComponent implements OnInit {
                         <mat-option [value]="opt.value">{{ opt.label }}</mat-option>
                       }
                     </mat-select>
+                    @if (input.description) {
+                      <mat-hint>{{ input.description }}</mat-hint>
+                    }
                   </mat-form-field>
                 }
               }
@@ -1360,6 +1399,15 @@ export class AppComponent implements OnInit {
   display: flex;
   gap: 8px;
   align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.checkbox-hint {
+  width: 100%;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.6);
+  margin-top: 4px;
+  margin-left: 32px;
 }
 
 .full-width {
