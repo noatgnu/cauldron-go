@@ -319,19 +319,21 @@ func (g *SPAGenerator) generateEnvironment() error {
 		defCopy.Plots = plotsCopy
 	}
 
-	if defCopy.Example != nil && defCopy.Example.Values != nil {
+	if defCopy.Example != nil {
 		newValues := make(map[string]interface{})
-		for k, v := range defCopy.Example.Values {
-			if strVal, ok := v.(string); ok {
-				if strings.HasPrefix(strVal, "examples/") {
-					newValues[k] = strings.TrimPrefix(strVal, "examples/")
-				} else if strings.HasPrefix(strVal, "examples\\") {
-					newValues[k] = strings.TrimPrefix(strVal, "examples\\")
+		if defCopy.Example.Values != nil {
+			for k, v := range defCopy.Example.Values {
+				if strVal, ok := v.(string); ok {
+					if strings.HasPrefix(strVal, "examples/") {
+						newValues[k] = strings.TrimPrefix(strVal, "examples/")
+					} else if strings.HasPrefix(strVal, "examples\\") {
+						newValues[k] = strings.TrimPrefix(strVal, "examples\\")
+					} else {
+						newValues[k] = v
+					}
 				} else {
 					newValues[k] = v
 				}
-			} else {
-				newValues[k] = v
 			}
 		}
 		defCopy.Example = &models.ExampleData{

@@ -118,7 +118,13 @@ export class PluginRegistryDetail implements OnInit {
 
       if (plugin.readme) {
         try {
-          const html = this.convertMarkdownToHtml(plugin.readme);
+          const readmeContent = plugin.readme.trim();
+          let html: string;
+          if (this.isHtmlContent(readmeContent)) {
+            html = readmeContent;
+          } else {
+            html = this.convertMarkdownToHtml(readmeContent);
+          }
           this.readmeHtml.set(this.sanitizer.bypassSecurityTrustHtml(html));
         } catch (mdError) {
           await this.wails.logToFile(`[PluginRegistryDetail] Failed to parse README: ${mdError}`);
@@ -158,6 +164,16 @@ export class PluginRegistryDetail implements OnInit {
 
   private normalizeRepoUrl(url: string): string {
     return url.toLowerCase().replace(/\.git$/, '').replace(/\/$/, '');
+  }
+
+  private isHtmlContent(content: string): boolean {
+    const trimmed = content.trim();
+    return trimmed.startsWith('<!DOCTYPE') ||
+           trimmed.startsWith('<html') ||
+           trimmed.startsWith('<div') ||
+           trimmed.startsWith('<p') ||
+           trimmed.startsWith('<h1') ||
+           /<[a-z][\s\S]*>/i.test(trimmed);
   }
 
   convertMarkdownToHtml(markdown: string): string {
