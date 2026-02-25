@@ -1,0 +1,29 @@
+html, body { height: 100%; }
+body { margin: 0; font-family: Roboto, "Helvetica Neue", sans-serif; }
+
+.mat-app-background {
+  background-color: #fafafa;
+}
+
+.spacer {
+  flex: 1 1 auto;
+}
+
+mat-toolbar a {
+  color: inherit;
+}
+
+.error-snackbar {
+  background-color: #f44336;
+  color: white;
+}
+
+.success-snackbar {
+  background-color: #4caf50;
+  color: white;
+}
+
+.warning-snackbar {
+  background-color: #ff9800;
+  color: white;
+}

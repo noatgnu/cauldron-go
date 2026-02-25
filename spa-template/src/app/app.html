@@ -1,0 +1,73 @@
+<mat-toolbar color="primary">
+  <span>{{ pluginName }}</span>
+  <span class="spacer"></span>
+  @if (repositoryUrl) {
+    <a mat-icon-button [href]="repositoryUrl" target="_blank" rel="noopener" matTooltip="View Plugin Repository">
+      <mat-icon>code</mat-icon>
+    </a>
+  }
+</mat-toolbar>
+
+<div class="container">
+  <mat-card class="main-card">
+    <mat-card-header>
+      <mat-card-title>{{ pluginName }}</mat-card-title>
+      <mat-card-subtitle>{{ pluginDescription }}</mat-card-subtitle>
+    </mat-card-header>
+
+    <mat-card-content>
+      @if (!runtimeReady()) {
+        <app-progress-panel [progress]="progress()" />
+      } @else {
+        <cld-dynamic-form
+          [plugin]="plugin"
+          [disabled]="loading()"
+          [exampleFilePathResolver]="exampleResolver"
+          (formSubmit)="onFormSubmit($event)"
+        />
+      }
+
+      @if (error()) {
+        <div class="error-box">
+          <mat-icon>error</mat-icon>
+          <span>{{ error() }}</span>
+        </div>
+      }
+
+      <app-results-panel
+        [outputs]="outputs()"
+        [pluginId]="plugin.definition.plugin.id"
+        (downloadRequested)="downloadOutput($event)"
+        (downloadAllRequested)="downloadAll()"
+      />
+
+      @if (logs().length > 0) {
+        <mat-expansion-panel class="logs-panel">
+          <mat-expansion-panel-header>
+            <mat-panel-title>Execution Log</mat-panel-title>
+          </mat-expansion-panel-header>
+          <pre class="log-output">{{ logs().join('\n') }}</pre>
+        </mat-expansion-panel>
+      }
+    </mat-card-content>
+
+    <mat-card-actions>
+      @if (hasExample()) {
+        <button mat-stroked-button (click)="loadExample()" [disabled]="!runtimeReady() || loading()">
+          <mat-icon>folder_open</mat-icon>
+          Load Example
+        </button>
+      }
+      <button mat-raised-button color="primary"
+              [disabled]="!runtimeReady() || loading()"
+              (click)="submitForm()">
+        @if (loading()) {
+          <mat-spinner diameter="20"></mat-spinner>
+        } @else {
+          <mat-icon>play_arrow</mat-icon>
+        }
+        Run
+      </button>
+    </mat-card-actions>
+  </mat-card>
+</div>

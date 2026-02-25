@@ -1,0 +1,34 @@
+import { PluginDefinition } from '@cauldron/forms';
+
+export interface WebrPackage {
+  name: string;
+  repo: string;
+}
+
+export interface Environment {
+  production: boolean;
+  runtime: 'pyodide' | 'webr';
+  pyodideVersion: string;
+  pyodidePackages: string[];
+  webrVersion: string;
+  webrPackages: WebrPackage[];
+  pluginDefinition: PluginDefinition;
+  pluginScript: string;
+  pluginModules: Record<string, string>;
+  hasExample: boolean;
+  exampleBasePath: string;
+}
+
+export const environment: Environment = {
+  production: {{.Production}},
+  runtime: '{{.Runtime}}',
+  pyodideVersion: '{{.PyodideVersion}}',
+  pyodidePackages: {{.PyodidePackagesJSON}},
+  webrVersion: '{{.WebrVersion}}',
+  webrPackages: {{.WebrPackagesJSON}},
+  pluginDefinition: {{.PluginDefinitionJSON}},
+  pluginScript: `{{.PluginScript}}`,
+  pluginModules: {{.PluginModulesJSON}},
+  hasExample: {{.HasExample}},
+  exampleBasePath: '{{.ExampleBasePath}}'
+};

@@ -1,0 +1,42 @@
+.container {
+  padding: 20px;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.main-card {
+  margin-top: 20px;
+}
+
+.error-box {
+  background: #ffebee;
+  color: #c62828;
+  padding: 16px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 16px 0;
+}
+
+.logs-panel {
+  margin-top: 16px;
+}
+
+.log-output {
+  background: #263238;
+  color: #aed581;
+  padding: 16px;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 12px;
+  max-height: 300px;
+  overflow: auto;
+  white-space: pre-wrap;
+}
+
+mat-card-actions {
+  padding: 16px;
+  display: flex;
+  gap: 8px;
+}
