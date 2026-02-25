@@ -2,7 +2,7 @@ import { Injectable, Inject } from '@angular/core';
 import { ExampleFilePathResolver, FILE_HANDLER, FileHandler } from '@cauldron/forms';
 import { environment } from '../../environments/environment';
 
-@Injectable({ providedIn: 'root' })
+@Injectable()
 export class BrowserExampleFilePathResolver implements ExampleFilePathResolver {
   constructor(@Inject(FILE_HANDLER) private fileHandler: FileHandler) {}
 

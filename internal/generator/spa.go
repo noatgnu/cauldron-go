@@ -65,7 +65,8 @@ type PackageJSONData struct {
 }
 
 type AngularJSONData struct {
-	PluginID string
+	PluginID      string
+	SharedLibPath string
 }
 
 type IndexHTMLData struct {
@@ -113,6 +114,19 @@ func (g *SPAGenerator) CheckCompatibility() (bool, []string) {
 	compat := CheckPyodideCompatibility(definition, pluginDir)
 
 	return compat.Compatible, compat.Issues
+}
+
+func (g *SPAGenerator) getSharedLibPath() string {
+	sharedLibPath := g.config.SharedLibPath
+	if sharedLibPath == "" {
+		sharedLibPath = "../cauldron-go/shared-lib/dist/cauldron-forms"
+	}
+
+	if !filepath.IsAbs(sharedLibPath) {
+		cwd, _ := os.Getwd()
+		sharedLibPath = filepath.Join(cwd, sharedLibPath)
+	}
+	return filepath.ToSlash(sharedLibPath)
 }
 
 func (g *SPAGenerator) Generate() error {
@@ -179,6 +193,7 @@ func (g *SPAGenerator) Generate() error {
 	if err := g.generateAngularJSON(); err != nil {
 		return fmt.Errorf("failed to generate angular.json: %w", err)
 	}
+	// ...
 
 	if err := g.generateIndexHTML(); err != nil {
 		return fmt.Errorf("failed to generate index.html: %w", err)
@@ -412,11 +427,6 @@ func (g *SPAGenerator) generatePackageJSON() error {
 	pyodidePackagesJSON, _ := json.Marshal(pyodidePackages)
 	webrPackagesJSON, _ := json.Marshal(webrPackages)
 
-	sharedLibPath := g.config.SharedLibPath
-	if sharedLibPath == "" {
-		sharedLibPath = "../cauldron-go/shared-lib/dist/cauldron-forms"
-	}
-
 	data := PackageJSONData{
 		PluginID:            g.definition.Plugin.ID,
 		IsPython:            g.isPythonPlugin(),
@@ -424,7 +434,7 @@ func (g *SPAGenerator) generatePackageJSON() error {
 		PyodideVersion:      g.config.PyodideVersion,
 		PyodidePackagesJSON: string(pyodidePackagesJSON),
 		WebrPackagesJSON:    string(webrPackagesJSON),
-		SharedLibPath:       sharedLibPath,
+		SharedLibPath:       g.getSharedLibPath(),
 	}
 
 	tmpl, err := template.ParseFS(spaTemplates, "templates/spa/package.json.tmpl")
@@ -444,7 +454,8 @@ func (g *SPAGenerator) generatePackageJSON() error {
 
 func (g *SPAGenerator) generateAngularJSON() error {
 	data := AngularJSONData{
-		PluginID: g.definition.Plugin.ID,
+		PluginID:      g.definition.Plugin.ID,
+		SharedLibPath: g.getSharedLibPath(),
 	}
 
 	tmpl, err := template.ParseFS(spaTemplates, "templates/spa/angular.json.tmpl")
