@@ -19,62 +19,12 @@ import { PluginV2Service } from '../../core/services/plugin-v2';
 import { InstallPluginDialog, InstallPluginResult } from '../../components/install-plugin-dialog/install-plugin-dialog';
 import { PluginInstallProgress } from '../../components/plugin-install-progress/plugin-install-progress';
 import { ConfirmPluginInstallDialog, PluginInstallConfirmResult } from '../../components/confirm-plugin-install-dialog/confirm-plugin-install-dialog';
-
-interface RegistryPlugin {
-  id: string;
-  name: string;
-  description: string;
-  version: string;
-  author: {
-    id: number;
-    name: string;
-    email?: string;
-  };
-  category: {
-    id: number;
-    name: string;
-    description?: string;
-  };
-  icon?: string;
-  repository?: string;
-  commit_hash?: string;
-  requires_authentication: boolean;
-  created_at: string;
-  updated_at: string;
-  tags?: Array<{
-    id: number;
-    name: string;
-  }>;
-  runtime?: {
-    id: number;
-    plugin: string;
-    environments: string[];
-    entrypoint: string;
-  };
-  inputs?: any[];
-  outputs?: any[];
-  env_variables?: any[];
-}
-
-interface RegistryPluginListResponse {
-  count: number;
-  next: string | null;
-  previous: string | null;
-  results: RegistryPlugin[];
-}
-
-interface Category {
-  id: number;
-  name: string;
-  description?: string;
-}
-
-interface CategoryListResponse {
-  count: number;
-  next: string | null;
-  previous: string | null;
-  results: Category[];
-}
+import {
+  RegistryPlugin,
+  RegistryPluginListResponse,
+  RegistryCategory,
+  RegistryCategoryListResponse
+} from '../../core/models/registry';
 
 @Component({
   selector: 'app-plugin-registry',
@@ -98,7 +48,7 @@ interface CategoryListResponse {
 })
 export class PluginRegistry implements OnInit {
   protected plugins = signal<RegistryPlugin[]>([]);
-  protected categories = signal<Category[]>([]);
+  protected categories = signal<RegistryCategory[]>([]);
   protected loading = signal(false);
   protected loadingCategories = signal(false);
   protected totalCount = signal(0);
@@ -154,7 +104,7 @@ export class PluginRegistry implements OnInit {
   async loadCategories(): Promise<void> {
     this.loadingCategories.set(true);
     try {
-      const response = await this.wails.listRegistryCategories() as CategoryListResponse;
+      const response = await this.wails.listRegistryCategories() as RegistryCategoryListResponse;
       this.categories.set(response.results || []);
     } catch (error) {
       await this.wails.logToFile(`[PluginRegistry] Failed to load categories: ${error}`);

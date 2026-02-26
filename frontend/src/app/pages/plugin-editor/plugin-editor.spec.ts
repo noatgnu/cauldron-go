@@ -44,6 +44,7 @@ describe('PluginEditor', () => {
 
     wailsMock = {
       getPlugin: vi.fn(),
+      getPluginsV2: vi.fn(),
       logToFile: vi.fn()
     };
 
@@ -90,37 +91,38 @@ describe('PluginEditor', () => {
 
     it('should load plugin in edit mode', async () => {
       const mockPlugin = {
-        definition: new models.PluginDefinition({
-          plugin: new models.PluginMetadata({
+        id: 1,
+        definition: {
+          plugin: {
             id: 'test-plugin',
             name: 'Test Plugin',
             description: 'Test description',
             version: '1.0.0',
             category: 'analysis'
-          }),
-          runtime: new models.PluginRuntimeV2({
-            type: 'python',
-            script: 'test.py'
-          }),
+          },
+          runtime: {
+            environments: ['python'],
+            entrypoint: 'test.py'
+          },
           inputs: [],
           outputs: [],
           plots: [],
-          execution: new models.PluginExecution({
+          execution: {
             argsMapping: {},
             outputDir: '--output'
-          })
-        })
+          }
+        }
       };
 
-      activatedRouteMock.snapshot.paramMap.get = vi.fn().mockReturnValue('test-plugin');
-      wailsMock.getPlugin.mockResolvedValue(mockPlugin);
+      activatedRouteMock.snapshot.paramMap.get = vi.fn().mockReturnValue('1');
+      wailsMock.getPluginsV2.mockResolvedValue([mockPlugin]);
       wailsMock.logToFile.mockResolvedValue(undefined);
 
       fixture.detectChanges();
       await fixture.whenStable();
 
       expect(component.mode()).toBe('edit');
-      expect(wailsMock.getPlugin).toHaveBeenCalledWith('test-plugin');
+      expect(wailsMock.getPluginsV2).toHaveBeenCalled();
     });
 
     it('should clone from template', async () => {
@@ -287,10 +289,12 @@ describe('PluginEditor', () => {
           icon: ''
         },
         runtime: {
-          type: 'python',
-          script: 'test.py'
+          entrypoint: 'test.py'
         }
       });
+      // environments is a FormArray, needs special handling if not using patchValue for it
+      component.environments.clear();
+      component.environments.push(component['fb'].control('python'));
 
       pluginEditorServiceMock.savePlugin.mockResolvedValue(undefined);
       wailsMock.logToFile.mockResolvedValue(undefined);
@@ -334,8 +338,7 @@ describe('PluginEditor', () => {
           icon: ''
         },
         runtime: {
-          type: 'python',
-          script: 'test.py'
+          entrypoint: 'test.py'
         }
       });
 
@@ -466,8 +469,8 @@ describe('PluginEditor', () => {
           category: 'analysis'
         }),
         runtime: new models.PluginRuntimeV2({
-          type: 'r',
-          script: 'test.R'
+          environments: ['r'],
+          entrypoint: 'test.R'
         }),
         inputs: [
           new models.PluginInputV2({
@@ -496,7 +499,7 @@ describe('PluginEditor', () => {
 
       expect(component.pluginForm.get('plugin.id')?.value).toBe('test-plugin');
       expect(component.pluginForm.get('plugin.name')?.value).toBe('Test Plugin');
-      expect(component.pluginForm.get('runtime.type')?.value).toBe('r');
+      expect(component.environments.at(0).value).toBe('r');
       expect(component.inputs.length).toBe(1);
       expect(component.outputs.length).toBe(1);
     });
@@ -559,8 +562,7 @@ describe('PluginEditor', () => {
           icon: ''
         },
         runtime: {
-          type: 'python',
-          script: 'test.py'
+          entrypoint: 'test.py'
         }
       });
 

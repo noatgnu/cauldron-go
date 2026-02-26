@@ -16,38 +16,53 @@ describe('PluginV2Service', () => {
 
   describe('getPluginsByCategory', () => {
     it('should group plugins by category', () => {
-      const plugins: models.PluginV2[] = [
+      const plugins = [
         {
+          id: 1,
           definition: {
-            plugin: { id: 'p1', name: 'Plugin 1', category: 'analysis' } as any,
-            runtime: {} as any,
+            plugin: { id: 'p1', name: 'Plugin 1', category: 'analysis' },
+            runtime: { environments: ['python'], entrypoint: 'script' },
             inputs: [],
-            execution: {} as any
+            execution: {}
           },
           folderPath: '',
-          scriptPath: ''
-        } as models.PluginV2,
+          scriptPath: '',
+          installSource: 'builtin',
+          commitHash: '',
+          repository: '',
+          enabled: true
+        },
         {
+          id: 2,
           definition: {
-            plugin: { id: 'p2', name: 'Plugin 2', category: 'visualization' } as any,
-            runtime: {} as any,
+            plugin: { id: 'p2', name: 'Plugin 2', category: 'visualization' },
+            runtime: { environments: ['python'], entrypoint: 'script' },
             inputs: [],
-            execution: {} as any
+            execution: {}
           },
           folderPath: '',
-          scriptPath: ''
-        } as models.PluginV2,
+          scriptPath: '',
+          installSource: 'builtin',
+          commitHash: '',
+          repository: '',
+          enabled: true
+        },
         {
+          id: 3,
           definition: {
-            plugin: { id: 'p3', name: 'Plugin 3', category: 'analysis' } as any,
-            runtime: {} as any,
+            plugin: { id: 'p3', name: 'Plugin 3', category: 'analysis' },
+            runtime: { environments: ['python'], entrypoint: 'script' },
             inputs: [],
-            execution: {} as any
+            execution: {}
           },
           folderPath: '',
-          scriptPath: ''
-        } as models.PluginV2
-      ];
+          scriptPath: '',
+          installSource: 'builtin',
+          commitHash: '',
+          repository: '',
+          enabled: true
+        }
+      ] as unknown as models.PluginV2[];
 
       const categoryMap = service.getPluginsByCategory(plugins);
 
@@ -59,60 +74,80 @@ describe('PluginV2Service', () => {
 
   describe('filterPluginsByRuntime', () => {
     it('should filter plugins by runtime type', () => {
-      const plugins: models.PluginV2[] = [
+      const plugins = [
         {
+          id: 1,
           definition: {
-            plugin: {} as any,
-            runtime: { type: 'python' } as any,
+            plugin: {},
+            runtime: { environments: ['python'], entrypoint: 'script' },
             inputs: [],
-            execution: {} as any
+            execution: {}
           },
           folderPath: '',
-          scriptPath: ''
-        } as models.PluginV2,
+          scriptPath: '',
+          installSource: 'builtin',
+          commitHash: '',
+          repository: '',
+          enabled: true
+        },
         {
+          id: 2,
           definition: {
-            plugin: {} as any,
-            runtime: { type: 'r' } as any,
+            plugin: {},
+            runtime: { environments: ['r'], entrypoint: 'script' },
             inputs: [],
-            execution: {} as any
+            execution: {}
           },
           folderPath: '',
-          scriptPath: ''
-        } as models.PluginV2
-      ];
+          scriptPath: '',
+          installSource: 'builtin',
+          commitHash: '',
+          repository: '',
+          enabled: true
+        }
+      ] as unknown as models.PluginV2[];
 
       const pythonPlugins = service.filterPluginsByRuntime(plugins, 'python');
 
       expect(pythonPlugins.length).toBe(1);
-      expect(pythonPlugins[0].definition.runtime.type).toBe('python');
+      expect(pythonPlugins[0].definition.runtime.environments[0]).toBe('python');
     });
   });
 
   describe('searchPlugins', () => {
     it('should search plugins by name, description, and id', () => {
-      const plugins: models.PluginV2[] = [
+      const plugins = [
         {
+          id: 1,
           definition: {
-            plugin: { id: 'pca', name: 'PCA Analysis', description: 'Principal Component Analysis' } as any,
-            runtime: {} as any,
+            plugin: { id: 'pca', name: 'PCA Analysis', description: 'Principal Component Analysis' },
+            runtime: { environments: ['python'], entrypoint: 'script' },
             inputs: [],
-            execution: {} as any
+            execution: {}
           },
           folderPath: '',
-          scriptPath: ''
-        } as models.PluginV2,
+          scriptPath: '',
+          installSource: 'builtin',
+          commitHash: '',
+          repository: '',
+          enabled: true
+        },
         {
+          id: 2,
           definition: {
-            plugin: { id: 'phate', name: 'PHATE Analysis', description: 'Dimensionality reduction' } as any,
-            runtime: {} as any,
+            plugin: { id: 'phate', name: 'PHATE Analysis', description: 'Dimensionality reduction' },
+            runtime: { environments: ['python'], entrypoint: 'script' },
             inputs: [],
-            execution: {} as any
+            execution: {}
           },
           folderPath: '',
-          scriptPath: ''
-        } as models.PluginV2
-      ];
+          scriptPath: '',
+          installSource: 'builtin',
+          commitHash: '',
+          repository: '',
+          enabled: true
+        }
+      ] as unknown as models.PluginV2[];
 
       const results = service.searchPlugins(plugins, 'pca');
 

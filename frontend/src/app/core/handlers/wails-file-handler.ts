@@ -10,6 +10,10 @@ export class WailsFileHandler implements FileHandler {
     return this.wails.readFile(path);
   }
 
+  async readFileAsUint8Array(path: string): Promise<Uint8Array> {
+    return this.wails.readFileAsUint8Array(path);
+  }
+
   async readFilePreview(path: string, lines: number): Promise<string> {
     const preview = await this.wails.readFilePreview(path, lines);
     return preview.join('\n');
@@ -25,8 +29,9 @@ export class WailsFileHandler implements FileHandler {
     return path || null;
   }
 
-  async saveTempFile(filename: string, content: string): Promise<string> {
-    return this.wails.saveTempFile(filename, content);
+  async saveTempFile(filename: string, content: string | Uint8Array): Promise<string> {
+    const stringContent = typeof content === 'string' ? content : new TextDecoder().decode(content);
+    return this.wails.saveTempFile(filename, stringContent);
   }
 
   async getFileHeaders(path: string): Promise<string[]> {

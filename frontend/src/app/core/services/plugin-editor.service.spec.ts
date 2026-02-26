@@ -44,7 +44,8 @@ describe('PluginEditorService', () => {
           category: 'analysis'
         }),
         runtime: new models.PluginRuntimeV2({
-          type: 'python',
+          environments: ['python'],
+          entrypoint: 'script',
           script: 'test.py'
         }),
         inputs: [],
@@ -80,7 +81,8 @@ describe('PluginEditorService', () => {
           category: 'analysis'
         }),
         runtime: new models.PluginRuntimeV2({
-          type: 'python',
+          environments: ['python'],
+          entrypoint: 'script',
           script: 'test.py'
         }),
         inputs: [],
@@ -116,7 +118,8 @@ describe('PluginEditorService', () => {
           category: ''
         }),
         runtime: new models.PluginRuntimeV2({
-          type: '',
+          environments: [],
+          entrypoint: '',
           script: ''
         }),
         inputs: [],
@@ -152,7 +155,8 @@ describe('PluginEditorService', () => {
           category: 'analysis'
         }),
         runtime: new models.PluginRuntimeV2({
-          type: 'python',
+          environments: ['python'],
+          entrypoint: 'script',
           script: 'test.py'
         }),
         inputs: [],
@@ -196,7 +200,8 @@ describe('PluginEditorService', () => {
           category: 'analysis'
         }),
         runtime: new models.PluginRuntimeV2({
-          type: 'python',
+          environments: ['python'],
+          entrypoint: 'script',
           script: 'test.py'
         }),
         inputs: [],
@@ -228,7 +233,8 @@ describe('PluginEditorService', () => {
           category: 'analysis'
         }),
         runtime: new models.PluginRuntimeV2({
-          type: 'python',
+          environments: ['python'],
+          entrypoint: 'script',
           script: 'test.py'
         }),
         inputs: [],
@@ -281,7 +287,7 @@ describe('PluginEditorService', () => {
         {
           definition: {
             plugin: { id: 'pca', name: 'PCA Analysis', category: 'analysis', version: '2.0.0' },
-            runtime: { type: 'python', script: 'pca.py' },
+            runtime: { environments: ['python'], entrypoint: 'script', script: 'pca.py' },
             inputs: [{ name: 'input_file', label: 'Input File', type: 'file', required: true }],
             outputs: [],
             plots: [],
@@ -297,7 +303,7 @@ describe('PluginEditorService', () => {
       expect(newDefinition.plugin.id).toBe('my-pca');
       expect(newDefinition.plugin.name).toBe('My PCA');
       expect(newDefinition.plugin.version).toBe('1.0.0');
-      expect(newDefinition.runtime.type).toBe('python');
+      expect(newDefinition.runtime.environments[0]).toBe('python');
       expect(newDefinition.inputs.length).toBe(1);
     });
 

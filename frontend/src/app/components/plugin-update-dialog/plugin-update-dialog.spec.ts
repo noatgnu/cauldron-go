@@ -1,23 +1,23 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { vi, Mock } from 'vitest';
 import { MatDialogRef } from '@angular/material/dialog';
 import { PluginUpdateDialog } from './plugin-update-dialog';
 import { Wails } from '../../core/services/wails';
-import { models } from '../../../wailsjs/go/models';
 
 describe('PluginUpdateDialog', () => {
   let component: PluginUpdateDialog;
   let fixture: ComponentFixture<PluginUpdateDialog>;
-  let mockDialogRef: jasmine.SpyObj<MatDialogRef<PluginUpdateDialog>>;
-  let mockWails: jasmine.SpyObj<Wails>;
+  let mockDialogRef: { close: Mock };
+  let mockWails: { getPluginsV2: Mock; checkPluginUpdate: Mock; updatePluginToCommit: Mock; logToFile: Mock };
 
   beforeEach(async () => {
-    mockDialogRef = jasmine.createSpyObj('MatDialogRef', ['close']);
-    mockWails = jasmine.createSpyObj('Wails', [
-      'getPluginsV2',
-      'checkPluginUpdate',
-      'updatePluginToCommit',
-      'logToFile'
-    ]);
+    mockDialogRef = { close: vi.fn() };
+    mockWails = {
+      getPluginsV2: vi.fn(),
+      checkPluginUpdate: vi.fn(),
+      updatePluginToCommit: vi.fn(),
+      logToFile: vi.fn()
+    };
 
     await TestBed.configureTestingModule({
       imports: [PluginUpdateDialog],
@@ -55,14 +55,14 @@ describe('PluginUpdateDialog', () => {
       }
     } as any;
 
-    mockWails.getPluginsV2.and.returnValue(Promise.resolve([mockPlugin]));
-    mockWails.checkPluginUpdate.and.returnValue(Promise.resolve({
+    mockWails.getPluginsV2.mockResolvedValue([mockPlugin]);
+    mockWails.checkPluginUpdate.mockResolvedValue({
       has_update: true,
       current_commit: 'abc123',
       recommended_commit: 'def456',
       latest_commit: 'ghi789',
       changelog_url: 'https://github.com/test/plugin/compare/abc123...def456'
-    }));
+    });
 
     await component.ngOnInit();
 
@@ -85,11 +85,11 @@ describe('PluginUpdateDialog', () => {
       }
     } as any;
 
-    mockWails.getPluginsV2.and.returnValue(Promise.resolve([mockPlugin]));
-    mockWails.checkPluginUpdate.and.returnValue(Promise.resolve({
+    mockWails.getPluginsV2.mockResolvedValue([mockPlugin]);
+    mockWails.checkPluginUpdate.mockResolvedValue({
       has_update: false,
       current_commit: 'abc123'
-    }));
+    });
 
     await component.ngOnInit();
 
@@ -113,13 +113,13 @@ describe('PluginUpdateDialog', () => {
       }
     ] as any;
 
-    mockWails.getPluginsV2.and.returnValue(Promise.resolve(mockPlugins));
-    mockWails.checkPluginUpdate.and.returnValue(Promise.resolve({
+    mockWails.getPluginsV2.mockResolvedValue(mockPlugins);
+    mockWails.checkPluginUpdate.mockResolvedValue({
       has_update: true,
       current_commit: 'abc123',
       recommended_commit: 'def456',
       latest_commit: 'ghi789'
-    }));
+    });
 
     await component.ngOnInit();
 
@@ -164,8 +164,8 @@ describe('PluginUpdateDialog', () => {
     component.availableUpdates.set([mockUpdate]);
     component.selection.select(mockUpdate);
 
-    mockWails.updatePluginToCommit.and.returnValue(Promise.resolve());
-    mockWails.logToFile.and.returnValue(Promise.resolve());
+    mockWails.updatePluginToCommit.mockResolvedValue(undefined);
+    mockWails.logToFile.mockResolvedValue(undefined);
 
     await component.updateSelected();
 
@@ -204,13 +204,13 @@ describe('PluginUpdateDialog', () => {
     component.availableUpdates.set([mockUpdate]);
     component.selection.select(mockUpdate);
 
-    mockWails.updatePluginToCommit.and.returnValue(Promise.reject('Network error'));
-    mockWails.logToFile.and.returnValue(Promise.resolve());
+    mockWails.updatePluginToCommit.mockRejectedValue('Network error');
+    mockWails.logToFile.mockResolvedValue(undefined);
 
     await component.updateSelected();
 
     expect(mockWails.logToFile).toHaveBeenCalledWith(
-      jasmine.stringContaining('Failed to update')
+      expect.stringContaining('Failed to update')
     );
     expect(component.updating()).toBe(false);
   });
@@ -230,10 +230,10 @@ describe('PluginUpdateDialog', () => {
     component.availableUpdates.set([mockUpdate]);
     component.selection.select(mockUpdate);
 
-    mockWails.updatePluginToCommit.and.returnValue(
+    mockWails.updatePluginToCommit.mockReturnValue(
       new Promise(resolve => setTimeout(resolve, 100))
     );
-    mockWails.logToFile.and.returnValue(Promise.resolve());
+    mockWails.logToFile.mockResolvedValue(undefined);
 
     const updatePromise = component.updateSelected();
     expect(component.updating()).toBe(true);
@@ -243,19 +243,21 @@ describe('PluginUpdateDialog', () => {
   });
 
   it('should open changelog in new window', () => {
-    spyOn(window, 'open');
+    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
     const url = 'https://github.com/test/plugin/compare/abc...def';
 
     component.openChangelog(url);
 
-    expect(window.open).toHaveBeenCalledWith(url, '_blank');
+    expect(openSpy).toHaveBeenCalledWith(url, '_blank');
+    openSpy.mockRestore();
   });
 
   it('should not open changelog if url is empty', () => {
-    spyOn(window, 'open');
+    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
 
     component.openChangelog('');
 
-    expect(window.open).not.toHaveBeenCalled();
+    expect(openSpy).not.toHaveBeenCalled();
+    openSpy.mockRestore();
   });
 });

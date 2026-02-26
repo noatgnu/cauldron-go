@@ -14,55 +14,7 @@ import { NotificationService } from '../../core/services/notification.service';
 import { PluginV2Service } from '../../core/services/plugin-v2';
 import { ConfirmPluginInstallDialog, PluginInstallConfirmResult } from '../../components/confirm-plugin-install-dialog/confirm-plugin-install-dialog';
 import { PluginInstallProgress } from '../../components/plugin-install-progress/plugin-install-progress';
-
-interface RegistryPlugin {
-  id: string;
-  name: string;
-  description: string;
-  version: string;
-  author: {
-    id: number;
-    name: string;
-    email?: string;
-  };
-  category: {
-    id: number;
-    name: string;
-    description?: string;
-  };
-  repository: string;
-  commit_hash: string;
-  icon?: string;
-  requires_authentication: boolean;
-  tags?: Array<{ id: number; name: string }>;
-  created_at: string;
-  updated_at: string;
-  readme?: string;
-  runtime?: {
-    id: number;
-    plugin: string;
-    environments: string[];
-    entrypoint: string;
-  };
-  inputs?: Array<{
-    name: string;
-    type: string;
-    description: string;
-    required: boolean;
-    default?: string;
-  }>;
-  outputs?: Array<{
-    name: string;
-    type: string;
-    description: string;
-  }>;
-  env_variables?: Array<{
-    name: string;
-    description: string;
-    required: boolean;
-    default?: string;
-  }>;
-}
+import { RegistryPlugin, RegistryTag } from '../../core/models/registry';
 
 @Component({
   selector: 'app-plugin-registry-detail',
@@ -408,7 +360,7 @@ export class PluginRegistryDetail implements OnInit {
     }
   }
 
-  trackByTagId(index: number, tag: { id: number; name: string }): number {
+  trackByTagId(index: number, tag: RegistryTag): number {
     return tag.id;
   }
 }

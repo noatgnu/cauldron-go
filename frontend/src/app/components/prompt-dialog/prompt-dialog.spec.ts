@@ -1,4 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { vi } from 'vitest';
 import { PromptDialogComponent, PromptDialogData } from './prompt-dialog';
 import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
@@ -11,7 +12,7 @@ describe('PromptDialogComponent', () => {
 
   beforeEach(async () => {
     mockDialogRef = {
-      close: jasmine.createSpy('close')
+      close: vi.fn()
     };
 
     mockData = {

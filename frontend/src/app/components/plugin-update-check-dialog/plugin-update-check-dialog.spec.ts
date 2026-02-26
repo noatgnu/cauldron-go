@@ -1,16 +1,18 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { vi, Mock } from 'vitest';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { PluginUpdateCheckDialog } from './plugin-update-check-dialog';
 import { Wails } from '../../core/services/wails';
 import { MatDialog } from '@angular/material/dialog';
+import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { of } from 'rxjs';
 
 describe('PluginUpdateCheckDialog', () => {
   let component: PluginUpdateCheckDialog;
   let fixture: ComponentFixture<PluginUpdateCheckDialog>;
-  let mockDialogRef: jasmine.SpyObj<MatDialogRef<PluginUpdateCheckDialog>>;
-  let mockWails: jasmine.SpyObj<Wails>;
-  let mockDialog: jasmine.SpyObj<MatDialog>;
+  let mockDialogRef: { close: Mock };
+  let mockWails: { checkPluginUpdate: Mock; updatePluginToCommit: Mock; updatePluginToCommitForce: Mock; logToFile: Mock };
+  let mockDialog: { open: Mock };
 
   const mockPlugin = {
     id: 1,
@@ -35,21 +37,32 @@ describe('PluginUpdateCheckDialog', () => {
   };
 
   beforeEach(async () => {
-    mockDialogRef = jasmine.createSpyObj('MatDialogRef', ['close']);
-    mockWails = jasmine.createSpyObj('Wails', ['checkPluginUpdate', 'updatePluginToCommit', 'updatePluginWithForce', 'logToFile']);
-    mockDialog = jasmine.createSpyObj('MatDialog', ['open']);
-
-    mockWails.logToFile.and.returnValue(Promise.resolve());
+    mockDialogRef = { close: vi.fn() };
+    mockWails = {
+      checkPluginUpdate: vi.fn(),
+      updatePluginToCommit: vi.fn(),
+      updatePluginToCommitForce: vi.fn(),
+      logToFile: vi.fn().mockResolvedValue(undefined)
+    };
+    mockDialog = { open: vi.fn() };
 
     await TestBed.configureTestingModule({
-      imports: [PluginUpdateCheckDialog],
+      imports: [PluginUpdateCheckDialog, NoopAnimationsModule],
       providers: [
         { provide: MAT_DIALOG_DATA, useValue: { plugin: mockPlugin } },
         { provide: MatDialogRef, useValue: mockDialogRef },
         { provide: Wails, useValue: mockWails },
         { provide: MatDialog, useValue: mockDialog }
       ]
-    }).compileComponents();
+    })
+    .overrideComponent(PluginUpdateCheckDialog, {
+      add: {
+        providers: [
+          { provide: MatDialog, useValue: mockDialog }
+        ]
+      }
+    })
+    .compileComponents();
 
     fixture = TestBed.createComponent(PluginUpdateCheckDialog);
     component = fixture.componentInstance;
@@ -68,7 +81,7 @@ describe('PluginUpdateCheckDialog', () => {
       changelog_url: 'https://github.com/test/plugin/changelog'
     };
 
-    mockWails.checkPluginUpdate.and.returnValue(Promise.resolve(mockUpdateResult));
+    mockWails.checkPluginUpdate.mockResolvedValue(mockUpdateResult);
 
     await component.ngOnInit();
 
@@ -82,7 +95,7 @@ describe('PluginUpdateCheckDialog', () => {
   });
 
   it('should handle update check error', async () => {
-    mockWails.checkPluginUpdate.and.returnValue(Promise.reject('Network error'));
+    mockWails.checkPluginUpdate.mockRejectedValue('Network error');
 
     await component.ngOnInit();
 
@@ -96,8 +109,7 @@ describe('PluginUpdateCheckDialog', () => {
   });
 
   it('should open changelog in new window', () => {
-    const mockWindow = jasmine.createSpyObj('window', ['open']);
-    spyOn(window, 'open');
+    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
 
     component.updateResult.set({
       hasUpdate: true,
@@ -108,7 +120,8 @@ describe('PluginUpdateCheckDialog', () => {
 
     component.openChangelog();
 
-    expect(window.open).toHaveBeenCalledWith('https://github.com/test/plugin/changelog', '_blank');
+    expect(openSpy).toHaveBeenCalledWith('https://github.com/test/plugin/changelog', '_blank');
+    openSpy.mockRestore();
   });
 
   it('should proceed with update', async () => {
@@ -119,7 +132,7 @@ describe('PluginUpdateCheckDialog', () => {
       recommendedCommit: 'def5678'
     });
 
-    mockWails.updatePluginToCommit.and.returnValue(Promise.resolve());
+    mockWails.updatePluginToCommit.mockResolvedValue(undefined);
 
     await component.proceedWithUpdate();
 
@@ -138,19 +151,21 @@ describe('PluginUpdateCheckDialog', () => {
       recommendedCommit: 'def5678'
     });
 
-    mockWails.updatePluginToCommit.and.returnValue(Promise.reject('LOCAL_MODIFICATIONS'));
+    mockWails.updatePluginToCommit.mockRejectedValue('LOCAL_MODIFICATIONS');
 
-    const mockConfirmDialogRef = jasmine.createSpyObj('MatDialogRef', ['afterClosed']);
-    mockConfirmDialogRef.afterClosed.and.returnValue(of(true));
-    mockDialog.open.and.returnValue(mockConfirmDialogRef);
-    mockWails.updatePluginWithForce.and.returnValue(Promise.resolve());
+    const mockConfirmDialogRef = {
+      afterClosed: vi.fn().mockReturnValue(of(true))
+    };
+    mockDialog.open.mockReturnValue(mockConfirmDialogRef);
+    mockWails.updatePluginToCommitForce.mockResolvedValue(undefined);
 
     await component.proceedWithUpdate();
 
     expect(mockDialog.open).toHaveBeenCalled();
-    expect(mockWails.updatePluginWithForce).toHaveBeenCalledWith(
+    expect(mockWails.updatePluginToCommitForce).toHaveBeenCalledWith(
       mockPlugin.repository,
-      'def5678'
+      'def5678',
+      true
     );
     expect(mockDialogRef.close).toHaveBeenCalledWith({ updated: true });
   });

@@ -170,6 +170,24 @@ export class Wails {
     return new TextDecoder().decode(new Uint8Array(content));
   }
 
+  async readFileAsUint8Array(path: string): Promise<Uint8Array> {
+    if (!this.isWails) throw new Error('Wails not available');
+    const content = await WailsApp.ReadFile(path);
+    if (typeof content === 'string') {
+      try {
+        const binaryString = atob(content);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        return bytes;
+      } catch (e) {
+        return new TextEncoder().encode(content);
+      }
+    }
+    return new Uint8Array(content);
+  }
+
   async readFilePreview(path: string, limit: number = 10): Promise<string[]> {
     if (!this.isWails) throw new Error('Wails not available');
     return WailsApp.ReadFilePreview(path, limit);

@@ -1,23 +1,35 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { vi } from 'vitest';
+import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
+import { BoundPluginsDialogComponent } from './bound-plugins-dialog';
 
-import { BoundPluginsDialog } from './bound-plugins-dialog';
-
-describe('BoundPluginsDialog', () => {
-  let component: BoundPluginsDialog;
-  let fixture: ComponentFixture<BoundPluginsDialog>;
+describe('BoundPluginsDialogComponent', () => {
+  let component: BoundPluginsDialogComponent;
+  let fixture: ComponentFixture<BoundPluginsDialogComponent>;
+  let mockDialogRef: { close: ReturnType<typeof vi.fn> };
 
   beforeEach(async () => {
-    await TestBed.configureTestingModule({
-      imports: [BoundPluginsDialog]
-    })
-    .compileComponents();
+    mockDialogRef = { close: vi.fn() };
 
-    fixture = TestBed.createComponent(BoundPluginsDialog);
+    await TestBed.configureTestingModule({
+      imports: [BoundPluginsDialogComponent],
+      providers: [
+        { provide: MatDialogRef, useValue: mockDialogRef },
+        { provide: MAT_DIALOG_DATA, useValue: { plugins: [] } }
+      ]
+    }).compileComponents();
+
+    fixture = TestBed.createComponent(BoundPluginsDialogComponent);
     component = fixture.componentInstance;
     await fixture.whenStable();
   });
 
   it('should create', () => {
     expect(component).toBeTruthy();
+  });
+
+  it('should close dialog', () => {
+    component.close();
+    expect(mockDialogRef.close).toHaveBeenCalled();
   });
 });
