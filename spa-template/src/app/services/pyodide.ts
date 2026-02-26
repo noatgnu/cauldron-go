@@ -246,100 +246,77 @@ export class PyodideService {
   ): string[] {
     const args: string[] = [];
 
-    if (!inputs || inputs.length === 0) {
-      console.log('[buildArgs] No inputs provided, using params-based iteration');
-      for (const [paramName, value] of Object.entries(params)) {
-        const mapping = argsMapping[paramName];
-        if (!mapping) continue;
-        if (value === undefined || value === null || value === '') continue;
-
-        const flag = typeof mapping === 'string' ? mapping : (mapping as { flag: string }).flag;
-        if (!flag) continue;
-
-        args.push(flag, String(value));
-      }
-    } else {
-      console.log('[buildArgs] Iterating over inputs in definition order');
+    const inputMap = new Map<string, PluginInputV2>();
+    if (inputs) {
       for (const input of inputs) {
-        const inputName = input.name;
-        const mapping = argsMapping[inputName];
-
-        if (!mapping) {
-          continue;
-        }
-
-        const paramValue = params[inputName];
-        const hasValue = paramValue !== undefined;
-
-        let flag: string;
-        let transform: string | undefined;
-        let when: string | undefined;
-        let fixedValue: string | undefined;
-        let passAsValue = false;
-
-        if (typeof mapping === 'string') {
-          flag = mapping;
-        } else {
-          const mappingObj = mapping as {
-            flag: string;
-            transform?: string;
-            when?: string;
-            value?: string;
-            passAsValue?: boolean;
-          };
-          flag = mappingObj.flag;
-          transform = mappingObj.transform;
-          when = mappingObj.when;
-          fixedValue = mappingObj.value;
-          passAsValue = mappingObj.passAsValue === true;
-        }
-
-        if (!flag) {
-          continue;
-        }
-
-        if (!hasValue) {
-          continue;
-        }
-
-        if (when !== undefined) {
-          const shouldInclude = this.evaluateCondition(paramValue, when);
-          if (!shouldInclude) {
-            continue;
-          }
-          args.push(flag);
-          continue;
-        }
-
-        if (input.type === 'boolean' && fixedValue === undefined) {
-          const boolVal = paramValue === true || String(paramValue) === 'true';
-          console.log('[buildArgs] Boolean input ' + inputName + ': passAsValue=' + passAsValue + ', value=' + boolVal);
-          if (passAsValue) {
-            args.push(flag, String(boolVal));
-          } else if (boolVal) {
-            args.push(flag);
-          }
-          continue;
-        }
-
-        let valueToUse: string;
-        if (fixedValue !== undefined) {
-          valueToUse = fixedValue;
-        } else {
-          valueToUse = this.transformValue(paramValue, transform);
-        }
-
-        if (valueToUse !== '') {
-          args.push(flag, valueToUse);
-        }
+        inputMap.set(input.name, input);
       }
+    }
+
+    for (const [paramName, value] of Object.entries(params)) {
+      const mapping = argsMapping[paramName];
+      if (!mapping) continue;
+
+      const input = inputMap.get(paramName);
+      const inputType = input?.type;
+
+      let flag: string;
+      let transform: string | undefined;
+      let when: string | undefined;
+      let fixedValue: string | undefined;
+      let passAsValue = false;
+
+      if (typeof mapping === 'string') {
+        flag = mapping;
+      } else {
+        const mappingObj = mapping as {
+          flag: string;
+          transform?: string;
+          when?: string;
+          value?: string;
+          passAsValue?: boolean;
+        };
+        flag = mappingObj.flag;
+        transform = mappingObj.transform;
+        when = mappingObj.when;
+        fixedValue = mappingObj.value;
+        passAsValue = mappingObj.passAsValue === true;
+      }
+
+      if (!flag) continue;
+
+      if (when !== undefined) {
+        const shouldInclude = this.evaluateCondition(value, when);
+        if (!shouldInclude) continue;
+        args.push(flag);
+        continue;
+      }
+
+      if (inputType === 'boolean' && fixedValue === undefined) {
+        const boolVal = value === true || value === 'true';
+        if (passAsValue) {
+          args.push(flag, String(boolVal));
+        } else if (boolVal) {
+          args.push(flag);
+        }
+        continue;
+      }
+
+      if (value === undefined || value === null || value === '') continue;
+
+      if (fixedValue !== undefined) {
+        args.push(flag, fixedValue);
+        continue;
+      }
+
+      const transformedValue = this.transformValue(value, transform);
+      args.push(flag, transformedValue);
     }
 
     if (outputDirFlag) {
       args.push(outputDirFlag, '/output');
     }
 
-    console.log('[buildArgs] Final args:', JSON.stringify(args));
     return args;
   }
 
