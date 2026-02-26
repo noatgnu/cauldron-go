@@ -12,7 +12,7 @@ import (
 func main() {
 	pluginPath := flag.String("plugin", "", "Path to plugin.yaml")
 	outputDir := flag.String("output", "./spa-output", "Output directory")
-	pyodideVersion := flag.String("pyodide-version", "0.27.5", "Pyodide version to use")
+	pyodideVersion := flag.String("pyodide-version", "0.29.3", "Pyodide version to use")
 	webrVersion := flag.String("webr-version", "0.5.0", "WebR version to use")
 	skipCheck := flag.Bool("skip-check", false, "Skip compatibility check")
 	noBuild := flag.Bool("no-build", false, "Skip npm install and build")
@@ -29,7 +29,7 @@ func main() {
 		fmt.Println("")
 		fmt.Println("Options:")
 		fmt.Println("  --output <dir>          Output directory (default: ./spa-output)")
-		fmt.Println("  --pyodide-version <ver> Pyodide version (default: 0.27.5)")
+		fmt.Println("  --pyodide-version <ver> Pyodide version (default: 0.29.3)")
 		fmt.Println("  --webr-version <ver>    WebR version (default: 0.5.0)")
 		fmt.Println("  --skip-check            Skip compatibility check")
 		fmt.Println("  --no-build              Skip npm install and build")

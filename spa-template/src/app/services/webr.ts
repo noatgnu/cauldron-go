@@ -226,7 +226,7 @@ tryCatch({
             const blob = await canvas.convertToBlob({ type: 'image/png' });
             const arrayBuffer = await blob.arrayBuffer();
             const binaryContent = new Uint8Array(arrayBuffer);
-            const base64 = btoa(String.fromCharCode(...binaryContent));
+            const base64 = this.uint8ArrayToBase64(binaryContent);
             const filename = result.images.length === 1 ? 'plot.png' : 'plot_' + (i + 1) + '.png';
             outputs.push({
               name: filename,
@@ -252,7 +252,7 @@ tryCatch({
           if (type === 'text' || type === 'json') {
             content = new TextDecoder().decode(binaryContent);
           } else {
-            const base64 = btoa(String.fromCharCode(...binaryContent));
+            const base64 = this.uint8ArrayToBase64(binaryContent);
             content = type === 'image' ? 'data:image/png;base64,' + base64 : base64;
           }
           outputs.push({
@@ -401,11 +401,21 @@ tryCatch({
   private getFileType(filename: string): string {
     const ext = filename.split('.').pop()?.toLowerCase();
     switch (ext) {
-      case 'csv': case 'tsv': case 'txt': return 'text';
+      case 'csv': case 'tsv': case 'txt': case 'html': return 'text';
       case 'png': case 'jpg': case 'jpeg': case 'svg': return 'image';
       case 'json': return 'json';
       case 'rds': case 'rda': case 'rdata': return 'binary';
       default: return 'binary';
     }
+  }
+
+  private uint8ArrayToBase64(bytes: Uint8Array): string {
+    const chunkSize = 0x8000;
+    const chunks: string[] = [];
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+      const chunk = bytes.subarray(i, i + chunkSize);
+      chunks.push(String.fromCharCode.apply(null, chunk as unknown as number[]));
+    }
+    return btoa(chunks.join(''));
   }
 }

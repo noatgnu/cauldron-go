@@ -187,30 +187,40 @@ export class PyodideService {
 
     for (const [key, value] of Object.entries(params)) {
       if (value && typeof value === 'object' && 'name' in value && 'content' in value) {
-        const fileValue = value as { name: string; content: Uint8Array };
+        const fileValue = value as { name: string; content: Uint8Array | string };
         const filePath = '/input/' + fileValue.name;
-        fs.writeFile(filePath, fileValue.content);
+        if (typeof fileValue.content === 'string') {
+          fs.writeFile(filePath, new TextEncoder().encode(fileValue.content));
+        } else {
+          fs.writeFile(filePath, fileValue.content);
+        }
         params[key] = filePath;
       }
     }
 
     const args = this.buildArgs(params, argsMapping, outputDirFlag, inputs);
-    console.log('[pyodide.execute] Built args:', JSON.stringify(args));
 
     this.pyodide.globals.set('__params__', this.pyodide.toPy(params));
 
     fs.writeFile('/plugin_script.py', script);
 
     const wrappedScript = 'import sys\n' +
-      'import builtins\n' +
+      'import traceback\n' +
       'sys.argv = ' + JSON.stringify(['script.py', ...args]) + '\n' +
+      'print("[wrapper] sys.argv:", sys.argv)\n' +
       'def __run_plugin__():\n' +
       '    _globals = dict(globals())\n' +
       '    try:\n' +
       '        exec(open("/plugin_script.py").read(), _globals)\n' +
+      '        print("[wrapper] Script executed successfully")\n' +
       '    except SystemExit as e:\n' +
+      '        print("[wrapper] SystemExit:", e.code)\n' +
       '        if e.code != 0:\n' +
       '            raise\n' +
+      '    except Exception as e:\n' +
+      '        print("[wrapper] Exception:", str(e))\n' +
+      '        traceback.print_exc()\n' +
+      '        raise\n' +
       '__run_plugin__()\n';
 
     await this.pyodide.runPythonAsync(wrappedScript);
@@ -225,7 +235,7 @@ export class PyodideService {
           content = fs.readFile('/output/' + file, { encoding: 'utf8' });
         } else {
           const binaryContent = fs.readFile('/output/' + file, { encoding: 'binary' }) as unknown as Uint8Array;
-          const base64 = btoa(String.fromCharCode(...binaryContent));
+          const base64 = this.uint8ArrayToBase64(binaryContent);
           content = type === 'image' ? 'data:image/png;base64,' + base64 : base64;
         }
         outputs.push({
@@ -318,7 +328,6 @@ export class PyodideService {
       args.push(outputDirFlag, '/output');
     }
 
-    console.log('[buildArgs] Final args:', JSON.stringify(args));
     return args;
   }
 
@@ -368,10 +377,20 @@ export class PyodideService {
   private getFileType(filename: string): string {
     const ext = filename.split('.').pop()?.toLowerCase();
     switch (ext) {
-      case 'csv': case 'tsv': case 'txt': return 'text';
+      case 'csv': case 'tsv': case 'txt': case 'html': return 'text';
       case 'png': case 'jpg': case 'jpeg': case 'svg': return 'image';
       case 'json': return 'json';
       default: return 'binary';
     }
+  }
+
+  private uint8ArrayToBase64(bytes: Uint8Array): string {
+    const chunkSize = 0x8000;
+    const chunks: string[] = [];
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+      const chunk = bytes.subarray(i, i + chunkSize);
+      chunks.push(String.fromCharCode.apply(null, chunk as unknown as number[]));
+    }
+    return btoa(chunks.join(''));
   }
 }
