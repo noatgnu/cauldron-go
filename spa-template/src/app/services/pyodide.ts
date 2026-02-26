@@ -195,6 +195,7 @@ export class PyodideService {
     }
 
     const args = this.buildArgs(params, argsMapping, outputDirFlag, inputs);
+    console.log('[pyodide.execute] Built args:', JSON.stringify(args));
 
     this.pyodide.globals.set('__params__', this.pyodide.toPy(params));
 
@@ -317,6 +318,7 @@ export class PyodideService {
       args.push(outputDirFlag, '/output');
     }
 
+    console.log('[buildArgs] Final args:', JSON.stringify(args));
     return args;
   }
 
