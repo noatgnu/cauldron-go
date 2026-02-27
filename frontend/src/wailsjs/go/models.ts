@@ -748,6 +748,7 @@ export namespace models {
 	    accept?: string;
 	    multiple?: boolean;
 	    sourceFile?: string;
+	    keysFrom?: string;
 	    min?: number;
 	    max?: number;
 	    step?: number;
@@ -775,6 +776,7 @@ export namespace models {
 	        this.accept = source["accept"];
 	        this.multiple = source["multiple"];
 	        this.sourceFile = source["sourceFile"];
+	        this.keysFrom = source["keysFrom"];
 	        this.min = source["min"];
 	        this.max = source["max"];
 	        this.step = source["step"];

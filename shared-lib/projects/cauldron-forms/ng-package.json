@@ -3,5 +3,8 @@
   "dest": "../../dist/cauldron-forms",
   "lib": {
     "entryFile": "src/public-api.ts"
-  }
+  },
+  "assets": [
+    "src/lib/styles"
+  ]
 }

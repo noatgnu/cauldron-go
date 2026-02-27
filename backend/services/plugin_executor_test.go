@@ -183,3 +183,63 @@ func TestBuildArgumentsSkipsUnprovidedParameters(t *testing.T) {
 
 	t.Log("✓ Unprovided parameters are correctly skipped")
 }
+
+func TestBuildArgumentsColorMapTransform(t *testing.T) {
+	executor := NewPluginExecutor()
+
+	plugin := &models.PluginV2{
+		ScriptPath: "/path/to/script.py",
+		Definition: models.PluginDefinition{
+			Inputs: []models.PluginInputV2{
+				{Name: "categories", Type: models.PluginInputTypeColumnSelector, Multiple: true},
+				{Name: "colors", Type: models.PluginInputTypeColorMap, KeysFrom: "categories"},
+			},
+			Execution: models.PluginExecution{
+				ArgsMapping: map[string]interface{}{
+					"categories": map[string]interface{}{
+						"flag":      "--categories",
+						"transform": "comma-join",
+					},
+					"colors": map[string]interface{}{
+						"flag":      "--colors",
+						"transform": "color-map",
+					},
+				},
+			},
+		},
+	}
+
+	parameters := map[string]interface{}{
+		"categories": []interface{}{"Lysosome", "Mitochondria", "Golgi"},
+		"colors": []interface{}{
+			map[string]interface{}{"key": "Lysosome", "color": "#FF0000"},
+			map[string]interface{}{"key": "Mitochondria", "color": "#00FF00"},
+			map[string]interface{}{"key": "Golgi", "color": "#0000FF"},
+		},
+	}
+
+	args, err := executor.BuildArguments(plugin, parameters)
+	if err != nil {
+		t.Fatalf("BuildArguments failed: %v", err)
+	}
+
+	expectedArgs := []string{
+		"/path/to/script.py",
+		"--categories",
+		"Lysosome,Mitochondria,Golgi",
+		"--colors",
+		"Lysosome:#FF0000,Mitochondria:#00FF00,Golgi:#0000FF",
+	}
+
+	if len(args) != len(expectedArgs) {
+		t.Fatalf("Expected %d arguments, got %d: %v", len(expectedArgs), len(args), args)
+	}
+
+	for i, expected := range expectedArgs {
+		if args[i] != expected {
+			t.Errorf("Position %d: expected '%s', got '%s'", i, expected, args[i])
+		}
+	}
+
+	t.Log("✓ Color-map transform correctly formats key:color pairs")
+}

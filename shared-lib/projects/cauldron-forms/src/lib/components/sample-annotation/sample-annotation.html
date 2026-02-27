@@ -1,55 +1,56 @@
-<div class="annotation-dialog">
-  <h2 mat-dialog-title>Sample Annotation</h2>
+<div class="annotation-dialog" role="dialog" aria-labelledby="annotation-dialog-title">
+  <h2 mat-dialog-title id="annotation-dialog-title">Sample Annotation</h2>
 
   <mat-dialog-content>
     <mat-expansion-panel class="tools-panel">
       <mat-expansion-panel-header>
         <mat-panel-title>
-          <mat-icon>auto_fix_high</mat-icon>
+          <mat-icon aria-hidden="true">auto_fix_high</mat-icon>
           <span>Automation Tools</span>
         </mat-panel-title>
       </mat-expansion-panel-header>
 
       <div class="tools-content">
-        <section class="tool-section">
-          <h3>Regex-based Auto-Grouping</h3>
-          <p class="help-text">Apply conditions and batches to samples matching regex patterns</p>
+        <section class="tool-section" role="region" aria-labelledby="regex-grouping-title">
+          <h3 id="regex-grouping-title">Regex-based Auto-Grouping</h3>
+          <p class="help-text" id="regex-help">Apply conditions and batches to samples matching regex patterns</p>
 
           @for (rule of regexRules; track $index) {
-            <div class="regex-rule-row">
+            <div class="regex-rule-row" role="group" [attr.aria-label]="'Rule ' + ($index + 1)">
               <mat-form-field appearance="outline" class="pattern-field">
                 <mat-label>Pattern</mat-label>
-                <input matInput [(ngModel)]="rule.pattern">
+                <input matInput [(ngModel)]="rule.pattern" [attr.aria-label]="'Regex pattern for rule ' + ($index + 1)">
               </mat-form-field>
 
               <mat-form-field appearance="outline" class="condition-field">
                 <mat-label>Condition</mat-label>
-                <input matInput [(ngModel)]="rule.condition">
+                <input matInput [(ngModel)]="rule.condition" [attr.aria-label]="'Condition for rule ' + ($index + 1)">
               </mat-form-field>
 
               <mat-form-field appearance="outline" class="batch-field">
                 <mat-label>BioReplicate</mat-label>
-                <input matInput [(ngModel)]="rule.bioreplicate">
+                <input matInput [(ngModel)]="rule.bioreplicate" [attr.aria-label]="'BioReplicate for rule ' + ($index + 1)">
               </mat-form-field>
 
               <mat-form-field appearance="outline" class="batch-field">
                 <mat-label>Batch</mat-label>
-                <input matInput [(ngModel)]="rule.batch">
+                <input matInput [(ngModel)]="rule.batch" [attr.aria-label]="'Batch for rule ' + ($index + 1)">
               </mat-form-field>
 
-              <button mat-icon-button color="warn" (click)="removeRegexRule($index)" matTooltip="Remove rule">
-                <mat-icon>delete</mat-icon>
+              <button mat-icon-button color="warn" (click)="removeRegexRule($index)" matTooltip="Remove rule"
+                      [attr.aria-label]="'Remove rule ' + ($index + 1)">
+                <mat-icon aria-hidden="true">delete</mat-icon>
               </button>
             </div>
           }
 
-          <div class="tool-actions">
-            <button mat-stroked-button (click)="addRegexRule()">
-              <mat-icon>add</mat-icon>
+          <div class="tool-actions" role="group" aria-label="Rule actions">
+            <button mat-stroked-button (click)="addRegexRule()" aria-label="Add new regex rule">
+              <mat-icon aria-hidden="true">add</mat-icon>
               Add Rule
             </button>
-            <button mat-raised-button color="primary" (click)="applyRegexRules()" [disabled]="regexRules.length === 0">
-              <mat-icon>play_arrow</mat-icon>
+            <button mat-raised-button color="primary" (click)="applyRegexRules()" [disabled]="regexRules.length === 0" aria-label="Apply all regex rules">
+              <mat-icon aria-hidden="true">play_arrow</mat-icon>
               Apply Rules
             </button>
           </div>
@@ -57,40 +58,40 @@
 
         <mat-divider></mat-divider>
 
-        <section class="tool-section">
-          <h3>Batch Assignment</h3>
-          <p class="help-text">Select samples and assign condition/batch to multiple samples at once</p>
+        <section class="tool-section" role="region" aria-labelledby="batch-assignment-title">
+          <h3 id="batch-assignment-title">Batch Assignment</h3>
+          <p class="help-text" id="batch-help">Select samples and assign condition/batch to multiple samples at once</p>
 
           <div class="batch-controls">
-            <div class="selection-buttons">
-              <button mat-stroked-button (click)="selectAll()">
-                <mat-icon>select_all</mat-icon>
+            <div class="selection-buttons" role="group" aria-label="Selection controls">
+              <button mat-stroked-button (click)="selectAll()" aria-label="Select all samples">
+                <mat-icon aria-hidden="true">select_all</mat-icon>
                 Select All
               </button>
-              <button mat-stroked-button (click)="deselectAll()">
-                <mat-icon>deselect</mat-icon>
+              <button mat-stroked-button (click)="deselectAll()" aria-label="Clear sample selection">
+                <mat-icon aria-hidden="true">deselect</mat-icon>
                 Clear Selection
               </button>
             </div>
 
-            <div class="batch-inputs">
+            <div class="batch-inputs" role="group" aria-label="Batch assignment inputs">
               <mat-form-field appearance="outline" class="batch-input-field">
                 <mat-label>Condition</mat-label>
-                <input matInput [(ngModel)]="batchCondition">
+                <input matInput [(ngModel)]="batchCondition" aria-label="Condition for batch assignment">
               </mat-form-field>
 
               <mat-form-field appearance="outline" class="batch-input-field">
                 <mat-label>BioReplicate</mat-label>
-                <input matInput [(ngModel)]="batchBioReplicate">
+                <input matInput [(ngModel)]="batchBioReplicate" aria-label="BioReplicate for batch assignment">
               </mat-form-field>
 
               <mat-form-field appearance="outline" class="batch-input-field">
                 <mat-label>Batch</mat-label>
-                <input matInput [(ngModel)]="batchBatch">
+                <input matInput [(ngModel)]="batchBatch" aria-label="Batch for batch assignment">
               </mat-form-field>
 
-              <button mat-raised-button color="primary" (click)="applyBatchAssignment()">
-                <mat-icon>check</mat-icon>
+              <button mat-raised-button color="primary" (click)="applyBatchAssignment()" aria-label="Apply condition and batch to selected samples">
+                <mat-icon aria-hidden="true">check</mat-icon>
                 Apply to Selected
               </button>
             </div>
@@ -99,16 +100,16 @@
       </div>
     </mat-expansion-panel>
 
-    <div class="batch-operations">
-      <h3>Batch Operations</h3>
-      <div class="operation-buttons">
-        <button mat-button [matMenuTriggerFor]="conditionMenu">
-          <mat-icon>palette</mat-icon>
+    <div class="batch-operations" role="region" aria-labelledby="batch-ops-title">
+      <h3 id="batch-ops-title">Batch Operations</h3>
+      <div class="operation-buttons" role="toolbar" aria-label="Batch operation buttons">
+        <button mat-button [matMenuTriggerFor]="conditionMenu" aria-haspopup="menu" aria-label="Color samples by condition">
+          <mat-icon aria-hidden="true">palette</mat-icon>
           Color by Condition
         </button>
         <mat-menu #conditionMenu="matMenu">
           @for (condition of getUniqueConditions(); track condition) {
-            <button mat-menu-item (click)="replaceColorForCondition(condition)">
+            <button mat-menu-item (click)="replaceColorForCondition(condition)" [attr.aria-label]="'Set color for condition: ' + condition">
               {{ condition }}
             </button>
           }
@@ -117,13 +118,13 @@
           }
         </mat-menu>
 
-        <button mat-button [matMenuTriggerFor]="batchMenu">
-          <mat-icon>palette</mat-icon>
+        <button mat-button [matMenuTriggerFor]="batchMenu" aria-haspopup="menu" aria-label="Color samples by batch">
+          <mat-icon aria-hidden="true">palette</mat-icon>
           Color by Batch
         </button>
         <mat-menu #batchMenu="matMenu">
           @for (batch of getUniqueBatches(); track batch) {
-            <button mat-menu-item (click)="replaceColorForBatch(batch)">
+            <button mat-menu-item (click)="replaceColorForBatch(batch)" [attr.aria-label]="'Set color for batch: ' + batch">
               {{ batch }}
             </button>
           }
@@ -132,28 +133,28 @@
           }
         </mat-menu>
 
-        <button mat-button (click)="assignColorToSelected()">
-          <mat-icon>format_color_fill</mat-icon>
+        <button mat-button (click)="assignColorToSelected()" aria-label="Assign color to selected samples">
+          <mat-icon aria-hidden="true">format_color_fill</mat-icon>
           Color Selected
         </button>
 
-        <button mat-button [matMenuTriggerFor]="selectMenu">
-          <mat-icon>check_box</mat-icon>
+        <button mat-button [matMenuTriggerFor]="selectMenu" aria-haspopup="menu" aria-label="Select samples by group">
+          <mat-icon aria-hidden="true">check_box</mat-icon>
           Select By
         </button>
         <mat-menu #selectMenu="matMenu">
-          <div class="submenu-header">By Condition</div>
+          <div class="submenu-header" role="heading" aria-level="4">By Condition</div>
           @for (condition of getUniqueConditions(); track condition) {
-            <button mat-menu-item (click)="selectByCondition(condition)">
+            <button mat-menu-item (click)="selectByCondition(condition)" [attr.aria-label]="'Select samples with condition: ' + condition">
               {{ condition }}
             </button>
           }
           @if (getUniqueConditions().length > 0) {
             <mat-divider></mat-divider>
           }
-          <div class="submenu-header">By Batch</div>
+          <div class="submenu-header" role="heading" aria-level="4">By Batch</div>
           @for (batch of getUniqueBatches(); track batch) {
-            <button mat-menu-item (click)="selectByBatch(batch)">
+            <button mat-menu-item (click)="selectByBatch(batch)" [attr.aria-label]="'Select samples in batch: ' + batch">
               {{ batch }}
             </button>
           }
@@ -162,17 +163,17 @@
           }
         </mat-menu>
 
-        <button mat-button color="warn" [matMenuTriggerFor]="clearMenu">
-          <mat-icon>clear_all</mat-icon>
+        <button mat-button color="warn" [matMenuTriggerFor]="clearMenu" aria-haspopup="menu" aria-label="Clear data options">
+          <mat-icon aria-hidden="true">clear_all</mat-icon>
           Clear
         </button>
         <mat-menu #clearMenu="matMenu">
-          <button mat-menu-item (click)="clearAllConditions()">
-            <mat-icon>clear</mat-icon>
+          <button mat-menu-item (click)="clearAllConditions()" aria-label="Clear all conditions from samples">
+            <mat-icon aria-hidden="true">clear</mat-icon>
             Clear All Conditions
           </button>
-          <button mat-menu-item (click)="clearAllBatches()">
-            <mat-icon>clear</mat-icon>
+          <button mat-menu-item (click)="clearAllBatches()" aria-label="Clear all batches from samples">
+            <mat-icon aria-hidden="true">clear</mat-icon>
             Clear All Batches
           </button>
         </mat-menu>
@@ -180,39 +181,44 @@
     </div>
 
     <div class="table-container">
-      <table class="annotation-table">
+      <table class="annotation-table" role="grid" aria-label="Sample annotations">
         <thead>
-          <tr>
-            <th class="checkbox-col">
-              <mat-checkbox [(ngModel)]="selectAllCheckbox" (change)="toggleSelectAll()"></mat-checkbox>
+          <tr role="row">
+            <th class="checkbox-col" scope="col" role="columnheader">
+              <mat-checkbox [(ngModel)]="selectAllCheckbox" (change)="toggleSelectAll()" aria-label="Select all samples"></mat-checkbox>
             </th>
-            <th class="sample-col">Sample</th>
-            <th class="condition-col">Condition</th>
-            <th class="bioreplicate-col">BioReplicate</th>
-            <th class="color-col">Color</th>
-            <th class="batch-col">Batch</th>
+            <th class="sample-col" scope="col" role="columnheader">Sample</th>
+            <th class="condition-col" scope="col" role="columnheader">Condition</th>
+            <th class="bioreplicate-col" scope="col" role="columnheader">BioReplicate</th>
+            <th class="color-col" scope="col" role="columnheader">Color</th>
+            <th class="batch-col" scope="col" role="columnheader">Batch</th>
           </tr>
         </thead>
         <tbody>
           @for (s of annotation; track $index) {
-            <tr [class.selected]="s.selected">
-              <td class="checkbox-col">
-                <mat-checkbox [(ngModel)]="s.selected"></mat-checkbox>
+            <tr role="row" [class.selected]="s.selected">
+              <td class="checkbox-col" role="gridcell">
+                <mat-checkbox [(ngModel)]="s.selected" [attr.aria-label]="'Select sample ' + s.sample"></mat-checkbox>
               </td>
-              <td class="sample-col">
-                <input type="text" [(ngModel)]="s.sample" [readonly]="mode==='edit'" class="table-input">
+              <td class="sample-col" role="gridcell">
+                <input type="text" [(ngModel)]="s.sample" [readonly]="mode==='edit'" class="table-input"
+                       [attr.aria-label]="'Sample name for row ' + ($index + 1)">
               </td>
-              <td class="condition-col">
-                <input type="text" [(ngModel)]="s.condition" (ngModelChange)="onConditionChange(s)" class="table-input">
+              <td class="condition-col" role="gridcell">
+                <input type="text" [(ngModel)]="s.condition" (ngModelChange)="onConditionChange(s)" class="table-input"
+                       [attr.aria-label]="'Condition for sample ' + s.sample">
               </td>
-              <td class="bioreplicate-col">
-                <input type="text" [(ngModel)]="s.bioreplicate" class="table-input">
+              <td class="bioreplicate-col" role="gridcell">
+                <input type="text" [(ngModel)]="s.bioreplicate" class="table-input"
+                       [attr.aria-label]="'BioReplicate for sample ' + s.sample">
               </td>
-              <td class="color-col">
-                <input type="color" [(ngModel)]="s.color" class="color-input">
+              <td class="color-col" role="gridcell">
+                <input type="color" [(ngModel)]="s.color" class="color-input"
+                       [attr.aria-label]="'Color for sample ' + s.sample">
               </td>
-              <td class="batch-col">
-                <input type="text" [(ngModel)]="s.batch" class="table-input">
+              <td class="batch-col" role="gridcell">
+                <input type="text" [(ngModel)]="s.batch" class="table-input"
+                       [attr.aria-label]="'Batch for sample ' + s.sample">
               </td>
             </tr>
           }
@@ -222,32 +228,32 @@
   </mat-dialog-content>
 
   <mat-dialog-actions>
-    <div class="actions-left">
+    <div class="actions-left" role="group" aria-label="Data input actions">
       @if (mode === 'create') {
-        <button mat-stroked-button color="primary" (click)="addSample()">
-          <mat-icon>add</mat-icon>
+        <button mat-stroked-button color="primary" (click)="addSample()" aria-label="Add new sample row">
+          <mat-icon aria-hidden="true">add</mat-icon>
           Add Sample
         </button>
-        <button mat-stroked-button (click)="parseFromClipboard('sample')">
-          <mat-icon>content_paste</mat-icon>
+        <button mat-stroked-button (click)="parseFromClipboard('sample')" aria-label="Paste sample names from clipboard">
+          <mat-icon aria-hidden="true">content_paste</mat-icon>
           Paste Samples
         </button>
       }
-      <button mat-stroked-button (click)="parseFromClipboard('condition')">
-        <mat-icon>content_paste</mat-icon>
+      <button mat-stroked-button (click)="parseFromClipboard('condition')" aria-label="Paste conditions from clipboard">
+        <mat-icon aria-hidden="true">content_paste</mat-icon>
         Paste Conditions
       </button>
-      <button mat-stroked-button (click)="parseFromClipboard('bioreplicate')">
-        <mat-icon>content_paste</mat-icon>
+      <button mat-stroked-button (click)="parseFromClipboard('bioreplicate')" aria-label="Paste bioreplicates from clipboard">
+        <mat-icon aria-hidden="true">content_paste</mat-icon>
         Paste BioReplicates
       </button>
-      <button mat-stroked-button (click)="parseFromClipboard('batch')">
-        <mat-icon>content_paste</mat-icon>
+      <button mat-stroked-button (click)="parseFromClipboard('batch')" aria-label="Paste batches from clipboard">
+        <mat-icon aria-hidden="true">content_paste</mat-icon>
         Paste Batches
       </button>
     </div>
     <span class="spacer"></span>
-    <button mat-button (click)="close()">Cancel</button>
-    <button mat-raised-button color="primary" (click)="save()">Save</button>
+    <button mat-button (click)="close()" aria-label="Cancel and close dialog">Cancel</button>
+    <button mat-raised-button color="primary" (click)="save()" aria-label="Save annotations">Save</button>
   </mat-dialog-actions>
 </div>

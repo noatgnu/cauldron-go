@@ -9,8 +9,8 @@
 }
 
 .error-box {
-  background: #ffebee;
-  color: #c62828;
+  background: var(--error-container);
+  color: var(--on-error-container);
   padding: 16px;
   border-radius: 4px;
   display: flex;
@@ -24,8 +24,8 @@
 }
 
 .log-output {
-  background: #263238;
-  color: #aed581;
+  background: var(--console-background);
+  color: var(--console-text);
   padding: 16px;
   border-radius: 4px;
   font-family: monospace;
@@ -33,6 +33,7 @@
   max-height: 300px;
   overflow: auto;
   white-space: pre-wrap;
+  border: 1px solid var(--console-border);
 }
 
 mat-card-actions {
@@ -62,7 +63,7 @@ mat-card-actions {
   align-items: center;
   justify-content: space-between;
   padding: 8px 12px;
-  background: rgba(0, 0, 0, 0.04);
+  background: var(--hover);
   border-radius: 4px;
 }
 
@@ -75,11 +76,12 @@ mat-card-actions {
 .example-file-label {
   font-weight: 500;
   font-size: 14px;
+  color: var(--on-surface);
 }
 
 .example-file-name {
   font-size: 12px;
-  color: rgba(0, 0, 0, 0.6);
+  color: var(--on-surface-muted);
   font-family: monospace;
 }
 

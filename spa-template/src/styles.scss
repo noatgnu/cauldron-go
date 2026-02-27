@@ -1,29 +1,13 @@
-html, body { height: 100%; }
-body { margin: 0; font-family: Roboto, "Helvetica Neue", sans-serif; }
+@use '@angular/material' as mat;
+@use '@cauldron/forms/src/lib/styles' as cauldron;
 
-.mat-app-background {
-  background-color: #fafafa;
-}
-
-.spacer {
-  flex: 1 1 auto;
-}
-
-mat-toolbar a {
-  color: inherit;
-}
-
-.error-snackbar {
-  background-color: #f44336;
-  color: white;
-}
-
-.success-snackbar {
-  background-color: #4caf50;
-  color: white;
-}
-
-.warning-snackbar {
-  background-color: #ff9800;
-  color: white;
+html {
+  @include mat.theme((
+    color: (
+      primary: mat.$azure-palette,
+      tertiary: mat.$blue-palette,
+    ),
+    typography: Roboto,
+    density: 0,
+  ));
 }

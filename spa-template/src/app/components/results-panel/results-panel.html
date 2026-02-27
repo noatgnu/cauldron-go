@@ -11,7 +11,7 @@
           <mat-icon matListItemIcon>{{ getIcon(output.type) }}</mat-icon>
           <span matListItemTitle>{{ output.name }}</span>
           <span matListItemLine class="file-type">{{ output.type }}</span>
-          <button mat-icon-button (click)="downloadOutput(output)">
+          <button mat-icon-button matListItemMeta (click)="downloadOutput(output)">
             <mat-icon>download</mat-icon>
           </button>
         </mat-list-item>

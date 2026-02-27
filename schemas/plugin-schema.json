@@ -244,7 +244,12 @@
         "type": {
           "type": "string",
           "description": "Input type",
-          "enum": ["file", "text", "number", "boolean", "select", "multiselect-grouped", "column-selector"]
+          "enum": ["file", "directory", "text", "number", "boolean", "select", "multiselect-grouped", "column-selector", "color", "color-map"]
+        },
+        "keysFrom": {
+          "type": "string",
+          "description": "For color-map type: name of the input field that provides the keys (e.g., a column-selector)",
+          "pattern": "^[a-z][a-zA-Z0-9_]*$"
         },
         "required": {
           "type": "boolean",
@@ -478,7 +483,7 @@
               "label": { "type": "string" },
               "type": {
                 "type": "string",
-                "enum": ["text", "number", "boolean"]
+                "enum": ["text", "number", "boolean", "color"]
               },
               "default": {},
               "min": { "type": "number" },
@@ -499,7 +504,7 @@
         "transform": {
           "type": "string",
           "description": "Value transformation",
-          "enum": ["comma-join", "space-join", "json-encode"]
+          "enum": ["comma-join", "space-join", "json-encode", "color-map"]
         },
         "when": {
           "type": "string",

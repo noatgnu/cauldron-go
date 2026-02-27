@@ -1,4 +1,4 @@
-import { Component, signal, OnInit, ViewChild, Inject } from '@angular/core';
+import { Component, signal, OnInit, ViewChild, Inject, inject } from '@angular/core';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
@@ -6,6 +6,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatMenuModule } from '@angular/material/menu';
 import {
   DynamicFormComponent,
   PluginV2,
@@ -21,6 +22,7 @@ import { BrowserFileHandler } from './services/browser-file-handler';
 import { BrowserExampleFilePathResolver } from './services/browser-example-resolver';
 import { ResultsPanel, OutputFile } from './components/results-panel/results-panel';
 import { ProgressPanel, ProgressState } from './components/progress-panel/progress-panel';
+import { ThemeService, Theme } from './services/theme.service';
 
 @Component({
   selector: 'app-root',
@@ -32,6 +34,7 @@ import { ProgressPanel, ProgressState } from './components/progress-panel/progre
     MatProgressSpinnerModule,
     MatExpansionModule,
     MatTooltipModule,
+    MatMenuModule,
     DynamicFormComponent,
     ResultsPanel,
     ProgressPanel
@@ -41,6 +44,8 @@ import { ProgressPanel, ProgressState } from './components/progress-panel/progre
 })
 export class AppComponent implements OnInit {
   @ViewChild(DynamicFormComponent) dynamicForm!: DynamicFormComponent;
+
+  readonly themeService = inject(ThemeService);
 
   plugin: PluginV2 = {
     id: 0,

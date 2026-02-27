@@ -29,7 +29,8 @@ import {
   FieldGroup,
   FieldOption,
   SelectOption,
-  TableColumn
+  TableColumn,
+  ColorMapEntry
 } from '../../models/plugin.models';
 import { FileHandler, ImportedFile } from '../../interfaces/file-handler.interface';
 import { NotificationHandler } from '../../interfaces/notification.interface';
@@ -137,6 +138,8 @@ export class DynamicFormComponent implements OnInit, OnChanges, OnDestroy {
         this.validationErrors.set([]);
       }
     });
+
+    this.setupColorMapWatchers();
   }
 
   private buildForm() {
@@ -179,8 +182,126 @@ export class DynamicFormComponent implements OnInit, OnChanges, OnDestroy {
         return input.multiple ? [] : '';
       case 'multiselect-grouped':
         return [];
+      case 'color':
+        return input.multiple ? ['#1976d2'] : '#1976d2';
+      case 'color-map':
+        return [];
       default:
         return '';
+    }
+  }
+
+  addColor(inputName: string) {
+    const control = this.form.get(inputName);
+    if (control) {
+      const currentColors: string[] = Array.isArray(control.value) ? [...control.value] : [];
+      currentColors.push('#1976d2');
+      control.setValue(currentColors);
+    }
+  }
+
+  removeColor(inputName: string, index: number) {
+    const control = this.form.get(inputName);
+    if (control) {
+      const currentColors: string[] = Array.isArray(control.value) ? [...control.value] : [];
+      if (currentColors.length > 1) {
+        currentColors.splice(index, 1);
+        control.setValue(currentColors);
+      }
+    }
+  }
+
+  updateColor(inputName: string, index: number, color: string) {
+    const control = this.form.get(inputName);
+    if (control) {
+      const currentColors: string[] = Array.isArray(control.value) ? [...control.value] : [];
+      currentColors[index] = color;
+      control.setValue(currentColors);
+    }
+  }
+
+  getColors(inputName: string): string[] {
+    const control = this.form.get(inputName);
+    if (control) {
+      const value = control.value;
+      return Array.isArray(value) ? value : [value || '#1976d2'];
+    }
+    return ['#1976d2'];
+  }
+
+  getColorMapKeys(input: PluginInputV2): string[] {
+    if (!input.keysFrom) {
+      return [];
+    }
+    const sourceControl = this.form.get(input.keysFrom);
+    if (sourceControl) {
+      const value = sourceControl.value;
+      if (Array.isArray(value)) {
+        return value;
+      }
+    }
+    return [];
+  }
+
+  getColorMapEntries(inputName: string): ColorMapEntry[] {
+    const control = this.form.get(inputName);
+    if (control && Array.isArray(control.value)) {
+      return control.value as ColorMapEntry[];
+    }
+    return [];
+  }
+
+  updateColorMapEntry(inputName: string, key: string, color: string) {
+    const control = this.form.get(inputName);
+    if (control) {
+      const entries: ColorMapEntry[] = Array.isArray(control.value) ? [...control.value] : [];
+      const existingIndex = entries.findIndex(e => e.key === key);
+      if (existingIndex >= 0) {
+        entries[existingIndex] = { key, color };
+      } else {
+        entries.push({ key, color });
+      }
+      control.setValue(entries);
+    }
+  }
+
+  getColorForKey(inputName: string, key: string): string {
+    const entries = this.getColorMapEntries(inputName);
+    const entry = entries.find(e => e.key === key);
+    return entry?.color || this.getDefaultColorForIndex(entries.length);
+  }
+
+  private getDefaultColorForIndex(index: number): string {
+    const defaultColors = [
+      '#1976d2', '#dc004e', '#4caf50', '#ff9800', '#9c27b0',
+      '#00bcd4', '#795548', '#607d8b', '#e91e63', '#3f51b5'
+    ];
+    return defaultColors[index % defaultColors.length];
+  }
+
+  initializeColorMap(input: PluginInputV2) {
+    const keys = this.getColorMapKeys(input);
+    const control = this.form.get(input.name);
+    if (control && keys.length > 0) {
+      const currentEntries = this.getColorMapEntries(input.name);
+      const newEntries: ColorMapEntry[] = keys.map((key, index) => {
+        const existing = currentEntries.find(e => e.key === key);
+        return existing || { key, color: this.getDefaultColorForIndex(index) };
+      });
+      control.setValue(newEntries);
+    }
+  }
+
+  private setupColorMapWatchers() {
+    const colorMapInputs = this.plugin.definition.inputs.filter(i => i.type === 'color-map' && i.keysFrom);
+
+    for (const colorMapInput of colorMapInputs) {
+      const sourceControl = this.form.get(colorMapInput.keysFrom!);
+      if (sourceControl) {
+        sourceControl.valueChanges.subscribe(() => {
+          this.initializeColorMap(colorMapInput);
+        });
+      }
     }
   }
 

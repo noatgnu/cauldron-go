@@ -169,6 +169,22 @@ func (e *PluginExecutor) transformValue(value interface{}, transform *models.Inp
 		}
 		return string(jsonBytes), nil
 
+	case models.TransformColorMap:
+		if arr, ok := value.([]interface{}); ok {
+			pairs := make([]string, 0, len(arr))
+			for _, item := range arr {
+				if entry, ok := item.(map[string]interface{}); ok {
+					key, keyOk := entry["key"].(string)
+					color, colorOk := entry["color"].(string)
+					if keyOk && colorOk {
+						pairs = append(pairs, fmt.Sprintf("%s:%s", key, color))
+					}
+				}
+			}
+			return strings.Join(pairs, ","), nil
+		}
+		return value, nil
+
 	default:
 		return value, nil
 	}

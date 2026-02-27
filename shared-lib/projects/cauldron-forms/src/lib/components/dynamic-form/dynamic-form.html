@@ -1,14 +1,14 @@
 @for (key of [formKey()]; track key) {
   <form [formGroup]="form" class="dynamic-form" [class.loading-overlay]="loading()" [class.is-loading]="loading()" (ngSubmit)="submit()">
     @if (loading()) {
-      <div class="loading-indicator">
-        <mat-spinner diameter="20"></mat-spinner>
+      <div class="loading-indicator" role="status" aria-live="polite" aria-busy="true">
+        <mat-spinner diameter="20" aria-hidden="true"></mat-spinner>
         <span>Loading...</span>
       </div>
     }
 
     @if (validationErrors().length > 0) {
-      <div class="validation-summary has-errors">
+      <div class="validation-summary has-errors" role="alert" aria-live="assertive" aria-atomic="true">
         <strong>Please fix the following errors:</strong>
         <ul>
           @for (error of validationErrors(); track error) {
@@ -25,26 +25,32 @@
           @case ('file') {
             <mat-form-field appearance="outline" class="full-width">
               <mat-label>{{ input.label }}</mat-label>
-              <input matInput readonly [formControlName]="input.name">
+              <input matInput readonly [formControlName]="input.name"
+                     [attr.aria-describedby]="input.description ? input.name + '-hint' : null"
+                     [attr.aria-required]="input.required || null">
               @if (input.description) {
-                <mat-hint>{{ input.description }}</mat-hint>
+                <mat-hint [id]="input.name + '-hint'">{{ input.description }}</mat-hint>
               }
             </mat-form-field>
-            <div class="file-buttons">
-              <button mat-raised-button color="primary" type="button" (click)="openFile(input.name)" [disabled]="disabled">
+            <div class="file-buttons" role="group" [attr.aria-label]="'File actions for ' + input.label">
+              <button mat-raised-button color="primary" type="button" (click)="openFile(input.name)" [disabled]="disabled"
+                      [attr.aria-label]="'Browse files for ' + input.label">
                 Browse
               </button>
-              <button mat-raised-button type="button" (click)="openImportedFileSelector(input.name)" [disabled]="disabled">
+              <button mat-raised-button type="button" (click)="openImportedFileSelector(input.name)" [disabled]="disabled"
+                      [attr.aria-label]="'Select imported file for ' + input.label">
                 Select from Imported
               </button>
               @if (hasTableColumns(input)) {
-                <button mat-raised-button color="accent" type="button" (click)="openTableEditor(input.name)" [disabled]="disabled" matTooltip="Create or edit table file">
-                  <mat-icon>table_chart</mat-icon>
+                <button mat-raised-button color="accent" type="button" (click)="openTableEditor(input.name)" [disabled]="disabled" matTooltip="Create or edit table file"
+                        [attr.aria-label]="'Manage table for ' + input.label">
+                  <mat-icon aria-hidden="true">table_chart</mat-icon>
                   Manage Table
                 </button>
               } @else if (isAnnotationFileInput(input)) {
-                <button mat-raised-button color="accent" type="button" (click)="openAnnotationManager(input.name)" [disabled]="disabled" matTooltip="Create or edit annotation file">
-                  <mat-icon>edit_note</mat-icon>
+                <button mat-raised-button color="accent" type="button" (click)="openAnnotationManager(input.name)" [disabled]="disabled" matTooltip="Create or edit annotation file"
+                        [attr.aria-label]="'Manage annotation for ' + input.label">
+                  <mat-icon aria-hidden="true">edit_note</mat-icon>
                   Manage Annotation
                 </button>
               }
@@ -53,14 +59,17 @@
           @case ('directory') {
             <mat-form-field appearance="outline" class="full-width">
               <mat-label>{{ input.label }}</mat-label>
-              <input matInput readonly [formControlName]="input.name">
+              <input matInput readonly [formControlName]="input.name"
+                     [attr.aria-describedby]="input.description ? input.name + '-hint' : null"
+                     [attr.aria-required]="input.required || null">
               @if (input.description) {
-                <mat-hint>{{ input.description }}</mat-hint>
+                <mat-hint [id]="input.name + '-hint'">{{ input.description }}</mat-hint>
               }
             </mat-form-field>
             <div class="file-buttons">
-              <button mat-raised-button color="primary" type="button" (click)="openDirectory(input.name)" [disabled]="disabled">
-                <mat-icon>folder_open</mat-icon>
+              <button mat-raised-button color="primary" type="button" (click)="openDirectory(input.name)" [disabled]="disabled"
+                      [attr.aria-label]="'Browse directory for ' + input.label">
+                <mat-icon aria-hidden="true">folder_open</mat-icon>
                 Browse Directory
               </button>
             </div>
@@ -68,9 +77,11 @@
           @case ('text') {
             <mat-form-field appearance="outline" class="full-width" [floatLabel]="input.placeholder ? 'always' : 'auto'">
               <mat-label>{{ input.label }}</mat-label>
-              <input matInput [formControlName]="input.name" [placeholder]="input.placeholder || ''">
+              <input matInput [formControlName]="input.name" [placeholder]="input.placeholder || ''"
+                     [attr.aria-describedby]="input.description ? input.name + '-hint' : null"
+                     [attr.aria-required]="input.required || null">
               @if (input.description) {
-                <mat-hint>{{ input.description }}</mat-hint>
+                <mat-hint [id]="input.name + '-hint'">{{ input.description }}</mat-hint>
               }
               @if (form.get(input.name)?.hasError('required')) {
                 <mat-error>{{ input.label }} is required</mat-error>
@@ -84,9 +95,13 @@
                      [formControlName]="input.name"
                      [min]="input.min ?? null"
                      [max]="input.max ?? null"
-                     [step]="input.step || 1">
+                     [step]="input.step || 1"
+                     [attr.aria-describedby]="input.description ? input.name + '-hint' : null"
+                     [attr.aria-required]="input.required || null"
+                     [attr.aria-valuemin]="input.min ?? null"
+                     [attr.aria-valuemax]="input.max ?? null">
               @if (input.description) {
-                <mat-hint>{{ input.description }}</mat-hint>
+                <mat-hint [id]="input.name + '-hint'">{{ input.description }}</mat-hint>
               }
               @if (form.get(input.name)?.hasError('required')) {
                 <mat-error>{{ input.label }} is required</mat-error>
@@ -101,24 +116,27 @@
           }
           @case ('boolean') {
             <div class="checkbox-field">
-              <mat-checkbox [formControlName]="input.name" [disabled]="disabled">
+              <mat-checkbox [formControlName]="input.name" [disabled]="disabled"
+                            [attr.aria-describedby]="input.description ? input.name + '-hint' : null">
                 {{ input.label }}
               </mat-checkbox>
               @if (input.description) {
-                <p class="hint">{{ input.description }}</p>
+                <p class="hint" [id]="input.name + '-hint'">{{ input.description }}</p>
               }
             </div>
           }
           @case ('select') {
             <mat-form-field appearance="outline" class="full-width">
               <mat-label>{{ input.label }}</mat-label>
-              <mat-select [formControlName]="input.name">
+              <mat-select [formControlName]="input.name"
+                          [attr.aria-describedby]="input.description ? input.name + '-hint' : null"
+                          [attr.aria-required]="input.required || null">
                 @for (option of getSelectOptions(input); track option.value) {
                   <mat-option [value]="option.value">{{ option.label }}</mat-option>
                 }
               </mat-select>
               @if (input.description) {
-                <mat-hint>{{ input.description }}</mat-hint>
+                <mat-hint [id]="input.name + '-hint'">{{ input.description }}</mat-hint>
               }
               @if (form.get(input.name)?.hasError('required')) {
                 <mat-error>{{ input.label }} is required</mat-error>
@@ -128,7 +146,9 @@
           @case ('multiselect-grouped') {
             <mat-form-field appearance="outline" class="full-width">
               <mat-label>{{ input.label }}</mat-label>
-              <mat-select [formControlName]="input.name" multiple>
+              <mat-select [formControlName]="input.name" multiple
+                          [attr.aria-describedby]="input.description ? input.name + '-hint' : null"
+                          [attr.aria-required]="input.required || null">
                 @if (input.groups) {
                   @for (group of input.groups; track group.name) {
                     <mat-optgroup [label]="group.name">
@@ -148,7 +168,7 @@
                 }
               </mat-select>
               @if (input.description) {
-                <mat-hint>{{ input.description }}</mat-hint>
+                <mat-hint [id]="input.name + '-hint'">{{ input.description }}</mat-hint>
               }
               @if (form.get(input.name)?.hasError('required')) {
                 <mat-error>{{ input.label }} is required</mat-error>
@@ -158,7 +178,9 @@
           @case ('column-selector') {
             <mat-form-field appearance="outline" class="full-width">
               <mat-label>{{ input.label }}</mat-label>
-              <mat-select [formControlName]="input.name" [multiple]="input.multiple" [disabled]="getColumns(input.name).length === 0 || disabled">
+              <mat-select [formControlName]="input.name" [multiple]="input.multiple" [disabled]="getColumns(input.name).length === 0 || disabled"
+                          [attr.aria-describedby]="input.description ? input.name + '-hint' : null"
+                          [attr.aria-required]="input.required || null">
                 @if (getColumns(input.name).length === 0) {
                   <mat-option disabled>Select {{ input.sourceFile }} file first</mat-option>
                 } @else {
@@ -172,12 +194,82 @@
                 }
               </mat-select>
               @if (input.description) {
-                <mat-hint>{{ input.description }}</mat-hint>
+                <mat-hint [id]="input.name + '-hint'">{{ input.description }}</mat-hint>
               }
               @if (form.get(input.name)?.hasError('required')) {
                 <mat-error>{{ input.label }} is required</mat-error>
               }
             </mat-form-field>
+          }
+          @case ('color') {
+            <div class="color-field" role="group" [attr.aria-labelledby]="input.name + '-label'">
+              <label class="color-label" [id]="input.name + '-label'">{{ input.label }}</label>
+              @if (input.multiple) {
+                <div class="color-list" role="list" [attr.aria-label]="'Color list for ' + input.label">
+                  @for (color of getColors(input.name); track $index; let idx = $index) {
+                    <div class="color-input-row" role="listitem">
+                      <input
+                        type="color"
+                        class="color-picker"
+                        [value]="color"
+                        [disabled]="disabled"
+                        [attr.aria-label]="'Color ' + (idx + 1) + ' for ' + input.label"
+                        (input)="updateColor(input.name, idx, $any($event.target).value)">
+                      <span class="color-value" aria-hidden="true">{{ color }}</span>
+                      <button mat-icon-button type="button" (click)="removeColor(input.name, idx)" [disabled]="disabled || getColors(input.name).length <= 1" matTooltip="Remove color"
+                              [attr.aria-label]="'Remove color ' + (idx + 1)">
+                        <mat-icon aria-hidden="true">remove_circle_outline</mat-icon>
+                      </button>
+                    </div>
+                  }
+                  <button mat-stroked-button type="button" (click)="addColor(input.name)" [disabled]="disabled" class="add-color-btn"
+                          [attr.aria-label]="'Add color to ' + input.label">
+                    <mat-icon aria-hidden="true">add</mat-icon>
+                    Add Color
+                  </button>
+                </div>
+              } @else {
+                <div class="color-input-row">
+                  <input
+                    type="color"
+                    class="color-picker"
+                    [formControlName]="input.name"
+                    [disabled]="disabled"
+                    [attr.aria-label]="'Select color for ' + input.label">
+                  <span class="color-value" aria-hidden="true">{{ form.get(input.name)?.value || '#000000' }}</span>
+                </div>
+              }
+              @if (input.description) {
+                <p class="hint" [id]="input.name + '-hint'">{{ input.description }}</p>
+              }
+            </div>
+          }
+          @case ('color-map') {
+            <div class="color-map-field" role="group" [attr.aria-labelledby]="input.name + '-label'">
+              <label class="color-label" [id]="input.name + '-label'">{{ input.label }}</label>
+              @if (getColorMapKeys(input).length === 0) {
+                <p class="hint" role="status">Select {{ input.keysFrom }} first to assign colors</p>
+              } @else {
+                <div class="color-map-list" role="list" [attr.aria-label]="'Color assignments for ' + input.label">
+                  @for (key of getColorMapKeys(input); track key) {
+                    <div class="color-map-row" role="listitem">
+                      <span class="color-map-key" [id]="input.name + '-' + key + '-label'">{{ key }}</span>
+                      <input
+                        type="color"
+                        class="color-picker color-picker-small"
+                        [value]="getColorForKey(input.name, key)"
+                        [disabled]="disabled"
+                        [attr.aria-label]="'Color for ' + key"
+                        (input)="updateColorMapEntry(input.name, key, $any($event.target).value)">
+                      <span class="color-value" aria-hidden="true">{{ getColorForKey(input.name, key) }}</span>
+                    </div>
+                  }
+                </div>
+              }
+              @if (input.description) {
+                <p class="hint" [id]="input.name + '-hint'">{{ input.description }}</p>
+              }
+            </div>
           }
           }
         </div>

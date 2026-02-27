@@ -22,6 +22,7 @@ const (
 	TransformCommaJoin  InputTransform = "comma-join"
 	TransformSpaceJoin  InputTransform = "space-join"
 	TransformJSONEncode InputTransform = "json-encode"
+	TransformColorMap   InputTransform = "color-map"
 )
 
 type VisibilityCondition struct {
@@ -88,6 +89,7 @@ type PluginInputV2 struct {
 	Accept                      string               `yaml:"accept,omitempty" json:"accept,omitempty"`
 	Multiple                    bool                 `yaml:"multiple,omitempty" json:"multiple,omitempty"`
 	SourceFile                  string               `yaml:"sourceFile,omitempty" json:"sourceFile,omitempty"`
+	KeysFrom                    string               `yaml:"keysFrom,omitempty" json:"keysFrom,omitempty"`
 	Min                         *float64             `yaml:"min,omitempty" json:"min,omitempty"`
 	Max                         *float64             `yaml:"max,omitempty" json:"max,omitempty"`
 	Step                        *float64             `yaml:"step,omitempty" json:"step,omitempty"`

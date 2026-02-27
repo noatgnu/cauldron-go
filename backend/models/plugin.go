@@ -19,6 +19,8 @@ const (
 	PluginInputTypeSelect         PluginInputType = "select"
 	PluginInputTypeMultiSelect    PluginInputType = "multiselect"
 	PluginInputTypeColumnSelector PluginInputType = "column-selector"
+	PluginInputTypeColor          PluginInputType = "color"
+	PluginInputTypeColorMap       PluginInputType = "color-map"
 )
 
 type PluginInput struct {

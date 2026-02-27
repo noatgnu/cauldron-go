@@ -39,12 +39,18 @@ export interface PluginInputV2 {
   accept?: string;
   multiple?: boolean;
   sourceFile?: string;
+  keysFrom?: string;
   min?: number;
   max?: number;
   step?: number;
   visibleWhen?: VisibilityCondition;
   disableAnnotationManagement?: boolean;
   tableColumns?: TableColumn[];
+}
+
+export interface ColorMapEntry {
+  key: string;
+  color: string;
 }
 
 export interface PluginOutputV2 {

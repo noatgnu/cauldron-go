@@ -13,8 +13,8 @@ import { ImportedFile } from '../../interfaces/file-handler.interface';
     ImportedFileSelection
   ],
   template: `
-    <h2 mat-dialog-title>Select Imported File</h2>
-    <mat-dialog-content>
+    <h2 mat-dialog-title id="file-selection-title">Select Imported File</h2>
+    <mat-dialog-content aria-labelledby="file-selection-title">
       <cld-imported-file-selection
         (selected)="onFileSelected($event)"
         (columns)="onColumnsLoaded($event)"
@@ -22,7 +22,7 @@ import { ImportedFile } from '../../interfaces/file-handler.interface';
       </cld-imported-file-selection>
     </mat-dialog-content>
     <mat-dialog-actions align="end">
-      <button mat-button (click)="cancel()">Cancel</button>
+      <button mat-button (click)="cancel()" aria-label="Cancel file selection">Cancel</button>
     </mat-dialog-actions>
   `,
   styles: [`

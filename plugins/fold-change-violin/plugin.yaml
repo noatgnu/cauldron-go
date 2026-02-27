@@ -61,9 +61,9 @@ inputs:
 
   - name: "colors"
     label: "Category Colors"
-    type: "text"
-    default: "C..Lysosome:#ffb3ba,C..Mitochondria:#ffdfba,Endosome:#ffffba,Golgi:#baffc9,ER:#bae1ff,Ribosome:#d7baff,Nuclear:#ffbaff"
-    description: "Comma-separated category:color pairs (e.g., Lysosome:#ffb3ba)"
+    type: "color-map"
+    keysFrom: "categories"
+    description: "Assign colors to each category/organelle"
 
   - name: "figsize"
     label: "Figure Size"
@@ -104,7 +104,9 @@ execution:
     fold_enrichment_col: "--fold_enrichment_col"
     organelle_col: "--organelle_col"
     comparison_col: "--comparison_col"
-    colors: "--colors"
+    colors:
+      flag: "--colors"
+      transform: "color-map"
     figsize: "--figsize"
 
   outputDir: "--output_folder"
