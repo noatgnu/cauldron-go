@@ -57,6 +57,7 @@
 
 .mat-mdc-raised-button[color="primary"]:not(.mat-mdc-button-disabled),
 .mat-mdc-unelevated-button[color="primary"]:not(.mat-mdc-button-disabled) {
+  background-color: var(--primary) !important;
   color: var(--on-primary) !important;
 
   mat-icon {
@@ -66,15 +67,17 @@
 
 .mat-mdc-raised-button[color="accent"]:not(.mat-mdc-button-disabled),
 .mat-mdc-unelevated-button[color="accent"]:not(.mat-mdc-button-disabled) {
-  color: var(--on-primary) !important;
+  background-color: var(--accent) !important;
+  color: var(--on-accent) !important;
 
   mat-icon {
-    color: var(--on-primary) !important;
+    color: var(--on-accent) !important;
   }
 }
 
 .mat-mdc-raised-button[color="warn"]:not(.mat-mdc-button-disabled),
 .mat-mdc-unelevated-button[color="warn"]:not(.mat-mdc-button-disabled) {
+  background-color: var(--error) !important;
   color: var(--on-error) !important;
 
   mat-icon {
@@ -205,8 +208,18 @@
     border-color: var(--border) !important;
   }
 
+  .mdc-notched-outline__leading {
+    border-right: none !important;
+  }
+
   .mdc-notched-outline__notch {
     border-top: none !important;
+    border-left: none !important;
+    border-right: none !important;
+  }
+
+  .mdc-notched-outline__trailing {
+    border-left: none !important;
   }
 
   .mat-mdc-notch-piece {
@@ -220,8 +233,18 @@
       border-color: var(--primary) !important;
     }
 
+    .mdc-notched-outline__leading {
+      border-right: none !important;
+    }
+
     .mdc-notched-outline__notch {
       border-top: none !important;
+      border-left: none !important;
+      border-right: none !important;
+    }
+
+    .mdc-notched-outline__trailing {
+      border-left: none !important;
     }
 
     .mat-mdc-floating-label {
