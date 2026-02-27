@@ -47,6 +47,7 @@ type PluginInput struct {
 	Accept                      string               `yaml:"accept,omitempty"`
 	Multiple                    bool                 `yaml:"multiple,omitempty"`
 	SourceFile                  string               `yaml:"sourceFile,omitempty"`
+	KeysFrom                    string               `yaml:"keysFrom,omitempty"`
 	Min                         *float64             `yaml:"min,omitempty"`
 	Max                         *float64             `yaml:"max,omitempty"`
 	Step                        *float64             `yaml:"step,omitempty"`
@@ -254,9 +255,9 @@ func validatePlugin(pluginPath string) (bool, []string) {
 			errors = append(errors, fmt.Sprintf("inputs[%d].type is required", i))
 		} else {
 			validTypes := map[string]bool{
-				"file": true, "text": true, "number": true,
-				"boolean": true, "select": true, "column-selector": true,
-				"multiselect-grouped": true,
+				"file": true, "directory": true, "text": true, "number": true,
+				"boolean": true, "select": true, "multiselect": true, "column-selector": true,
+				"multiselect-grouped": true, "color": true, "color-map": true,
 			}
 			if !validTypes[input.Type] {
 				errors = append(errors, fmt.Sprintf("inputs[%d].type is invalid: %s", i, input.Type))
@@ -277,6 +278,10 @@ func validatePlugin(pluginPath string) (bool, []string) {
 
 			if input.Type == "column-selector" && input.SourceFile == "" {
 				errors = append(errors, fmt.Sprintf("inputs[%d]: column-selector requires sourceFile", i))
+			}
+
+			if input.Type == "color-map" && input.KeysFrom == "" {
+				errors = append(errors, fmt.Sprintf("inputs[%d]: color-map requires keysFrom to specify the source of category keys", i))
 			}
 		}
 
