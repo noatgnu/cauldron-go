@@ -40,6 +40,13 @@ type SPAGenerator struct {
 	pluginDir  string
 }
 
+type ExampleFileInfo struct {
+	InputName  string `json:"inputName"`
+	InputLabel string `json:"inputLabel"`
+	Filename   string `json:"filename"`
+	Path       string `json:"path"`
+}
+
 type EnvironmentData struct {
 	Production           bool
 	Runtime              string
@@ -52,6 +59,7 @@ type EnvironmentData struct {
 	PluginModulesJSON    string
 	HasExample           bool
 	ExampleBasePath      string
+	ExampleFilesJSON     string
 }
 
 type PackageJSONData struct {
@@ -378,6 +386,8 @@ func (g *SPAGenerator) generateEnvironment() error {
 		runtime = "webr"
 	}
 
+	exampleFilesJSON, _ := json.Marshal(g.getExampleFiles())
+
 	data := EnvironmentData{
 		Production:           true,
 		Runtime:              runtime,
@@ -390,6 +400,7 @@ func (g *SPAGenerator) generateEnvironment() error {
 		PluginModulesJSON:    string(pluginModulesJSON),
 		HasExample:           g.hasExampleInputs(),
 		ExampleBasePath:      "assets/examples/",
+		ExampleFilesJSON:     string(exampleFilesJSON),
 	}
 
 	tmpl, err := template.ParseFS(spaTemplates, "templates/spa/environment.ts.tmpl")
@@ -728,6 +739,49 @@ func (g *SPAGenerator) hasExampleInputs() bool {
 		}
 	}
 	return false
+}
+
+func (g *SPAGenerator) getExampleFiles() []ExampleFileInfo {
+	var files []ExampleFileInfo
+
+	if g.definition.Example == nil || !g.definition.Example.Enabled {
+		return files
+	}
+
+	if g.definition.Example.Values == nil {
+		return files
+	}
+
+	inputLabels := make(map[string]string)
+	fileInputs := make(map[string]bool)
+	for _, input := range g.definition.Inputs {
+		if input.Type == "file" {
+			fileInputs[input.Name] = true
+			inputLabels[input.Name] = input.Label
+		}
+	}
+
+	for key, value := range g.definition.Example.Values {
+		if fileInputs[key] {
+			if strVal, ok := value.(string); ok && strVal != "" {
+				normalizedPath := strVal
+				if strings.HasPrefix(strVal, "examples/") || strings.HasPrefix(strVal, "examples\\") {
+					normalizedPath = strVal[9:]
+				}
+
+				filename := filepath.Base(normalizedPath)
+
+				files = append(files, ExampleFileInfo{
+					InputName:  key,
+					InputLabel: inputLabels[key],
+					Filename:   filename,
+					Path:       normalizedPath,
+				})
+			}
+		}
+	}
+
+	return files
 }
 
 func (g *SPAGenerator) copyExampleFiles() error {

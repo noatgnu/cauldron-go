@@ -51,6 +51,39 @@
       }
     </mat-card-content>
 
+    @if (hasExampleFiles()) {
+      <mat-expansion-panel class="example-files-panel">
+        <mat-expansion-panel-header>
+          <mat-panel-title>
+            <mat-icon>folder</mat-icon>
+            Example Files
+          </mat-panel-title>
+          <mat-panel-description>
+            Download example input files
+          </mat-panel-description>
+        </mat-expansion-panel-header>
+        <div class="example-files-list">
+          @for (file of getExampleFiles(); track file.inputName) {
+            <div class="example-file-item">
+              <div class="example-file-info">
+                <span class="example-file-label">{{ file.inputLabel }}</span>
+                <span class="example-file-name">{{ file.filename }}</span>
+              </div>
+              <button mat-icon-button (click)="downloadExampleFile(file)" matTooltip="Download {{ file.filename }}">
+                <mat-icon>download</mat-icon>
+              </button>
+            </div>
+          }
+        </div>
+        <div class="example-files-actions">
+          <button mat-stroked-button (click)="downloadAllExampleFiles()">
+            <mat-icon>archive</mat-icon>
+            Download All
+          </button>
+        </div>
+      </mat-expansion-panel>
+    }
+
     <mat-card-actions>
       @if (hasExample()) {
         <button mat-stroked-button (click)="loadExample()" [disabled]="!runtimeReady() || loading()">

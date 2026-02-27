@@ -14,7 +14,7 @@ import {
   FileHandler,
   ExampleFilePathResolver
 } from '@cauldron/forms';
-import { environment } from '../environments/environment';
+import { environment, ExampleFile } from '../environments/environment';
 import { PyodideService } from './services/pyodide';
 import { WebRService } from './services/webr';
 import { BrowserFileHandler } from './services/browser-file-handler';
@@ -177,6 +177,66 @@ export class AppComponent implements OnInit {
 
   hasExample(): boolean {
     return environment.pluginDefinition.example?.enabled === true;
+  }
+
+  getExampleFiles(): ExampleFile[] {
+    return environment.exampleFiles || [];
+  }
+
+  hasExampleFiles(): boolean {
+    return this.getExampleFiles().length > 0;
+  }
+
+  async downloadExampleFile(file: ExampleFile): Promise<void> {
+    const basePath = environment.exampleBasePath || 'assets/examples/';
+    const url = basePath + file.path;
+
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch: ${response.statusText}`);
+      }
+
+      const blob = await response.blob();
+      const downloadUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = downloadUrl;
+      a.download = file.filename;
+      a.click();
+      URL.revokeObjectURL(downloadUrl);
+    } catch (error) {
+      console.error('Failed to download example file:', error);
+    }
+  }
+
+  async downloadAllExampleFiles(): Promise<void> {
+    const files = this.getExampleFiles();
+    if (files.length === 0) return;
+
+    const JSZip = (await import('jszip')).default;
+    const zip = new JSZip();
+    const basePath = environment.exampleBasePath || 'assets/examples/';
+
+    for (const file of files) {
+      const url = basePath + file.path;
+      try {
+        const response = await fetch(url);
+        if (response.ok) {
+          const buffer = await response.arrayBuffer();
+          zip.file(file.filename, buffer);
+        }
+      } catch (error) {
+        console.error(`Failed to fetch ${file.filename}:`, error);
+      }
+    }
+
+    const content = await zip.generateAsync({ type: 'blob' });
+    const url = URL.createObjectURL(content);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = environment.pluginDefinition.plugin.id + '-examples.zip';
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   submitForm() {

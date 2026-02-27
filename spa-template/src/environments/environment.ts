@@ -5,6 +5,13 @@ export interface WebrPackage {
   repo: string;
 }
 
+export interface ExampleFile {
+  inputName: string;
+  inputLabel: string;
+  filename: string;
+  path: string;
+}
+
 export interface Environment {
   production: boolean;
   runtime: 'pyodide' | 'webr';
@@ -17,6 +24,7 @@ export interface Environment {
   pluginModules: Record<string, string>;
   hasExample: boolean;
   exampleBasePath: string;
+  exampleFiles: ExampleFile[];
 }
 
 export const environment: Environment = {
@@ -48,5 +56,6 @@ export const environment: Environment = {
   pluginScript: '',
   pluginModules: {},
   hasExample: false,
-  exampleBasePath: 'assets/examples/'
+  exampleBasePath: 'assets/examples/',
+  exampleFiles: []
 };
