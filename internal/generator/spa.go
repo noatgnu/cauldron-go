@@ -742,7 +742,7 @@ func (g *SPAGenerator) hasExampleInputs() bool {
 }
 
 func (g *SPAGenerator) getExampleFiles() []ExampleFileInfo {
-	var files []ExampleFileInfo
+	files := []ExampleFileInfo{}
 
 	if g.definition.Example == nil || !g.definition.Example.Enabled {
 		return files
