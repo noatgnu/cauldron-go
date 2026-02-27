@@ -7,6 +7,20 @@ import (
 	"github.com/noatgnu/cauldron-go/backend/models"
 )
 
+var validInputTypes = map[models.PluginInputType]bool{
+	models.PluginInputTypeFile:           true,
+	models.PluginInputTypeDirectory:      true,
+	models.PluginInputTypeText:           true,
+	models.PluginInputTypeNumber:         true,
+	models.PluginInputTypeBoolean:        true,
+	models.PluginInputTypeSelect:         true,
+	models.PluginInputTypeMultiSelect:    true,
+	models.PluginInputTypeColumnSelector: true,
+	models.PluginInputTypeColor:          true,
+	models.PluginInputTypeColorMap:       true,
+	"multiselect-grouped":                true,
+}
+
 type PluginValidator struct{}
 
 func NewPluginValidator() *PluginValidator {
@@ -99,6 +113,12 @@ func (v *PluginValidator) ValidateDefinition(def *models.PluginDefinition) (bool
 
 		if input.Type == "" {
 			errors = append(errors, fmt.Sprintf("Input '%s': type is required", input.Name))
+		} else if !validInputTypes[input.Type] {
+			errors = append(errors, fmt.Sprintf("Input '%s': invalid type '%s'. Valid types are: file, directory, text, number, boolean, select, multiselect, multiselect-grouped, column-selector, color, color-map", input.Name, input.Type))
+		}
+
+		if input.Type == models.PluginInputTypeColorMap && input.KeysFrom == "" {
+			errors = append(errors, fmt.Sprintf("Input '%s': color-map type requires 'keysFrom' field to specify the source of category keys", input.Name))
 		}
 	}
 

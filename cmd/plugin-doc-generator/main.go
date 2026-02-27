@@ -81,6 +81,7 @@ type PluginInput struct {
 	Accept                      string               `yaml:"accept,omitempty"`
 	Multiple                    bool                 `yaml:"multiple,omitempty"`
 	SourceFile                  string               `yaml:"sourceFile,omitempty"`
+	KeysFrom                    string               `yaml:"keysFrom,omitempty"`
 	Min                         *float64             `yaml:"min,omitempty"`
 	Max                         *float64             `yaml:"max,omitempty"`
 	Step                        *float64             `yaml:"step,omitempty"`
@@ -256,6 +257,15 @@ func formatType(input PluginInput) string {
 		}
 		return "column-selector (single)"
 
+	case "color":
+		return "color (color picker)"
+
+	case "color-map":
+		if input.KeysFrom != "" {
+			return fmt.Sprintf("color-map (keys from `%s`)", input.KeysFrom)
+		}
+		return "color-map"
+
 	default:
 		return input.Type
 	}
@@ -392,6 +402,17 @@ func generateInputDetails(inputs []PluginInput) string {
 				if col.Description != "" {
 					lines = append(lines, fmt.Sprintf("      - %s", col.Description))
 				}
+			}
+		}
+
+		if input.Type == "color" {
+			lines = append(lines, "- **Input Type**: Color picker for selecting a single color value")
+		}
+
+		if input.Type == "color-map" {
+			lines = append(lines, "- **Input Type**: Color map for assigning colors to categories")
+			if input.KeysFrom != "" {
+				lines = append(lines, fmt.Sprintf("- **Keys From**: `%s` (categories are derived from this input)", input.KeysFrom))
 			}
 		}
 
