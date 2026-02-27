@@ -27,6 +27,11 @@
 
 <div class="container">
   <mat-card class="main-card">
+    @if (pluginDescription) {
+      <mat-card-header>
+        <mat-card-subtitle>{{ pluginDescription }}</mat-card-subtitle>
+      </mat-card-header>
+    }
     <mat-card-content>
       @if (!runtimeReady()) {
         <app-progress-panel [progress]="progress()" />

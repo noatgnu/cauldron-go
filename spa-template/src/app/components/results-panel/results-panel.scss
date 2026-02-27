@@ -10,6 +10,12 @@
     overflow: visible;
     height: auto;
     min-height: 56px;
+
+    button[mat-icon-button] {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
   }
 }
 
