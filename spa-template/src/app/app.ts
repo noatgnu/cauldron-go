@@ -7,6 +7,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatMenuModule } from '@angular/material/menu';
+import { MatDividerModule } from '@angular/material/divider';
 import {
   DynamicFormComponent,
   PluginV2,
@@ -35,6 +36,7 @@ import { ThemeService, Theme } from './services/theme.service';
     MatExpansionModule,
     MatTooltipModule,
     MatMenuModule,
+    MatDividerModule,
     DynamicFormComponent,
     ResultsPanel,
     ProgressPanel

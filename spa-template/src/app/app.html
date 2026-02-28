@@ -17,6 +17,16 @@
       <mat-icon>brightness_auto</mat-icon>
       <span>System</span>
     </button>
+    <mat-divider></mat-divider>
+    @for (theme of themeService.availableColorThemes(); track theme.id) {
+      <button mat-menu-item (click)="themeService.setColorTheme(theme.id)">
+        <span class="color-preview" [style.background-color]="themeService.getColorThemePreview(theme)"></span>
+        <span>{{ theme.displayName }}</span>
+        @if (themeService.colorTheme() === theme.id) {
+          <mat-icon class="check-icon">check</mat-icon>
+        }
+      </button>
+    }
   </mat-menu>
   @if (repositoryUrl) {
     <a mat-icon-button [href]="repositoryUrl" target="_blank" rel="noopener" matTooltip="View Plugin Repository">
