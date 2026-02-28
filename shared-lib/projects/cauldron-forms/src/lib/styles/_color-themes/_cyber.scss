@@ -1,0 +1,46 @@
+body[data-color-theme="cyber"],
+body[data-color-theme="cyber"].light-theme {
+  --primary: #0077be;
+  --primary-light: #2196f3;
+  --primary-dark: #005a8d;
+  --primary-container: #e1f5fe;
+  --primary-hover: rgba(0, 119, 190, 0.08);
+  --on-primary: #ffffff;
+
+  --accent: #ff6f00;
+  --accent-light: #ffa040;
+  --accent-dark: #c43e00;
+  --accent-container: #fff3e0;
+  --on-accent: #ffffff;
+  --on-accent-container: #e65100;
+
+  --tertiary: #102a43;
+  --tertiary-light: #334e68;
+  --tertiary-dark: #0a1929;
+  --tertiary-container: #e8eaf6;
+  --on-tertiary: #ffffff;
+  --on-tertiary-container: #102a43;
+}
+
+body[data-color-theme="cyber"].dark-theme {
+  --primary: #ffb400;
+  --primary-light: #ffc947;
+  --primary-dark: #cc9000;
+  --primary-container: rgba(255, 180, 0, 0.2);
+  --primary-hover: rgba(255, 180, 0, 0.08);
+  --on-primary: rgba(0, 0, 0, 0.87);
+
+  --accent: #00e5ff;
+  --accent-light: #6effff;
+  --accent-dark: #00b2cc;
+  --accent-container: rgba(0, 229, 255, 0.2);
+  --on-accent: rgba(0, 0, 0, 0.87);
+  --on-accent-container: #00e5ff;
+
+  --tertiary: #ff4081;
+  --tertiary-light: #ff79b0;
+  --tertiary-dark: #c60055;
+  --tertiary-container: rgba(255, 64, 129, 0.2);
+  --on-tertiary: rgba(0, 0, 0, 0.87);
+  --on-tertiary-container: #ff4081;
+}
