@@ -159,7 +159,7 @@ func CheckPyodideCompatibility(definition *models.PluginDefinition, pluginDir st
 
 func getRequiredPackages(definition *models.PluginDefinition, pluginDir string) []string {
 	seen := make(map[string]bool)
-	var packages []string
+	packages := []string{}
 
 	addPackage := func(pkg string) {
 		pkgName := strings.Split(pkg, "==")[0]
