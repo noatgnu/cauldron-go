@@ -286,6 +286,13 @@ build_dev_tools() {
         return 1
     fi
 
+    if go build -o "bin/schema-doc-generator$exe_ext" ./cmd/schema-doc-generator; then
+        print_success "Built schema-doc-generator"
+    else
+        print_error "Failed to build schema-doc-generator"
+        return 1
+    fi
+
     print_success "All developer tools built successfully"
 }
 
