@@ -1,6 +1,7 @@
 import { Injectable, signal, computed, effect, inject } from '@angular/core';
 import { Wails } from './wails';
 import { getColorPalette, COLOR_PALETTES } from '../constants/color-palettes';
+import { ColorTheme, ThemeDefinition, COLOR_THEMES, getColorTheme } from '../constants/color-themes';
 
 export type Theme = 'light' | 'dark' | 'system';
 export type FontScale = '75' | '100' | '125' | '150' | '200';
@@ -14,6 +15,7 @@ export class ThemeService {
 
   theme = signal<Theme>('system');
   isDark = signal<boolean>(false);
+  colorTheme = signal<ColorTheme>('azure');
 
   fontScale = signal<FontScale>('100');
   highContrast = signal<boolean>(false);
@@ -26,6 +28,14 @@ export class ThemeService {
 
   availablePalettes = computed(() => {
     return Object.values(COLOR_PALETTES);
+  });
+
+  availableColorThemes = computed(() => {
+    return Object.values(COLOR_THEMES);
+  });
+
+  currentColorTheme = computed((): ThemeDefinition => {
+    return getColorTheme(this.colorTheme());
   });
 
   constructor() {
@@ -45,6 +55,11 @@ export class ThemeService {
           this.theme.set(savedTheme);
         }
 
+        const savedColorTheme = localStorage.getItem('app-color-theme') as ColorTheme;
+        if (savedColorTheme && COLOR_THEMES[savedColorTheme]) {
+          this.colorTheme.set(savedColorTheme);
+        }
+
         if (config.accessibilityFontScale) {
           this.fontScale.set(config.accessibilityFontScale as FontScale);
         }
@@ -54,7 +69,6 @@ export class ThemeService {
         this.highContrast.set(config.accessibilityHighContrast || false);
         this.reducedMotion.set(config.accessibilityReducedMotion || false);
       } catch (error) {
-        console.error('Failed to load settings:', error);
         this.loadFromLocalStorage();
       }
     } else {
@@ -65,6 +79,11 @@ export class ThemeService {
   private loadFromLocalStorage(): void {
     const savedTheme = localStorage.getItem('app-theme') as Theme || 'system';
     this.theme.set(savedTheme);
+
+    const savedColorTheme = localStorage.getItem('app-color-theme') as ColorTheme;
+    if (savedColorTheme && COLOR_THEMES[savedColorTheme]) {
+      this.colorTheme.set(savedColorTheme);
+    }
 
     const savedFontScale = localStorage.getItem('accessibility.fontScale') as FontScale;
     if (savedFontScale) {
@@ -92,6 +111,13 @@ export class ThemeService {
       const theme = this.theme();
       this.applyTheme(theme);
       localStorage.setItem('app-theme', theme);
+    });
+
+    effect(() => {
+      const colorTheme = this.colorTheme();
+      this.applyColorTheme(colorTheme);
+      localStorage.setItem('app-color-theme', colorTheme);
+      this.saveSetting('appearance.colorTheme', colorTheme);
     });
 
     effect(() => {
@@ -124,6 +150,10 @@ export class ThemeService {
 
   setTheme(theme: Theme): void {
     this.theme.set(theme);
+  }
+
+  setColorTheme(colorTheme: ColorTheme): void {
+    this.colorTheme.set(colorTheme);
   }
 
   toggleTheme(): void {
@@ -167,6 +197,10 @@ export class ThemeService {
     document.body.classList.remove('light-theme', 'dark-theme');
     document.body.classList.add(isDark ? 'dark-theme' : 'light-theme');
     document.body.setAttribute('data-theme', isDark ? 'dark' : 'light');
+  }
+
+  private applyColorTheme(colorTheme: ColorTheme): void {
+    document.body.setAttribute('data-color-theme', colorTheme);
   }
 
   private applyFontScale(scale: FontScale): void {
@@ -216,12 +250,12 @@ export class ThemeService {
     });
   }
 
-  private async saveSetting(key: string, value: any): Promise<void> {
+  private async saveSetting(key: string, value: unknown): Promise<void> {
     if (this.wails.isWails) {
       try {
         await this.wails.setSetting(key, value);
-      } catch (error) {
-        console.error(`Failed to save setting ${key}:`, error);
+      } catch {
+        // Silent fail for settings persistence
       }
     }
   }

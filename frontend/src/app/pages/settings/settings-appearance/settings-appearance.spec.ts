@@ -4,13 +4,13 @@ import { ThemeService } from '../../../core/services/theme.service';
 import { Wails } from '../../../core/services/wails';
 import { vi, beforeAll } from 'vitest';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
-import { signal } from '@angular/core';
+import { COLOR_THEMES } from '../../../core/constants/color-themes';
 
 describe('SettingsAppearance', () => {
   let component: SettingsAppearance;
   let fixture: ComponentFixture<SettingsAppearance>;
-  let themeServiceMock: any;
-  let wailsMock: any;
+  let themeServiceMock: Partial<ThemeService>;
+  let wailsMock: Partial<Wails>;
 
   beforeAll(() => {
     Object.defineProperty(window, 'matchMedia', {
@@ -19,8 +19,8 @@ describe('SettingsAppearance', () => {
         matches: false,
         media: query,
         onchange: null,
-        addListener: vi.fn(), // deprecated
-        removeListener: vi.fn(), // deprecated
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
         addEventListener: vi.fn(),
         removeEventListener: vi.fn(),
         dispatchEvent: vi.fn(),
@@ -35,9 +35,12 @@ describe('SettingsAppearance', () => {
       setSetting: vi.fn().mockResolvedValue(undefined)
     };
     themeServiceMock = {
-      theme: vi.fn().mockReturnValue('system'),
-      isDark: vi.fn().mockReturnValue(false),
-      setTheme: vi.fn()
+      theme: vi.fn().mockReturnValue('system') as any,
+      isDark: vi.fn().mockReturnValue(false) as any,
+      colorTheme: vi.fn().mockReturnValue('azure') as any,
+      availableColorThemes: vi.fn().mockReturnValue(Object.values(COLOR_THEMES)) as any,
+      setTheme: vi.fn(),
+      setColorTheme: vi.fn()
     };
 
     await TestBed.configureTestingModule({
@@ -56,5 +59,28 @@ describe('SettingsAppearance', () => {
 
   it('should create', () => {
     expect(component).toBeTruthy();
+  });
+
+  it('should set theme when setTheme is called', () => {
+    component.setTheme('dark');
+    expect(themeServiceMock.setTheme).toHaveBeenCalledWith('dark');
+  });
+
+  it('should set color theme when setColorTheme is called', () => {
+    const tealTheme = COLOR_THEMES.teal;
+    component.setColorTheme(tealTheme);
+    expect(themeServiceMock.setColorTheme).toHaveBeenCalledWith('teal');
+  });
+
+  it('should check if color theme is selected', () => {
+    const azureTheme = COLOR_THEMES.azure;
+    const result = component.isColorThemeSelected(azureTheme);
+    expect(result).toBe(true);
+  });
+
+  it('should return false for non-selected theme', () => {
+    const purpleTheme = COLOR_THEMES.purple;
+    const result = component.isColorThemeSelected(purpleTheme);
+    expect(result).toBe(false);
   });
 });

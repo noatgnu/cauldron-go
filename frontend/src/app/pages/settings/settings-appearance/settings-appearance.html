@@ -1,6 +1,6 @@
 <div class="appearance-settings">
   <div class="form-section">
-    <h3>Theme</h3>
+    <h3>Theme Mode</h3>
     <p class="section-description">Choose between light, dark, or system theme</p>
 
     <mat-button-toggle-group
@@ -30,12 +30,35 @@
         }
       </div>
     </div>
+  </div>
 
-    <div class="info-box">
-      <mat-icon>code</mat-icon>
-      <div>
-        Console and terminal outputs will always use dark theme regardless of the selected app theme for better readability.
-      </div>
+  <div class="form-section">
+    <h3>Color Theme</h3>
+    <p class="section-description">Select a color palette for the application</p>
+
+    <div class="color-theme-grid">
+      @for (theme of themeService.availableColorThemes(); track theme.id) {
+        <button
+          class="color-theme-card"
+          [class.selected]="isColorThemeSelected(theme)"
+          (click)="setColorTheme(theme)">
+          <div class="color-preview">
+            <div class="color-half light" [style.background-color]="theme.previewLight"></div>
+            <div class="color-half dark" [style.background-color]="theme.previewDark"></div>
+          </div>
+          <span class="theme-name">{{ theme.displayName }}</span>
+          @if (isColorThemeSelected(theme)) {
+            <mat-icon class="check-icon">check</mat-icon>
+          }
+        </button>
+      }
+    </div>
+  </div>
+
+  <div class="info-box">
+    <mat-icon>code</mat-icon>
+    <div>
+      Console and terminal outputs will always use dark theme regardless of the selected app theme for better readability.
     </div>
   </div>
 </div>

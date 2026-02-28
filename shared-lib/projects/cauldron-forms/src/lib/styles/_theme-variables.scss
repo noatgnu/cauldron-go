@@ -1,3 +1,5 @@
+@use './_color-themes' as *;
+
 :root {
   --background: #ffffff;
   --surface: #f5f5f5;
@@ -13,13 +15,6 @@
   --selected: rgba(0, 0, 0, 0.08);
   --disabled: rgba(0, 0, 0, 0.38);
   --overlay: rgba(0, 0, 0, 0.7);
-
-  --primary: #1976d2;
-  --primary-light: #2196f3;
-  --primary-dark: #0d47a1;
-  --primary-container: #e3f2fd;
-  --primary-hover: rgba(25, 118, 210, 0.08);
-  --on-primary: #ffffff;
 
   --error: #d32f2f;
   --error-light: #f44336;
@@ -50,20 +45,6 @@
   --on-info: #ffffff;
   --on-info-container: #0d47a1;
 
-  --accent: #ff4081;
-  --accent-light: #ff79b0;
-  --accent-dark: #c60055;
-  --accent-container: #fce4ec;
-  --on-accent: #ffffff;
-  --on-accent-container: #880e4f;
-
-  --tertiary: #6a1b9a;
-  --tertiary-light: #9c4dcc;
-  --tertiary-dark: #4a148c;
-  --tertiary-container: #f3e5f5;
-  --on-tertiary: #ffffff;
-  --on-tertiary-container: #4a148c;
-
   --console-background: #1e1e1e;
   --console-text: #d4d4d4;
   --console-border: #333333;
@@ -86,13 +67,6 @@ body.dark-theme {
   --selected: rgba(255, 255, 255, 0.08);
   --disabled: rgba(255, 255, 255, 0.38);
   --overlay: rgba(0, 0, 0, 0.8);
-
-  --primary: #64b5f6;
-  --primary-light: #90caf9;
-  --primary-dark: #42a5f5;
-  --primary-container: rgba(33, 150, 243, 0.2);
-  --primary-hover: rgba(100, 181, 246, 0.08);
-  --on-primary: rgba(0, 0, 0, 0.87);
 
   --error: #ef5350;
   --error-light: #e57373;
@@ -122,20 +96,6 @@ body.dark-theme {
   --info-container: rgba(33, 150, 243, 0.2);
   --on-info: rgba(0, 0, 0, 0.87);
   --on-info-container: #64b5f6;
-
-  --accent: #ff80ab;
-  --accent-light: #ffb2dd;
-  --accent-dark: #f50057;
-  --accent-container: rgba(255, 64, 129, 0.2);
-  --on-accent: rgba(0, 0, 0, 0.87);
-  --on-accent-container: #ff80ab;
-
-  --tertiary: #ba68c8;
-  --tertiary-light: #ce93d8;
-  --tertiary-dark: #ab47bc;
-  --tertiary-container: rgba(156, 39, 176, 0.2);
-  --on-tertiary: rgba(0, 0, 0, 0.87);
-  --on-tertiary-container: #ba68c8;
 }
 
 body.light-theme {
