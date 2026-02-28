@@ -14,9 +14,14 @@
     "importHelpers": true,
     "target": "ES2022",
     "module": "preserve",
+    "moduleResolution": "bundler",
     "baseUrl": ".",
     "paths": {
-      "@cauldron/forms": ["../shared-lib/dist/cauldron-forms"]
+      "@cauldron/forms": [
+        "../shared-lib/dist/cauldron-forms",
+        "../shared-lib/dist/cauldron-forms/types/cauldron-forms.d.ts"
+      ],
+      "@cauldron/forms/*": ["../shared-lib/dist/cauldron-forms/*"]
     }
   },
   "angularCompilerOptions": {
