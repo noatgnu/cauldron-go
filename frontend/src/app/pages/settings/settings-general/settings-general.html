@@ -5,7 +5,7 @@
     <mat-form-field appearance="outline" class="full-width-field">
       <mat-label>Output Directory</mat-label>
       <input matInput [value]="config().outputDirectory || ''" readonly>
-      <button mat-icon-button matSuffix (click)="browseOutputDirectory()" matTooltip="Select output directory">
+      <button mat-icon-button matSuffix (click)="browseOutputDirectory()" matTooltip="Select output directory" aria-label="Select output directory">
         <mat-icon>folder_open</mat-icon>
       </button>
     </mat-form-field>

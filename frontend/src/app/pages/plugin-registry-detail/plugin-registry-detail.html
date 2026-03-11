@@ -8,7 +8,7 @@
 
   @if (!loading() && plugin()) {
     <div class="header-bar">
-      <button mat-icon-button (click)="goBack()">
+      <button mat-icon-button (click)="goBack()" aria-label="Go back to plugin registry">
         <mat-icon>arrow_back</mat-icon>
       </button>
       <h1>{{ plugin()!.name }}</h1>

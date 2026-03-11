@@ -29,7 +29,7 @@
                             <p class="env-path">{{ pythonBinding()?.EnvironmentPath }}</p>
                           </div>
                         </div>
-                        <button mat-icon-button color="warn" (click)="unbindEnvironment('python')" matTooltip="Unbind">
+                        <button mat-icon-button color="warn" (click)="unbindEnvironment('python')" matTooltip="Unbind" aria-label="Unbind Python environment">
                           <mat-icon>link_off</mat-icon>
                         </button>
                       </mat-card-content>
@@ -46,7 +46,7 @@
                             <p class="env-path">{{ rBinding()?.EnvironmentPath }}</p>
                           </div>
                         </div>
-                        <button mat-icon-button color="warn" (click)="unbindEnvironment('r')" matTooltip="Unbind">
+                        <button mat-icon-button color="warn" (click)="unbindEnvironment('r')" matTooltip="Unbind" aria-label="Unbind R environment">
                           <mat-icon>link_off</mat-icon>
                         </button>
                       </mat-card-content>

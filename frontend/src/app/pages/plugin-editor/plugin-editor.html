@@ -122,7 +122,7 @@
                       <mat-option value="direct">Direct (no runtime)</mat-option>
                     </mat-select>
                   </mat-form-field>
-                  <button mat-icon-button (click)="removeEnvironment(i)" type="button" [disabled]="environments.length === 1">
+                  <button mat-icon-button (click)="removeEnvironment(i)" type="button" [disabled]="environments.length === 1" aria-label="Remove environment">
                     <mat-icon>delete</mat-icon>
                   </button>
                 </div>
@@ -336,7 +336,7 @@
                       <input matInput [formControl]="$any(pkg)">
                       <mat-hint>Package name with optional version (e.g., pandas>=2.0.0)</mat-hint>
                     </mat-form-field>
-                    <button mat-icon-button (click)="removePackage(i)" type="button">
+                    <button mat-icon-button (click)="removePackage(i)" type="button" aria-label="Remove package">
                       <mat-icon>delete</mat-icon>
                     </button>
                   </div>

@@ -51,7 +51,7 @@
                     <div class="license-info">
                       <span class="license-type">{{ dep.license }}</span>
                       @if (dep.repository) {
-                        <a mat-icon-button [href]="dep.repository" target="_blank" color="primary" matTooltip="Open repository">
+                        <a mat-icon-button [href]="dep.repository" target="_blank" color="primary" matTooltip="Open repository" aria-label="Open repository in browser">
                           <mat-icon>open_in_new</mat-icon>
                         </a>
                       }
@@ -77,7 +77,7 @@
                     <div class="license-info">
                       <span class="license-type">{{ dep.license }}</span>
                       @if (dep.repository) {
-                        <a mat-icon-button [href]="dep.repository" target="_blank" color="primary" matTooltip="Open repository">
+                        <a mat-icon-button [href]="dep.repository" target="_blank" color="primary" matTooltip="Open repository" aria-label="Open repository in browser">
                           <mat-icon>open_in_new</mat-icon>
                         </a>
                       }

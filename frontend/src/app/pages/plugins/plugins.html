@@ -102,7 +102,7 @@
                       <mat-label>{{ input.label }}</mat-label>
                       <input matInput readonly [formControlName]="input.name" [placeholder]="input.placeholder || ''">
                       <mat-icon matPrefix>{{ getInputIcon(input.type) }}</mat-icon>
-                      <button mat-icon-button matSuffix type="button" (click)="openFileForInput(i, input.name)">
+                      <button mat-icon-button matSuffix type="button" (click)="openFileForInput(i, input.name)" aria-label="Browse for file">
                         <mat-icon>folder_open</mat-icon>
                       </button>
                       @if (input.description) {

@@ -37,7 +37,7 @@
                 <code class="key">{{ v.Key }}</code>
                 <span class="separator">=</span>
                 <span class="value">{{ v.Value }}</span>
-                <button mat-icon-button color="warn" (click)="deleteGlobalVar(v.ID)">
+                <button mat-icon-button color="warn" (click)="deleteGlobalVar(v.ID)" aria-label="Delete variable">
                   <mat-icon>delete</mat-icon>
                 </button>
               </div>

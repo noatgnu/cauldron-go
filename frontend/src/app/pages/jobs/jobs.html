@@ -138,7 +138,7 @@
           <div class="action-buttons">
             @if (canRerun(job)) {
               <button mat-icon-button [matMenuTriggerFor]="rerunMenu" (click)="$event.stopPropagation()"
-                      matTooltip="Rerun job">
+                      matTooltip="Rerun job" aria-label="Rerun job">
                 <mat-icon>replay</mat-icon>
               </button>
               <mat-menu #rerunMenu="matMenu">
@@ -155,12 +155,12 @@
             }
             @if (hasOutputDirectory(job)) {
               <button mat-icon-button (click)="openOutputDirectory($event, job)"
-                      matTooltip="Open output directory">
+                      matTooltip="Open output directory" aria-label="Open output directory">
                 <mat-icon>folder_open</mat-icon>
               </button>
             }
             <button mat-icon-button (click)="deleteJob($event, job.id)"
-                    matTooltip="Delete job">
+                    matTooltip="Delete job" aria-label="Delete job">
               <mat-icon>delete</mat-icon>
             </button>
           </div>

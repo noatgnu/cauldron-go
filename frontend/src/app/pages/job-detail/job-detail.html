@@ -166,22 +166,24 @@
                 <mat-form-field appearance="outline" class="search-field">
                   <mat-label>Search console output</mat-label>
                   <input matInput [(ngModel)]="searchTerm" (ngModelChange)="searchTerm.set($event)">
-                  <button mat-icon-button matSuffix *ngIf="searchTerm()" (click)="clearSearch()" matTooltip="Clear search">
+                  <button mat-icon-button matSuffix *ngIf="searchTerm()" (click)="clearSearch()" matTooltip="Clear search" aria-label="Clear search">
                     <mat-icon>close</mat-icon>
                   </button>
                 </mat-form-field>
                 <div class="search-controls">
                   <button mat-icon-button (click)="toggleCaseSensitive()"
                           [color]="caseSensitive() ? 'primary' : ''"
-                          matTooltip="Case sensitive">
+                          matTooltip="Case sensitive"
+                          aria-label="Toggle case sensitive search"
+                          [attr.aria-pressed]="caseSensitive()">
                     <mat-icon>match_case</mat-icon>
                   </button>
                   @if (searchTerm() && matchCount() > 0) {
                     <span class="match-count">{{ matchCount() }} {{ matchCount() === 1 ? 'match' : 'matches' }}</span>
-                    <button mat-icon-button (click)="previousMatch()" matTooltip="Previous match">
+                    <button mat-icon-button (click)="previousMatch()" matTooltip="Previous match" aria-label="Previous match">
                       <mat-icon>keyboard_arrow_up</mat-icon>
                     </button>
-                    <button mat-icon-button (click)="nextMatch()" matTooltip="Next match">
+                    <button mat-icon-button (click)="nextMatch()" matTooltip="Next match" aria-label="Next match">
                       <mat-icon>keyboard_arrow_down</mat-icon>
                     </button>
                   }

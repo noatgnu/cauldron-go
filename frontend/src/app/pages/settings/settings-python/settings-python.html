@@ -105,11 +105,11 @@
     <mat-form-field appearance="outline" class="full-width-field">
       <mat-label>Virtual Environments Storage Path</mat-label>
       <input matInput [value]="config().venvStoragePath || ''" readonly placeholder="Default location">
-      <button mat-icon-button matSuffix (click)="browseVenvStorage()" matTooltip="Select venv storage directory">
+      <button mat-icon-button matSuffix (click)="browseVenvStorage()" matTooltip="Select venv storage directory" aria-label="Select venv storage directory">
         <mat-icon>folder_open</mat-icon>
       </button>
       @if (config().venvStoragePath) {
-        <button mat-icon-button matSuffix (click)="clearVenvStorage()" matTooltip="Use default location">
+        <button mat-icon-button matSuffix (click)="clearVenvStorage()" matTooltip="Use default location" aria-label="Use default location">
           <mat-icon>clear</mat-icon>
         </button>
       }
@@ -146,12 +146,12 @@
               <div class="meta-actions">
                 @if (getBoundPlugins(venv.ID); as plugins) {
                   @if (plugins.length > 0) {
-                    <button mat-icon-button color="accent" (click)="showBoundPlugins(venv.ID, venv.Name)" matTooltip="View bound plugins">
+                    <button mat-icon-button color="accent" (click)="showBoundPlugins(venv.ID, venv.Name)" matTooltip="View bound plugins" aria-label="View bound plugins">
                       <mat-icon>link</mat-icon>
                     </button>
                   }
                 }
-                <button mat-icon-button (click)="deleteVirtualEnv(venv.ID)" color="warn" matTooltip="Delete environment">
+                <button mat-icon-button (click)="deleteVirtualEnv(venv.ID)" color="warn" matTooltip="Delete environment" aria-label="Delete environment">
                   <mat-icon>delete</mat-icon>
                 </button>
               </div>

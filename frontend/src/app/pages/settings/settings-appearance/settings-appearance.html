@@ -41,14 +41,16 @@
         <button
           class="color-theme-card"
           [class.selected]="isColorThemeSelected(theme)"
-          (click)="setColorTheme(theme)">
-          <div class="color-preview">
+          (click)="setColorTheme(theme)"
+          [attr.aria-label]="'Select ' + theme.displayName + ' theme'"
+          [attr.aria-pressed]="isColorThemeSelected(theme)">
+          <div class="color-preview" aria-hidden="true">
             <div class="color-half light" [style.background-color]="theme.previewLight"></div>
             <div class="color-half dark" [style.background-color]="theme.previewDark"></div>
           </div>
           <span class="theme-name">{{ theme.displayName }}</span>
           @if (isColorThemeSelected(theme)) {
-            <mat-icon class="check-icon">check</mat-icon>
+            <mat-icon class="check-icon" aria-hidden="true">check</mat-icon>
           }
         </button>
       }

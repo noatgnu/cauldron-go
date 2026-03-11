@@ -98,11 +98,11 @@
     <mat-form-field appearance="outline" class="full-width-field">
       <mat-label>R Environments Storage Path</mat-label>
       <input matInput [value]="config().renvStoragePath || ''" readonly placeholder="Default location">
-      <button mat-icon-button matSuffix (click)="browseRenvStorage()" matTooltip="Select renv storage directory">
+      <button mat-icon-button matSuffix (click)="browseRenvStorage()" matTooltip="Select renv storage directory" aria-label="Select renv storage directory">
         <mat-icon>folder_open</mat-icon>
       </button>
       @if (config().renvStoragePath) {
-        <button mat-icon-button matSuffix (click)="clearRenvStorage()" matTooltip="Use default location">
+        <button mat-icon-button matSuffix (click)="clearRenvStorage()" matTooltip="Use default location" aria-label="Use default location">
           <mat-icon>clear</mat-icon>
         </button>
       }
@@ -139,12 +139,12 @@
               <div class="meta-actions">
                 @if (getBoundPlugins(renv.ID); as plugins) {
                   @if (plugins.length > 0) {
-                    <button mat-icon-button color="accent" (click)="showBoundPlugins(renv.ID, getRenvName(renv))" matTooltip="View bound plugins">
+                    <button mat-icon-button color="accent" (click)="showBoundPlugins(renv.ID, getRenvName(renv))" matTooltip="View bound plugins" aria-label="View bound plugins">
                       <mat-icon>link</mat-icon>
                     </button>
                   }
                 }
-                <button mat-icon-button (click)="deleteRenvEnvironment(renv.ID)" color="warn" matTooltip="Delete environment">
+                <button mat-icon-button (click)="deleteRenvEnvironment(renv.ID)" color="warn" matTooltip="Delete environment" aria-label="Delete environment">
                   <mat-icon>delete</mat-icon>
                 </button>
               </div>

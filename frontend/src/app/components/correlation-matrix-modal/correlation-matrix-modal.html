@@ -114,7 +114,7 @@
         @for (c of colorRamp; track c; let i = $index) {
           <div class="color-item">
             <input type="color" [(ngModel)]="colorRamp[i]" [ngModelOptions]="{standalone: true}" class="color-picker">
-            <button mat-icon-button color="warn" type="button" (click)="removeColor(i)">
+            <button mat-icon-button color="warn" type="button" (click)="removeColor(i)" aria-label="Remove color">
               <mat-icon>remove</mat-icon>
             </button>
           </div>

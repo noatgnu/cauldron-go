@@ -42,7 +42,8 @@
           [value]="newPassphrase()"
           (input)="newPassphrase.set($any($event.target).value)">
         <mat-icon matPrefix>lock</mat-icon>
-        <button mat-icon-button matSuffix (click)="togglePassphraseVisibility()" type="button">
+        <button mat-icon-button matSuffix (click)="togglePassphraseVisibility()" type="button"
+                aria-label="Toggle passphrase visibility" [attr.aria-pressed]="showPassphrase()">
           <mat-icon>{{ showPassphrase() ? 'visibility_off' : 'visibility' }}</mat-icon>
         </button>
       </mat-form-field>
@@ -117,7 +118,8 @@
                   mat-icon-button
                   color="warn"
                   (click)="deleteConfig(config.repositoryURL)"
-                  matTooltip="Delete configuration">
+                  matTooltip="Delete configuration"
+                  aria-label="Delete configuration">
                   <mat-icon>delete</mat-icon>
                 </button>
               </div>

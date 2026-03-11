@@ -8,7 +8,7 @@
       <p class="header-description">Browse and install community plugins from the registry</p>
     </div>
     <div class="header-actions">
-      <button mat-icon-button (click)="refreshRegistry()" [disabled]="loading()" matTooltip="Refresh registry data">
+      <button mat-icon-button (click)="refreshRegistry()" [disabled]="loading()" matTooltip="Refresh registry data" aria-label="Refresh registry data">
         <mat-icon>refresh</mat-icon>
       </button>
       <button mat-raised-button color="accent" (click)="openManualInstallDialog()">
@@ -23,7 +23,7 @@
       <mat-label>Search plugins</mat-label>
       <input matInput [(ngModel)]="searchQuery" (keyup.enter)="onSearch()">
       <mat-icon matPrefix>search</mat-icon>
-      <button mat-icon-button matSuffix (click)="onSearch()" [disabled]="loading()">
+      <button mat-icon-button matSuffix (click)="onSearch()" [disabled]="loading()" aria-label="Search plugins">
         <mat-icon>arrow_forward</mat-icon>
       </button>
     </mat-form-field>
@@ -123,7 +123,8 @@
             <button
               mat-icon-button
               (click)="viewDetails(plugin)"
-              matTooltip="View Details">
+              matTooltip="View Details"
+              aria-label="View plugin details">
               <mat-icon>info</mat-icon>
             </button>
             <button
@@ -131,7 +132,8 @@
               color="primary"
               (click)="installPlugin(plugin)"
               [disabled]="!plugin.repository || isPluginInstalled(plugin)"
-              [matTooltip]="isPluginInstalled(plugin) ? 'Already Installed' : 'Install Plugin'">
+              [matTooltip]="isPluginInstalled(plugin) ? 'Already Installed' : 'Install Plugin'"
+              [attr.aria-label]="isPluginInstalled(plugin) ? 'Plugin already installed' : 'Install plugin'">
               <mat-icon>download</mat-icon>
             </button>
             @if (plugin.repository) {
@@ -140,7 +142,8 @@
                 [href]="plugin.repository"
                 target="_blank"
                 rel="noopener noreferrer"
-                matTooltip="View Repository">
+                matTooltip="View Repository"
+                aria-label="View plugin repository in browser">
                 <mat-icon>open_in_new</mat-icon>
               </a>
             }

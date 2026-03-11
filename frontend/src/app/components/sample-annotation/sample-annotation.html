@@ -37,7 +37,7 @@
                 <input matInput [(ngModel)]="rule.batch">
               </mat-form-field>
 
-              <button mat-icon-button color="warn" (click)="removeRegexRule($index)" matTooltip="Remove rule">
+              <button mat-icon-button color="warn" (click)="removeRegexRule($index)" matTooltip="Remove rule" aria-label="Remove rule">
                 <mat-icon>delete</mat-icon>
               </button>
             </div>

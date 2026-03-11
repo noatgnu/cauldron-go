@@ -15,7 +15,7 @@
       <input matInput [(ngModel)]="searchQuery">
       <mat-icon matPrefix>search</mat-icon>
       @if (searchQuery()) {
-        <button matSuffix mat-icon-button (click)="clearSearch()">
+        <button matSuffix mat-icon-button (click)="clearSearch()" aria-label="Clear search">
           <mat-icon>clear</mat-icon>
         </button>
       }

@@ -10,7 +10,7 @@
                    (input)="updateSearch($any($event.target).value)">
             <mat-icon matPrefix>search</mat-icon>
             @if (searchQuery()) {
-              <button matSuffix mat-icon-button (click)="clearSearch()" type="button">
+              <button matSuffix mat-icon-button (click)="clearSearch()" type="button" aria-label="Clear search">
                 <mat-icon>clear</mat-icon>
               </button>
             }

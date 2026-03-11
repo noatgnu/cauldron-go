@@ -15,8 +15,9 @@
             max="200"
             step="25"
             discrete
-            [displayWith]="formatLabel">
-            <input matSliderThumb [(ngModel)]="fontScaleValue">
+            [displayWith]="formatLabel"
+            aria-label="Font size percentage">
+            <input matSliderThumb [(ngModel)]="fontScaleValue" aria-label="Font size">
           </mat-slider>
           <div class="font-scale-preview">
             Current size: {{ fontScaleValue }}%

@@ -1,3 +1,4 @@
+<a href="#main-content" class="skip-link">Skip to main content</a>
 <app-loading-screen></app-loading-screen>
 <div class="app-container">
   <mat-sidenav-container class="sidenav-container">
@@ -6,11 +7,13 @@
       [opened]="true"
       [mode]="'side'"
       [disableClose]="true"
-      class="sidenav">
+      class="sidenav"
+      role="navigation"
+      aria-label="Main navigation">
       <app-sidenav></app-sidenav>
     </mat-sidenav>
 
-    <mat-sidenav-content class="main-content">
+    <mat-sidenav-content class="main-content" id="main-content" role="main">
       <app-breadcrumbs></app-breadcrumbs>
       <router-outlet></router-outlet>
     </mat-sidenav-content>
