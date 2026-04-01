@@ -475,6 +475,17 @@ jobs:
           cp -r plugins/* build/bin/plugins/
           cp -r examples/diann/* build/bin/examples/diann/
 
+      - name: Create dummy frontend dist for embedding
+        run: |
+          mkdir -p frontend/dist/browser
+          echo "placeholder" > frontend/dist/browser/index.html
+
+      - name: Create dummy license files for embedding
+        run: |
+          mkdir -p resources/licenses
+          echo "[]" > resources/licenses/go-licenses.json
+          echo "[]" > resources/licenses/npm-licenses.json
+
       - name: Verify example data exists
         run: |
           echo "Checking example data files..."
