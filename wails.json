@@ -10,7 +10,7 @@
   "bindings": {
     "output_dir": "./frontend/bindings",
     "ts_generation": {
-      "output_type": "classes"
+      "outputType": "classes"
     }
   },
   "author": {

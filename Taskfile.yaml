@@ -36,7 +36,7 @@ tasks:
     deps:
       - build-frontend
     cmds:
-      - wails3 generate bindings
+      - wails3 generate bindings -ts
 
   generate-licenses:
     desc: Generate license information for Go and NPM dependencies

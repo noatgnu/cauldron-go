@@ -86,6 +86,13 @@ jobs:
           echo "placeholder" > frontend/dist/browser/index.html
         shell: bash
 
+      - name: Create dummy license files for embedding
+        run: |
+          mkdir -p resources/licenses
+          echo "[]" > resources/licenses/go-licenses.json
+          echo "[]" > resources/licenses/npm-licenses.json
+        shell: bash
+
       - name: Run Backend Tests
         run: go test -v ./backend/... ./cmd/...
         shell: bash
@@ -274,6 +281,12 @@ jobs:
           mkdir -p frontend/dist/browser
           echo "placeholder" > frontend/dist/browser/index.html
 
+      - name: Create dummy license files for embedding
+        run: |
+          mkdir -p resources/licenses
+          echo "[]" > resources/licenses/go-licenses.json
+          echo "[]" > resources/licenses/npm-licenses.json
+
       - name: Run Backend Tests
         run: go test -v ./backend/... ./cmd/...
 
@@ -433,6 +446,12 @@ jobs:
         run: |
           mkdir -p frontend/dist/browser
           echo "placeholder" > frontend/dist/browser/index.html
+
+      - name: Create dummy license files for embedding
+        run: |
+          mkdir -p resources/licenses
+          echo "[]" > resources/licenses/go-licenses.json
+          echo "[]" > resources/licenses/npm-licenses.json
 
       - name: Run Backend Tests
         run: go test -v ./backend/... ./cmd/...
