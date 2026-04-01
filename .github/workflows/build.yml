@@ -379,14 +379,12 @@ jobs:
 
       - name: Run E2E plugin requirements tests
         env:
-          PYTHON_PATH: ${{ github.workspace }}/python/python/bin/python3
           BUILD_DIR: ${{ github.workspace }}/build/bin
         run: |
           go test -v -run "TestE2EPluginRequirements" -timeout 120s
 
       - name: Run E2E process job code path tests
         env:
-          PYTHON_PATH: ${{ github.workspace }}/python/python/bin/python3
           BUILD_DIR: ${{ github.workspace }}/build/bin
         run: |
           go test -v -run "TestE2EProcessJobCodePath" -timeout 120s
@@ -437,9 +435,9 @@ jobs:
           tar -xzf cpython-3.11.10+20241016-x86_64-unknown-linux-gnu-install_only.tar.gz -C "${{ github.workspace }}/python" --no-same-owner --no-same-permissions
           echo "${{ github.workspace }}/python/python/bin" >> $GITHUB_PATH
 
-      - name: Install Python dependencies for CV Plot plugin
+      - name: Install base Python dependencies
         run: |
-          ${{ github.workspace }}/python/python/bin/pip3 install pandas numpy matplotlib seaborn scipy plotly kaleido
+          ${{ github.workspace }}/python/python/bin/pip3 install pip --upgrade
 
       - name: Make build.sh executable
         run: chmod +x build.sh
@@ -497,14 +495,12 @@ jobs:
 
       - name: Run E2E tests with actual plugins
         env:
-          PYTHON_PATH: ${{ github.workspace }}/python/python/bin/python3
           BUILD_DIR: ${{ github.workspace }}/build/bin
         run: |
           go test -v -run "TestE2EWithActualPlugins" -timeout 300s
 
       - name: Run E2E job output operations test
         env:
-          PYTHON_PATH: ${{ github.workspace }}/python/python/bin/python3
           BUILD_DIR: ${{ github.workspace }}/build/bin
         run: |
           go test -v -run "TestE2EJobOutputOperations" -timeout 300s

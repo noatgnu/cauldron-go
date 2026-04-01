@@ -43,6 +43,45 @@ func TestE2EWithActualPlugins(t *testing.T) {
 		t.Fatal("No plugins found in build directory")
 	}
 
+	settings := app.GetSettings()
+	pythonPath := settings.PythonPath
+	if pythonPath == "" {
+		var err error
+		pythonPath, err = app.DetectPythonPath()
+		if err != nil {
+			t.Skipf("Failed to detect Python: %v", err)
+		}
+	}
+	t.Logf("Using Python at: %s", pythonPath)
+
+	var createdVenvPaths []string
+	for _, p := range plugins {
+		if p.Definition.Runtime.HasEnvironment("python") {
+			venvPath, err := app.GetDefaultVenvPath(p.Definition.Plugin.ID)
+			if err != nil {
+				t.Logf("Warning: Failed to get venv path for %s: %v", p.Definition.Plugin.ID, err)
+				continue
+			}
+			err = app.CreatePythonVirtualEnv(pythonPath, venvPath, p.Definition.Plugin.ID)
+			if err != nil {
+				t.Logf("Warning: Failed to create venv for %s: %v", p.Definition.Plugin.ID, err)
+				continue
+			}
+			createdVenvPaths = append(createdVenvPaths, venvPath)
+			venvPythonPath := filepath.Join(venvPath, "bin", "python")
+			err = app.BindPluginToEnvironment(p.Definition.Plugin.ID, "python", 0, venvPythonPath)
+			if err != nil {
+				t.Logf("Warning: Failed to bind environment for %s: %v", p.Definition.Plugin.ID, err)
+			}
+		}
+	}
+	defer func() {
+		for _, venvPath := range createdVenvPaths {
+			os.RemoveAll(venvPath)
+		}
+	}()
+	t.Logf("Created virtual environments and bound Python plugins")
+
 	for i, p := range plugins {
 		if i >= 5 {
 			t.Logf("... and %d more", len(plugins)-5)
@@ -213,6 +252,17 @@ func TestE2EProcessJobCodePath(t *testing.T) {
 
 	time.Sleep(500 * time.Millisecond)
 
+	settings := app.GetSettings()
+	pythonPath := settings.PythonPath
+	if pythonPath == "" {
+		var err error
+		pythonPath, err = app.DetectPythonPath()
+		if err != nil {
+			t.Skipf("Failed to detect Python: %v", err)
+		}
+	}
+	t.Logf("Using Python at: %s", pythonPath)
+
 	db := app.db
 	pluginLoader := services.NewPluginLoaderV2(pluginsDir, db, nil)
 	if err := pluginLoader.LoadPlugins(); err != nil {
@@ -224,6 +274,33 @@ func TestE2EProcessJobCodePath(t *testing.T) {
 	if len(plugins) == 0 {
 		t.Fatal("No plugins loaded")
 	}
+
+	var createdVenvPaths []string
+	for _, p := range plugins {
+		if p.Definition.Runtime.HasEnvironment("python") {
+			venvPath, err := app.GetDefaultVenvPath(p.Definition.Plugin.ID)
+			if err != nil {
+				t.Logf("Warning: Failed to get venv path for %s: %v", p.Definition.Plugin.ID, err)
+				continue
+			}
+			err = app.CreatePythonVirtualEnv(pythonPath, venvPath, p.Definition.Plugin.ID)
+			if err != nil {
+				t.Logf("Warning: Failed to create venv for %s: %v", p.Definition.Plugin.ID, err)
+				continue
+			}
+			createdVenvPaths = append(createdVenvPaths, venvPath)
+			venvPythonPath := filepath.Join(venvPath, "bin", "python")
+			err = app.BindPluginToEnvironment(p.Definition.Plugin.ID, "python", 0, venvPythonPath)
+			if err != nil {
+				t.Logf("Warning: Failed to bind environment for %s: %v", p.Definition.Plugin.ID, err)
+			}
+		}
+	}
+	defer func() {
+		for _, venvPath := range createdVenvPaths {
+			os.RemoveAll(venvPath)
+		}
+	}()
 
 	plugin := plugins[0]
 	t.Logf("Using plugin: %s (ID: %d)", plugin.Definition.Plugin.Name, plugin.ID)

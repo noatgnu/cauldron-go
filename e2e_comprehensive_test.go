@@ -224,6 +224,37 @@ func TestE2EJobOutputOperations(t *testing.T) {
 		t.Skip("cv-plot plugin not found")
 	}
 
+	settings := app.GetSettings()
+	pythonPath := settings.PythonPath
+	if pythonPath == "" {
+		var err error
+		pythonPath, err = app.DetectPythonPath()
+		if err != nil {
+			t.Skipf("Failed to detect Python: %v", err)
+		}
+	}
+	t.Logf("Using Python at: %s", pythonPath)
+
+	venvPath, err := app.GetDefaultVenvPath(cvPlugin.Definition.Plugin.ID)
+	if err != nil {
+		t.Fatalf("Failed to get default venv path: %v", err)
+	}
+	defer os.RemoveAll(venvPath)
+	t.Logf("Creating virtual environment at: %s", venvPath)
+
+	err = app.CreatePythonVirtualEnv(pythonPath, venvPath, cvPlugin.Definition.Plugin.ID)
+	if err != nil {
+		t.Fatalf("Failed to create virtual environment: %v", err)
+	}
+	t.Logf("Created virtual environment with requirements installed")
+
+	venvPythonPath := filepath.Join(venvPath, "bin", "python")
+	err = app.BindPluginToEnvironment(cvPlugin.Definition.Plugin.ID, "python", 0, venvPythonPath)
+	if err != nil {
+		t.Fatalf("Failed to bind Python environment: %v", err)
+	}
+	t.Logf("Bound cv-plot plugin to virtual environment: %s", venvPythonPath)
+
 	examplesDir := filepath.Join(buildDir, "examples", "diann")
 	annotationPath := filepath.Join(examplesDir, "annotation.txt")
 	logFilePath := filepath.Join(examplesDir, "Reports.log.txt")

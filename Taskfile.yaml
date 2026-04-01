@@ -213,16 +213,19 @@ tasks:
       - wails3 dev
 
   test:e2e:
-    desc: Run E2E integration tests using Playwright
-    dir: frontend
+    desc: Run E2E integration tests using Playwright (starts app automatically)
     cmds:
-      - npx playwright test
+      - ./scripts/run-e2e-tests.sh
 
   test:e2e:ui:
     desc: Run E2E integration tests using Playwright with UI
-    dir: frontend
     cmds:
-      - npx playwright test --ui
+      - ./scripts/run-e2e-tests.sh --ui
+
+  test:e2e:headed:
+    desc: Run E2E integration tests in headed mode
+    cmds:
+      - ./scripts/run-e2e-tests.sh --headed
 
   clean:
     desc: Clean build artifacts
