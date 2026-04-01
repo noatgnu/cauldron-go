@@ -35,24 +35,24 @@ jobs:
         run: ./build.sh external linux/amd64
 
       - name: Test plugin-validator
-        run: ./bin/plugin-validator plugins/pca-analysis
+        run: ./bin/linux-amd64/plugin-validator plugins/pca-analysis
 
       - name: Test plugin-to-nextflow
-        run: ./bin/plugin-to-nextflow --plugin plugins/pca-analysis --output /tmp/nf-pca
+        run: ./bin/linux-amd64/plugin-to-nextflow --plugin plugins/pca-analysis --output /tmp/nf-pca
 
       - name: Test doc generator
-        run: ./bin/plugin-doc-generator plugins/pca-analysis
+        run: ./bin/linux-amd64/plugin-doc-generator plugins/pca-analysis
 
       - name: Validate all plugins
-        run: ./bin/plugin-validator plugins/
+        run: ./bin/linux-amd64/plugin-validator plugins/
 
       - name: Test uniprot-fetcher help
-        run: ./bin/external/uniprot-fetcher --help
+        run: ./bin/external/linux-amd64/uniprot-fetcher --help
 
       - name: Test utility programs
         run: |
           echo "Testing uniprot-fetcher text mode..."
-          ./bin/external/uniprot-fetcher --ids "P12345" --from "UniProtKB_AC-ID" --fields "accession,id" --output /tmp/uniprot-test
+          ./bin/external/linux-amd64/uniprot-fetcher --ids "P12345" --from "UniProtKB_AC-ID" --fields "accession,id" --output /tmp/uniprot-test
           if [ ! -f /tmp/uniprot-test/uniprot_results.tsv ]; then
             echo "::error::uniprot-fetcher failed to create output file"
             exit 1
@@ -63,7 +63,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: dev-tools-linux
-          path: bin/
+          path: bin/linux-amd64/
 
   build-backend:
     name: Build Backend
@@ -108,7 +108,10 @@ jobs:
             libomp-dev \
             libreadline-dev \
             bzip2 \
-            python3-venv
+            python3-venv \
+            libgtk-3-dev \
+            libwebkit2gtk-4.1-dev \
+            libsoup-3.0-dev
 
       - name: Compile R
         run: |
@@ -167,10 +170,21 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+
+      - name: Install Wails CLI
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@latest
+
+      - name: Generate Wails bindings
+        run: wails3 generate bindings
 
       - name: Install shared-lib dependencies
         working-directory: shared-lib
@@ -214,7 +228,7 @@ jobs:
           path: bin/
 
       - name: Make tools executable
-        run: chmod +x bin/*
+        run: chmod -R +x bin/
 
       - name: Download frontend
         uses: actions/download-artifact@v4
@@ -294,6 +308,12 @@ jobs:
 
       - name: Make build.sh executable
         run: chmod +x build.sh
+
+      - name: Install Wails CLI
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@latest
+
+      - name: Generate Wails bindings
+        run: wails3 generate bindings
 
       - name: Build shared-lib
         working-directory: shared-lib
@@ -387,6 +407,12 @@ jobs:
 
       - name: Make build.sh executable
         run: chmod +x build.sh
+
+      - name: Install Wails CLI
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@latest
+
+      - name: Generate Wails bindings
+        run: wails3 generate bindings
 
       - name: Build shared-lib
         working-directory: shared-lib

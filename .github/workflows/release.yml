@@ -72,7 +72,7 @@ jobs:
       - name: Validate Plugins
         run: |
           echo "Validating all plugins before release..."
-          ./bin/plugin-validator.exe plugins/
+          ./bin/windows-amd64/plugin-validator.exe plugins/
           if [ $? -ne 0 ]; then
             echo "::error::Plugin validation failed - cannot create release"
             exit 1
@@ -256,7 +256,7 @@ jobs:
       - name: Validate Plugins
         run: |
           echo "Validating all plugins before release..."
-          ./bin/plugin-validator plugins/
+          ./bin/linux-amd64/plugin-validator plugins/
           if [ $? -ne 0 ]; then
             echo "::error::Plugin validation failed - cannot create release"
             exit 1
@@ -411,7 +411,7 @@ jobs:
       - name: Validate Plugins
         run: |
           echo "Validating all plugins before release..."
-          ./bin/plugin-validator plugins/
+          ./bin/darwin-arm64/plugin-validator plugins/
           if [ $? -ne 0 ]; then
             echo "::error::Plugin validation failed - cannot create release"
             exit 1
