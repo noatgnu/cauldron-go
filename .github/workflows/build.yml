@@ -153,6 +153,11 @@ jobs:
       - name: Build external utilities
         run: ./build.sh external linux/amd64
 
+      - name: Create dummy frontend dist for embedding
+        run: |
+          mkdir -p frontend/dist/browser
+          echo "placeholder" > frontend/dist/browser/index.html
+
       - name: Run backend unit tests
         run: go test -v ./backend/... ./cmd/...
 
@@ -179,6 +184,14 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+
+      - name: Install system dependencies for Wails
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgtk-3-dev \
+            libwebkit2gtk-4.1-dev \
+            libsoup-3.0-dev
 
       - name: Install Wails CLI
         run: go install github.com/wailsapp/wails/v3/cmd/wails3@latest

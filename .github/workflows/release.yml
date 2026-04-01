@@ -80,6 +80,12 @@ jobs:
           echo "::notice::All plugins validated successfully"
         shell: bash
 
+      - name: Create dummy frontend dist for embedding
+        run: |
+          mkdir -p frontend/dist/browser
+          echo "placeholder" > frontend/dist/browser/index.html
+        shell: bash
+
       - name: Run Backend Tests
         run: go test -v ./backend/... ./cmd/...
         shell: bash
@@ -263,6 +269,11 @@ jobs:
           fi
           echo "::notice::All plugins validated successfully"
 
+      - name: Create dummy frontend dist for embedding
+        run: |
+          mkdir -p frontend/dist/browser
+          echo "placeholder" > frontend/dist/browser/index.html
+
       - name: Run Backend Tests
         run: go test -v ./backend/... ./cmd/...
 
@@ -418,6 +429,11 @@ jobs:
           fi
           echo "::notice::All plugins validated successfully"
 
+      - name: Create dummy frontend dist for embedding
+        run: |
+          mkdir -p frontend/dist/browser
+          echo "placeholder" > frontend/dist/browser/index.html
+
       - name: Run Backend Tests
         run: go test -v ./backend/... ./cmd/...
 
@@ -432,7 +448,12 @@ jobs:
           cp resources/appicon.png build/appicon.png
 
       - name: Build Application
-        run: wails build -platform darwin/arm64
+        run: |
+          cd frontend
+          npm install
+          npm run build
+          cd ..
+          wails build -platform darwin/arm64
 
       - name: Verify Build
         run: ls -l build/bin/
