@@ -1,4 +1,4 @@
-import {Component, Inject} from '@angular/core';
+import {Component, Inject, ChangeDetectionStrategy} from '@angular/core';
 import {MAT_DIALOG_DATA, MatDialogModule, MatDialogRef} from "@angular/material/dialog";
 import {MatButtonModule} from "@angular/material/button";
 import {DataFrame, fromCSV, IDataFrame} from "data-forge";
@@ -20,6 +20,7 @@ export interface PhatePlotModalData {
   ],
   templateUrl: './phate-plot-modal.html',
   styleUrl: './phate-plot-modal.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class PhatePlotModal {
   phateData: IDataFrame<number, {x_phate: number, y_phate: number, z_phate?: number, sample: string}> = new DataFrame();

@@ -1,4 +1,4 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, signal, ChangeDetectionStrategy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -45,6 +45,7 @@ import {
   ],
   templateUrl: './plugin-registry.html',
   styleUrl: './plugin-registry.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class PluginRegistry implements OnInit {
   protected plugins = signal<RegistryPlugin[]>([]);

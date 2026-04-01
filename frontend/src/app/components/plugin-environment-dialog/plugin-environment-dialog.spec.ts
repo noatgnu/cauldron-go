@@ -1,11 +1,11 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { signal } from '@angular/core';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { PluginEnvironmentDialog } from './plugin-environment-dialog';
 import { Wails } from '../../core/services/wails';
 import { NotificationService } from '../../core/services/notification.service';
 import { vi } from 'vitest';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
-import { of } from 'rxjs';
 
 describe('PluginEnvironmentDialog', () => {
   let component: PluginEnvironmentDialog;
@@ -19,7 +19,7 @@ describe('PluginEnvironmentDialog', () => {
       close: vi.fn()
     };
     wailsMock = {
-      progress$: of(null),
+      progress: signal(null),
       getPluginEnvironmentBinding: vi.fn().mockResolvedValue(null),
       detectPythonEnvironments: vi.fn().mockResolvedValue([]),
       detectREnvironments: vi.fn().mockResolvedValue([]),

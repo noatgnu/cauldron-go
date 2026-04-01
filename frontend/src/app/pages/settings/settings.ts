@@ -1,4 +1,4 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, signal, ChangeDetectionStrategy } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { Location } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
@@ -30,6 +30,7 @@ type SettingsSection = 'general' | 'appearance' | 'accessibility' | 'python' | '
   ],
   templateUrl: './settings.html',
   styleUrl: './settings.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class Settings implements OnInit {
   protected currentSection = signal<SettingsSection>('general');

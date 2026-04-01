@@ -1,4 +1,4 @@
-import { Component, EventEmitter, OnInit, Output, signal, Inject } from '@angular/core';
+import { Component, EventEmitter, OnInit, Output, signal, Inject, ChangeDetectionStrategy } from '@angular/core';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
 import { FileHandler, ImportedFile } from '../../interfaces/file-handler.interface';
@@ -12,7 +12,8 @@ import { FILE_HANDLER } from '../../tokens/injection-tokens';
     MatSelectModule
   ],
   templateUrl: './imported-file-selection.html',
-  styleUrl: './imported-file-selection.scss'
+  styleUrl: './imported-file-selection.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class ImportedFileSelection implements OnInit {
   files = signal<ImportedFile[]>([]);

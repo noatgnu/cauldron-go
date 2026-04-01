@@ -1,4 +1,4 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, signal, ChangeDetectionStrategy, effect } from '@angular/core';
 import { Router } from '@angular/router';
 import { MatCardModule } from '@angular/material/card';
 import { MatChipsModule } from '@angular/material/chips';
@@ -27,6 +27,7 @@ import { Wails, Job, PythonEnvironment, REnvironment } from '../../core/services
   ],
   templateUrl: './jobs.html',
   styleUrl: './jobs.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class Jobs implements OnInit {
   protected jobs = signal<Job[]>([]);
@@ -55,15 +56,57 @@ export class Jobs implements OnInit {
     private wails: Wails,
     private router: Router,
     private dialog: MatDialog
-  ) {}
+  ) {
+    effect(() => {
+      const job = this.wails.jobUpdate();
+      if (!job) return;
+
+      const currentJobs = this.jobs();
+      const index = currentJobs.findIndex(j => j.id === job.id);
+
+      if (index >= 0) {
+        const updated = [...currentJobs];
+        updated[index] = job;
+        this.jobs.set(updated);
+      } else {
+        this.jobs.set([job, ...currentJobs]);
+      }
+    });
+
+    effect(() => {
+      const progress = this.wails.progress();
+      if (!progress) return;
+
+      if (progress.type === 'script' || progress.type === 'analysis') {
+        const jobId = progress.id;
+        const currentProgress = this.jobProgress();
+
+        if (progress.status === 'completed' || progress.status === 'error') {
+          const { [jobId]: _, ...rest } = currentProgress;
+          this.jobProgress.set(rest);
+        } else {
+          this.jobProgress.set({
+            ...currentProgress,
+            [jobId]: {
+              message: progress.message,
+              percentage: progress.percentage
+            }
+          });
+        }
+      }
+    });
+
+    effect(() => {
+      const status = this.wails.queueStatus();
+      if (!status) return;
+      this.queueStatus.set(status);
+    });
+  }
 
   async ngOnInit(): Promise<void> {
     await this.loadJobs();
     await this.loadEnvironments();
     await this.loadQueueStatus();
-    this.setupJobUpdates();
-    this.setupProgressUpdates();
-    this.setupQueueStatusUpdates();
   }
 
   async loadEnvironments(): Promise<void> {
@@ -91,46 +134,6 @@ export class Jobs implements OnInit {
     }
   }
 
-  setupJobUpdates(): void {
-    this.wails.jobUpdate$.subscribe(job => {
-      if (!job) return;
-
-      const currentJobs = this.jobs();
-      const index = currentJobs.findIndex(j => j.id === job.id);
-
-      if (index >= 0) {
-        const updated = [...currentJobs];
-        updated[index] = job;
-        this.jobs.set(updated);
-      } else {
-        this.jobs.set([job, ...currentJobs]);
-      }
-    });
-  }
-
-  setupProgressUpdates(): void {
-    this.wails.progress$.subscribe(progress => {
-      if (!progress) return;
-
-      if (progress.type === 'script' || progress.type === 'analysis') {
-        const jobId = progress.id;
-        const currentProgress = this.jobProgress();
-
-        if (progress.status === 'completed' || progress.status === 'error') {
-          const { [jobId]: _, ...rest } = currentProgress;
-          this.jobProgress.set(rest);
-        } else {
-          this.jobProgress.set({
-            ...currentProgress,
-            [jobId]: {
-              message: progress.message,
-              percentage: progress.percentage
-            }
-          });
-        }
-      }
-    });
-  }
 
   async deleteJob(event: Event, id: string): Promise<void> {
     event.stopPropagation();
@@ -292,13 +295,6 @@ export class Jobs implements OnInit {
     } catch (error) {
       await this.wails.logToFile(`Failed to load queue status: ${error}`);
     }
-  }
-
-  setupQueueStatusUpdates(): void {
-    this.wails.queueStatus$.subscribe(status => {
-      if (!status) return;
-      this.queueStatus.set(status);
-    });
   }
 
   async pauseQueue(): Promise<void> {

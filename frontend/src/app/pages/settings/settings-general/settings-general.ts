@@ -1,4 +1,4 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, signal, ChangeDetectionStrategy } from '@angular/core';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -9,7 +9,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { FormsModule } from '@angular/forms';
 import { Wails, Config } from '../../../core/services/wails';
 import { NotificationService } from '../../../core/services/notification.service';
-import { models } from '../../../../wailsjs/go/models';
+import * as models from '../../../../../bindings/github.com/noatgnu/cauldron-go/backend/models/models';
 
 @Component({
   selector: 'app-settings-general',
@@ -25,6 +25,7 @@ import { models } from '../../../../wailsjs/go/models';
   ],
   templateUrl: './settings-general.html',
   styleUrl: './settings-general.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class SettingsGeneral implements OnInit {
   protected config = signal<Partial<Config>>({});

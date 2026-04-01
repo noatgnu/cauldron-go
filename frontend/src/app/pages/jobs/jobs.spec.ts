@@ -1,4 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { signal } from '@angular/core';
 import { Jobs } from './jobs';
 import { Wails } from '../../core/services/wails';
 import { NotificationService } from '../../core/services/notification.service';
@@ -6,7 +7,6 @@ import { Router } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
 import { vi } from 'vitest';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
-import { of } from 'rxjs';
 
 describe('Jobs', () => {
   let component: Jobs;
@@ -20,9 +20,9 @@ describe('Jobs', () => {
     wailsMock = {
       getAllJobs: vi.fn().mockResolvedValue([]),
       getJobQueueStatus: vi.fn().mockResolvedValue({ status: 'running' }),
-      queueStatus$: of({ status: 'running' }),
-      jobUpdate$: of(null),
-      progress$: of(null),
+      queueStatus: signal({ status: 'running' }),
+      jobUpdate: signal(null),
+      progress: signal(null),
       logToFile: vi.fn().mockResolvedValue(undefined)
     };
     notificationMock = {

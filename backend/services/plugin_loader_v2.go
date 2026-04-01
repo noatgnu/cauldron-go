@@ -24,8 +24,14 @@ type PluginLoaderV2 struct {
 
 func NewPluginLoaderV2(pluginsDir string, db *DatabaseService, imageBuilder *DockerImageBuilder) *PluginLoaderV2 {
 	if pluginsDir == "" {
-		execPath, _ := os.Executable()
-		pluginsDir = filepath.Join(filepath.Dir(execPath), "plugins")
+		execPath, err := os.Executable()
+		if err == nil {
+			execDir := filepath.Dir(execPath)
+			pluginsDir = filepath.Join(execDir, "plugins")
+		} else {
+			log.Printf("[PluginLoader] ERROR: Failed to get executable path: %v", err)
+			pluginsDir = "plugins" // Fallback to relative path
+		}
 	}
 
 	return &PluginLoaderV2{

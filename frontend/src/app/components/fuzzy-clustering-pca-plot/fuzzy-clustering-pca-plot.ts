@@ -1,4 +1,4 @@
-import {Component, Input} from '@angular/core';
+import {Component, Input, ChangeDetectionStrategy} from '@angular/core';
 import { PlotlyModule } from 'angular-plotly.js';
 import {DataFrame, IDataFrame} from "data-forge";
 
@@ -7,6 +7,7 @@ import {DataFrame, IDataFrame} from "data-forge";
   imports: [PlotlyModule],
   templateUrl: './fuzzy-clustering-pca-plot.html',
   styleUrl: './fuzzy-clustering-pca-plot.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class FuzzyClusteringPcaPlot {
   @Input() data: IDataFrame<number, {x: number, y: number, Sample: string, Condition: string, cluster: number}> = new DataFrame();

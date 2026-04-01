@@ -1,4 +1,4 @@
-import { Component, OnInit, signal, inject, computed } from '@angular/core';
+import { Component, OnInit, signal, inject, computed, ChangeDetectionStrategy, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
@@ -17,7 +17,7 @@ import { MatTabsModule } from '@angular/material/tabs';
 import { FormsModule } from '@angular/forms';
 import { Wails, PythonEnvironment, REnvironment, PluginEnvironmentBinding, VirtualEnvironment, RenvEnvironment, CustomEnvVar } from '../../core/services/wails';
 import { DynamicFormComponent } from '../dynamic-form/dynamic-form';
-import { models } from '../../../wailsjs/go/models';
+import * as models from '../../../../bindings/github.com/noatgnu/cauldron-go/backend/models/models';
 
 export interface PluginEnvironmentDialogData {
   pluginId: string;
@@ -48,12 +48,22 @@ export interface PluginEnvironmentDialogData {
   ],
   templateUrl: './plugin-environment-dialog.html',
   styleUrl: './plugin-environment-dialog.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class PluginEnvironmentDialog implements OnInit {
-  data = inject<PluginEnvironmentDialogData>(MAT_DIALOG_DATA);
-  dialogRef = inject(MatDialogRef<PluginEnvironmentDialog>);
-  wails = inject(Wails);
-  notification = inject(NotificationService);
+  protected readonly data = inject<PluginEnvironmentDialogData>(MAT_DIALOG_DATA);
+  protected readonly dialogRef = inject(MatDialogRef<PluginEnvironmentDialog>);
+  private readonly wails = inject(Wails);
+  private readonly notification = inject(NotificationService);
+
+  constructor() {
+    effect(() => {
+      const progress = this.wails.progress();
+      if (progress && (progress.type === 'install' || progress.type === 'generic')) {
+        this.creationProgress.set(progress.message);
+      }
+    });
+  }
 
   loading = signal(true);
   pythonBinding = signal<PluginEnvironmentBinding | null>(null);
@@ -94,7 +104,6 @@ export class PluginEnvironmentDialog implements OnInit {
   async ngOnInit() {
     await this.loadData();
     await this.loadCustomEnvVars();
-    this.setupProgressListener();
   }
 
   async loadCustomEnvVars() {
@@ -124,14 +133,6 @@ export class PluginEnvironmentDialog implements OnInit {
     } catch (error) {
       this.notification.showError('Failed to save environment variables');
     }
-  }
-
-  private setupProgressListener() {
-    this.wails.progress$.subscribe(progress => {
-      if (progress && (progress.type === 'install' || progress.type === 'generic')) {
-        this.creationProgress.set(progress.message);
-      }
-    });
   }
 
   async loadData() {

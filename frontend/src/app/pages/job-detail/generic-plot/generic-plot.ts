@@ -1,4 +1,4 @@
-import { Component, Input, OnInit, signal, NgZone } from '@angular/core';
+import { Component, Input, OnInit, signal, NgZone, ChangeDetectionStrategy } from '@angular/core';
 import { ReactiveFormsModule, FormBuilder, FormGroup } from '@angular/forms';
 import { PlotlyModule } from 'angular-plotly.js';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
@@ -35,6 +35,7 @@ interface PlotData {
   ],
   templateUrl: './generic-plot.html',
   styleUrl: './generic-plot.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class GenericPlot implements OnInit {
   @Input() jobId!: string;

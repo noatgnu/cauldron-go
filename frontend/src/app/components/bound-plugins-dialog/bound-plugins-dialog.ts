@@ -1,4 +1,4 @@
-import { Component, Inject } from '@angular/core';
+import { Component, Inject, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
@@ -49,7 +49,9 @@ export interface BoundPluginsDialogData {
 
   templateUrl: './bound-plugins-dialog.html',
 
-  styleUrl: './bound-plugins-dialog.scss'
+  styleUrl: './bound-plugins-dialog.scss',
+
+  changeDetection: ChangeDetectionStrategy.OnPush
 
 })
 

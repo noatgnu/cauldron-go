@@ -1,39 +1,33 @@
-import { Component, output, signal, OnInit, OnDestroy } from '@angular/core';
+import { Component, output, signal, OnInit, ChangeDetectionStrategy, effect } from '@angular/core';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatBadgeModule } from '@angular/material/badge';
 import { Router } from '@angular/router';
-import { Wails, Job } from '../../core/services/wails';
-import { Subscription } from 'rxjs';
+import { Wails } from '../../core/services/wails';
 
 @Component({
   selector: 'app-toolbar',
   imports: [MatToolbarModule, MatButtonModule, MatIconModule, MatBadgeModule],
   templateUrl: './toolbar.html',
   styleUrl: './toolbar.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class Toolbar implements OnInit, OnDestroy {
+export class Toolbar implements OnInit {
   menuToggle = output<void>();
   protected activeJobsCount = signal(0);
-  private jobUpdateSubscription?: Subscription;
 
-  constructor(private router: Router, private wails: Wails) {}
-
-  async ngOnInit() {
-    await this.updateActiveJobsCount();
-
-    this.jobUpdateSubscription = this.wails.jobUpdate$.subscribe((job: Job | null) => {
+  constructor(private router: Router, private wails: Wails) {
+    effect(() => {
+      const job = this.wails.jobUpdate();
       if (job) {
         this.updateActiveJobsCount();
       }
     });
   }
 
-  ngOnDestroy() {
-    if (this.jobUpdateSubscription) {
-      this.jobUpdateSubscription.unsubscribe();
-    }
+  async ngOnInit() {
+    await this.updateActiveJobsCount();
   }
 
   async updateActiveJobsCount() {

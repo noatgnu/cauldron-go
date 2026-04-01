@@ -1,4 +1,4 @@
-import {Component, Inject} from '@angular/core';
+import {Component, Inject, ChangeDetectionStrategy} from '@angular/core';
 import {FormBuilder, FormControl, FormGroup, ReactiveFormsModule, Validators} from "@angular/forms";
 import {MAT_DIALOG_DATA, MatDialogModule, MatDialogRef} from "@angular/material/dialog";
 import {Wails} from "../../core/services/wails";
@@ -28,6 +28,7 @@ export interface MsfraggerToCurtainPtmConfig {
   ],
   templateUrl: './msfragger-to-curtainptm-modal.html',
   styleUrl: './msfragger-to-curtainptm-modal.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class MsfraggerToCurtainptmModal {
   form!: FormGroup;

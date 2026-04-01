@@ -1,4 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { signal } from '@angular/core';
 import { JobDetail } from './job-detail';
 import { Wails } from '../../core/services/wails';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -24,7 +25,7 @@ describe('JobDetail', () => {
       getJob: vi.fn().mockResolvedValue({ id: '1', status: 'completed' }),
       getJobExecutionLog: vi.fn().mockResolvedValue(''),
       listJobOutputFiles: vi.fn().mockResolvedValue([]),
-      jobUpdate$: of(null),
+      jobUpdate: signal(null),
       logToFile: vi.fn().mockResolvedValue(undefined)
     };
     activatedRouteMock = {

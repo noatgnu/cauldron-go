@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
-import { GetPluginsV2, GetPluginV2, ExecutePluginV2, ReloadPluginsV2 } from '../../../wailsjs/go/main/App';
-import { models } from '../../../wailsjs/go/models';
+import { GetPluginsV2, GetPluginV2, ExecutePluginV2, ReloadPluginsV2 } from '../../../../bindings/github.com/noatgnu/cauldron-go/app';
+import * as models from '../../../../bindings/github.com/noatgnu/cauldron-go/backend/models/models';
 
 @Injectable({
   providedIn: 'root'
@@ -9,11 +9,14 @@ export class PluginV2Service {
   constructor() { }
 
   async getAllPlugins(): Promise<models.PluginV2[]> {
-    return GetPluginsV2();
+    const result = await GetPluginsV2();
+    return (result || []).filter((p): p is models.PluginV2 => p !== null);
   }
 
   async getPlugin(id: number): Promise<models.PluginV2> {
-    return GetPluginV2(id);
+    const result = await GetPluginV2(id);
+    if (!result) throw new Error(`Plugin not found: ${id}`);
+    return result;
   }
 
   async executePlugin(pluginId: number, parameters: Record<string, any>): Promise<string> {

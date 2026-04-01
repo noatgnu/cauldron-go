@@ -1,4 +1,4 @@
-import { Component, OnInit, signal, computed } from '@angular/core';
+import { Component, OnInit, signal, computed, ChangeDetectionStrategy, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { MatCardModule } from '@angular/material/card';
@@ -10,6 +10,7 @@ import { MatChipsModule } from '@angular/material/chips';
 import { MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatDialog } from '@angular/material/dialog';
+import { Events } from '@wailsio/runtime';
 import { Wails, Job, ImportedFile } from '../core/services/wails';
 import { ImportDialog } from '../pages/import-dialog/import-dialog';
 import { NotificationService } from '../core/services/notification.service';
@@ -32,7 +33,8 @@ import {CauldronLoaderComponent} from '../components/cauldron-loader/cauldron-lo
     CauldronLoaderComponent
   ],
   templateUrl: './home.html',
-  styleUrl: './home.scss'
+  styleUrl: './home.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class Home implements OnInit {
   protected pythonVersion = signal('');
@@ -64,7 +66,22 @@ export class Home implements OnInit {
     private dialog: MatDialog,
     private router: Router,
     private notificationService: NotificationService
-  ) {}
+  ) {
+    effect(() => {
+      const job = this.wails.jobUpdate();
+      if (job) {
+        const currentJobs = this.jobs();
+        const index = currentJobs.findIndex(j => j.id === job.id);
+        if (index >= 0) {
+          const updated = [...currentJobs];
+          updated[index] = job;
+          this.jobs.set(updated);
+        } else {
+          this.jobs.set([job, ...currentJobs]);
+        }
+      }
+    });
+  }
 
   async ngOnInit() {
     const addLog = (msg: string) => {
@@ -87,15 +104,17 @@ export class Home implements OnInit {
 
     addLog('=== Home Component Initialization ===');
 
+    const windowWailsExists = typeof window !== 'undefined' && '_wails' in window;
     const windowGoExists = typeof window !== 'undefined' && !!(window as any).go;
     const windowRuntimeExists = typeof window !== 'undefined' && !!(window as any).runtime;
 
     this.debugInfo.set({
       ...this.debugInfo(),
-      windowGoExists,
+      windowGoExists: windowWailsExists || windowGoExists,
       windowRuntimeExists
     });
 
+    addLog(`window._wails exists: ${windowWailsExists}`);
     addLog(`window.go exists: ${windowGoExists}`);
     addLog(`window.runtime exists: ${windowRuntimeExists}`);
     addLog(`wails.isWails: ${this.wails.isWails}`);
@@ -140,29 +159,13 @@ export class Home implements OnInit {
   }
 
   private setupEventListeners(): void {
-    this.wails.jobUpdate$.subscribe(job => {
-      if (job) {
-        const currentJobs = this.jobs();
-        const index = currentJobs.findIndex(j => j.id === job.id);
-        if (index >= 0) {
-          const updated = [...currentJobs];
-          updated[index] = job;
-          this.jobs.set(updated);
-        } else {
-          this.jobs.set([job, ...currentJobs]);
-        }
-      }
+    Events.On('menu:import-data', () => {
+      this.openImportDialog();
     });
 
-    if (window.runtime) {
-      window.runtime.EventsOn('menu:import-data', () => {
-        this.openImportDialog();
-      });
-
-      window.runtime.EventsOn('file:imported', () => {
-        this.loadImportedFiles();
-      });
-    }
+    Events.On('file:imported', () => {
+      this.loadImportedFiles();
+    });
   }
 
   async loadImportedFiles() {

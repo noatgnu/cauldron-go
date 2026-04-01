@@ -1,4 +1,4 @@
-import { Component, output, signal, computed, OnInit, effect } from '@angular/core';
+import { Component, output, signal, computed, OnInit, effect, ChangeDetectionStrategy } from '@angular/core';
 import { MatListModule } from '@angular/material/list';
 import { MatIconModule } from '@angular/material/icon';
 import { MatExpansionModule } from '@angular/material/expansion';
@@ -8,8 +8,9 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatDividerModule } from '@angular/material/divider';
 import { FormsModule } from '@angular/forms';
 import { Router, NavigationEnd } from '@angular/router';
+import { Events } from '@wailsio/runtime';
 import { PluginV2Service } from '../../core/services/plugin-v2';
-import { models } from '../../../wailsjs/go/models';
+import * as models from '../../../../bindings/github.com/noatgnu/cauldron-go/backend/models/models';
 import { filter } from 'rxjs';
 
 interface NavItem {
@@ -33,6 +34,7 @@ interface NavItem {
   ],
   templateUrl: './sidenav.html',
   styleUrl: './sidenav.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class Sidenav implements OnInit {
   navigationClose = output<void>();
@@ -198,19 +200,17 @@ export class Sidenav implements OnInit {
   async ngOnInit() {
     await this.loadPlugins();
 
-    if (window.runtime) {
-      window.runtime.EventsOn('plugin:install:success', () => {
-        this.loadPlugins();
-      });
+    Events.On('plugin:install:success', () => {
+      this.loadPlugins();
+    });
 
-      window.runtime.EventsOn('plugin:uninstall:success', () => {
-        this.loadPlugins();
-      });
+    Events.On('plugin:uninstall:success', () => {
+      this.loadPlugins();
+    });
 
-      window.runtime.EventsOn('plugin:enabled:changed', () => {
-        this.loadPlugins();
-      });
-    }
+    Events.On('plugin:enabled:changed', () => {
+      this.loadPlugins();
+    });
   }
 
   async loadPlugins() {

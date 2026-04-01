@@ -1,4 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { PluginExecute } from './plugin-execute';
 import { PluginV2Service } from '../../core/services/plugin-v2';
@@ -36,7 +37,7 @@ describe('PluginExecute', () => {
       showSuccess: vi.fn()
     };
     wailsMock = {
-      bindingsUpdated$: of(undefined),
+      bindingsUpdated: signal(0),
       getPluginEnvironmentBinding: vi.fn().mockResolvedValue(null),
       logToFile: vi.fn().mockResolvedValue(undefined)
     };

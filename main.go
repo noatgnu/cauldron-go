@@ -3,22 +3,101 @@ package main
 import (
 	"embed"
 	"fmt"
+	"io/fs"
 	"log"
+	"net/http"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"time"
 
-	"github.com/wailsapp/wails/v2"
-	"github.com/wailsapp/wails/v2/pkg/options"
-	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
-	"github.com/wailsapp/wails/v2/pkg/options/mac"
-	"github.com/wailsapp/wails/v2/pkg/options/windows"
+	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
 //go:embed all:frontend/dist/browser
 var assets embed.FS
+
+//go:embed resources/appicon.png
+var iconPNG []byte
+
+func getAssets() fs.FS {
+	subFS, err := fs.Sub(assets, "frontend/dist/browser")
+	if err != nil {
+		log.Printf("WARNING: Failed to get assets: %v\n", err)
+		return assets
+	}
+	return subFS
+}
+
+func getMimeType(path string) string {
+	ext := strings.ToLower(filepath.Ext(path))
+	mimeTypes := map[string]string{
+		".html":  "text/html; charset=utf-8",
+		".css":   "text/css; charset=utf-8",
+		".js":    "application/javascript; charset=utf-8",
+		".mjs":   "application/javascript; charset=utf-8",
+		".json":  "application/json; charset=utf-8",
+		".png":   "image/png",
+		".jpg":   "image/jpeg",
+		".jpeg":  "image/jpeg",
+		".gif":   "image/gif",
+		".svg":   "image/svg+xml",
+		".ico":   "image/x-icon",
+		".woff":  "font/woff",
+		".woff2": "font/woff2",
+		".ttf":   "font/ttf",
+		".eot":   "application/vnd.ms-fontobject",
+		".map":   "application/json",
+	}
+	if mime, ok := mimeTypes[ext]; ok {
+		return mime
+	}
+	return "application/octet-stream"
+}
+
+func newSPAHandler(assetsFS fs.FS) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path := strings.TrimPrefix(r.URL.Path, "/")
+		if path == "" {
+			path = "index.html"
+		}
+
+		// Try to read the file from the embedded filesystem
+		content, err := fs.ReadFile(assetsFS, path)
+		if err == nil {
+			w.Header().Set("Content-Type", getMimeType(path))
+			w.WriteHeader(http.StatusOK)
+			w.Write(content)
+			return
+		}
+
+		// If the file is not found and it's not a static asset (likely a SPA route),
+		// fall back to index.html
+		isStaticAsset := func(path string) bool {
+			ext := strings.ToLower(filepath.Ext(path))
+			staticExts := []string{".js", ".css", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico", ".woff", ".woff2", ".ttf", ".eot", ".map", ".json"}
+			for _, e := range staticExts {
+				if ext == e {
+					return true
+				}
+			}
+			return false
+		}
+
+		if !isStaticAsset(path) {
+			indexContent, err := fs.ReadFile(assetsFS, "index.html")
+			if err == nil {
+				w.Header().Set("Content-Type", "text/html; charset=utf-8")
+				w.WriteHeader(http.StatusOK)
+				w.Write(indexContent)
+				return
+			}
+		}
+
+		http.NotFound(w, r)
+	})
+}
 
 func setupLogRotation(logDir string) (*os.File, error) {
 	os.MkdirAll(logDir, 0755)
@@ -83,7 +162,6 @@ func main() {
 	log.Printf("Log directory: %s\n", logDir)
 	fmt.Println("Cauldron starting - logs at:", logDir)
 
-	// Create an instance of the app structure
 	app := NewApp()
 	if logFilePath != "" {
 		app.SetLogFilePath(logFilePath)
@@ -92,35 +170,48 @@ func main() {
 
 	log.Println("Creating Wails application...")
 
-	// Create application with options
-	err = wails.Run(&options.App{
-		Title:  "Cauldron",
-		Width:  1280,
-		Height: 800,
-		AssetServer: &assetserver.Options{
-			Assets: assets,
+	wailsApp := application.New(application.Options{
+		Name:        "Cauldron",
+		Description: "Proteomics data visualization and analysis",
+		Icon:        iconPNG,
+		Services: []application.Service{
+			application.NewService(app),
 		},
-		BackgroundColour: &options.RGBA{R: 27, G: 38, B: 54, A: 1},
-		OnStartup:        app.startup,
-		OnBeforeClose:    app.beforeClose,
-		OnShutdown:       app.shutdown,
-		Bind: []interface{}{
-			app,
+		Assets: application.AssetOptions{
+			Handler: newSPAHandler(getAssets()),
 		},
-		Mac: &mac.Options{
-			TitleBar:             mac.TitleBarHiddenInset(),
-			Appearance:           mac.NSAppearanceNameDarkAqua,
-			WebviewIsTransparent: false,
-			WindowIsTranslucent:  false,
+		Mac: application.MacOptions{
+			ApplicationShouldTerminateAfterLastWindowClosed: true,
 		},
-		Windows: &windows.Options{
-			WebviewIsTransparent: false,
-			WindowIsTranslucent:  false,
-			DisableWindowIcon:    false,
-			Theme:                windows.Dark,
+		OnShutdown: func() {
+			app.Shutdown()
 		},
 	})
 
+	app.SetApplication(wailsApp)
+
+	appMenu := createApplicationMenu(app)
+	wailsApp.Menu.SetApplicationMenu(appMenu)
+
+	mainWindow := wailsApp.Window.NewWithOptions(application.WebviewWindowOptions{
+		Title:            "Cauldron",
+		Width:            1280,
+		Height:           800,
+		URL:              "/",
+		BackgroundColour: application.NewRGB(27, 38, 54),
+		Mac: application.MacWindow{
+			TitleBar: application.MacTitleBar{
+				AppearsTransparent: true,
+			},
+		},
+	})
+
+	app.SetMainWindow(mainWindow)
+	mainWindow.SetMenu(appMenu)
+
+	go app.Initialize()
+
+	err = wailsApp.Run()
 	if err != nil {
 		log.Printf("ERROR: Wails.Run failed: %v\n", err)
 		println("Error:", err.Error())

@@ -17,12 +17,14 @@ import (
 
 	"github.com/noatgnu/cauldron-go/backend/models"
 	"github.com/ulikunitz/xz"
-	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
+	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
 type FileService struct {
 	ctx              context.Context
 	progressNotifier *ProgressNotifier
+	window           *application.WebviewWindow
+	wailsApp         *application.App
 }
 
 func NewFileService(ctx context.Context) *FileService {
@@ -59,26 +61,38 @@ func (f *FileService) ReadFileLines(path string, limit int) ([]string, error) {
 	return lines, nil
 }
 
-func (f *FileService) OpenFileDialog(title string, filters []wailsRuntime.FileFilter) (string, error) {
-	path, err := wailsRuntime.OpenFileDialog(f.ctx, wailsRuntime.OpenDialogOptions{
-		Title:   title,
-		Filters: filters,
-	})
+func (f *FileService) OpenFileDialog(title string, filters []application.FileFilter) (string, error) {
+	if f.wailsApp == nil {
+		return "", fmt.Errorf("wails app not initialized")
+	}
+	dialog := f.wailsApp.Dialog.OpenFile().SetTitle(title)
+	for _, filter := range filters {
+		dialog.AddFilter(filter.DisplayName, filter.Pattern)
+	}
+	path, err := dialog.PromptForSingleSelection()
 	return path, err
 }
 
 func (f *FileService) OpenDirectoryDialog(title string) (string, error) {
-	path, err := wailsRuntime.OpenDirectoryDialog(f.ctx, wailsRuntime.OpenDialogOptions{
-		Title: title,
-	})
+	if f.wailsApp == nil {
+		return "", fmt.Errorf("wails app not initialized")
+	}
+	path, err := f.wailsApp.Dialog.OpenFile().
+		SetTitle(title).
+		CanChooseDirectories(true).
+		CanChooseFiles(false).
+		PromptForSingleSelection()
 	return path, err
 }
 
 func (f *FileService) SaveFileDialog(title string, defaultName string) (string, error) {
-	path, err := wailsRuntime.SaveFileDialog(f.ctx, wailsRuntime.SaveDialogOptions{
-		Title:           title,
-		DefaultFilename: defaultName,
-	})
+	if f.wailsApp == nil {
+		return "", fmt.Errorf("wails app not initialized")
+	}
+	path, err := f.wailsApp.Dialog.SaveFile().
+		SetMessage(title).
+		SetFilename(defaultName).
+		PromptForSingleSelection()
 	return path, err
 }
 
@@ -378,24 +392,15 @@ func (f *FileService) ParseDataFile(path string, previewRows int) (*DataFilePrev
 }
 
 func (f *FileService) OpenDataFileDialog() (string, error) {
-	filters := []wailsRuntime.FileFilter{
-		{
-			DisplayName: "Data Files (*.csv, *.tsv, *.txt)",
-			Pattern:     "*.csv;*.tsv;*.txt",
-		},
-		{
-			DisplayName: "CSV Files (*.csv)",
-			Pattern:     "*.csv",
-		},
-		{
-			DisplayName: "TSV Files (*.tsv)",
-			Pattern:     "*.tsv",
-		},
-		{
-			DisplayName: "All Files (*.*)",
-			Pattern:     "*.*",
-		},
+	if f.wailsApp == nil {
+		return "", fmt.Errorf("wails app not initialized")
 	}
-
-	return f.OpenFileDialog("Select Data File", filters)
+	path, err := f.wailsApp.Dialog.OpenFile().
+		SetTitle("Select Data File").
+		AddFilter("Data Files (*.csv, *.tsv, *.txt)", "*.csv;*.tsv;*.txt").
+		AddFilter("CSV Files (*.csv)", "*.csv").
+		AddFilter("TSV Files (*.tsv)", "*.tsv").
+		AddFilter("All Files (*.*)", "*.*").
+		PromptForSingleSelection()
+	return path, err
 }

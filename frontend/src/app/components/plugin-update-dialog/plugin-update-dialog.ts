@@ -1,4 +1,4 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, signal, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
@@ -8,7 +8,7 @@ import { MatTableModule } from '@angular/material/table';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { SelectionModel } from '@angular/cdk/collections';
 import { Wails } from '../../core/services/wails';
-import { models } from '../../../wailsjs/go/models';
+import * as models from '../../../../bindings/github.com/noatgnu/cauldron-go/backend/models/models';
 
 interface PluginUpdateInfo {
   plugin: models.PluginV2;
@@ -31,6 +31,7 @@ interface PluginUpdateInfo {
   ],
   templateUrl: './plugin-update-dialog.html',
   styleUrl: './plugin-update-dialog.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class PluginUpdateDialog implements OnInit {
   checking = signal(true);

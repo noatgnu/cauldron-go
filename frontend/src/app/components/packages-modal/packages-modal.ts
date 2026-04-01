@@ -1,4 +1,4 @@
-import { Component, Inject, signal, computed } from '@angular/core';
+import { Component, Inject, signal, computed, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatDialogModule, MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
@@ -30,6 +30,7 @@ export interface PackagesModalData {
   ],
   templateUrl: './packages-modal.html',
   styleUrl: './packages-modal.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class PackagesModal {
   packages = signal<string[]>([]);

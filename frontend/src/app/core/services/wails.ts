@@ -1,8 +1,9 @@
-import { Injectable } from '@angular/core';
-import { BehaviorSubject, Observable, Subscription } from 'rxjs';
-import * as WailsApp from '../../../wailsjs/go/main/App';
-import { EventsOn } from '../../../wailsjs/runtime/runtime';
-import { models, services } from '../../../wailsjs/go/models';
+import { Injectable, signal, Signal } from '@angular/core';
+import { Subscription } from 'rxjs';
+import * as WailsApp from '../../../../bindings/github.com/noatgnu/cauldron-go/app';
+import { Events } from '@wailsio/runtime';
+import * as models from '../../../../bindings/github.com/noatgnu/cauldron-go/backend/models/models';
+import * as services from '../../../../bindings/github.com/noatgnu/cauldron-go/backend/services/models';
 
 declare global {
   interface Window {
@@ -55,58 +56,63 @@ export interface ProgressNotification {
   providedIn: 'root'
 })
 export class Wails {
-  isWails = typeof window !== 'undefined' && !!window.go;
+  isWails = typeof window !== 'undefined' && '_wails' in window;
 
-  private jobUpdateSubject = new BehaviorSubject<Job | null>(null);
-  jobUpdate$: Observable<Job | null> = this.jobUpdateSubject.asObservable();
+  private _jobUpdate = signal<Job | null>(null);
+  jobUpdate: Signal<Job | null> = this._jobUpdate.asReadonly();
 
-  private scriptOutputSubject = new BehaviorSubject<string>('');
-  scriptOutput$: Observable<string> = this.scriptOutputSubject.asObservable();
+  private _scriptOutput = signal<string>('');
+  scriptOutput: Signal<string> = this._scriptOutput.asReadonly();
 
-  private downloadProgressSubject = new BehaviorSubject<{message: string, percentage: number} | null>(null);
-  downloadProgress$: Observable<{message: string, percentage: number} | null> = this.downloadProgressSubject.asObservable();
+  private _downloadProgress = signal<{message: string, percentage: number} | null>(null);
+  downloadProgress: Signal<{message: string, percentage: number} | null> = this._downloadProgress.asReadonly();
 
-  private progressSubject = new BehaviorSubject<ProgressNotification | null>(null);
-  progress$: Observable<ProgressNotification | null> = this.progressSubject.asObservable();
+  private _progress = signal<ProgressNotification | null>(null);
+  progress: Signal<ProgressNotification | null> = this._progress.asReadonly();
 
-  private queueStatusSubject = new BehaviorSubject<any | null>(null);
-  queueStatus$: Observable<any | null> = this.queueStatusSubject.asObservable();
+  private _queueStatus = signal<any | null>(null);
+  queueStatus: Signal<any | null> = this._queueStatus.asReadonly();
 
-  private bindingsUpdatedSubject = new BehaviorSubject<void>(undefined);
-  bindingsUpdated$: Observable<void> = this.bindingsUpdatedSubject.asObservable();
+  private _bindingsUpdated = signal<number>(0);
+  bindingsUpdated: Signal<number> = this._bindingsUpdated.asReadonly();
 
   constructor() {
     this.setupEventListeners();
+  }
+
+  notifyBindingsUpdated(): void {
+    this._bindingsUpdated.update(n => n + 1);
   }
 
   private setupEventListeners(): void {
     if (!this.isWails) return;
 
     try {
-      EventsOn('job:update', (data: Job) => {
-        this.jobUpdateSubject.next(data);
+      Events.On('job:update', (ev: any) => {
+        this._jobUpdate.set(ev.data as Job);
       });
 
-      EventsOn('script:output', (data: string) => {
-        this.scriptOutputSubject.next(data);
+      Events.On('script:output', (ev: any) => {
+        this._scriptOutput.set(ev.data as string);
       });
 
-      EventsOn('download-progress', (data: {message: string, percentage: number}) => {
-        this.downloadProgressSubject.next(data);
+      Events.On('download-progress', (ev: any) => {
+        this._downloadProgress.set(ev.data as {message: string, percentage: number});
       });
 
-      EventsOn('progress', (data: ProgressNotification) => {
-        this.progressSubject.next(data);
+      Events.On('progress', (ev: any) => {
+        const data = ev.data as ProgressNotification;
+        this._progress.set(data);
         if (data.type === 'download' || data.type === 'extract' || data.type === 'install') {
-          this.downloadProgressSubject.next({
+          this._downloadProgress.set({
             message: data.message,
             percentage: data.percentage
           });
         }
       });
 
-      EventsOn('queue:status', (data: any) => {
-        this.queueStatusSubject.next(data);
+      Events.On('queue:status', (ev: any) => {
+        this._queueStatus.set(ev.data);
       });
     } catch (error) {
       console.error('Failed to setup event listeners:', error);
@@ -115,7 +121,9 @@ export class Wails {
 
   async getSettings(): Promise<Config> {
     if (!this.isWails) throw new Error('Wails not available');
-    return WailsApp.GetSettings();
+    const result = await WailsApp.GetSettings();
+    if (!result) throw new Error('Settings not found');
+    return result;
   }
 
   async setSetting(key: string, value: any): Promise<void> {
@@ -195,7 +203,9 @@ export class Wails {
 
   async getJob(id: string): Promise<Job> {
     if (!this.isWails) throw new Error('Wails not available');
-    return WailsApp.GetJob(id);
+    const result = await WailsApp.GetJob(id);
+    if (!result) throw new Error(`Job not found: ${id}`);
+    return result;
   }
 
   async getJobExecutionLog(id: string): Promise<string> {
@@ -214,7 +224,7 @@ export class Wails {
       console.log('[Wails Service] Calling WailsApp.GetAllJobs()...');
       const result = await WailsApp.GetAllJobs();
       console.log('[Wails Service] GetAllJobs() returned:', result);
-      return result;
+      return (result || []).filter((job): job is Job => job !== null);
     } catch (error) {
       console.error('[Wails Service] GetAllJobs() failed:', error);
       throw error;
@@ -366,7 +376,9 @@ export class Wails {
 
   async parseDataFile(path: string, previewRows: number = 10): Promise<DataFilePreview> {
     if (!this.isWails) throw new Error('Wails not available');
-    return WailsApp.ParseDataFile(path, previewRows);
+    const result = await WailsApp.ParseDataFile(path, previewRows);
+    if (!result) throw new Error('Failed to parse data file');
+    return result;
   }
 
   async importDataFile(path: string): Promise<number> {
@@ -396,7 +408,7 @@ export class Wails {
   async createPythonVirtualEnv(basePythonPath: string, venvPath: string, pluginID: string = ''): Promise<void> {
     if (!this.isWails) throw new Error('Wails not available');
     await WailsApp.CreatePythonVirtualEnv(basePythonPath, venvPath, pluginID);
-    this.bindingsUpdatedSubject.next();
+    this.notifyBindingsUpdated();
   }
 
   async getDefaultVenvPath(pluginID: string): Promise<string> {
@@ -412,13 +424,13 @@ export class Wails {
   async deleteVirtualEnvironment(id: number): Promise<void> {
     if (!this.isWails) throw new Error('Wails not available');
     await WailsApp.DeleteVirtualEnvironment(id);
-    this.bindingsUpdatedSubject.next();
+    this.notifyBindingsUpdated();
   }
 
   async createRenvEnvironment(name: string, packages: string[], pluginID: string, useCache: boolean = false) {
     if (!this.isWails) throw new Error('Wails not available');
     await WailsApp.CreateRenvEnvironment(name, packages, pluginID, useCache);
-    this.bindingsUpdatedSubject.next();
+    this.notifyBindingsUpdated();
   }
 
   async getRenvEnvironments(): Promise<services.RenvEnvironment[]> {
@@ -429,13 +441,13 @@ export class Wails {
   async deleteRenvEnvironment(id: number): Promise<void> {
     if (!this.isWails) throw new Error('Wails not available');
     await WailsApp.DeleteRenvEnvironment(id);
-    this.bindingsUpdatedSubject.next();
+    this.notifyBindingsUpdated();
   }
 
   async bindPluginToEnvironment(pluginID: string, envType: string, envID: number, envPath: string): Promise<void> {
     if (!this.isWails) throw new Error('Wails not available');
     await WailsApp.BindPluginToEnvironment(pluginID, envType, envID, envPath);
-    this.bindingsUpdatedSubject.next();
+    this.notifyBindingsUpdated();
   }
 
   async getPluginEnvironmentBinding(pluginID: string, envType: string): Promise<services.PluginEnvironmentBinding | null> {
@@ -446,7 +458,7 @@ export class Wails {
   async deletePluginEnvironmentBinding(pluginID: string, envType: string): Promise<void> {
     if (!this.isWails) throw new Error('Wails not available');
     await WailsApp.DeletePluginEnvironmentBinding(pluginID, envType);
-    this.bindingsUpdatedSubject.next();
+    this.notifyBindingsUpdated();
   }
 
   async getAllPluginEnvironmentBindings(): Promise<services.PluginEnvironmentBinding[]> {
@@ -514,7 +526,7 @@ export class Wails {
     return WailsApp.SaveGitAuthConfig(repoURL, sshKeyPath, passphrase);
   }
 
-  async getGitAuthConfig(repoURL: string): Promise<GitAuthConfig> {
+  async getGitAuthConfig(repoURL: string): Promise<GitAuthConfig | null> {
     if (!this.isWails) throw new Error('Wails not available');
     return WailsApp.GetGitAuthConfig(repoURL);
   }
@@ -687,7 +699,7 @@ export class Wails {
 
   listen(eventName: string, callback: (data: any) => void): Subscription {
     if (this.isWails) {
-      EventsOn(eventName, callback);
+      Events.On(eventName, callback);
     }
     return new Subscription();
   }

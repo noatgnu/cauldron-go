@@ -1,4 +1,4 @@
-import {Component, Inject, Input} from '@angular/core';
+import {Component, Inject, Input, ChangeDetectionStrategy} from '@angular/core';
 import {MAT_DIALOG_DATA, MatDialogModule, MatDialogRef} from "@angular/material/dialog";
 import {FormBuilder, FormControl, FormGroup, ReactiveFormsModule} from "@angular/forms";
 import {Wails} from "../../core/services/wails";
@@ -31,6 +31,7 @@ export interface VolcanoPlotModalData {
   ],
   templateUrl: './volcano-plot-modal.html',
   styleUrl: './volcano-plot-modal.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class VolcanoPlotModal {
   _differentialAnalysisFile: string = '';

@@ -1,4 +1,4 @@
-import {Component, Inject, inject} from '@angular/core';
+import {Component, Inject, inject, ChangeDetectionStrategy} from '@angular/core';
 import {MAT_DIALOG_DATA, MatDialogModule, MatDialogRef} from "@angular/material/dialog";
 import {FormsModule, ReactiveFormsModule} from "@angular/forms";
 import {IDataFrame} from "data-forge";
@@ -47,7 +47,8 @@ interface RegexRule {
     MatMenuModule
   ],
   templateUrl: './sample-annotation.html',
-  styleUrl: './sample-annotation.scss'
+  styleUrl: './sample-annotation.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class SampleAnnotation {
   _annotation: {Sample: string, Condition: string, BioReplicate: string, Batch: string, Color: string, selected?: boolean}[] = [];

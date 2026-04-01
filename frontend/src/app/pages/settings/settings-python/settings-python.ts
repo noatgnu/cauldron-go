@@ -1,4 +1,4 @@
-import { Component, OnInit, signal, computed } from '@angular/core';
+import { Component, OnInit, signal, computed, ChangeDetectionStrategy, effect } from '@angular/core';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -36,6 +36,7 @@ import { BoundPluginsDialogComponent, BoundPlugin } from '../../../components/bo
   ],
   templateUrl: './settings-python.html',
   styleUrl: './settings-python.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class SettingsPython implements OnInit {
   protected config = signal<Partial<Config>>({});
@@ -58,29 +59,9 @@ export class SettingsPython implements OnInit {
     private wails: Wails,
     private dialog: MatDialog,
     private notification: NotificationService
-  ) {}
-
-
-  async ngOnInit(): Promise<void> {
-    await this.loadSettings();
-    await this.loadVersion();
-    this.detectAllPythonEnvironments();
-    await this.loadVirtualEnvironments();
-    await this.loadPlugins();
-    this.setupProgressUpdates();
-  }
-
-  async loadPlugins(): Promise<void> {
-    try {
-      const plugins = await this.wails.getPluginsV2();
-      this.plugins.set(plugins || []);
-    } catch (error) {
-      await this.wails.logToFile(`[SettingsPython] Failed to load plugins: ${error}`);
-    }
-  }
-
-  setupProgressUpdates(): void {
-    this.wails.progress$.subscribe(progress => {
+  ) {
+    effect(() => {
+      const progress = this.wails.progress();
       if (!progress) return;
 
       if (progress.type === 'install' || progress.type === 'download' || progress.type === 'extract') {
@@ -110,6 +91,25 @@ export class SettingsPython implements OnInit {
       }
     });
   }
+
+
+  async ngOnInit(): Promise<void> {
+    await this.loadSettings();
+    await this.loadVersion();
+    this.detectAllPythonEnvironments();
+    await this.loadVirtualEnvironments();
+    await this.loadPlugins();
+  }
+
+  async loadPlugins(): Promise<void> {
+    try {
+      const plugins = await this.wails.getPluginsV2();
+      this.plugins.set(plugins || []);
+    } catch (error) {
+      await this.wails.logToFile(`[SettingsPython] Failed to load plugins: ${error}`);
+    }
+  }
+
 
   async loadSettings(): Promise<void> {
     try {

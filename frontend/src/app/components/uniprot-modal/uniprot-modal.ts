@@ -1,4 +1,4 @@
-import {Component, Inject, Input} from '@angular/core';
+import {Component, Inject, Input, ChangeDetectionStrategy} from '@angular/core';
 import {FormBuilder, FormControl, FormGroup, ReactiveFormsModule, Validators} from "@angular/forms";
 import {MAT_DIALOG_DATA, MatDialogModule, MatDialogRef} from "@angular/material/dialog";
 import {MatButtonModule} from "@angular/material/button";
@@ -29,6 +29,7 @@ export interface UniprotConfig {
   ],
   templateUrl: './uniprot-modal.html',
   styleUrl: './uniprot-modal.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class UniprotModal {
   uniprotFromFields: {groupName: string, items: any[]}[] = [];

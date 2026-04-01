@@ -1,4 +1,4 @@
-import {Component, Input, inject, effect} from '@angular/core';
+import {Component, Input, inject, effect, ChangeDetectionStrategy} from '@angular/core';
 import { PlotlyModule } from 'angular-plotly.js';
 import {DataFrame, IDataFrame} from "data-forge";
 import {FormBuilder, FormControl, FormGroup, ReactiveFormsModule} from "@angular/forms";
@@ -10,6 +10,7 @@ import { ThemeService } from '../../core/services/theme.service';
   imports: [PlotlyModule, ReactiveFormsModule, MatButtonModule],
   templateUrl: './phate-plot.html',
   styleUrl: './phate-plot.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class PhatePlot {
   _data: IDataFrame<number, {x_phate: number, y_phate: number, z_phate?: number, sample: string}> = new DataFrame();

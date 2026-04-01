@@ -1,4 +1,4 @@
-import {Component, EventEmitter, OnInit, Output, signal} from '@angular/core';
+import {Component, EventEmitter, OnInit, Output, signal, ChangeDetectionStrategy} from '@angular/core';
 import {Wails, ImportedFile} from "../../core/services/wails";
 import {MatFormFieldModule} from "@angular/material/form-field";
 import {MatSelectModule} from "@angular/material/select";
@@ -11,6 +11,7 @@ import {MatSelectModule} from "@angular/material/select";
   ],
   templateUrl: './imported-file-selection.html',
   styleUrl: './imported-file-selection.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class ImportedFileSelection implements OnInit {
   files = signal<ImportedFile[]>([]);

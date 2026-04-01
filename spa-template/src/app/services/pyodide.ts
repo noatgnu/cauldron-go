@@ -1,5 +1,4 @@
-import { Injectable } from '@angular/core';
-import { Subject } from 'rxjs';
+import { Injectable, signal } from '@angular/core';
 import { PluginInputV2 } from '@cauldron/forms';
 import { environment } from '../../environments/environment';
 
@@ -36,11 +35,18 @@ const LOCK_FILE_PATH = 'assets/pyodide-lock.json';
 export class PyodideService {
   private pyodide: PyodideInterface | null = null;
 
-  progress$ = new Subject<{ stage: string; percent: number }>();
-  output$ = new Subject<string>();
+  private _progress = signal<{ stage: string; percent: number }>({ stage: '', percent: 0 });
+  private _outputs = signal<string[]>([]);
+
+  progress = this._progress.asReadonly();
+  outputs = this._outputs.asReadonly();
+
+  clearOutputs(): void {
+    this._outputs.set([]);
+  }
 
   async initialize(packages: string[]): Promise<void> {
-    this.progress$.next({ stage: 'Loading Pyodide...', percent: 10 });
+    this._progress.set({ stage: 'Loading Pyodide...', percent: 10 });
 
     const script = document.createElement('script');
     script.src = PYODIDE_CDN + 'pyodide.js';
@@ -54,7 +60,7 @@ export class PyodideService {
     const lockFileExists = !isTestEnvironment && await this.checkLockFile();
 
     if (lockFileExists) {
-      this.progress$.next({ stage: 'Loading packages from lock file...', percent: 30 });
+      this._progress.set({ stage: 'Loading packages from lock file...', percent: 30 });
       try {
         const lockFileURL = new URL(LOCK_FILE_PATH, window.location.href).href;
         this.pyodide = await loadPyodide({
@@ -62,14 +68,14 @@ export class PyodideService {
           lockFileURL: lockFileURL
         });
 
-        this.progress$.next({ stage: 'Loading packages...', percent: 60 });
+        this._progress.set({ stage: 'Loading packages...', percent: 60 });
         const packageNames = packages.map(p => p.split(/[<>=]/)[0]);
         await this.pyodide.loadPackage(packageNames);
 
         const testPkg = packageNames[0];
         try {
           this.pyodide.pyimport(testPkg);
-          this.progress$.next({ stage: 'Ready', percent: 100 });
+          this._progress.set({ stage: 'Ready', percent: 100 });
           return;
         } catch {
           this.pyodide = null;
@@ -85,14 +91,14 @@ export class PyodideService {
       });
     }
 
-    this.progress$.next({ stage: 'Installing packages...', percent: 40 });
+    this._progress.set({ stage: 'Installing packages...', percent: 40 });
 
     await this.pyodide.loadPackage(['micropip', 'packaging']);
     const micropip = this.pyodide.pyimport('micropip') as { install(pkg: string | string[]): Promise<void> };
 
     const nativePackages = ['scipy', 'lmfit', 'scikit-learn', 'statsmodels'];
 
-    this.progress$.next({ stage: 'Loading native packages...', percent: 45 });
+    this._progress.set({ stage: 'Loading native packages...', percent: 45 });
     for (const nativePkg of nativePackages) {
       try {
         await this.pyodide!.loadPackage(nativePkg);
@@ -106,7 +112,7 @@ export class PyodideService {
     for (let i = 0; i < packages.length; i++) {
       const pkg = packages[i];
       const pkgName = pkg.split(/[<>=]/)[0];
-      this.progress$.next({
+      this._progress.set({
         stage: 'Installing ' + pkgName + '...',
         percent: 50 + (i / total) * 45
       });
@@ -126,7 +132,7 @@ export class PyodideService {
       }
     }
 
-    this.progress$.next({ stage: 'Ready', percent: 100 });
+    this._progress.set({ stage: 'Ready', percent: 100 });
   }
 
   private async checkLockFile(): Promise<boolean> {
@@ -157,14 +163,14 @@ export class PyodideService {
     this.pyodide.setStdout({
       batched: (text: string) => {
         stdout += text + '\n';
-        this.output$.next(text);
+        this._outputs.update(arr => [...arr, text]);
       }
     });
 
     this.pyodide.setStderr({
       batched: (text: string) => {
         stderr += text + '\n';
-        this.output$.next('[stderr] ' + text);
+        this._outputs.update(arr => [...arr, '[stderr] ' + text]);
       }
     });
 

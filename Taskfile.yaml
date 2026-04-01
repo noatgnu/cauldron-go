@@ -1,0 +1,231 @@
+version: '3'
+
+vars:
+  APP_NAME: cauldron
+  BIN_DIR: build/bin
+  VERSION: '{{.VERSION | default "1.0.0"}}'
+
+tasks:
+  default:
+    cmds:
+      - task: build
+
+  install-frontend-deps:
+    dir: frontend
+    sources:
+      - package.json
+    generates:
+      - node_modules/.package-lock.json
+    cmds:
+      - npm install
+
+  build-frontend:
+    dir: frontend
+    deps:
+      - install-frontend-deps
+    sources:
+      - src/**/*
+      - angular.json
+      - tsconfig*.json
+    generates:
+      - dist/browser/**/*
+    cmds:
+      - npm run build
+
+  generate-bindings:
+    deps:
+      - build-frontend
+    cmds:
+      - wails3 generate bindings
+
+  generate-licenses:
+    desc: Generate license information for Go and NPM dependencies
+    cmds:
+      - node scripts/generate-go-licenses.js
+      - node scripts/generate-npm-licenses.js
+    sources:
+      - scripts/generate-go-licenses.js
+      - scripts/generate-npm-licenses.js
+      - go.mod
+      - frontend/package.json
+    generates:
+      - resources/licenses/go-licenses.json
+      - resources/licenses/npm-licenses.json
+
+  generate-icons:
+    desc: Generate application icons in all formats
+    sources:
+      - resources/appicon.png
+    generates:
+      - resources/icon.ico
+      - resources/icons/*
+      - rsrc_windows_amd64.syso
+    cmds:
+      - ./scripts/generate-icons.sh all
+
+  generate-windows-resources:
+    desc: Generate Windows resource files (.syso)
+    sources:
+      - resources/icon.ico
+    generates:
+      - rsrc_windows_amd64.syso
+      - rsrc_windows_386.syso
+      - rsrc_windows_arm64.syso
+    cmds:
+      - ./scripts/generate-icons.sh winres
+
+  build-dev-tools:
+    desc: Build developer tools (validators, generators, etc.)
+    vars:
+      TOOLS_DIR: '{{.BIN_DIR}}/tools'
+    cmds:
+      - mkdir -p {{.TOOLS_DIR}}
+      - go build -o {{.TOOLS_DIR}}/plugin-validator{{exeExt}} ./cmd/plugin-validator
+      - go build -o {{.TOOLS_DIR}}/plugin-doc-generator{{exeExt}} ./cmd/plugin-doc-generator
+      - go build -o {{.TOOLS_DIR}}/plugin-doc-generator-all{{exeExt}} ./cmd/plugin-doc-generator-all
+      - go build -o {{.TOOLS_DIR}}/plugin-scaffolder{{exeExt}} ./cmd/plugin-scaffolder
+      - go build -o {{.TOOLS_DIR}}/plugin-to-nextflow{{exeExt}} ./cmd/plugin-to-nextflow
+      - go build -o {{.TOOLS_DIR}}/plugin-to-slivka{{exeExt}} ./cmd/plugin-to-slivka
+      - go build -o {{.TOOLS_DIR}}/plugin-to-spa{{exeExt}} ./cmd/plugin-to-spa
+      - go build -o {{.TOOLS_DIR}}/schema-doc-generator{{exeExt}} ./cmd/schema-doc-generator
+      - go build -o {{.TOOLS_DIR}}/webr-resolver{{exeExt}} ./cmd/webr-resolver
+
+  build-uniprot-fetcher:
+    desc: Build the uniprot-fetcher tool (used as a plugin)
+    cmds:
+      - go build -o {{.BIN_DIR}}/uniprot-fetcher{{exeExt}} ./cmd/uniprot-fetcher
+
+  copy-resources:
+    desc: Copy necessary resources to the build directory
+    vars:
+      TARGET_DIR: '{{.TARGET_DIR | default .BIN_DIR}}'
+    cmds:
+      - mkdir -p {{.TARGET_DIR}}
+      - cp -r examples {{.TARGET_DIR}}/ 2>/dev/null || true
+      - cp -r scripts {{.TARGET_DIR}}/ 2>/dev/null || true
+      - cp -r plugins {{.TARGET_DIR}}/ 2>/dev/null || true
+      - mkdir -p {{.TARGET_DIR}}/schemas
+      - cp schemas/*.json {{.TARGET_DIR}}/schemas/ 2>/dev/null || true
+      - mkdir -p {{.TARGET_DIR}}/plugins/uniprot-fetcher
+      - cp {{.BIN_DIR}}/uniprot-fetcher{{exeExt}} {{.TARGET_DIR}}/plugins/uniprot-fetcher/ 2>/dev/null || true
+      - mkdir -p {{.TARGET_DIR}}/tools
+      - cp {{.BIN_DIR}}/tools/* {{.TARGET_DIR}}/tools/ 2>/dev/null || true
+
+  build:
+    desc: Build the application for the current platform
+    deps:
+      - build-frontend
+      - generate-licenses
+      - build-dev-tools
+      - build-uniprot-fetcher
+    cmds:
+      - go build -ldflags="-s -w" -o {{.BIN_DIR}}/{{.APP_NAME}}{{exeExt}}
+      - task: copy-resources
+
+  build:linux:amd64:
+    desc: Build the application for Linux AMD64
+    deps:
+      - build-frontend
+      - generate-licenses
+      - build-dev-tools
+      - build-uniprot-fetcher
+    env:
+      GOOS: linux
+      GOARCH: amd64
+      CGO_ENABLED: 1
+    vars:
+      PLATFORM_BIN_DIR: '{{.BIN_DIR}}/linux-amd64'
+    cmds:
+      - mkdir -p {{.PLATFORM_BIN_DIR}}
+      - go build -tags devtools -ldflags="-s -w" -o {{.PLATFORM_BIN_DIR}}/{{.APP_NAME}}
+      - task: copy-resources
+        vars: { TARGET_DIR: '{{.PLATFORM_BIN_DIR}}' }
+
+  build:windows:amd64:
+    desc: Build the application for Windows AMD64
+    deps:
+      - build-frontend
+      - generate-windows-resources
+      - generate-licenses
+      - build-dev-tools
+      - build-uniprot-fetcher
+    env:
+      GOOS: windows
+      GOARCH: amd64
+      CGO_ENABLED: 0
+    vars:
+      PLATFORM_BIN_DIR: '{{.BIN_DIR}}/windows-amd64'
+    cmds:
+      - mkdir -p {{.PLATFORM_BIN_DIR}}
+      - go build -ldflags="-s -w -H windowsgui" -o {{.PLATFORM_BIN_DIR}}/{{.APP_NAME}}.exe
+      - task: copy-resources
+        vars: { TARGET_DIR: '{{.PLATFORM_BIN_DIR}}' }
+
+  build:darwin:amd64:
+    desc: Build the application for Darwin AMD64
+    deps:
+      - build-frontend
+      - generate-licenses
+      - build-dev-tools
+      - build-uniprot-fetcher
+    env:
+      GOOS: darwin
+      GOARCH: amd64
+      CGO_ENABLED: 1
+    vars:
+      PLATFORM_BIN_DIR: '{{.BIN_DIR}}/darwin-amd64'
+    cmds:
+      - mkdir -p {{.PLATFORM_BIN_DIR}}
+      - go build -ldflags="-s -w" -o {{.PLATFORM_BIN_DIR}}/{{.APP_NAME}}
+      - task: copy-resources
+        vars: { TARGET_DIR: '{{.PLATFORM_BIN_DIR}}' }
+
+  build:darwin:arm64:
+    desc: Build the application for Darwin ARM64
+    deps:
+      - build-frontend
+      - generate-licenses
+      - build-dev-tools
+      - build-uniprot-fetcher
+    env:
+      GOOS: darwin
+      GOARCH: arm64
+      CGO_ENABLED: 1
+    vars:
+      PLATFORM_BIN_DIR: '{{.BIN_DIR}}/darwin-arm64'
+    cmds:
+      - mkdir -p {{.PLATFORM_BIN_DIR}}
+      - go build -ldflags="-s -w" -o {{.PLATFORM_BIN_DIR}}/{{.APP_NAME}}
+      - task: copy-resources
+        vars: { TARGET_DIR: '{{.PLATFORM_BIN_DIR}}' }
+
+  build:all:
+    desc: Build the application for all supported platforms
+    cmds:
+      - task: build:linux:amd64
+      - task: build:windows:amd64
+      - task: build:darwin:amd64
+      - task: build:darwin:arm64
+
+  dev:
+    desc: Run the application in development mode
+    cmds:
+      - wails3 dev
+
+  test:e2e:
+    desc: Run E2E integration tests using Playwright
+    dir: frontend
+    cmds:
+      - npx playwright test
+
+  test:e2e:ui:
+    desc: Run E2E integration tests using Playwright with UI
+    dir: frontend
+    cmds:
+      - npx playwright test --ui
+
+  clean:
+    desc: Clean build artifacts
+    cmds:
+      - rm -rf {{.BIN_DIR}}
+      - rm -rf frontend/dist

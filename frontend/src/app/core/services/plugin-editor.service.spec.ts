@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { PluginEditorService } from './plugin-editor.service';
 import { Wails } from './wails';
-import { models } from '../../../wailsjs/go/models';
+import * as models from '../../../../bindings/github.com/noatgnu/cauldron-go/backend/models/models';
 
 describe('PluginEditorService', () => {
   let service: PluginEditorService;
@@ -41,7 +41,7 @@ describe('PluginEditorService', () => {
           name: 'Test Plugin',
           description: 'Test description',
           version: '1.0.0',
-          category: 'analysis'
+          category: models.PluginCategory.PluginCategoryAnalysis
         }),
         runtime: new models.PluginRuntimeV2({
           environments: ['python'],
@@ -78,7 +78,7 @@ describe('PluginEditorService', () => {
           name: 'Test Plugin',
           description: 'Test description',
           version: '1.0.0',
-          category: 'analysis'
+          category: models.PluginCategory.PluginCategoryAnalysis
         }),
         runtime: new models.PluginRuntimeV2({
           environments: ['python'],
@@ -114,8 +114,7 @@ describe('PluginEditorService', () => {
           id: '',
           name: '',
           description: '',
-          version: '',
-          category: ''
+          version: ''
         }),
         runtime: new models.PluginRuntimeV2({
           environments: [],
@@ -152,7 +151,7 @@ describe('PluginEditorService', () => {
           name: 'Test',
           description: 'Test',
           version: '1.0.0',
-          category: 'analysis'
+          category: models.PluginCategory.PluginCategoryAnalysis
         }),
         runtime: new models.PluginRuntimeV2({
           environments: ['python'],
@@ -197,7 +196,7 @@ describe('PluginEditorService', () => {
           name: 'Test',
           description: 'Test',
           version: '1.0.0',
-          category: 'analysis'
+          category: models.PluginCategory.PluginCategoryAnalysis
         }),
         runtime: new models.PluginRuntimeV2({
           environments: ['python'],
@@ -230,7 +229,7 @@ describe('PluginEditorService', () => {
           name: 'Test',
           description: 'Test',
           version: '1.0.0',
-          category: 'analysis'
+          category: models.PluginCategory.PluginCategoryAnalysis
         }),
         runtime: new models.PluginRuntimeV2({
           environments: ['python'],
@@ -260,12 +259,12 @@ describe('PluginEditorService', () => {
       const mockPlugins = [
         {
           definition: {
-            plugin: { id: 'pca', name: 'PCA Analysis', category: 'analysis' }
+            plugin: { id: 'pca', name: 'PCA Analysis', category: models.PluginCategory.PluginCategoryAnalysis }
           }
         },
         {
           definition: {
-            plugin: { id: 'limma', name: 'Limma', category: 'analysis' }
+            plugin: { id: 'limma', name: 'Limma', category: models.PluginCategory.PluginCategoryAnalysis }
           }
         }
       ];
@@ -286,7 +285,7 @@ describe('PluginEditorService', () => {
       const mockPlugins = [
         {
           definition: {
-            plugin: { id: 'pca', name: 'PCA Analysis', category: 'analysis', version: '2.0.0' },
+            plugin: { id: 'pca', name: 'PCA Analysis', category: models.PluginCategory.PluginCategoryAnalysis, version: '2.0.0' },
             runtime: { environments: ['python'], entrypoint: 'script', script: 'pca.py' },
             inputs: [{ name: 'input_file', label: 'Input File', type: 'file', required: true }],
             outputs: [],

@@ -1,4 +1,4 @@
-import { Component, input, computed } from '@angular/core';
+import { Component, input, computed, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 
 @Component({
@@ -6,7 +6,8 @@ import { CommonModule } from '@angular/common';
   standalone: true,
   imports: [CommonModule],
   templateUrl: './cauldron-loader.html',
-  styleUrl: './cauldron-loader.scss'
+  styleUrl: './cauldron-loader.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class CauldronLoaderComponent {
   message = input<string>('Brewing...');

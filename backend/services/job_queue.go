@@ -12,7 +12,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/noatgnu/cauldron-go/backend/models"
-	"github.com/wailsapp/wails/v2/pkg/runtime"
+	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
 type JobQueueService struct {
@@ -31,6 +31,7 @@ type JobQueueService struct {
 	currentJobID   string
 	cancelFuncs    map[string]context.CancelFunc
 	shutdownChan   chan struct{}
+	wailsApp       *application.App
 }
 
 func getScriptName(plugin *models.PluginV2) string {
@@ -41,6 +42,13 @@ func getScriptName(plugin *models.PluginV2) string {
 }
 
 func NewJobQueueService(ctx context.Context, db *DatabaseService) *JobQueueService {
+	return newJobQueueServiceInternal(db, ctx)
+}
+
+func newJobQueueServiceInternal(db *DatabaseService, ctx context.Context) *JobQueueService {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	service := &JobQueueService{
 		ctx:          ctx,
 		db:           db,
@@ -457,11 +465,20 @@ func (j *JobQueueService) processJob(job *models.Job) {
 }
 
 func (j *JobQueueService) emitJobUpdate(job *models.Job) {
-	// Skip events in test mode
-	if j.ctx.Value("wails-test") != nil {
+	if j.ctx != nil && j.ctx.Value("wails-test") != nil {
 		return
 	}
-	runtime.EventsEmit(j.ctx, "job:update", job)
+	j.emitEvent("job:update", job)
+}
+
+func (j *JobQueueService) emitEvent(name string, data interface{}) {
+	if j.wailsApp != nil && j.wailsApp.Event != nil {
+		j.wailsApp.Event.Emit(name, data)
+	}
+}
+
+func (j *JobQueueService) SetWailsApp(wailsApp *application.App) {
+	j.wailsApp = wailsApp
 }
 
 func (j *JobQueueService) RerunJob(jobID string, useSameEnvironment bool, pythonEnvPath string, rEnvPath string) (string, error) {
@@ -785,8 +802,8 @@ func (j *JobQueueService) PauseQueue() error {
 	j.paused = true
 	log.Println("[PauseQueue] Queue paused - will finish current job then stop processing")
 
-	if j.ctx.Value("wails-test") == nil {
-		runtime.EventsEmit(j.ctx, "queue:status", map[string]interface{}{
+	if j.ctx == nil || j.ctx.Value("wails-test") == nil {
+		j.emitEvent("queue:status", map[string]interface{}{
 			"paused":        true,
 			"stopImmediate": false,
 		})
@@ -829,8 +846,8 @@ func (j *JobQueueService) StopQueueImmediate() error {
 			delete(j.cancelFuncs, job.ID)
 		}
 
-		if j.ctx.Value("wails-test") == nil {
-			runtime.EventsEmit(j.ctx, "job:update", map[string]interface{}{
+		if j.ctx == nil || j.ctx.Value("wails-test") == nil {
+			j.emitEvent("job:update", map[string]interface{}{
 				"jobId":       job.ID,
 				"status":      job.Status,
 				"startedAt":   nil,
@@ -843,8 +860,8 @@ func (j *JobQueueService) StopQueueImmediate() error {
 	j.currentJobID = ""
 	log.Println("[StopQueueImmediate] Cleared currentJobID and stopped all jobs")
 
-	if j.ctx.Value("wails-test") == nil {
-		runtime.EventsEmit(j.ctx, "queue:status", map[string]interface{}{
+	if j.ctx == nil || j.ctx.Value("wails-test") == nil {
+		j.emitEvent("queue:status", map[string]interface{}{
 			"paused":        true,
 			"stopImmediate": true,
 		})
@@ -883,8 +900,8 @@ func (j *JobQueueService) ResumeQueue() error {
 
 	log.Println("[ResumeQueue] Queue resumed - processing will continue")
 
-	if j.ctx.Value("wails-test") == nil {
-		runtime.EventsEmit(j.ctx, "queue:status", map[string]interface{}{
+	if j.ctx == nil || j.ctx.Value("wails-test") == nil {
+		j.emitEvent("queue:status", map[string]interface{}{
 			"paused":        false,
 			"stopImmediate": false,
 		})

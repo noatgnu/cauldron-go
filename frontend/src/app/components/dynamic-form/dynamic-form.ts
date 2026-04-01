@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter, OnInit, OnChanges, OnDestroy, SimpleChanges, signal, computed } from '@angular/core';
+import { Component, Input, Output, EventEmitter, OnInit, OnChanges, OnDestroy, SimpleChanges, signal, computed, ChangeDetectionStrategy } from '@angular/core';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -10,7 +10,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatDialog } from '@angular/material/dialog';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { models } from '../../../wailsjs/go/models';
+import * as models from '../../../../bindings/github.com/noatgnu/cauldron-go/backend/models/models';
 import { Wails } from '../../core/services/wails';
 import { NotificationService } from '../../core/services/notification.service';
 import { SampleAnnotation } from '../sample-annotation/sample-annotation';
@@ -33,7 +33,8 @@ import { Subscription } from 'rxjs';
     MatTooltipModule
   ],
   templateUrl: './dynamic-form.html',
-  styleUrl: './dynamic-form.scss'
+  styleUrl: './dynamic-form.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class DynamicFormComponent implements OnInit, OnChanges, OnDestroy {
   @Input() plugin!: models.PluginV2;
@@ -127,7 +128,8 @@ export class DynamicFormComponent implements OnInit, OnChanges, OnDestroy {
       return input.default;
     }
 
-    switch (input.type) {
+    const inputType = input.type as string;
+    switch (inputType) {
       case 'boolean':
         return false;
       case 'number':
@@ -229,11 +231,16 @@ export class DynamicFormComponent implements OnInit, OnChanges, OnDestroy {
     return this.columnOptions.get(inputName) || [];
   }
 
+  getInputType(input: models.PluginInputV2): string {
+    return input.type as string;
+  }
+
   private async loadExternalOptions() {
     for (const input of this.plugin.definition.inputs) {
-      if (input.type === 'select' && input.optionsFromFile) {
+      const inputType = input.type as string;
+      if (inputType === 'select' && input.optionsFromFile) {
         await this.loadOptionsFromFile(input.name, input.optionsFromFile);
-      } else if (input.type === 'multiselect-grouped' && input.groupsFromFile) {
+      } else if (inputType === 'multiselect-grouped' && input.groupsFromFile) {
         await this.loadGroupsFromFile(input.name, input.groupsFromFile);
       }
     }
@@ -435,18 +442,19 @@ export class DynamicFormComponent implements OnInit, OnChanges, OnDestroy {
         const input = this.plugin.definition.inputs.find(i => i.name === key);
 
         if (input) {
-          await this.wails.logToFile(`[DynamicForm] Processing parameter ${key}: type=${input.type}, value=${value} (${typeof value})`);
+          const inputType = input.type as string;
+          await this.wails.logToFile(`[DynamicForm] Processing parameter ${key}: type=${inputType}, value=${value} (${typeof value})`);
 
-          if (input.type === 'file' && typeof value === 'string') {
+          if (inputType === 'file' && typeof value === 'string') {
             valuesToSet[key] = value;
             await this.loadColumnsForDependents(key, value);
-          } else if (input.type === 'column' || input.type === 'column-selector') {
+          } else if (inputType === 'column' || inputType === 'column-selector') {
             const sourceFile = parameters[`${key}_source`];
             if (sourceFile && typeof sourceFile === 'string') {
               await this.loadColumns(key, sourceFile);
             }
             valuesToSet[key] = value;
-          } else if (input.type === 'boolean' || input.type === 'checkbox') {
+          } else if (inputType === 'boolean' || inputType === 'checkbox') {
             let boolValue: boolean;
             if (typeof value === 'string') {
               boolValue = value === 'true' || value === '1' || value === 'True';

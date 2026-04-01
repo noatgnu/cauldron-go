@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { Wails } from './wails';
-import { models } from '../../../wailsjs/go/models';
+import * as models from '../../../../bindings/github.com/noatgnu/cauldron-go/backend/models/models';
 
 export interface ValidationResult {
   valid: boolean;

@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/wailsapp/wails/v2/pkg/runtime"
+	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
 const installServerPort = 50060
@@ -19,6 +19,17 @@ type HTTPInstallServer struct {
 	protocolHandler *ProtocolHandler
 	port            int
 	ctx             context.Context
+	wailsApp        *application.App
+}
+
+func (h *HTTPInstallServer) emitEvent(name string, data interface{}) {
+	if h.wailsApp != nil && h.wailsApp.Event != nil {
+		h.wailsApp.Event.Emit(name, data)
+	}
+}
+
+func (h *HTTPInstallServer) SetWailsApp(wailsApp *application.App) {
+	h.wailsApp = wailsApp
 }
 
 func NewHTTPInstallServer(handler *ProtocolHandler) *HTTPInstallServer {
@@ -95,7 +106,7 @@ func (h *HTTPInstallServer) handleInstall(w http.ResponseWriter, r *http.Request
 		isInstalled, err := h.protocolHandler.pluginInstaller.IsPluginInstalled(repoURL)
 		if err != nil {
 			log.Printf("[HTTPInstallServer] Failed to check if plugin is installed: %v", err)
-			runtime.EventsEmit(h.ctx, "plugin:install:error", map[string]interface{}{
+			h.emitEvent("plugin:install:error", map[string]interface{}{
 				"repo":  repoURL,
 				"error": err.Error(),
 			})
@@ -103,7 +114,7 @@ func (h *HTTPInstallServer) handleInstall(w http.ResponseWriter, r *http.Request
 		}
 
 		if isInstalled {
-			runtime.EventsEmit(h.ctx, "plugin:install:error", map[string]interface{}{
+			h.emitEvent("plugin:install:error", map[string]interface{}{
 				"repo":  repoURL,
 				"error": "Plugin from this repository is already installed",
 			})
@@ -113,7 +124,7 @@ func (h *HTTPInstallServer) handleInstall(w http.ResponseWriter, r *http.Request
 		pluginInfo, err := h.protocolHandler.pluginInstaller.FetchPluginInfo(repoURL)
 		if err != nil {
 			log.Printf("[HTTPInstallServer] Failed to fetch plugin info: %v", err)
-			runtime.EventsEmit(h.ctx, "plugin:install:error", map[string]interface{}{
+			h.emitEvent("plugin:install:error", map[string]interface{}{
 				"repo":  repoURL,
 				"error": fmt.Sprintf("Failed to fetch plugin information: %v", err),
 			})
@@ -130,7 +141,7 @@ func (h *HTTPInstallServer) handleInstall(w http.ResponseWriter, r *http.Request
 		hasRDeps = pluginInfo.Execution.Requirements.RPackagesFile != "" ||
 			(pluginInfo.Execution.Requirements.R != "" && pluginInfo.Runtime.HasEnvironment("r"))
 
-		runtime.EventsEmit(h.ctx, "plugin:install:request", map[string]interface{}{
+		h.emitEvent("plugin:install:request", map[string]interface{}{
 			"repo":                repoURL,
 			"name":                pluginInfo.Plugin.Name,
 			"id":                  pluginInfo.Plugin.ID,

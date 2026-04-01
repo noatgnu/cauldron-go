@@ -1,4 +1,4 @@
-import { Component, signal, OnInit, ViewChild, Inject, inject } from '@angular/core';
+import { Component, signal, OnInit, ViewChild, Inject, inject, ChangeDetectionStrategy, computed, effect } from '@angular/core';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
@@ -42,7 +42,8 @@ import { ThemeService, Theme } from './services/theme.service';
     ProgressPanel
   ],
   templateUrl: './app.html',
-  styleUrl: './app.scss'
+  styleUrl: './app.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class AppComponent implements OnInit {
   @ViewChild(DynamicFormComponent) dynamicForm!: DynamicFormComponent;
@@ -63,9 +64,21 @@ export class AppComponent implements OnInit {
   runtimeReady = signal(false);
   loading = signal(false);
   outputs = signal<OutputFile[]>([]);
-  logs = signal<string[]>([]);
   error = signal<string | null>(null);
-  progress = signal<ProgressState>({ stage: '', percent: 0 });
+
+  progress = computed(() => {
+    if (environment.runtime === 'webr') {
+      return this.webr.progress();
+    }
+    return this.pyodide.progress();
+  });
+
+  logs = computed(() => {
+    if (environment.runtime === 'webr') {
+      return this.webr.outputs();
+    }
+    return this.pyodide.outputs();
+  });
 
   exampleResolver: ExampleFilePathResolver;
 
@@ -86,11 +99,6 @@ export class AppComponent implements OnInit {
     this.loading.set(true);
 
     if (environment.runtime === 'webr') {
-      this.webr.progress$.subscribe(p => this.progress.set(p));
-      this.webr.output$.subscribe(line => {
-        this.logs.update(logs => [...logs, line]);
-      });
-
       try {
         const packages = environment.webrPackages.map(p => p.name);
         await this.webr.initialize(packages, environment.webrPackages);
@@ -100,11 +108,6 @@ export class AppComponent implements OnInit {
         this.error.set('Failed to initialize WebR: ' + message);
       }
     } else {
-      this.pyodide.progress$.subscribe(p => this.progress.set(p));
-      this.pyodide.output$.subscribe(line => {
-        this.logs.update(logs => [...logs, line]);
-      });
-
       try {
         await this.pyodide.initialize(environment.pyodidePackages);
         this.runtimeReady.set(true);
@@ -121,7 +124,12 @@ export class AppComponent implements OnInit {
     this.loading.set(true);
     this.error.set(null);
     this.outputs.set([]);
-    this.logs.set([]);
+
+    if (environment.runtime === 'webr') {
+      this.webr.clearOutputs();
+    } else {
+      this.pyodide.clearOutputs();
+    }
 
     try {
       const params = await this.prepareParams(values);

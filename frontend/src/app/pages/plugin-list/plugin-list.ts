@@ -1,4 +1,4 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, signal, ChangeDetectionStrategy, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -20,8 +20,8 @@ import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { PluginV2Service } from '../../core/services/plugin-v2';
 import { NotificationService } from '../../core/services/notification.service';
-import { models } from '../../../wailsjs/go/models';
-import { SetPluginEnabled } from '../../../wailsjs/go/main/App';
+import * as models from '../../../../bindings/github.com/noatgnu/cauldron-go/backend/models/models';
+import { SetPluginEnabled } from '../../../../bindings/github.com/noatgnu/cauldron-go/app';
 import { PluginEnvironmentDialog } from '../../components/plugin-environment-dialog/plugin-environment-dialog';
 import { UninstallPluginDialog, UninstallPluginResult } from '../../components/uninstall-plugin-dialog/uninstall-plugin-dialog';
 import { PluginUpdateDialog } from '../../components/plugin-update-dialog/plugin-update-dialog';
@@ -61,6 +61,7 @@ interface UpdateInfo {
   ],
   templateUrl: './plugin-list.html',
   styleUrl: './plugin-list.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 
 export class PluginList implements OnInit {
@@ -87,14 +88,15 @@ export class PluginList implements OnInit {
     private wails: Wails,
     private notification: NotificationService,
     private snackBar: MatSnackBar
-  ) {}
+  ) {
+    effect(() => {
+      const _ = this.wails.bindingsUpdated();
+      this.loadPluginBindings(this.plugins());
+    });
+  }
 
   async ngOnInit() {
     await this.loadPlugins();
-
-    this.wails.bindingsUpdated$.subscribe(() => {
-      this.loadPluginBindings(this.plugins());
-    });
   }
 
   async loadPlugins() {

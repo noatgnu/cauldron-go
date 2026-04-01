@@ -1,4 +1,4 @@
-import {Component, Inject} from '@angular/core';
+import {Component, Inject, ChangeDetectionStrategy} from '@angular/core';
 import {FormBuilder, FormControl, FormGroup, ReactiveFormsModule, Validators} from "@angular/forms";
 import {MAT_DIALOG_DATA, MatDialogModule, MatDialogRef} from "@angular/material/dialog";
 import {Wails} from "../../core/services/wails";
@@ -30,6 +30,7 @@ export interface CoverageMapConfig {
   ],
   templateUrl: './coverage-map-modal.html',
   styleUrl: './coverage-map-modal.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class CoverageMapModal {
   form!: FormGroup;

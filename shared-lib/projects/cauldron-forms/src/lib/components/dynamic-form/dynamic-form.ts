@@ -9,7 +9,11 @@ import {
   SimpleChanges,
   signal,
   Inject,
-  Optional
+  Optional,
+  ChangeDetectionStrategy,
+  DestroyRef,
+  inject,
+  effect
 } from '@angular/core';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
@@ -22,7 +26,8 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { Subscription } from 'rxjs';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { firstValueFrom } from 'rxjs';
 import {
   PluginV2,
   PluginInputV2,
@@ -63,7 +68,8 @@ export const EXAMPLE_FILE_PATH_RESOLVER = Symbol('EXAMPLE_FILE_PATH_RESOLVER');
     MatDialogModule
   ],
   templateUrl: './dynamic-form.html',
-  styleUrl: './dynamic-form.scss'
+  styleUrl: './dynamic-form.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class DynamicFormComponent implements OnInit, OnChanges, OnDestroy {
   @Input() plugin!: PluginV2;
@@ -81,7 +87,7 @@ export class DynamicFormComponent implements OnInit, OnChanges, OnDestroy {
   formValues = signal<Record<string, unknown>>({});
   validationErrors = signal<string[]>([]);
   lastSelectedIndex = new Map<string, number>();
-  private valueChangesSubscription?: Subscription;
+  private destroyRef = inject(DestroyRef);
 
   constructor(
     private fb: FormBuilder,
@@ -104,7 +110,6 @@ export class DynamicFormComponent implements OnInit, OnChanges, OnDestroy {
   }
 
   ngOnDestroy() {
-    this.valueChangesSubscription?.unsubscribe();
   }
 
   private async log(message: string): Promise<void> {
@@ -120,8 +125,6 @@ export class DynamicFormComponent implements OnInit, OnChanges, OnDestroy {
   }
 
   private async initializeForm() {
-    this.valueChangesSubscription?.unsubscribe();
-
     this.columnOptions.clear();
     this.selectOptions.clear();
     this.groupedOptions.clear();
@@ -131,7 +134,9 @@ export class DynamicFormComponent implements OnInit, OnChanges, OnDestroy {
     this.buildForm();
     await this.loadExternalOptions();
 
-    this.valueChangesSubscription = this.form.valueChanges.subscribe((values) => {
+    this.form.valueChanges.pipe(
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe((values) => {
       this.formValues.set(values);
       this.formChange.emit(this.getFormValue());
       if (this.validationErrors().length > 0) {
@@ -298,7 +303,9 @@ export class DynamicFormComponent implements OnInit, OnChanges, OnDestroy {
     for (const colorMapInput of colorMapInputs) {
       const sourceControl = this.form.get(colorMapInput.keysFrom!);
       if (sourceControl) {
-        sourceControl.valueChanges.subscribe(() => {
+        sourceControl.valueChanges.pipe(
+          takeUntilDestroyed(this.destroyRef)
+        ).subscribe(() => {
           this.initializeColorMap(colorMapInput);
         });
       }
@@ -330,18 +337,17 @@ export class DynamicFormComponent implements OnInit, OnChanges, OnDestroy {
       disableClose: false
     });
 
-    dialogRef.afterClosed().subscribe(async (result: { filePath?: string; columns?: string[] } | undefined) => {
-      if (result && result.filePath) {
-        this.form.patchValue({ [inputName]: result.filePath });
+    const result = await firstValueFrom(dialogRef.afterClosed()) as { filePath?: string; columns?: string[] } | undefined;
+    if (result && result.filePath) {
+      this.form.patchValue({ [inputName]: result.filePath });
 
-        const input = this.plugin.definition.inputs.find(i => i.name === inputName);
-        if (input && result.columns) {
-          await this.loadColumnsForDependentsWithHeaders(inputName, result.filePath, result.columns);
-        } else if (input) {
-          await this.loadColumnsForDependents(inputName, result.filePath);
-        }
+      const input = this.plugin.definition.inputs.find(i => i.name === inputName);
+      if (input && result.columns) {
+        await this.loadColumnsForDependentsWithHeaders(inputName, result.filePath, result.columns);
+      } else if (input) {
+        await this.loadColumnsForDependents(inputName, result.filePath);
       }
-    });
+    }
   }
 
   private async loadColumnsForDependentsWithHeaders(sourceInputName: string, filePath: string, headers: string[]) {
@@ -736,19 +742,18 @@ export class DynamicFormComponent implements OnInit, OnChanges, OnDestroy {
       }
     });
 
-    dialogRef.afterClosed().subscribe(async (result) => {
-      if (result && Array.isArray(result)) {
-        try {
-          const filePath = await this.saveAnnotationFile(result);
-          this.form.patchValue({ [inputName]: filePath });
-          this.notification.showSuccess('Annotation file saved successfully');
-        } catch (error) {
-          const errorMsg = error instanceof Error ? error.message : String(error);
-          await this.logError(`Error saving annotation file: ${errorMsg}`);
-          this.notification.showError(`Failed to save annotation file: ${errorMsg}`);
-        }
+    const result = await firstValueFrom(dialogRef.afterClosed());
+    if (result && Array.isArray(result)) {
+      try {
+        const filePath = await this.saveAnnotationFile(result);
+        this.form.patchValue({ [inputName]: filePath });
+        this.notification.showSuccess('Annotation file saved successfully');
+      } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        await this.logError(`Error saving annotation file: ${errorMsg}`);
+        this.notification.showError(`Failed to save annotation file: ${errorMsg}`);
       }
-    });
+    }
   }
 
   private getSampleNamesForAnnotation(): string[] {
@@ -841,19 +846,18 @@ export class DynamicFormComponent implements OnInit, OnChanges, OnDestroy {
       }
     });
 
-    dialogRef.afterClosed().subscribe(async (result) => {
-      if (result && Array.isArray(result) && input.tableColumns) {
-        try {
-          const filePath = await this.saveTableFile(result, input.tableColumns, inputName);
-          this.form.patchValue({ [inputName]: filePath });
-          this.notification.showSuccess('Table file saved successfully');
-        } catch (error) {
-          const errorMsg = error instanceof Error ? error.message : String(error);
-          await this.logError(`Error saving table file: ${errorMsg}`);
-          this.notification.showError(`Failed to save table file: ${errorMsg}`);
-        }
+    const result = await firstValueFrom(dialogRef.afterClosed());
+    if (result && Array.isArray(result) && input.tableColumns) {
+      try {
+        const filePath = await this.saveTableFile(result, input.tableColumns, inputName);
+        this.form.patchValue({ [inputName]: filePath });
+        this.notification.showSuccess('Table file saved successfully');
+      } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        await this.logError(`Error saving table file: ${errorMsg}`);
+        this.notification.showError(`Failed to save table file: ${errorMsg}`);
       }
-    });
+    }
   }
 
   private parseTableFile(content: string, columns: TableColumn[]): Record<string, unknown>[] {

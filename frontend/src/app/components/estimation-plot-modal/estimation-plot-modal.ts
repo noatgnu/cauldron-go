@@ -1,4 +1,4 @@
-import {Component} from '@angular/core';
+import {Component, ChangeDetectionStrategy} from '@angular/core';
 import {FormBuilder, FormControl, FormGroup, ReactiveFormsModule, Validators} from "@angular/forms";
 import {MatDialogModule, MatDialogRef} from "@angular/material/dialog";
 import {Wails} from "../../core/services/wails";
@@ -41,6 +41,7 @@ export interface EstimationPlotConfig {
   ],
   templateUrl: './estimation-plot-modal.html',
   styleUrl: './estimation-plot-modal.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class EstimationPlotModal {
   form!: FormGroup;

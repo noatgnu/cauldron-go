@@ -1,4 +1,4 @@
-import { Component, input, output } from '@angular/core';
+import { Component, input, output, ChangeDetectionStrategy } from '@angular/core';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { MatListModule } from '@angular/material/list';
 import { MatIconModule } from '@angular/material/icon';
@@ -19,7 +19,8 @@ export interface OutputFile {
     MatButtonModule
   ],
   templateUrl: './results-panel.html',
-  styleUrl: './results-panel.scss'
+  styleUrl: './results-panel.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class ResultsPanel {
   outputs = input.required<OutputFile[]>();

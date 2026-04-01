@@ -1,4 +1,4 @@
-import { Component, Inject, inject, signal, computed, OnInit } from '@angular/core';
+import { Component, Inject, inject, signal, computed, OnInit, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, FormGroup } from '@angular/forms';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
@@ -60,6 +60,7 @@ export interface PluginInstallConfirmResult {
   ],
   templateUrl: './confirm-plugin-install-dialog.html',
   styleUrl: './confirm-plugin-install-dialog.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class ConfirmPluginInstallDialog implements OnInit {
   private wails = inject(Wails);

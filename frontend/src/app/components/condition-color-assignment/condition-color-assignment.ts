@@ -1,4 +1,4 @@
-import {Component, Input} from '@angular/core';
+import {Component, Input, ChangeDetectionStrategy} from '@angular/core';
 import {FormBuilder, FormGroup, ReactiveFormsModule} from "@angular/forms";
 
 @Component({
@@ -6,6 +6,7 @@ import {FormBuilder, FormGroup, ReactiveFormsModule} from "@angular/forms";
   imports: [ReactiveFormsModule],
   templateUrl: './condition-color-assignment.html',
   styleUrl: './condition-color-assignment.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class ConditionColorAssignment {
   @Input() conditions: string[] = [];

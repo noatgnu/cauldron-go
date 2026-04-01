@@ -1,4 +1,5 @@
 import { TestBed } from '@angular/core/testing';
+import { signal } from '@angular/core';
 import { App } from './app';
 import { Router, NavigationEnd, ActivatedRoute } from '@angular/router';
 import { ProtocolHandlerService } from './core/services/protocol-handler.service';
@@ -45,7 +46,7 @@ describe('App', () => {
       url: '/'
     };
     protocolHandlerMock = {};
-    loadingServiceMock = { loading$: of(false) };
+    loadingServiceMock = { loading: signal({ isLoading: false, message: '' }) };
     dialogMock = { open: vi.fn() };
     notificationMock = {
       showError: vi.fn(),
@@ -58,8 +59,8 @@ describe('App', () => {
     };
     wailsMock = {
       isWails: false,
-      bindingsUpdated$: of(undefined),
-      progress$: of(null)
+      bindingsUpdated: signal(0),
+      progress: signal(null)
     };
     pluginV2ServiceMock = {
       getAllPlugins: vi.fn().mockResolvedValue([])

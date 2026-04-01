@@ -1,4 +1,4 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, signal, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, FormArray, Validators, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -17,7 +17,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 
 import { PluginEditorService } from '../../core/services/plugin-editor.service';
 import { Wails } from '../../core/services/wails';
-import { models } from '../../../wailsjs/go/models';
+import * as models from '../../../../bindings/github.com/noatgnu/cauldron-go/backend/models/models';
 
 @Component({
   selector: 'app-plugin-editor',
@@ -39,7 +39,8 @@ import { models } from '../../../wailsjs/go/models';
     MatTooltipModule
   ],
   templateUrl: './plugin-editor.html',
-  styleUrls: ['./plugin-editor.scss']
+  styleUrls: ['./plugin-editor.scss'],
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class PluginEditor implements OnInit {
   mode = signal<'create' | 'edit'>('create');
@@ -457,8 +458,7 @@ export class PluginEditor implements OnInit {
         envVariables: formValue.execution.envVariables
       }),
       annotation: formValue.annotation?.samplesFrom || formValue.annotation?.annotationFile ? formValue.annotation : undefined,
-      example: formValue.example?.enabled ? formValue.example : undefined,
-      diagram: formValue.diagram
+      example: formValue.example?.enabled ? formValue.example : undefined
     });
   }
 

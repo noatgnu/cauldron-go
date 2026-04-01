@@ -1,4 +1,4 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, signal, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, NavigationEnd, ActivatedRoute } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
@@ -19,7 +19,8 @@ interface RouteConfig {
   selector: 'app-breadcrumbs',
   imports: [CommonModule, MatIconModule],
   templateUrl: './breadcrumbs.html',
-  styleUrl: './breadcrumbs.scss'
+  styleUrl: './breadcrumbs.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class Breadcrumbs implements OnInit {
   protected breadcrumbs = signal<Breadcrumb[]>([]);

@@ -1,4 +1,4 @@
-import { Component, Inject, OnInit, OnDestroy, signal } from '@angular/core';
+import { Component, Inject, OnInit, OnDestroy, signal, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
@@ -30,7 +30,8 @@ export interface PluginInstallProgressData {
     MatButtonModule
   ],
   templateUrl: './plugin-install-progress.html',
-  styleUrl: './plugin-install-progress.scss'
+  styleUrl: './plugin-install-progress.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class PluginInstallProgress implements OnInit, OnDestroy {
   protected currentStatus = signal('Initializing installation...');

@@ -7,7 +7,7 @@ import { Router } from '@angular/router';
 import { ActivatedRoute } from '@angular/router';
 import { ReactiveFormsModule } from '@angular/forms';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
-import { models } from '../../../wailsjs/go/models';
+import * as models from '../../../../bindings/github.com/noatgnu/cauldron-go/backend/models/models';
 import { of } from 'rxjs';
 
 describe('PluginEditor', () => {
@@ -98,7 +98,7 @@ describe('PluginEditor', () => {
             name: 'Test Plugin',
             description: 'Test description',
             version: '1.0.0',
-            category: 'analysis'
+            category: models.PluginCategory.PluginCategoryAnalysis
           },
           runtime: {
             environments: ['python'],
@@ -132,11 +132,11 @@ describe('PluginEditor', () => {
           name: 'Copy of pca',
           description: 'Test',
           version: '1.0.0',
-          category: 'analysis'
+          category: models.PluginCategory.PluginCategoryAnalysis
         }),
         runtime: new models.PluginRuntimeV2({
-          type: 'python',
-          script: 'pca.py'
+          environments: ['python'],
+          entrypoint: 'pca.py'
         }),
         inputs: [],
         outputs: [],
@@ -284,7 +284,7 @@ describe('PluginEditor', () => {
           name: 'Test Plugin',
           description: 'Test description long enough',
           version: '1.0.0',
-          category: 'analysis',
+          category: models.PluginCategory.PluginCategoryAnalysis,
           author: 'Test',
           icon: ''
         },
@@ -333,7 +333,7 @@ describe('PluginEditor', () => {
           name: 'Test',
           description: 'Test description long enough',
           version: '1.0.0',
-          category: 'analysis',
+          category: models.PluginCategory.PluginCategoryAnalysis,
           author: 'Test',
           icon: ''
         },
@@ -466,7 +466,7 @@ describe('PluginEditor', () => {
           name: 'Test Plugin',
           description: 'Test description',
           version: '2.0.0',
-          category: 'analysis'
+          category: models.PluginCategory.PluginCategoryAnalysis
         }),
         runtime: new models.PluginRuntimeV2({
           environments: ['r'],
@@ -476,7 +476,7 @@ describe('PluginEditor', () => {
           new models.PluginInputV2({
             name: 'input1',
             label: 'Input 1',
-            type: 'file',
+            type: models.PluginInputType.PluginInputTypeFile,
             required: true
           })
         ],
@@ -520,9 +520,9 @@ describe('PluginEditor', () => {
               name: 'Test',
               description: 'Test',
               version: '1.0.0',
-              category: 'analysis'
+              category: models.PluginCategory.PluginCategoryAnalysis
             }),
-            runtime: new models.PluginRuntimeV2({ type: 'python', script: 'test.py' }),
+            runtime: new models.PluginRuntimeV2({ environments: ['python'], entrypoint: 'test.py' }),
             inputs: [],
             outputs: [],
             plots: [],
@@ -557,7 +557,7 @@ describe('PluginEditor', () => {
           name: 'Test',
           description: 'Test description long enough',
           version: '1.0.0',
-          category: 'analysis',
+          category: models.PluginCategory.PluginCategoryAnalysis,
           author: 'Test',
           icon: ''
         },

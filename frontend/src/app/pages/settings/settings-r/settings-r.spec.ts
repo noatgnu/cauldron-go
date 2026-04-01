@@ -1,10 +1,10 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { signal } from '@angular/core';
 import { SettingsR } from './settings-r';
 import { Wails } from '../../../core/services/wails';
 import { NotificationService } from '../../../core/services/notification.service';
 import { vi } from 'vitest';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
-import { of } from 'rxjs';
 
 describe('SettingsR', () => {
   let component: SettingsR;
@@ -19,8 +19,9 @@ describe('SettingsR', () => {
       getActiveREnvironment: vi.fn().mockResolvedValue(null),
       getRVersion: vi.fn().mockResolvedValue('4.2.0'),
       getRenvEnvironments: vi.fn().mockResolvedValue([]),
-      bindingsUpdated$: of(undefined),
-      progress$: of(null),
+      getPluginsV2: vi.fn().mockResolvedValue([]),
+      bindingsUpdated: signal(0),
+      progress: signal(null),
       logToFile: vi.fn().mockResolvedValue(undefined)
     };
     notificationMock = {

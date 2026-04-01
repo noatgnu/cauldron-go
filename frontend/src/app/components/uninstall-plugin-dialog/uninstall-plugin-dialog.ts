@@ -1,4 +1,4 @@
-import { Component, Inject, OnInit, signal } from '@angular/core';
+import { Component, Inject, OnInit, signal, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, FormGroup } from '@angular/forms';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
@@ -34,7 +34,8 @@ export interface UninstallPluginResult {
     MatProgressSpinnerModule
   ],
   templateUrl: './uninstall-plugin-dialog.html',
-  styleUrl: './uninstall-plugin-dialog.scss'
+  styleUrl: './uninstall-plugin-dialog.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class UninstallPluginDialog implements OnInit {
   form: FormGroup;

@@ -1,4 +1,4 @@
-import {Component, Inject} from '@angular/core';
+import {Component, Inject, ChangeDetectionStrategy} from '@angular/core';
 import {FormBuilder, FormControl, FormGroup, ReactiveFormsModule, Validators} from "@angular/forms";
 import {MAT_DIALOG_DATA, MatDialogModule, MatDialogRef} from "@angular/material/dialog";
 import {Wails} from "../../core/services/wails";
@@ -29,6 +29,7 @@ export interface CheckPeptideInLibraryConfig {
   ],
   templateUrl: './check-peptide-in-library-modal.html',
   styleUrl: './check-peptide-in-library-modal.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class CheckPeptideInLibraryModal {
   form!: FormGroup;

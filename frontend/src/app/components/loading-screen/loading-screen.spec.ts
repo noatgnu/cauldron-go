@@ -1,18 +1,18 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { BehaviorSubject } from 'rxjs';
+import { signal, WritableSignal } from '@angular/core';
 import { LoadingScreenComponent } from './loading-screen';
-import { LoadingService } from '../../services/loading';
+import { LoadingService, LoadingState } from '../../services/loading';
 
 describe('LoadingScreenComponent', () => {
   let component: LoadingScreenComponent;
   let fixture: ComponentFixture<LoadingScreenComponent>;
-  let loadingSubject: BehaviorSubject<{ isLoading: boolean; message: string }>;
+  let loadingSignal: WritableSignal<LoadingState>;
 
   beforeEach(async () => {
-    loadingSubject = new BehaviorSubject<{ isLoading: boolean; message: string }>({ isLoading: false, message: 'Loading...' });
+    loadingSignal = signal<LoadingState>({ isLoading: false, message: 'Loading...' });
 
     const mockLoadingService = {
-      loading$: loadingSubject.asObservable()
+      loading: loadingSignal
     };
 
     await TestBed.configureTestingModule({
@@ -31,9 +31,11 @@ describe('LoadingScreenComponent', () => {
     expect(component).toBeTruthy();
   });
 
-  it('should update loading state', () => {
-    loadingSubject.next({ isLoading: true, message: 'Test loading' });
-    expect(component.isLoading).toBe(true);
-    expect(component.loadingMessage).toBe('Test loading');
+  it('should update loading state', async () => {
+    loadingSignal.set({ isLoading: true, message: 'Test loading' });
+    TestBed.flushEffects();
+    await fixture.whenStable();
+    expect(component.isLoading()).toBe(true);
+    expect(component.loadingMessage()).toBe('Test loading');
   });
 });

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"testing"
 	"time"
@@ -11,10 +10,9 @@ import (
 
 // TestE2EAngularWailsCommunication simulates what Angular does when it calls Wails bindings
 func TestE2EAngularWailsCommunication(t *testing.T) {
-	ctx := context.WithValue(context.Background(), "wails-test", true)
 	app := NewApp()
-	app.startup(ctx)
-	defer app.shutdown(ctx)
+	app.Initialize()
+	defer app.Shutdown()
 
 	t.Run("E2E: Home Component Initialization Sequence", func(t *testing.T) {
 		// This simulates what happens in home.ts ngOnInit()
@@ -207,10 +205,9 @@ func TestE2EAngularWailsCommunication(t *testing.T) {
 
 // TestE2EDataSerialization specifically tests that data formats match Angular expectations
 func TestE2EDataSerialization(t *testing.T) {
-	ctx := context.WithValue(context.Background(), "wails-test", true)
 	app := NewApp()
-	app.startup(ctx)
-	defer app.shutdown(ctx)
+	app.Initialize()
+	defer app.Shutdown()
 
 	t.Run("Empty Arrays Must Serialize to [] not null", func(t *testing.T) {
 		// This is critical - Angular expects [] not null

@@ -21,6 +21,7 @@ type PluginInstaller struct {
 	db           *DatabaseService
 	pluginLoader *PluginLoaderV2
 	gitAuth      *GitAuthService
+	wailsApp     interface{}
 }
 
 func NewPluginInstaller(pluginsDir string, db *DatabaseService, loader *PluginLoaderV2, gitAuth *GitAuthService) *PluginInstaller {

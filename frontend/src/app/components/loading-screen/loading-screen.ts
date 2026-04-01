@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, ChangeDetectionStrategy, effect, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { LoadingService } from '../../services/loading';
 
@@ -7,16 +7,18 @@ import { LoadingService } from '../../services/loading';
   templateUrl: './loading-screen.html',
   styleUrls: ['./loading-screen.scss'],
   imports: [CommonModule],
-  standalone: true
+  standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class LoadingScreenComponent {
-  isLoading = false;
-  loadingMessage = 'Loading...';
+  isLoading = signal(false);
+  loadingMessage = signal('Loading...');
 
   constructor(private loadingService: LoadingService) {
-    this.loadingService.loading$.subscribe(state => {
-      this.isLoading = state.isLoading;
-      this.loadingMessage = state.message;
+    effect(() => {
+      const state = this.loadingService.loading();
+      this.isLoading.set(state.isLoading);
+      this.loadingMessage.set(state.message);
     });
   }
 }

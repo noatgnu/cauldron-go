@@ -1,4 +1,4 @@
-import {Component} from '@angular/core';
+import {Component, ChangeDetectionStrategy} from '@angular/core';
 import {FormBuilder, FormControl, FormGroup, ReactiveFormsModule} from "@angular/forms";
 import {MatDialogModule, MatDialogRef} from "@angular/material/dialog";
 import {MatButtonModule} from "@angular/material/button";
@@ -20,6 +20,7 @@ export interface ProtocolIoCitationExportConfig {
   ],
   templateUrl: './protocol-io-citation-export-modal.html',
   styleUrl: './protocol-io-citation-export-modal.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class ProtocolIoCitationExportModal {
   form!: FormGroup;

@@ -1,4 +1,4 @@
-import { Component, Inject } from '@angular/core';
+import { Component, Inject, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatDialogModule, MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
@@ -28,7 +28,8 @@ export interface PromptDialogData {
     FormsModule
   ],
   templateUrl: './prompt-dialog.html',
-  styleUrl: './prompt-dialog.scss'
+  styleUrl: './prompt-dialog.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class PromptDialogComponent {
   inputValue: string = '';

@@ -1,4 +1,4 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, signal, ChangeDetectionStrategy } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTabsModule } from '@angular/material/tabs';
@@ -31,6 +31,7 @@ interface LicenseData {
   ],
   templateUrl: './about.html',
   styleUrl: './about.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class About implements OnInit {
   protected readonly version = '1.0.0';

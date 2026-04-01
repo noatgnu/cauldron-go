@@ -84,6 +84,11 @@ jobs:
         run: go test -v ./backend/... ./cmd/...
         shell: bash
 
+      - name: Run E2E Tests (no plugins required)
+        run: |
+          go test -v -run "TestE2ESettingsManagement|TestE2EEnvironmentDetection|TestE2EFileOperations|TestE2EVersionChecks|TestE2ELogging|TestE2ETempFileOperations|TestE2EDefaultVenvPath|TestE2EJobQueueAdvanced|TestE2EPluginManagement" -timeout 120s
+        shell: bash
+
       - name: Generate Licenses
         run: |
           node scripts/generate-go-licenses.js
@@ -260,6 +265,10 @@ jobs:
 
       - name: Run Backend Tests
         run: go test -v ./backend/... ./cmd/...
+
+      - name: Run E2E Tests (no plugins required)
+        run: |
+          go test -v -run "TestE2ESettingsManagement|TestE2EEnvironmentDetection|TestE2EFileOperations|TestE2EVersionChecks|TestE2ELogging|TestE2ETempFileOperations|TestE2EDefaultVenvPath|TestE2EJobQueueAdvanced|TestE2EPluginManagement" -timeout 120s
 
       - name: Generate Licenses
         run: |

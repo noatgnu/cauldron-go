@@ -1,5 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideAnimationsAsync } from '@angular/platform-browser/animations/async';
+import { signal } from '@angular/core';
 import { AppComponent } from './app';
 import { PyodideService } from './services/pyodide';
 import { WebRService } from './services/webr';
@@ -8,7 +9,6 @@ import { BrowserNotificationHandler } from './services/browser-notification-hand
 import { BrowserLogHandler } from './services/browser-log-handler';
 import { BrowserExampleFilePathResolver } from './services/browser-example-resolver';
 import { FILE_HANDLER, NOTIFICATION_HANDLER, LOG_HANDLER } from '@cauldron/forms';
-import { Subject } from 'rxjs';
 import { environment } from '../environments/environment';
 
 describe('AppComponent', () => {
@@ -23,15 +23,15 @@ describe('AppComponent', () => {
       initializeResolver = resolve;
     });
 
-    mockPyodideService = jasmine.createSpyObj('PyodideService', ['initialize', 'execute'], {
-      progress$: new Subject(),
-      output$: new Subject()
+    mockPyodideService = jasmine.createSpyObj('PyodideService', ['initialize', 'execute', 'clearOutputs'], {
+      progress: signal({ stage: '', percent: 0 }),
+      outputs: signal<string[]>([])
     });
     mockPyodideService.initialize.and.returnValue(initializePromise);
 
-    mockWebRService = jasmine.createSpyObj('WebRService', ['initialize', 'execute'], {
-      progress$: new Subject(),
-      output$: new Subject()
+    mockWebRService = jasmine.createSpyObj('WebRService', ['initialize', 'execute', 'clearOutputs'], {
+      progress: signal({ stage: '', percent: 0 }),
+      outputs: signal<string[]>([])
     });
     mockWebRService.initialize.and.returnValue(initializePromise);
 

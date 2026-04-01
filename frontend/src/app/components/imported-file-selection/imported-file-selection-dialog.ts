@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, ChangeDetectionStrategy } from '@angular/core';
 import { MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
 import { ImportedFileSelection } from './imported-file-selection';
@@ -29,7 +29,8 @@ import { ImportedFile } from '../../core/services/wails';
       min-width: 500px;
       padding: 20px 24px;
     }
-  `]
+  `],
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class ImportedFileSelectionDialog {
   private selectedFilePath?: string;

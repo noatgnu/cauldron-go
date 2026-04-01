@@ -1,4 +1,4 @@
-import { Component, Input, OnInit, signal } from '@angular/core';
+import { Component, Input, OnInit, signal, ChangeDetectionStrategy } from '@angular/core';
 import { PlotlyModule } from 'angular-plotly.js';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatIconModule } from '@angular/material/icon';
@@ -24,6 +24,7 @@ interface PlotlyData {
   ],
   templateUrl: './plugin-plot.html',
   styleUrl: './plugin-plot.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class PluginPlot implements OnInit {
   @Input() jobId!: string;

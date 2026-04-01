@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -10,12 +9,9 @@ import (
 
 // TestAppInitialization tests that the App initializes correctly
 func TestAppInitialization(t *testing.T) {
-	ctx := context.WithValue(context.Background(), "wails-test", true)
 	app := NewApp()
-
-	// Initialize the app
-	app.startup(ctx)
-	defer app.shutdown(ctx)
+	app.Initialize()
+	defer app.Shutdown()
 
 	if app.db == nil {
 		t.Fatal("Database service was not initialized")
@@ -38,10 +34,9 @@ func TestAppInitialization(t *testing.T) {
 
 // TestGetSettings tests the GetSettings endpoint
 func TestGetSettings(t *testing.T) {
-	ctx := context.WithValue(context.Background(), "wails-test", true)
 	app := NewApp()
-	app.startup(ctx)
-	defer app.shutdown(ctx)
+	app.Initialize()
+	defer app.Shutdown()
 
 	config := app.GetSettings()
 	if config == nil {
@@ -53,10 +48,9 @@ func TestGetSettings(t *testing.T) {
 
 // TestJobLifecycle tests creating, retrieving, and deleting a job
 func TestJobLifecycle(t *testing.T) {
-	ctx := context.WithValue(context.Background(), "wails-test", true)
 	app := NewApp()
-	app.startup(ctx)
-	defer app.shutdown(ctx)
+	app.Initialize()
+	defer app.Shutdown()
 
 	// Get PCA plugin ID
 	plugins := app.GetPluginsV2()
@@ -144,10 +138,9 @@ func TestJobLifecycle(t *testing.T) {
 
 // TestImportFile tests importing a data file
 func TestImportDataFile(t *testing.T) {
-	ctx := context.WithValue(context.Background(), "wails-test", true)
 	app := NewApp()
-	app.startup(ctx)
-	defer app.shutdown(ctx)
+	app.Initialize()
+	defer app.Shutdown()
 
 	// Note: This will fail if the file doesn't exist, but tests the flow
 	// In a real test, we'd create a temp CSV file first
@@ -165,13 +158,9 @@ func TestImportDataFile(t *testing.T) {
 
 // TestDatabasePersistence tests that data persists across app restarts
 func TestDatabasePersistence(t *testing.T) {
-	ctx := context.WithValue(context.Background(), "wails-test", true)
-
-	// First app instance - create a job
 	app1 := NewApp()
-	app1.startup(ctx)
+	app1.Initialize()
 
-	// Get normalization plugin ID
 	plugins := app1.GetPluginsV2()
 	var normPluginID uint
 	for _, p := range plugins {
@@ -181,7 +170,7 @@ func TestDatabasePersistence(t *testing.T) {
 		}
 	}
 	if normPluginID == 0 {
-		app1.shutdown(ctx)
+		app1.Shutdown()
 		t.Skip("Normalization plugin not installed, skipping test")
 	}
 
@@ -197,16 +186,14 @@ func TestDatabasePersistence(t *testing.T) {
 		t.Fatalf("Failed to create job in first instance: %v", err)
 	}
 
-	t.Logf("✓ Created job with ID: %s in first instance", jobID)
+	t.Logf("Created job with ID: %s in first instance", jobID)
 
-	// Shut down first instance
-	app1.shutdown(ctx)
-	t.Log("✓ Shut down first app instance")
+	app1.Shutdown()
+	t.Log("Shut down first app instance")
 
-	// Second app instance - verify job still exists
 	app2 := NewApp()
-	app2.startup(ctx)
-	defer app2.shutdown(ctx)
+	app2.Initialize()
+	defer app2.Shutdown()
 
 	job, err := app2.GetJob(jobID)
 	if err != nil {
@@ -230,10 +217,9 @@ func TestDatabasePersistence(t *testing.T) {
 
 // TestVersionDetection tests Python and R version detection
 func TestVersionDetection(t *testing.T) {
-	ctx := context.WithValue(context.Background(), "wails-test", true)
 	app := NewApp()
-	app.startup(ctx)
-	defer app.shutdown(ctx)
+	app.Initialize()
+	defer app.Shutdown()
 
 	// Test Python version
 	pyVersion, err := app.GetPythonVersion()

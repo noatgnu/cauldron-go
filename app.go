@@ -17,7 +17,7 @@ import (
 
 	"github.com/noatgnu/cauldron-go/backend/models"
 	"github.com/noatgnu/cauldron-go/backend/services"
-	"github.com/wailsapp/wails/v2/pkg/runtime"
+	"github.com/wailsapp/wails/v3/pkg/application"
 	"gopkg.in/yaml.v3"
 )
 
@@ -28,7 +28,8 @@ var goLicensesJSON []byte
 var npmLicensesJSON []byte
 
 type App struct {
-	ctx                   context.Context
+	wailsApp              *application.App
+	mainWindow            *application.WebviewWindow
 	db                    *services.DatabaseService
 	settings              *services.SettingsService
 	fileService           *services.FileService
@@ -46,46 +47,61 @@ type App struct {
 	gitAuthService        *services.GitAuthService
 	ready                 chan bool
 	logFilePath           string
+	initialized           chan struct{}
 }
 
 func NewApp() *App {
 	return &App{
-		ready: make(chan bool),
+		ready:       make(chan bool),
+		initialized: make(chan struct{}),
 	}
 }
 
-func (a *App) startup(ctx context.Context) {
-	log.Println("[App.startup] Starting application...")
-	log.Println("[App.startup] OnBeforeClose handler will handle window close events")
-	a.ctx = ctx
+func (a *App) SetApplication(wailsApp *application.App) {
+	a.wailsApp = wailsApp
+}
 
-	if ctx.Value("wails-test") == nil {
-		log.Println("[App.startup] Setting up menu...")
-		menu := services.BuildApplicationMenu(ctx, a)
-		runtime.MenuSetApplicationMenu(ctx, menu)
+func (a *App) SetMainWindow(window *application.WebviewWindow) {
+	a.mainWindow = window
+}
+
+func (a *App) emitEvent(name string, data interface{}) {
+	if a.wailsApp != nil && a.wailsApp.Event != nil {
+		a.wailsApp.Event.Emit(name, data)
+	}
+}
+
+func (a *App) Initialize() {
+	log.Println("[App.Initialize] Starting application...")
+	time.Sleep(1 * time.Second)
+
+	log.Println("[App.Initialize] Initializing database...")
+	userDataPath, err := getUserDataPath()
+	if err != nil {
+		log.Printf("[App.Initialize] ERROR: Failed to get user data path: %v\n", err)
+		return
 	}
 
-	log.Println("[App.startup] Initializing database...")
-	db, err := services.NewDatabaseService(ctx)
+	db, err := services.NewDatabaseServiceV3(userDataPath)
 	if err != nil {
-		log.Printf("[App.startup] ERROR: Failed to initialize database: %v\n", err)
-		fmt.Printf("[App.startup] ERROR: Failed to initialize database: %v\n", err)
+		log.Printf("[App.Initialize] ERROR: Failed to initialize database: %v\n", err)
+		fmt.Printf("[App.Initialize] ERROR: Failed to initialize database: %v\n", err)
 		return
 	}
 	a.db = db
-	log.Println("[App.startup] Database initialized successfully")
+	log.Println("[App.Initialize] Database initialized successfully")
 
-	log.Println("[App.startup] Initializing services...")
-	a.settings = services.NewSettingsService(ctx, db)
-	a.fileService = services.NewFileService(ctx)
-	a.envService = services.NewEnvironmentService(ctx, db, a.settings, services.NewProgressNotifier(ctx))
-	a.portableEnvService = services.NewPortableEnvService(ctx, a.fileService)
+	log.Println("[App.Initialize] Initializing services...")
+	a.settings = services.NewSettingsServiceV3(db)
+	a.fileService = services.NewFileServiceV3(a.wailsApp)
+	a.envService = services.NewEnvironmentServiceV3(db, a.settings, services.NewProgressNotifierV3(a.wailsApp))
+	a.portableEnvService = services.NewPortableEnvServiceV3(a.fileService)
 
-	log.Println("[App.startup] Initializing job queue...")
-	a.jobQueue = services.NewJobQueueService(ctx, db)
-	log.Println("[App.startup] Setting job queue runners...")
+	log.Println("[App.Initialize] Initializing job queue...")
+	a.jobQueue = services.NewJobQueueServiceV3(db, a.wailsApp)
+	log.Println("[App.Initialize] Setting job queue runners...")
 
-	log.Println("[App.startup] Initializing script executor...")
+	log.Println("[App.Initialize] Initializing script executor...")
 	a.scriptExecutor = services.NewScriptExecutor(a.settings, a.db)
 	a.scriptExecutor.SetUpdateCallback(func(jobID string, update models.Job) {
 		job, err := a.jobQueue.GetJob(jobID)
@@ -115,7 +131,7 @@ func (a *App) startup(ctx context.Context) {
 			log.Printf("[App] Failed to save job %s: %v", jobID, err)
 		}
 
-		runtime.EventsEmit(a.ctx, "job:update", job)
+		a.emitEvent("job:update", job)
 	})
 
 	a.scriptExecutor.SetOutputCallback(func(jobID string, line string) {
@@ -134,81 +150,95 @@ func (a *App) startup(ctx context.Context) {
 			log.Printf("[App] Failed to save job output %s: %v", jobID, err)
 		}
 
-		runtime.EventsEmit(a.ctx, "job:output", map[string]interface{}{
+		a.emitEvent("job:output", map[string]interface{}{
 			"jobId":  jobID,
 			"output": line,
 		})
 	})
 
-	log.Println("[App.startup] Initializing plugin service...")
+	log.Println("[App.Initialize] Initializing plugin service...")
 	a.pluginService = services.NewPluginService()
 
-	log.Println("[App.startup] Initializing Docker image builder...")
+	log.Println("[App.Initialize] Initializing Docker image builder...")
 	dockerImageBuilder := services.NewDockerImageBuilder(a.db)
 	if err := dockerImageBuilder.CheckDockerAvailable(); err != nil {
-		log.Printf("[App.startup] Warning: Docker daemon not available. Docker-based plugins will not work: %v", err)
+		log.Printf("[App.Initialize] Warning: Docker daemon not available. Docker-based plugins will not work: %v", err)
 	} else {
-		log.Println("[App.startup] Docker is available")
+		log.Println("[App.Initialize] Docker is available")
 	}
 
-	log.Println("[App.startup] Initializing plugin system V2...")
+	log.Println("[App.Initialize] Initializing plugin system V2...")
 	a.pluginLoaderV2 = services.NewPluginLoaderV2("", a.db, dockerImageBuilder)
 	if err := a.pluginLoaderV2.LoadPlugins(); err != nil {
-		log.Printf("[App.startup] Failed to load plugins: %v", err)
+		log.Printf("[App.Initialize] Failed to load plugins: %v", err)
 	}
 	a.pluginExecutor = services.NewPluginExecutor()
 
-	log.Println("[App.startup] Wiring up job queue with script executor and plugin loader...")
+	log.Println("[App.Initialize] Wiring up job queue with script executor and plugin loader...")
 	a.scriptExecutor.SetPluginLoader(a.pluginLoaderV2)
 	a.jobQueue.SetScriptExecutor(a.scriptExecutor)
 	a.jobQueue.SetPluginLoader(a.pluginLoaderV2)
 
-	log.Println("[App.startup] Initializing Git authentication service...")
+	log.Println("[App.Initialize] Initializing Git authentication service...")
 	a.gitAuthService = services.NewGitAuthService(a.db)
-	log.Println("[App.startup] Git authentication service initialized")
+	log.Println("[App.Initialize] Git authentication service initialized")
 
 	exePath, _ := os.Executable()
 	pluginsDir := filepath.Join(filepath.Dir(exePath), "plugins")
-	a.pluginInstaller = services.NewPluginInstaller(pluginsDir, a.db, a.pluginLoaderV2, a.gitAuthService)
-	log.Println("[App.startup] Plugin installer initialized")
+	a.pluginInstaller = services.NewPluginInstallerV3(pluginsDir, a.db, a.pluginLoaderV2, a.gitAuthService, a.wailsApp)
+	log.Println("[App.Initialize] Plugin installer initialized")
 
-	log.Println("[App.startup] Initializing plugin registry service...")
-	a.pluginRegistryService = services.NewPluginRegistryService(ctx, a.settings, a.gitAuthService)
-	log.Println("[App.startup] Plugin registry service initialized")
+	log.Println("[App.Initialize] Initializing plugin registry service...")
+	a.pluginRegistryService = services.NewPluginRegistryServiceV3(a.settings, a.gitAuthService)
+	log.Println("[App.Initialize] Plugin registry service initialized")
 
-	log.Println("[App.startup] Initializing protocol handler...")
-	a.protocolHandler = services.NewProtocolHandler(a.pluginInstaller)
-	a.protocolHandler.SetContext(ctx)
+	log.Println("[App.Initialize] Initializing protocol handler...")
+	a.protocolHandler = services.NewProtocolHandlerV3(a.pluginInstaller, a.wailsApp)
 	if err := a.protocolHandler.RegisterProtocol(); err != nil {
-		log.Printf("[App.startup] Warning: Failed to register protocol handler: %v", err)
+		log.Printf("[App.Initialize] Warning: Failed to register protocol handler: %v", err)
 	}
-	log.Println("[App.startup] Protocol handler initialized")
+	log.Println("[App.Initialize] Protocol handler initialized")
 
-	log.Println("[App.startup] Starting HTTP install server...")
+	log.Println("[App.Initialize] Starting HTTP install server...")
 	a.httpInstallServer = services.NewHTTPInstallServer(a.protocolHandler)
+	a.httpInstallServer.SetWailsApp(a.wailsApp)
+	ctx := context.Background()
 	if err := a.httpInstallServer.Start(ctx); err != nil {
-		log.Printf("[App.startup] Warning: Failed to start HTTP install server: %v", err)
+		log.Printf("[App.Initialize] Warning: Failed to start HTTP install server: %v", err)
 	} else {
-		log.Printf("[App.startup] HTTP install server ready at http://localhost:%d", a.httpInstallServer.GetPort())
+		log.Printf("[App.Initialize] HTTP install server ready at http://localhost:%d", a.httpInstallServer.GetPort())
 	}
 
-	log.Println("[App.startup] Checking for protocol URL...")
+	log.Println("[App.Initialize] Checking for protocol URL...")
 	a.handleProtocolURL()
 
-	log.Println("[App.startup] Plugin system V2 initialized")
+	log.Println("[App.Initialize] Plugin system V2 initialized")
 
-	log.Println("[App.startup] Checking for unfinished jobs...")
+	log.Println("[App.Initialize] Checking for unfinished jobs...")
 	go a.checkUnfinishedJobs()
 
-	log.Println("[App.startup] Application startup complete!")
+	log.Println("[App.Initialize] Application initialization complete!")
 	close(a.ready)
+	close(a.initialized)
 }
 
-func (a *App) shutdown(ctx context.Context) {
+func getUserDataPath() (string, error) {
+	configDir, err := os.UserConfigDir()
+	if err != nil {
+		return "", err
+	}
+	dataPath := filepath.Join(configDir, "cauldron")
+	if err := os.MkdirAll(dataPath, 0755); err != nil {
+		return "", err
+	}
+	return dataPath, nil
+}
+
+func (a *App) Shutdown() {
 	if a.httpInstallServer != nil {
-		log.Println("[App.shutdown] Stopping HTTP install server...")
+		log.Println("[App.Shutdown] Stopping HTTP install server...")
 		if err := a.httpInstallServer.Stop(); err != nil {
-			log.Printf("[App.shutdown] Error stopping HTTP install server: %v", err)
+			log.Printf("[App.Shutdown] Error stopping HTTP install server: %v", err)
 		}
 	}
 	if a.jobQueue != nil {
@@ -515,7 +545,6 @@ func (a *App) CreatePythonVirtualEnv(basePythonPath string, venvPath string, plu
 	if pluginID != "" {
 		plugin, err := a.pluginLoaderV2.GetPluginByStringID(pluginID)
 		if err != nil {
-			// Try to convert pluginID to uint and get by numeric ID
 			if id, convErr := strconv.ParseUint(pluginID, 10, 64); convErr == nil {
 				plugin, err = a.pluginLoaderV2.GetPlugin(uint(id))
 			}
@@ -755,7 +784,7 @@ func (a *App) ImportDataFile(path string) (uint, error) {
 		return 0, err
 	}
 
-	runtime.EventsEmit(a.ctx, "file:imported", importedFile)
+	a.emitEvent("file:imported", importedFile)
 
 	return importedFile.ID, nil
 }
@@ -853,7 +882,8 @@ func (a *App) ExecutePlugin(req models.PluginExecutionRequest) (string, error) {
 		}
 
 		go func() {
-			err := a.scriptExecutor.ExecutePythonScript(a.ctx, jobID, services.ScriptConfig{
+			ctx := context.Background()
+			err := a.scriptExecutor.ExecutePythonScript(ctx, jobID, services.ScriptConfig{
 				Type:       "plugin",
 				ScriptName: plugin.ScriptPath,
 				Args:       args[1:],
@@ -871,7 +901,8 @@ func (a *App) ExecutePlugin(req models.PluginExecutionRequest) (string, error) {
 		}
 
 		go func() {
-			err := a.scriptExecutor.ExecuteRScript(a.ctx, jobID, services.ScriptConfig{
+			ctx := context.Background()
+			err := a.scriptExecutor.ExecuteRScript(ctx, jobID, services.ScriptConfig{
 				Type:       "plugin",
 				ScriptName: plugin.ScriptPath,
 				Args:       args[1:],
@@ -894,7 +925,8 @@ func (a *App) ExecutePlugin(req models.PluginExecutionRequest) (string, error) {
 		}
 
 		go func() {
-			err := a.scriptExecutor.ExecutePythonScript(a.ctx, jobID, services.ScriptConfig{
+			ctx := context.Background()
+			err := a.scriptExecutor.ExecutePythonScript(ctx, jobID, services.ScriptConfig{
 				Type:       "plugin",
 				ScriptName: plugin.ScriptPath,
 				Args:       args[1:],
@@ -1148,11 +1180,6 @@ func (a *App) OpenLogFile() error {
 	logFilePath, err := a.GetLogFilePath()
 	if err != nil {
 		log.Printf("[OpenLogFile] Error getting log file path: %v", err)
-		runtime.MessageDialog(a.ctx, runtime.MessageDialogOptions{
-			Type:    runtime.ErrorDialog,
-			Title:   "Error",
-			Message: fmt.Sprintf("Failed to get log file path: %v", err),
-		})
 		return err
 	}
 
@@ -1160,11 +1187,6 @@ func (a *App) OpenLogFile() error {
 
 	if _, err := os.Stat(logFilePath); os.IsNotExist(err) {
 		log.Printf("[OpenLogFile] Log file does not exist: %s", logFilePath)
-		runtime.MessageDialog(a.ctx, runtime.MessageDialogOptions{
-			Type:    runtime.ErrorDialog,
-			Title:   "Error",
-			Message: fmt.Sprintf("Log file does not exist: %s", logFilePath),
-		})
 		return fmt.Errorf("log file does not exist: %s", logFilePath)
 	}
 
@@ -1184,21 +1206,11 @@ func (a *App) OpenLogFile() error {
 	default:
 		err := fmt.Errorf("unsupported operating system: %s", goruntime.GOOS)
 		log.Printf("[OpenLogFile] %v", err)
-		runtime.MessageDialog(a.ctx, runtime.MessageDialogOptions{
-			Type:    runtime.ErrorDialog,
-			Title:   "Error",
-			Message: err.Error(),
-		})
 		return err
 	}
 
 	if err := cmd.Start(); err != nil {
 		log.Printf("[OpenLogFile] Failed to execute command: %v", err)
-		runtime.MessageDialog(a.ctx, runtime.MessageDialogOptions{
-			Type:    runtime.ErrorDialog,
-			Title:   "Error",
-			Message: fmt.Sprintf("Failed to open log file: %v", err),
-		})
 		return fmt.Errorf("failed to open log file: %v", err)
 	}
 
@@ -1292,9 +1304,14 @@ func (a *App) OpenLogDirectory() error {
 
 func (a *App) HandleQuit() {
 	log.Println("[HandleQuit] Quit requested from menu")
-	shouldPreventClose := a.beforeClose(a.ctx)
-	if !shouldPreventClose {
-		runtime.Quit(a.ctx)
+	if a.HasInProgressJobs() {
+		log.Println("[HandleQuit] Jobs in progress, stopping...")
+		if a.jobQueue != nil {
+			a.jobQueue.StopQueueImmediate()
+		}
+	}
+	if a.wailsApp != nil {
+		a.wailsApp.Quit()
 	}
 }
 
@@ -1368,136 +1385,9 @@ func (a *App) checkUnfinishedJobs() {
 	}
 
 	log.Printf("[checkUnfinishedJobs] Found %d unfinished job(s)", len(unfinishedJobs))
-
-	selection, err := runtime.MessageDialog(a.ctx, runtime.MessageDialogOptions{
-		Type:          runtime.QuestionDialog,
-		Title:         "Unfinished Jobs Found",
-		Message:       fmt.Sprintf("Found %d unfinished job(s) from previous session. Would you like to restart them?", len(unfinishedJobs)),
-		Buttons:       []string{"Restart Jobs", "Mark as Failed", "Leave as Is"},
-		DefaultButton: "Restart Jobs",
+	a.emitEvent("unfinished-jobs-found", map[string]interface{}{
+		"count": len(unfinishedJobs),
 	})
-
-	if err != nil {
-		log.Printf("[checkUnfinishedJobs] Error showing dialog: %v", err)
-		return
-	}
-
-	log.Printf("[checkUnfinishedJobs] User selected: %s", selection)
-
-	switch selection {
-	case "Restart Jobs":
-		for _, job := range unfinishedJobs {
-			job.Status = models.JobStatusPending
-			job.Progress = 0
-			job.Error = ""
-			job.StartedAt = nil
-			job.CompletedAt = nil
-			job.TerminalOutput = []string{}
-
-			if err := a.db.GetDB().Save(job).Error; err != nil {
-				log.Printf("[checkUnfinishedJobs] Failed to reset job %s: %v", job.ID, err)
-				continue
-			}
-
-			a.jobQueue.RequeueJob(job)
-			runtime.EventsEmit(a.ctx, "job:update", job)
-			log.Printf("[checkUnfinishedJobs] Restarted job: %s - %s", job.ID, job.Name)
-		}
-
-	case "Mark as Failed":
-		now := time.Now()
-		for _, job := range unfinishedJobs {
-			job.Status = models.JobStatusFailed
-			job.Error = "Job was interrupted by application shutdown"
-			job.CompletedAt = &now
-
-			if err := a.db.GetDB().Save(job).Error; err != nil {
-				log.Printf("[checkUnfinishedJobs] Failed to mark job %s as failed: %v", job.ID, err)
-				continue
-			}
-
-			runtime.EventsEmit(a.ctx, "job:update", job)
-			log.Printf("[checkUnfinishedJobs] Marked job as failed: %s - %s", job.ID, job.Name)
-		}
-
-	case "Leave as Is":
-		log.Println("[checkUnfinishedJobs] Leaving jobs as is")
-	}
-}
-
-func (a *App) beforeClose(ctx context.Context) bool {
-	defer func() {
-		if r := recover(); r != nil {
-			log.Printf("[beforeClose] PANIC recovered: %v", r)
-		}
-		log.Println("[beforeClose] Function exiting")
-	}()
-
-	log.Println("[beforeClose] ========== CLOSE REQUESTED ==========")
-	log.Printf("[beforeClose] Context: %v", ctx)
-	log.Printf("[beforeClose] App: %v", a)
-
-	if a == nil {
-		log.Println("[beforeClose] ERROR: App is nil!")
-		return false
-	}
-
-	if a.jobQueue == nil {
-		log.Println("[beforeClose] Job queue is nil, allowing close")
-		return false
-	}
-
-	hasInProgress := a.HasInProgressJobs()
-	log.Printf("[beforeClose] Has in-progress jobs: %v", hasInProgress)
-
-	if hasInProgress {
-		log.Println("[beforeClose] Showing jobs in progress dialog")
-		selection, err := runtime.MessageDialog(ctx, runtime.MessageDialogOptions{
-			Type:    runtime.QuestionDialog,
-			Title:   "Jobs in Progress",
-			Message: "There are jobs still running.\n\nClick YES to stop all jobs and exit.\nClick NO to cancel and keep jobs running.",
-		})
-
-		if err != nil {
-			log.Printf("[beforeClose] Error showing dialog: %v", err)
-			return false
-		}
-
-		log.Printf("[beforeClose] User selected: %s", selection)
-
-		if selection == "Yes" {
-			log.Println("[beforeClose] User chose to stop jobs and exit")
-			if a.jobQueue != nil {
-				log.Println("[beforeClose] Stopping all jobs and killing processes...")
-				a.jobQueue.StopQueueImmediate()
-
-				log.Println("[beforeClose] Waiting up to 5 seconds for jobs to terminate...")
-				waitDuration := 5 * time.Second
-				waitStart := time.Now()
-				ticker := time.NewTicker(500 * time.Millisecond)
-				defer ticker.Stop()
-
-				for time.Since(waitStart) < waitDuration {
-					if !a.HasInProgressJobs() {
-						log.Println("[beforeClose] All jobs terminated successfully")
-						break
-					}
-					<-ticker.C
-				}
-
-				if a.HasInProgressJobs() {
-					log.Println("[beforeClose] WARNING: Some jobs still in progress after 5 seconds, forcing shutdown")
-				}
-			}
-			return false
-		}
-
-		log.Println("[beforeClose] User chose to cancel close")
-		return true
-	}
-
-	log.Println("[beforeClose] No in-progress jobs, allowing close")
-	return false
 }
 
 type PluginInstallResult struct {
@@ -1507,7 +1397,7 @@ type PluginInstallResult struct {
 func (a *App) InstallPluginFromRepo(repoURL string, commitHash string) (*PluginInstallResult, error) {
 	log.Printf("[App] Installing plugin from repository: %s (ref: %s)", repoURL, commitHash)
 	pluginID, err := a.pluginInstaller.InstallPlugin(repoURL, commitHash, nil, func(status string) {
-		runtime.EventsEmit(a.ctx, "plugin:install:progress", map[string]string{
+		a.emitEvent("plugin:install:progress", map[string]string{
 			"repo":   repoURL,
 			"status": status,
 		})
@@ -1677,7 +1567,7 @@ func (a *App) UninstallPluginFromRepo(repoURL string, removeGitAuth bool, delete
 	}
 
 	log.Printf("[App] Plugin uninstalled successfully from: %s", repoURL)
-	runtime.EventsEmit(a.ctx, "plugin:uninstall:success", map[string]interface{}{
+	a.emitEvent("plugin:uninstall:success", map[string]interface{}{
 		"repo": repoURL,
 	})
 
@@ -1714,21 +1604,21 @@ func (a *App) ConfirmPluginInstallationWithRegistry(repoURL string, commitHash s
 		log.Printf("[App] Registry source: %s", *registrySource)
 	}
 
-	runtime.EventsEmit(a.ctx, "plugin:install:start", map[string]interface{}{
+	a.emitEvent("plugin:install:start", map[string]interface{}{
 		"repo": repoURL,
 		"ref":  commitHash,
 	})
 
 	go func() {
 		_, err := a.pluginInstaller.InstallPlugin(repoURL, commitHash, registrySource, func(status string) {
-			runtime.EventsEmit(a.ctx, "plugin:install:progress", map[string]string{
+			a.emitEvent("plugin:install:progress", map[string]string{
 				"repo":   repoURL,
 				"status": status,
 			})
 		})
 		if err != nil {
 			log.Printf("[App] Plugin installation failed: %v", err)
-			runtime.EventsEmit(a.ctx, "plugin:install:error", map[string]interface{}{
+			a.emitEvent("plugin:install:error", map[string]interface{}{
 				"repo":  repoURL,
 				"error": err.Error(),
 			})
@@ -1736,7 +1626,7 @@ func (a *App) ConfirmPluginInstallationWithRegistry(repoURL string, commitHash s
 		}
 
 		log.Printf("[App] Plugin installed successfully from: %s", repoURL)
-		runtime.EventsEmit(a.ctx, "plugin:install:success", map[string]interface{}{
+		a.emitEvent("plugin:install:success", map[string]interface{}{
 			"repo": repoURL,
 		})
 	}()
@@ -1756,12 +1646,12 @@ func (a *App) handleProtocolURL() {
 				time.Sleep(2 * time.Second)
 				if err := a.HandleProtocolURL(url); err != nil {
 					log.Printf("[App] Error handling protocol URL: %v", err)
-					runtime.EventsEmit(a.ctx, "protocol:error", map[string]string{
+					a.emitEvent("protocol:error", map[string]string{
 						"url":   url,
 						"error": err.Error(),
 					})
 				} else {
-					runtime.EventsEmit(a.ctx, "protocol:success", map[string]string{
+					a.emitEvent("protocol:success", map[string]string{
 						"url": url,
 					})
 				}
@@ -1781,7 +1671,7 @@ func (a *App) HandleProtocolURL(url string) error {
 		return err
 	}
 
-	runtime.EventsEmit(a.ctx, "plugin:installed", nil)
+	a.emitEvent("plugin:installed", nil)
 	return nil
 }
 

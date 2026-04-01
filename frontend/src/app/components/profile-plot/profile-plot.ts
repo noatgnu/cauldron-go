@@ -1,4 +1,4 @@
-import {Component, Input} from '@angular/core';
+import {Component, Input, ChangeDetectionStrategy} from '@angular/core';
 import {DataFrame, IDataFrame} from 'data-forge';
 import {FormBuilder, FormControl, FormGroup, ReactiveFormsModule} from "@angular/forms";
 import {PlotlyModule} from "angular-plotly.js";
@@ -9,6 +9,7 @@ import {MatButtonModule} from "@angular/material/button";
   imports: [PlotlyModule, ReactiveFormsModule, MatButtonModule],
   templateUrl: './profile-plot.html',
   styleUrl: './profile-plot.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class ProfilePlot {
   _annotation: IDataFrame<number, {Sample: string, Condition: string}> = new DataFrame();

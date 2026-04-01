@@ -1,4 +1,4 @@
-import {Component, Input} from '@angular/core';
+import {Component, Input, ChangeDetectionStrategy} from '@angular/core';
 import { PlotlyModule } from 'angular-plotly.js';
 import {DataFrame, IDataFrame} from "data-forge";
 import {VolcanoDataRow} from "./volcano-data-row";
@@ -8,6 +8,7 @@ import {VolcanoDataRow} from "./volcano-data-row";
   imports: [PlotlyModule],
   templateUrl: './volcano-plot.html',
   styleUrl: './volcano-plot.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class VolcanoPlot {
   _data: IDataFrame<number, VolcanoDataRow> = new DataFrame();

@@ -1,5 +1,5 @@
 import { DataFrame } from 'data-forge';
-import { Component, OnInit, OnDestroy, AfterViewChecked, signal, ViewChild, ElementRef, computed } from '@angular/core';
+import { Component, OnInit, OnDestroy, AfterViewChecked, signal, ViewChild, ElementRef, computed, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -15,8 +15,9 @@ import { MatInputModule } from '@angular/material/input';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatDialog } from '@angular/material/dialog';
+import { Events } from '@wailsio/runtime';
 import { Wails, Job } from '../../core/services/wails';
-import { models } from '../../../wailsjs/go/models';
+import * as models from '../../../../bindings/github.com/noatgnu/cauldron-go/backend/models/models';
 import { PcaPlot } from './pca-plot/pca-plot';
 import { PhatePlot } from './phate-plot/phate-plot';
 import { FuzzyClusteringPlot } from './fuzzy-clustering-plot/fuzzy-clustering-plot';
@@ -49,7 +50,8 @@ import { NotificationService } from '../../core/services/notification.service';
     GenericPlot
   ],
   templateUrl: './job-detail.html',
-  styleUrl: './job-detail.scss'
+  styleUrl: './job-detail.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class JobDetail implements OnInit, OnDestroy, AfterViewChecked {
   protected job = signal<Job | null>(null);
@@ -112,8 +114,8 @@ export class JobDetail implements OnInit, OnDestroy, AfterViewChecked {
       await this.loadJob();
     });
 
-    if (window.runtime) {
-      window.runtime.EventsOn('job:update', async (data: Job) => {
+    Events.On('job:update', async (ev: any) => {
+        const data = ev.data as Job;
         if (data.id === this.jobId) {
           const previousStatus = this.job()?.status;
           const currentTerminalOutput = this.job()?.terminalOutput || [];
@@ -131,27 +133,27 @@ export class JobDetail implements OnInit, OnDestroy, AfterViewChecked {
         }
       });
 
-      window.runtime.EventsOn('job:output', (data: { jobId: string; output: string }) => {
-        if (data.jobId === this.jobId) {
-          this.job.update(currentJob => {
-            if (currentJob) {
-              const newJob = new models.Job({
-                ...currentJob,
-                terminalOutput: [...(currentJob.terminalOutput || []), data.output]
-              });
-              this.shouldAutoScroll = true;
+    Events.On('job:output', (ev: any) => {
+      const data = ev.data as { jobId: string; output: string };
+      if (data.jobId === this.jobId) {
+        this.job.update(currentJob => {
+          if (currentJob) {
+            const newJob = new models.Job({
+              ...currentJob,
+              terminalOutput: [...(currentJob.terminalOutput || []), data.output]
+            });
+            this.shouldAutoScroll = true;
 
-              const newLineCount = newJob.terminalOutput?.length || 0;
-              this.displayedLogLines.set(newLineCount);
-              this.totalLogLines.set(newLineCount);
+            const newLineCount = newJob.terminalOutput?.length || 0;
+            this.displayedLogLines.set(newLineCount);
+            this.totalLogLines.set(newLineCount);
 
-              return newJob;
-            }
-            return currentJob;
-          });
-        }
-      });
-    }
+            return newJob;
+          }
+          return currentJob;
+        });
+      }
+    });
   }
 
   ngAfterViewChecked() {

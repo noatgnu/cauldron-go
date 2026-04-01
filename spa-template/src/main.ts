@@ -1,4 +1,4 @@
-import { provideBrowserGlobalErrorListeners, importProvidersFrom } from '@angular/core';
+import { provideBrowserGlobalErrorListeners, importProvidersFrom, provideZonelessChangeDetection } from '@angular/core';
 import { bootstrapApplication } from '@angular/platform-browser';
 import { provideAnimations } from '@angular/platform-browser/animations';
 import { MatSnackBarModule } from '@angular/material/snack-bar';
@@ -11,6 +11,7 @@ import { BrowserExampleFilePathResolver } from './app/services/browser-example-r
 
 bootstrapApplication(AppComponent, {
   providers: [
+    provideZonelessChangeDetection(),
     provideBrowserGlobalErrorListeners(),
     provideAnimations(),
     importProvidersFrom(MatSnackBarModule),

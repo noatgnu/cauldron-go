@@ -1,4 +1,4 @@
-import { Component, Inject, inject, signal } from '@angular/core';
+import { Component, Inject, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
@@ -39,7 +39,8 @@ export interface InstallPluginResult {
     MatTooltipModule
   ],
   templateUrl: './install-plugin-dialog.html',
-  styleUrl: './install-plugin-dialog.scss'
+  styleUrl: './install-plugin-dialog.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class InstallPluginDialog {
   private wails = inject(Wails);

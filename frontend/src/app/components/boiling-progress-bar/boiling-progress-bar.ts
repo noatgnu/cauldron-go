@@ -1,4 +1,4 @@
-import { Component, input, OnInit } from '@angular/core';
+import { Component, input, OnInit, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 
 interface Bubble {
@@ -14,7 +14,8 @@ export type ProgressBarMode = 'determinate' | 'indeterminate';
   standalone: true,
   imports: [CommonModule],
   templateUrl: './boiling-progress-bar.html',
-  styleUrl: './boiling-progress-bar.scss'
+  styleUrl: './boiling-progress-bar.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class BoilingProgressBarComponent implements OnInit {
   value = input<number>(0);

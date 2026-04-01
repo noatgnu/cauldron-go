@@ -150,8 +150,15 @@ jobs:
       - name: Build external utilities
         run: ./build.sh external linux/amd64
 
-      - name: Run backend tests
+      - name: Run backend unit tests
         run: go test -v ./backend/... ./cmd/...
+
+      - name: Run job queue service tests
+        run: go test -v -run "TestJobQueue" -timeout 60s
+
+      - name: Run basic E2E tests (no plugins required)
+        run: |
+          go test -v -run "TestE2ESettingsManagement|TestE2EEnvironmentDetection|TestE2EFileOperations|TestE2EVersionChecks|TestE2ELicenseInfo|TestE2ELogging|TestE2ETempFileOperations|TestE2EDefaultVenvPath|TestE2EJobQueueAdvanced" -timeout 120s
 
   build-frontend:
     name: Build Frontend
@@ -237,3 +244,194 @@ jobs:
           echo ""
           echo "Dev tools built:"
           ls -lh bin/
+
+  e2e-plugin-tests:
+    name: E2E Plugin Tests
+    needs: [build-dev-tools, build-backend, build-frontend]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            xorg-dev \
+            libpng-dev \
+            libjpeg-dev \
+            libx11-dev \
+            libxext-dev \
+            libxrender-dev \
+            libxtst-dev \
+            libcairo2-dev \
+            python3-venv \
+            python3-pip
+
+      - name: Download Portable Python
+        run: |
+          curl -LO https://github.com/indygreg/python-build-standalone/releases/download/20241016/cpython-3.11.10+20241016-x86_64-unknown-linux-gnu-install_only.tar.gz
+
+      - name: Extract Python
+        run: |
+          mkdir -p "${{ github.workspace }}/python"
+          tar -xzf cpython-3.11.10+20241016-x86_64-unknown-linux-gnu-install_only.tar.gz -C "${{ github.workspace }}/python" --no-same-owner --no-same-permissions
+          echo "${{ github.workspace }}/python/python/bin" >> $GITHUB_PATH
+
+      - name: Install Python dependencies for plugins
+        run: |
+          ${{ github.workspace }}/python/python/bin/pip3 install pandas numpy matplotlib seaborn scipy
+
+      - name: Make build.sh executable
+        run: chmod +x build.sh
+
+      - name: Build shared-lib
+        working-directory: shared-lib
+        run: |
+          npm install
+          npm run build
+
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          npm install
+          npm run build
+
+      - name: Build developer tools
+        run: ./build.sh tools
+
+      - name: Build external utilities
+        run: ./build.sh external linux/amd64
+
+      - name: Setup build directory structure
+        run: |
+          mkdir -p build/bin/plugins
+          mkdir -p build/bin/examples
+          cp -r plugins/* build/bin/plugins/
+          cp -r examples/* build/bin/examples/
+
+      - name: Run E2E plugin management tests
+        run: |
+          go test -v -run "TestE2EPluginManagement" -timeout 60s
+
+      - name: Run E2E plugin requirements tests
+        env:
+          PYTHON_PATH: ${{ github.workspace }}/python/python/bin/python3
+          BUILD_DIR: ${{ github.workspace }}/build/bin
+        run: |
+          go test -v -run "TestE2EPluginRequirements" -timeout 120s
+
+      - name: Run E2E process job code path tests
+        env:
+          PYTHON_PATH: ${{ github.workspace }}/python/python/bin/python3
+          BUILD_DIR: ${{ github.workspace }}/build/bin
+        run: |
+          go test -v -run "TestE2EProcessJobCodePath" -timeout 120s
+
+  e2e-full-plugin-execution:
+    name: E2E Full Plugin Execution
+    needs: [build-dev-tools, build-backend, build-frontend]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            xorg-dev \
+            libpng-dev \
+            libjpeg-dev \
+            libx11-dev \
+            libxext-dev \
+            libxrender-dev \
+            libxtst-dev \
+            libcairo2-dev \
+            python3-venv \
+            python3-pip
+
+      - name: Download Portable Python
+        run: |
+          curl -LO https://github.com/indygreg/python-build-standalone/releases/download/20241016/cpython-3.11.10+20241016-x86_64-unknown-linux-gnu-install_only.tar.gz
+
+      - name: Extract Python
+        run: |
+          mkdir -p "${{ github.workspace }}/python"
+          tar -xzf cpython-3.11.10+20241016-x86_64-unknown-linux-gnu-install_only.tar.gz -C "${{ github.workspace }}/python" --no-same-owner --no-same-permissions
+          echo "${{ github.workspace }}/python/python/bin" >> $GITHUB_PATH
+
+      - name: Install Python dependencies for CV Plot plugin
+        run: |
+          ${{ github.workspace }}/python/python/bin/pip3 install pandas numpy matplotlib seaborn scipy plotly kaleido
+
+      - name: Make build.sh executable
+        run: chmod +x build.sh
+
+      - name: Build shared-lib
+        working-directory: shared-lib
+        run: |
+          npm install
+          npm run build
+
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          npm install
+          npm run build
+
+      - name: Build developer tools
+        run: ./build.sh tools
+
+      - name: Build external utilities
+        run: ./build.sh external linux/amd64
+
+      - name: Setup build directory structure for E2E tests
+        run: |
+          mkdir -p build/bin/plugins
+          mkdir -p build/bin/examples/diann
+          cp -r plugins/* build/bin/plugins/
+          cp -r examples/diann/* build/bin/examples/diann/
+
+      - name: Verify example data exists
+        run: |
+          echo "Checking example data files..."
+          ls -la build/bin/examples/diann/
+          test -f build/bin/examples/diann/annotation.txt && echo "[SUCCESS] annotation.txt exists"
+          test -f build/bin/examples/diann/Reports.log.txt && echo "[SUCCESS] Reports.log.txt exists"
+          test -f build/bin/examples/diann/Reports.pr_matrix.tsv && echo "[SUCCESS] Reports.pr_matrix.tsv exists"
+          test -f build/bin/examples/diann/Reports.pg_matrix.tsv && echo "[SUCCESS] Reports.pg_matrix.tsv exists"
+
+      - name: Run E2E tests with actual plugins
+        env:
+          PYTHON_PATH: ${{ github.workspace }}/python/python/bin/python3
+          BUILD_DIR: ${{ github.workspace }}/build/bin
+        run: |
+          go test -v -run "TestE2EWithActualPlugins" -timeout 300s
+
+      - name: Run E2E job output operations test
+        env:
+          PYTHON_PATH: ${{ github.workspace }}/python/python/bin/python3
+          BUILD_DIR: ${{ github.workspace }}/build/bin
+        run: |
+          go test -v -run "TestE2EJobOutputOperations" -timeout 300s

@@ -1,4 +1,4 @@
-import { Component, OnInit, signal, computed, inject } from '@angular/core';
+import { Component, OnInit, signal, computed, inject, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatTabsModule } from '@angular/material/tabs';
 import { MatCardModule } from '@angular/material/card';
@@ -13,7 +13,7 @@ import { FormsModule } from '@angular/forms';
 import { Wails, CustomEnvVar } from '../../../core/services/wails';
 import { PluginV2Service } from '../../../core/services/plugin-v2';
 import { NotificationService } from '../../../core/services/notification.service';
-import { models } from '../../../../wailsjs/go/models';
+import * as models from '../../../../../bindings/github.com/noatgnu/cauldron-go/backend/models/models';
 import { DynamicFormComponent } from '../../../components/dynamic-form/dynamic-form';
 
 @Component({
@@ -35,6 +35,7 @@ import { DynamicFormComponent } from '../../../components/dynamic-form/dynamic-f
   ],
   templateUrl: './settings-env.html',
   styleUrl: './settings-env.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class SettingsEnv implements OnInit {
   private wails = inject(Wails);

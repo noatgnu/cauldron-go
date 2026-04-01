@@ -1,4 +1,4 @@
-import { Component, OnInit, signal, input, output } from '@angular/core';
+import { Component, OnInit, signal, input, output, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -6,6 +6,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { Events } from '@wailsio/runtime';
 import { Wails, ImportedFile } from '../../core/services/wails';
 
 @Component({
@@ -20,7 +21,8 @@ import { Wails, ImportedFile } from '../../core/services/wails';
     MatProgressSpinnerModule
   ],
   templateUrl: './file-selector.html',
-  styleUrl: './file-selector.scss'
+  styleUrl: './file-selector.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class FileSelector implements OnInit {
   label = input<string>('Select Data File');
@@ -41,11 +43,9 @@ export class FileSelector implements OnInit {
       this.currentSelection.set(this.selectedPath());
     }
 
-    if (window.runtime) {
-      window.runtime.EventsOn('file:imported', () => {
-        this.loadImportedFiles();
-      });
-    }
+    Events.On('file:imported', () => {
+      this.loadImportedFiles();
+    });
   }
 
   async loadImportedFiles() {

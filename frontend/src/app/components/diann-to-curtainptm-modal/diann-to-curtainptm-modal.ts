@@ -1,4 +1,4 @@
-import {Component, Inject} from '@angular/core';
+import {Component, Inject, ChangeDetectionStrategy} from '@angular/core';
 import {FormBuilder, FormControl, FormGroup, ReactiveFormsModule, Validators} from "@angular/forms";
 import {Wails} from "../../core/services/wails";
 import {MAT_DIALOG_DATA, MatDialogModule, MatDialogRef} from "@angular/material/dialog";
@@ -24,7 +24,8 @@ export interface DiannToCurtainPtmConfig {
     MatInputModule
   ],
   templateUrl: './diann-to-curtainptm-modal.html',
-  styleUrl: './diann-to-curtainptm-modal.scss'
+  styleUrl: './diann-to-curtainptm-modal.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class DiannToCurtainptmModal {
   form!: FormGroup;

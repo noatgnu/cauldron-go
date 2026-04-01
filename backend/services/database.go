@@ -122,16 +122,18 @@ type PluginDockerImage struct {
 func NewDatabaseService(ctx context.Context) (*DatabaseService, error) {
 	userConfigDir, _ := os.UserConfigDir()
 	dbDir := filepath.Join(userConfigDir, "cauldron")
+	return newDatabaseServiceFromPath(dbDir)
+}
+
+func newDatabaseServiceFromPath(dbDir string) (*DatabaseService, error) {
 	os.MkdirAll(dbDir, 0755)
 
 	dbPath := filepath.Join(dbDir, "cauldron.db")
 
 	log.Printf("[Database] Opening database at: %s\n", dbPath)
 
-	// Add SQLite-specific settings to prevent hangs
 	dsn := dbPath + "?_busy_timeout=5000&_journal_mode=WAL"
 
-	// Open using modernc.org/sqlite driver explicitly
 	sqlDB, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		log.Printf("[Database] ERROR: Failed to open SQL connection: %v\n", err)
@@ -140,7 +142,6 @@ func NewDatabaseService(ctx context.Context) (*DatabaseService, error) {
 
 	log.Println("[Database] SQL connection opened successfully")
 
-	// Wrap with GORM
 	db, err := gorm.Open(sqlite.Dialector{Conn: sqlDB}, &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Silent),
 	})
@@ -152,15 +153,13 @@ func NewDatabaseService(ctx context.Context) (*DatabaseService, error) {
 
 	log.Println("[Database] GORM initialized successfully")
 
-	// SQLite doesn't handle concurrent writes well, so limit to 1 connection
 	sqlDB.SetMaxOpenConns(1)
 	sqlDB.SetMaxIdleConns(1)
 
 	log.Println("[Database] Connection pool configured")
 
 	service := &DatabaseService{
-		ctx: ctx,
-		db:  db,
+		db: db,
 	}
 
 	log.Println("[Database] Running auto-migration...")

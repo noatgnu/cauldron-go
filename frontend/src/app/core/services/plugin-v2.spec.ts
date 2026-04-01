@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { PluginV2Service } from './plugin-v2';
-import { models } from '../../../wailsjs/go/models';
+import * as models from '../../../../bindings/github.com/noatgnu/cauldron-go/backend/models/models';
 
 describe('PluginV2Service', () => {
   let service: PluginV2Service;

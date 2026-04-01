@@ -1,10 +1,10 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { signal } from '@angular/core';
 import { SettingsPython } from './settings-python';
 import { Wails } from '../../../core/services/wails';
 import { NotificationService } from '../../../core/services/notification.service';
 import { vi } from 'vitest';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
-import { of } from 'rxjs';
 
 describe('SettingsPython', () => {
   let component: SettingsPython;
@@ -20,8 +20,9 @@ describe('SettingsPython', () => {
       getPythonVersion: vi.fn().mockResolvedValue('3.10.0'),
       checkDockerVersion: vi.fn().mockResolvedValue('20.10.0'),
       getVirtualEnvironments: vi.fn().mockResolvedValue([]),
-      bindingsUpdated$: of(undefined),
-      progress$: of(null),
+      getPluginsV2: vi.fn().mockResolvedValue([]),
+      bindingsUpdated: signal(0),
+      progress: signal(null),
       logToFile: vi.fn().mockResolvedValue(undefined)
     };
     notificationMock = {

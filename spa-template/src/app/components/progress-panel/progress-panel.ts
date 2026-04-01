@@ -1,4 +1,4 @@
-import { Component, input } from '@angular/core';
+import { Component, input, ChangeDetectionStrategy } from '@angular/core';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatCardModule } from '@angular/material/card';
 
@@ -14,7 +14,8 @@ export interface ProgressState {
     MatCardModule
   ],
   templateUrl: './progress-panel.html',
-  styleUrl: './progress-panel.scss'
+  styleUrl: './progress-panel.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class ProgressPanel {
   progress = input.required<ProgressState>();

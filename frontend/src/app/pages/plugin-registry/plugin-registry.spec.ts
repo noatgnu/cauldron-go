@@ -1,4 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { signal } from '@angular/core';
 import { PluginRegistry } from './plugin-registry';
 import { Wails } from '../../core/services/wails';
 import { NotificationService } from '../../core/services/notification.service';
@@ -6,7 +7,6 @@ import { Router } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
 import { vi } from 'vitest';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
-import { of } from 'rxjs';
 
 describe('PluginRegistry', () => {
   let component: PluginRegistry;
@@ -21,7 +21,7 @@ describe('PluginRegistry', () => {
       listRegistryPlugins: vi.fn().mockResolvedValue({ plugins: [], total: 0 }),
       listRegistryCategories: vi.fn().mockResolvedValue([]),
       getPluginsV2: vi.fn().mockResolvedValue([]),
-      progress$: of(null),
+      progress: signal(null),
       logToFile: vi.fn().mockResolvedValue(undefined)
     };
     notificationMock = {

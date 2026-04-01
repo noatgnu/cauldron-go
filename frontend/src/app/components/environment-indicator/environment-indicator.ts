@@ -1,4 +1,4 @@
-import { Component, Input } from '@angular/core';
+import { Component, Input, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatIconModule } from '@angular/material/icon';
@@ -9,7 +9,8 @@ import { MatTooltipModule } from '@angular/material/tooltip';
   standalone: true,
   imports: [CommonModule, MatChipsModule, MatIconModule, MatTooltipModule],
   templateUrl: './environment-indicator.html',
-  styleUrl: './environment-indicator.scss'
+  styleUrl: './environment-indicator.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class EnvironmentIndicator {
   @Input() python: boolean = false;

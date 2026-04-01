@@ -1,4 +1,4 @@
-import { Component, signal } from '@angular/core';
+import { Component, signal, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
@@ -18,7 +18,8 @@ import { Wails, DataFilePreview } from '../../core/services/wails';
     MatIconModule
   ],
   templateUrl: './import-dialog.html',
-  styleUrl: './import-dialog.scss'
+  styleUrl: './import-dialog.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class ImportDialog {
   protected selectedFile = signal('');

@@ -1,4 +1,4 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, signal, ChangeDetectionStrategy } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { MatTabsModule } from '@angular/material/tabs';
@@ -30,6 +30,7 @@ import { RegistryPlugin, RegistryTag } from '../../core/models/registry';
   ],
   templateUrl: './plugin-registry-detail.html',
   styleUrl: './plugin-registry-detail.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class PluginRegistryDetail implements OnInit {
   protected plugin = signal<RegistryPlugin | null>(null);

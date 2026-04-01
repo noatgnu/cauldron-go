@@ -1,4 +1,4 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, signal, ChangeDetectionStrategy, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, FormGroup, FormArray, Validators } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
@@ -39,7 +39,8 @@ import { PluginInstallProgress } from '../../components/plugin-install-progress/
     EnvironmentIndicator
   ],
   templateUrl: './plugins.html',
-  styleUrl: './plugins.scss'
+  styleUrl: './plugins.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class Plugins implements OnInit {
   protected plugins = signal<Plugin[]>([]);
@@ -54,7 +55,12 @@ export class Plugins implements OnInit {
     private wails: Wails,
     private fb: FormBuilder,
     private dialog: MatDialog
-  ) {}
+  ) {
+    effect(() => {
+      const _ = this.wails.bindingsUpdated();
+      this.loadPlugins();
+    });
+  }
 
   get pluginsFormArray(): FormArray {
     return this.mainFormGroup.get('plugins') as FormArray;
@@ -67,10 +73,6 @@ export class Plugins implements OnInit {
 
     await this.loadPlugins();
     await this.loadPluginsDirectory();
-
-    this.wails.bindingsUpdated$.subscribe(() => {
-      this.loadPlugins();
-    });
   }
 
   async loadPlugins() {

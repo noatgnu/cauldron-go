@@ -20,7 +20,7 @@
             "outputPath": "dist",
             "index": "src/index.html",
             "browser": "src/main.ts",
-            "polyfills": ["zone.js"],
+            "polyfills": [],
             "tsConfig": "tsconfig.app.json",
             "assets": [
               "src/favicon.ico",
@@ -67,7 +67,7 @@
           "builder": "@angular/build:karma",
           "options": {
             "preserveSymlinks": true,
-            "polyfills": ["zone.js"],
+            "polyfills": [],
             "tsConfig": "tsconfig.spec.json",
             "karmaConfig": "karma.conf.js",
             "assets": [

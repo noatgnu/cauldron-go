@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, ChangeDetectionStrategy } from '@angular/core';
 import { MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
 import { ImportedFileSelection } from './imported-file-selection';
@@ -12,6 +12,7 @@ import { ImportedFile } from '../../interfaces/file-handler.interface';
     MatButtonModule,
     ImportedFileSelection
   ],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <h2 mat-dialog-title id="file-selection-title">Select Imported File</h2>
     <mat-dialog-content aria-labelledby="file-selection-title">

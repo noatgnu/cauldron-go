@@ -1,4 +1,4 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, signal, ChangeDetectionStrategy } from '@angular/core';
 import { MatDialogModule } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
@@ -29,6 +29,7 @@ interface LicenseData {
   ],
   templateUrl: './about-dialog.html',
   styleUrl: './about-dialog.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class AboutDialog implements OnInit {
   protected readonly version = '1.0.0';

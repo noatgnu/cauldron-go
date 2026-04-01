@@ -1,5 +1,4 @@
-import { Injectable } from '@angular/core';
-import { BehaviorSubject } from 'rxjs';
+import { Injectable, signal, Signal } from '@angular/core';
 
 export interface LoadingState {
   isLoading: boolean;
@@ -10,18 +9,18 @@ export interface LoadingState {
   providedIn: 'root'
 })
 export class LoadingService {
-  private loadingSubject = new BehaviorSubject<LoadingState>({
+  private _loading = signal<LoadingState>({
     isLoading: false,
     message: ''
   });
 
-  loading$ = this.loadingSubject.asObservable();
+  loading: Signal<LoadingState> = this._loading.asReadonly();
 
   show(message: string = 'Loading...') {
-    this.loadingSubject.next({ isLoading: true, message });
+    this._loading.set({ isLoading: true, message });
   }
 
   hide() {
-    this.loadingSubject.next({ isLoading: false, message: '' });
+    this._loading.set({ isLoading: false, message: '' });
   }
 }

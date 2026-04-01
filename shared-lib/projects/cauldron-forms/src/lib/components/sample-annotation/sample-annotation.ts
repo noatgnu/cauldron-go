@@ -1,4 +1,4 @@
-import { Component, Inject, Optional } from '@angular/core';
+import { Component, Inject, Optional, ChangeDetectionStrategy } from '@angular/core';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -46,7 +46,8 @@ interface RegexRule {
     MatMenuModule
   ],
   templateUrl: './sample-annotation.html',
-  styleUrl: './sample-annotation.scss'
+  styleUrl: './sample-annotation.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class SampleAnnotation {
   _annotation: AnnotationRow[] = [];

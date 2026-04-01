@@ -153,3 +153,39 @@ examples
 /plugin-to-spa
 /plugin-to-spa.exe
 spa-output/
+
+# Built CLI tools (binaries only, not source)
+/plugin-doc-generator
+/plugin-doc-generator.exe
+/plugin-to-nextflow
+/plugin-to-nextflow.exe
+/plugin-to-slivka
+/plugin-to-slivka.exe
+/webr-resolver
+/webr-resolver.exe
+/plugin-validator
+/plugin-validator.exe
+/plugin-scaffolder
+/plugin-scaffolder.exe
+/schema-doc-generator
+/schema-doc-generator.exe
+
+# Windows resource files (generated during build)
+*.syso
+
+# SPA template Angular cache
+spa-template/.angular/
+spa-template/node_modules/
+spa-template/dist/
+
+# Wails generated bindings
+frontend/bindings/
+
+# Generated licenses directory
+resources/licenses/
+
+# E2E test scripts
+run-e2e-tests.sh
+
+# Taskfile (if not needed in repo)
+# Taskfile.yaml

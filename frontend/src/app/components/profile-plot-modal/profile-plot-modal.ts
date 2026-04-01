@@ -1,4 +1,4 @@
-import {Component, Inject} from '@angular/core';
+import {Component, Inject, ChangeDetectionStrategy} from '@angular/core';
 import {MAT_DIALOG_DATA, MatDialogModule, MatDialogRef} from "@angular/material/dialog";
 import {MatButtonModule} from "@angular/material/button";
 import {DataFrame, IDataFrame} from "data-forge";
@@ -17,6 +17,7 @@ export interface ProfilePlotModalData {
   ],
   templateUrl: './profile-plot-modal.html',
   styleUrl: './profile-plot-modal.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class ProfilePlotModal {
   annotation: IDataFrame<number, {Sample: string, Condition: string}> = new DataFrame();

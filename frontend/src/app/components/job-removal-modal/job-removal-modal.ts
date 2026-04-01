@@ -1,4 +1,4 @@
-import {Component, Inject} from '@angular/core';
+import {Component, Inject, ChangeDetectionStrategy} from '@angular/core';
 import {MAT_DIALOG_DATA, MatDialogModule, MatDialogRef} from "@angular/material/dialog";
 import {MatButtonModule} from "@angular/material/button";
 
@@ -10,6 +10,7 @@ import {MatButtonModule} from "@angular/material/button";
   ],
   templateUrl: './job-removal-modal.html',
   styleUrl: './job-removal-modal.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class JobRemovalModal {
   constructor(

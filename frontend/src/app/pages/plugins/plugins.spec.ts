@@ -1,4 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { signal } from '@angular/core';
 import { Plugins } from './plugins';
 import { Wails } from '../../core/services/wails';
 import { NotificationService } from '../../core/services/notification.service';
@@ -6,7 +7,6 @@ import { Router } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
 import { vi } from 'vitest';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
-import { of } from 'rxjs';
 
 describe('Plugins', () => {
   let component: Plugins;
@@ -22,9 +22,9 @@ describe('Plugins', () => {
       getAllPluginEnvironmentBindings: vi.fn().mockResolvedValue([]),
       getPluginsDirectory: vi.fn().mockResolvedValue(''),
       getPluginsV2: vi.fn().mockResolvedValue([]),
-      bindingsUpdated$: of(undefined),
-      progress$: of(null),
-      jobUpdate$: of(null),
+      bindingsUpdated: signal(0),
+      progress: signal(null),
+      jobUpdate: signal(null),
       logToFile: vi.fn().mockResolvedValue(undefined)
     };
     notificationMock = {

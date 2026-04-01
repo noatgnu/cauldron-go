@@ -10,12 +10,14 @@ import (
 	goruntime "runtime"
 	"strings"
 
-	"github.com/wailsapp/wails/v2/pkg/runtime"
+	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
 type ProtocolHandler struct {
 	pluginInstaller *PluginInstaller
+	installer       *PluginInstaller
 	ctx             context.Context
+	wailsApp        *application.App
 }
 
 func NewProtocolHandler(installer *PluginInstaller) *ProtocolHandler {
@@ -26,6 +28,12 @@ func NewProtocolHandler(installer *PluginInstaller) *ProtocolHandler {
 
 func (ph *ProtocolHandler) SetContext(ctx context.Context) {
 	ph.ctx = ctx
+}
+
+func (ph *ProtocolHandler) emitEvent(name string, data interface{}) {
+	if ph.wailsApp != nil && ph.wailsApp.Event != nil {
+		ph.wailsApp.Event.Emit(name, data)
+	}
 }
 
 func (ph *ProtocolHandler) RegisterProtocol() error {
@@ -119,7 +127,7 @@ func (ph *ProtocolHandler) handleInstall(parsedURL *url.URL) error {
 	isInstalled, err := ph.pluginInstaller.IsPluginInstalled(repoURL)
 	if err != nil {
 		log.Printf("[ProtocolHandler] Failed to check if plugin is installed: %v", err)
-		runtime.EventsEmit(ph.ctx, "plugin:install:error", map[string]interface{}{
+		ph.emitEvent("plugin:install:error", map[string]interface{}{
 			"repo":  repoURL,
 			"ref":   ref,
 			"error": err.Error(),
@@ -128,7 +136,7 @@ func (ph *ProtocolHandler) handleInstall(parsedURL *url.URL) error {
 	}
 
 	if isInstalled {
-		runtime.EventsEmit(ph.ctx, "plugin:install:error", map[string]interface{}{
+		ph.emitEvent("plugin:install:error", map[string]interface{}{
 			"repo":  repoURL,
 			"ref":   ref,
 			"error": "Plugin from this repository is already installed",
@@ -139,7 +147,7 @@ func (ph *ProtocolHandler) handleInstall(parsedURL *url.URL) error {
 	pluginInfo, err := ph.pluginInstaller.FetchPluginInfo(repoURL)
 	if err != nil {
 		log.Printf("[ProtocolHandler] Failed to fetch plugin info: %v", err)
-		runtime.EventsEmit(ph.ctx, "plugin:install:error", map[string]interface{}{
+		ph.emitEvent("plugin:install:error", map[string]interface{}{
 			"repo":  repoURL,
 			"ref":   ref,
 			"error": fmt.Sprintf("Failed to fetch plugin information: %v", err),
@@ -173,7 +181,7 @@ func (ph *ProtocolHandler) handleInstall(parsedURL *url.URL) error {
 	if registryURL != "" {
 		eventData["registry"] = registryURL
 	}
-	runtime.EventsEmit(ph.ctx, "plugin:install:request", eventData)
+	ph.emitEvent("plugin:install:request", eventData)
 
 	return nil
 }

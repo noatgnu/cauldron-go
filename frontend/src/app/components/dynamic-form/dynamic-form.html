@@ -21,7 +21,7 @@
     @for (input of plugin.definition.inputs; track input.name) {
       @if (isInputVisible(input)) {
         <div class="form-field">
-          @switch (input.type) {
+          @switch (getInputType(input)) {
           @case ('file') {
             <mat-form-field appearance="outline" class="full-width">
               <mat-label>{{ input.label }}</mat-label>

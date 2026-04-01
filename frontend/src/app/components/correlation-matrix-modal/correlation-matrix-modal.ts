@@ -1,4 +1,4 @@
-import {Component, Inject} from '@angular/core';
+import {Component, Inject, ChangeDetectionStrategy} from '@angular/core';
 import {FormBuilder, FormControl, FormGroup, FormsModule, ReactiveFormsModule, Validators} from "@angular/forms";
 import {MAT_DIALOG_DATA, MatDialogModule, MatDialogRef} from "@angular/material/dialog";
 import {ImportedFileSelection} from "../imported-file-selection/imported-file-selection";
@@ -39,7 +39,8 @@ export interface CorrelationMatrixConfig {
     MatIconModule
   ],
   templateUrl: './correlation-matrix-modal.html',
-  styleUrl: './correlation-matrix-modal.scss'
+  styleUrl: './correlation-matrix-modal.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class CorrelationMatrixModal {
   correlationPlotShape: string[] = ["full", "lower", "upper"];

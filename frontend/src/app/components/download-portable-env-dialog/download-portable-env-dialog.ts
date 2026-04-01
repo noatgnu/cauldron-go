@@ -1,4 +1,4 @@
-import { Component, Input, OnInit, OnDestroy, ChangeDetectorRef, inject } from '@angular/core';
+import { Component, Input, OnInit, ChangeDetectorRef, inject, ChangeDetectionStrategy, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { MatDialogModule, MatDialogRef, MatDialog } from '@angular/material/dialog';
@@ -8,7 +8,6 @@ import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { Wails } from '../../core/services/wails';
-import { Subscription } from 'rxjs';
 import { ConfirmDialogComponent } from '../confirm-dialog/confirm-dialog';
 
 @Component({
@@ -25,9 +24,10 @@ import { ConfirmDialogComponent } from '../confirm-dialog/confirm-dialog';
     MatProgressBarModule
   ],
   templateUrl: './download-portable-env-dialog.html',
-  styleUrl: './download-portable-env-dialog.scss'
+  styleUrl: './download-portable-env-dialog.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class DownloadPortableEnvDialogComponent implements OnInit, OnDestroy {
+export class DownloadPortableEnvDialogComponent implements OnInit {
   @Input() environment: 'python' | 'r-portable' = 'python';
 
   form: FormGroup;
@@ -44,8 +44,6 @@ export class DownloadPortableEnvDialogComponent implements OnInit, OnDestroy {
   currentPhase = '';
   overallProgress = 0;
 
-  private progressSubscription?: Subscription;
-
   private dialog = inject(MatDialog);
 
   constructor(
@@ -60,65 +58,8 @@ export class DownloadPortableEnvDialogComponent implements OnInit, OnDestroy {
       url: [{value: '', disabled: true}]
     });
 
-    this.setupProgressListener();
-  }
-
-  ngOnInit() {
-    this.detectPlatformAndArch();
-    this.setupFormListeners();
-    this.updateURL();
-  }
-
-  ngOnDestroy() {
-    if (this.progressSubscription) {
-      this.progressSubscription.unsubscribe();
-    }
-  }
-
-  private detectPlatformAndArch() {
-    const userAgent = window.navigator.userAgent.toLowerCase();
-    let platform = 'win';
-
-    if (userAgent.includes('linux')) {
-      platform = 'linux';
-    } else if (userAgent.includes('mac')) {
-      platform = 'darwin';
-    }
-
-    this.form.patchValue({ platform });
-  }
-
-  private setupFormListeners() {
-    this.form.get('platform')?.valueChanges.subscribe(() => {
-      this.updateURL();
-    });
-
-    this.form.get('arch')?.valueChanges.subscribe(() => {
-      this.updateURL();
-    });
-  }
-
-  private async updateURL() {
-    const platform = this.form.get('platform')?.value;
-    const arch = this.form.get('arch')?.value;
-    const version = 'latest'; // Use latest release
-
-    try {
-      const url = await this.wails.getPortableEnvironmentURL(
-        platform,
-        arch,
-        version,
-        this.environment
-      );
-      this.form.patchValue({ url });
-    } catch (error) {
-      console.error('Failed to get download URL:', error);
-      this.form.patchValue({ url: 'Error: Could not fetch download URL - ' + (error as Error).message });
-    }
-  }
-
-  private setupProgressListener() {
-    this.progressSubscription = this.wails.progress$.subscribe(progress => {
+    effect(() => {
+      const progress = this.wails.progress();
       if (!progress) return;
 
       if (progress.type !== 'download' && progress.type !== 'extract' && progress.type !== 'install') {
@@ -185,6 +126,54 @@ export class DownloadPortableEnvDialogComponent implements OnInit, OnDestroy {
         this.cdr.detectChanges();
       }
     });
+  }
+
+  ngOnInit() {
+    this.detectPlatformAndArch();
+    this.setupFormListeners();
+    this.updateURL();
+  }
+
+  private detectPlatformAndArch() {
+    const userAgent = window.navigator.userAgent.toLowerCase();
+    let platform = 'win';
+
+    if (userAgent.includes('linux')) {
+      platform = 'linux';
+    } else if (userAgent.includes('mac')) {
+      platform = 'darwin';
+    }
+
+    this.form.patchValue({ platform });
+  }
+
+  private setupFormListeners() {
+    this.form.get('platform')?.valueChanges.subscribe(() => {
+      this.updateURL();
+    });
+
+    this.form.get('arch')?.valueChanges.subscribe(() => {
+      this.updateURL();
+    });
+  }
+
+  private async updateURL() {
+    const platform = this.form.get('platform')?.value;
+    const arch = this.form.get('arch')?.value;
+    const version = 'latest'; // Use latest release
+
+    try {
+      const url = await this.wails.getPortableEnvironmentURL(
+        platform,
+        arch,
+        version,
+        this.environment
+      );
+      this.form.patchValue({ url });
+    } catch (error) {
+      console.error('Failed to get download URL:', error);
+      this.form.patchValue({ url: 'Error: Could not fetch download URL - ' + (error as Error).message });
+    }
   }
 
   async download() {

@@ -1,4 +1,4 @@
-import {Component, Inject} from '@angular/core';
+import {Component, Inject, ChangeDetectionStrategy} from '@angular/core';
 import {MAT_DIALOG_DATA, MatDialogModule, MatDialogRef} from "@angular/material/dialog";
 import {FormBuilder, FormControl, FormGroup, ReactiveFormsModule} from "@angular/forms";
 import {MatButtonModule} from "@angular/material/button";
@@ -25,6 +25,7 @@ export interface FuzzyClusteringPlotModalData {
   ],
   templateUrl: './fuzzy-clustering-plot-modal.html',
   styleUrl: './fuzzy-clustering-plot-modal.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class FuzzyClusteringPlotModal {
   filePathList: string[] = [];

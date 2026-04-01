@@ -1,4 +1,4 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, signal, ChangeDetectionStrategy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -22,6 +22,7 @@ import { NotificationService } from '../../../core/services/notification.service
   ],
   templateUrl: './settings-registry.html',
   styleUrl: './settings-registry.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class SettingsRegistry implements OnInit {
   protected config = signal<Partial<Config>>({});

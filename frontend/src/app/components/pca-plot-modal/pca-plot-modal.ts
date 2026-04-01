@@ -1,4 +1,4 @@
-import {Component, Inject} from '@angular/core';
+import {Component, Inject, ChangeDetectionStrategy} from '@angular/core';
 import {MAT_DIALOG_DATA, MatDialogModule, MatDialogRef} from "@angular/material/dialog";
 import {MatButtonModule} from "@angular/material/button";
 import {DataFrame, fromCSV, IDataFrame} from "data-forge";
@@ -21,6 +21,7 @@ export interface PcaPlotModalData {
   ],
   templateUrl: './pca-plot-modal.html',
   styleUrl: './pca-plot-modal.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class PcaPlotModal {
   pcaData: IDataFrame<number, {x_pca: number, y_pca: number, z_pca?: number, sample: string}> = new DataFrame();

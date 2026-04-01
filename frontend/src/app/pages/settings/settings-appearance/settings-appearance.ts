@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, ChangeDetectionStrategy } from '@angular/core';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatIconModule } from '@angular/material/icon';
@@ -14,6 +14,7 @@ import { ColorTheme, ThemeDefinition } from '../../../core/constants/color-theme
   ],
   templateUrl: './settings-appearance.html',
   styleUrl: './settings-appearance.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class SettingsAppearance {
   constructor(protected themeService: ThemeService) {}

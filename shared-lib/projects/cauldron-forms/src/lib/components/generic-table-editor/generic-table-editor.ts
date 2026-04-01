@@ -1,4 +1,4 @@
-import { Component, Inject, OnInit } from '@angular/core';
+import { Component, Inject, OnInit, ChangeDetectionStrategy } from '@angular/core';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -29,7 +29,8 @@ import { TableColumn, GenericTableEditorData } from '../../models/plugin.models'
     MatTooltipModule
   ],
   templateUrl: './generic-table-editor.html',
-  styleUrls: ['./generic-table-editor.scss']
+  styleUrls: ['./generic-table-editor.scss'],
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class GenericTableEditor implements OnInit {
   tableData: Record<string, unknown>[] = [];

@@ -18,9 +18,14 @@ type SettingsService struct {
 }
 
 func NewSettingsService(ctx context.Context, db *DatabaseService) *SettingsService {
+	service := newSettingsServiceInternal(db)
+	service.ctx = ctx
+	return service
+}
+
+func newSettingsServiceInternal(db *DatabaseService) *SettingsService {
 	service := &SettingsService{
-		ctx: ctx,
-		db:  db,
+		db: db,
 		config: &models.Config{
 			CurtainBackendURL: "https://celsus.muttsu.xyz",
 			PluginRegistryURL: "https://cauldron.proteo.info",

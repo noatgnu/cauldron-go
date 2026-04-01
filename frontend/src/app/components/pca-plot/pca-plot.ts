@@ -1,4 +1,4 @@
-import {AfterViewInit, Component, Input, inject, effect} from '@angular/core';
+import {AfterViewInit, Component, Input, inject, effect, ChangeDetectionStrategy} from '@angular/core';
 import { PlotlyModule } from 'angular-plotly.js';
 import {DataFrame, IDataFrame} from "data-forge";
 import {FormBuilder, FormControl, FormGroup, ReactiveFormsModule} from "@angular/forms";
@@ -10,6 +10,7 @@ import { ThemeService } from '../../core/services/theme.service';
   imports: [PlotlyModule, MatButtonModule, ReactiveFormsModule],
   templateUrl: './pca-plot.html',
   styleUrl: './pca-plot.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class PcaPlot implements AfterViewInit {
   _data: IDataFrame<number, {x_pca: number, y_pca: number, z_pca?: number, sample: string}> = new DataFrame();

@@ -1,5 +1,4 @@
-import { Injectable } from '@angular/core';
-import { Subject } from 'rxjs';
+import { Injectable, signal } from '@angular/core';
 import { PluginInputV2 } from '@cauldron/forms';
 import { environment, WebrPackage } from '../../environments/environment';
 
@@ -54,20 +53,27 @@ const WEBR_CDN = 'https://webr.r-wasm.org/v' + environment.webrVersion + '/';
 export class WebRService {
   private webR: WebRInterface | null = null;
 
-  progress$ = new Subject<{ stage: string; percent: number }>();
-  output$ = new Subject<string>();
+  private _progress = signal<{ stage: string; percent: number }>({ stage: '', percent: 0 });
+  private _outputs = signal<string[]>([]);
+
+  progress = this._progress.asReadonly();
+  outputs = this._outputs.asReadonly();
+
+  clearOutputs(): void {
+    this._outputs.set([]);
+  }
 
   async initialize(packages: string[], packageRepos: WebrPackage[] = []): Promise<void> {
-    this.progress$.next({ stage: 'Loading WebR...', percent: 10 });
+    this._progress.set({ stage: 'Loading WebR...', percent: 10 });
 
     const { WebR } = await import(/* webpackIgnore: true */ WEBR_CDN + 'webr.mjs') as { WebR: new () => WebRInterface };
 
-    this.progress$.next({ stage: 'Initializing R...', percent: 20 });
+    this._progress.set({ stage: 'Initializing R...', percent: 20 });
 
     this.webR = new WebR();
     await this.webR.init();
 
-    this.progress$.next({ stage: 'Installing packages...', percent: 40 });
+    this._progress.set({ stage: 'Installing packages...', percent: 40 });
 
     const repoMap = new Map<string, string>();
     for (const pr of packageRepos) {
@@ -82,13 +88,13 @@ export class WebRService {
 
     while (toInstall.length > 0 && pass < maxPasses) {
       pass++;
-      this.progress$.next({ stage: 'Installation pass ' + pass + '...', percent: 40 + (pass / maxPasses) * 40 });
+      this._progress.set({ stage: 'Installation pass ' + pass + '...', percent: 40 + (pass / maxPasses) * 40 });
 
       const failed: string[] = [];
       for (const pkg of toInstall) {
         if (installed.has(pkg)) continue;
 
-        this.progress$.next({ stage: 'Installing ' + pkg + '...', percent: 40 + (pass / maxPasses) * 40 });
+        this._progress.set({ stage: 'Installing ' + pkg + '...', percent: 40 + (pass / maxPasses) * 40 });
 
         const pkgRepo = repoMap.get(pkg);
         const repos = pkgRepo ? [pkgRepo, ...defaultRepos] : defaultRepos;
@@ -117,7 +123,7 @@ export class WebRService {
       toInstall = failed;
     }
 
-    this.progress$.next({ stage: 'Ready', percent: 100 });
+    this._progress.set({ stage: 'Ready', percent: 100 });
   }
 
   async execute(
@@ -207,10 +213,10 @@ tryCatch({
       for (const item of result.output) {
         if (item.type === 'stdout') {
           stdout += item.data + '\n';
-          this.output$.next(item.data);
+          this._outputs.update(arr => [...arr, item.data]);
         } else if (item.type === 'stderr') {
           stderr += item.data + '\n';
-          this.output$.next('[stderr] ' + item.data);
+          this._outputs.update(arr => [...arr, '[stderr] ' + item.data]);
         }
       }
     }
