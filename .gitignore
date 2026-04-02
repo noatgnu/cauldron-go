@@ -120,6 +120,10 @@ coverage/
 .coverage
 htmlcov/
 
+# Playwright
+frontend/playwright-report/
+frontend/test-results/
+
 # Build artifacts
 *.tar.gz
 *.zip
