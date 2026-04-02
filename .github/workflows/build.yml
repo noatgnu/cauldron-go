@@ -623,7 +623,11 @@ jobs:
           echo "[]" > resources/licenses/go-licenses.json
           echo "[]" > resources/licenses/npm-licenses.json
 
-      - name: Start Wails dev server and run Playwright tests
+      - name: Build application
+        run: |
+          go build -tags devtools -o ./build/bin/cauldron .
+
+      - name: Start application and run Playwright tests
         env:
           DISPLAY: ':99'
           CI: 'true'
@@ -632,18 +636,18 @@ jobs:
           sleep 2
 
           cd ${{ github.workspace }}
-          wails3 dev > /tmp/wails-e2e.log 2>&1 &
-          WAILS_PID=$!
+          ./build/bin/cauldron > /tmp/cauldron-e2e.log 2>&1 &
+          APP_PID=$!
 
-          echo "Waiting for Wails dev server..."
-          for i in {1..120}; do
+          echo "Waiting for application..."
+          for i in {1..60}; do
             if curl -s http://localhost:4200 > /dev/null 2>&1; then
-              echo "Wails dev server is ready"
+              echo "Application is ready"
               break
             fi
-            if [ $i -eq 120 ]; then
-              echo "Timeout waiting for Wails dev server"
-              cat /tmp/wails-e2e.log
+            if [ $i -eq 60 ]; then
+              echo "Timeout waiting for application"
+              cat /tmp/cauldron-e2e.log
               exit 1
             fi
             sleep 1
@@ -655,7 +659,7 @@ jobs:
           npx playwright test --reporter=html
           TEST_EXIT=$?
 
-          kill $WAILS_PID 2>/dev/null || true
+          kill $APP_PID 2>/dev/null || true
           exit $TEST_EXIT
 
       - name: Upload Playwright report
