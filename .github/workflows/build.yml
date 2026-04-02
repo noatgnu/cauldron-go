@@ -504,3 +504,164 @@ jobs:
           BUILD_DIR: ${{ github.workspace }}/build/bin
         run: |
           go test -v -run "TestE2EJobOutputOperations" -timeout 300s
+
+  e2e-playwright-tests:
+    name: Playwright E2E Tests
+    needs: [build-dev-tools, build-backend, build-frontend]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            xorg-dev \
+            gfortran \
+            libpng-dev \
+            libjpeg-dev \
+            liblzma-dev \
+            libpcre2-dev \
+            libcurl4-openssl-dev \
+            libharfbuzz-dev \
+            libfribidi-dev \
+            libx11-dev \
+            libxext-dev \
+            libxrender-dev \
+            libxtst-dev \
+            libcairo2-dev \
+            tcl-dev \
+            tk-dev \
+            libhdf5-dev \
+            libblosc-dev \
+            libhiredis-dev \
+            libopenmpi-dev \
+            liblzo2-dev \
+            libomp-dev \
+            libreadline-dev \
+            bzip2 \
+            libgtk-3-dev \
+            libwebkit2gtk-4.1-dev \
+            libsoup-3.0-dev \
+            xvfb
+
+      - name: Compile R
+        run: |
+          curl -O https://cran.r-project.org/src/base/R-4/R-4.5.2.tar.gz
+          tar -xzvf R-4.5.2.tar.gz
+          cd R-4.5.2
+          CPPFLAGS="-I/usr/include -I/usr/include/xorg" \
+          LDFLAGS="-L/usr/lib -L/usr/lib/xorg" \
+          CFLAGS="-I/usr/include" \
+          TCL_LIBRARY="/usr/lib/tcltk" \
+          TK_LIBRARY="/usr/lib/tcltk" \
+          PKG_CONFIG_PATH="/usr/lib/pkgconfig" \
+          C_INCLUDE_PATH="/usr/include" \
+          LIBRARY_PATH="/usr/lib" \
+          ./configure --prefix=${{ github.workspace }}/R --enable-R-shlib --with-blas --with-lapack --with-tcltk --with-mpi
+          make -j$(nproc)
+          make install
+
+      - name: Set R environment variables
+        run: |
+          echo "${{ github.workspace }}/R/bin" >> $GITHUB_PATH
+          echo "R_HOME=${{ github.workspace }}/R" >> $GITHUB_ENV
+          echo "R_LIBS_USER=${{ github.workspace }}/R_libs" >> $GITHUB_ENV
+          mkdir -p "${{ github.workspace }}/R_libs"
+
+      - name: Download Portable Python
+        run: |
+          curl -LO https://github.com/indygreg/python-build-standalone/releases/download/20241016/cpython-3.11.10+20241016-x86_64-unknown-linux-gnu-install_only.tar.gz
+
+      - name: Extract Python
+        run: |
+          mkdir -p "${{ github.workspace }}/python"
+          tar -xzf cpython-3.11.10+20241016-x86_64-unknown-linux-gnu-install_only.tar.gz -C "${{ github.workspace }}/python" --no-same-owner --no-same-permissions
+          echo "${{ github.workspace }}/python/python/bin" >> $GITHUB_PATH
+
+      - name: Make build.sh executable
+        run: chmod +x build.sh
+
+      - name: Install Wails CLI
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@latest
+
+      - name: Generate Wails bindings
+        run: wails3 generate bindings -ts
+
+      - name: Build shared-lib
+        working-directory: shared-lib
+        run: |
+          npm install
+          npm run build
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm install
+
+      - name: Install Playwright browsers
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+      - name: Create dummy license files for embedding
+        run: |
+          mkdir -p resources/licenses
+          echo "[]" > resources/licenses/go-licenses.json
+          echo "[]" > resources/licenses/npm-licenses.json
+
+      - name: Start Wails dev server and run Playwright tests
+        env:
+          DISPLAY: ':99'
+          CI: 'true'
+        run: |
+          Xvfb :99 -screen 0 1920x1080x24 &
+          sleep 2
+
+          cd ${{ github.workspace }}
+          wails3 dev > /tmp/wails-e2e.log 2>&1 &
+          WAILS_PID=$!
+
+          echo "Waiting for Wails dev server..."
+          for i in {1..120}; do
+            if curl -s http://localhost:4200 > /dev/null 2>&1; then
+              echo "Wails dev server is ready"
+              break
+            fi
+            if [ $i -eq 120 ]; then
+              echo "Timeout waiting for Wails dev server"
+              cat /tmp/wails-e2e.log
+              exit 1
+            fi
+            sleep 1
+          done
+
+          sleep 5
+
+          cd frontend
+          npx playwright test --reporter=html
+          TEST_EXIT=$?
+
+          kill $WAILS_PID 2>/dev/null || true
+          exit $TEST_EXIT
+
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: frontend/playwright-report/
+          retention-days: 7
