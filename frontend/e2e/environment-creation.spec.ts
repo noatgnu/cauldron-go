@@ -125,7 +125,7 @@ test.describe('Python Virtual Environment Tests', () => {
   });
 
   test('should navigate to Python settings and see virtual environments section', async ({ page }) => {
-    await page.goto(`${BASE_URL}/settings/python`);
+    await page.goto(`${BASE_URL}/#/settings/python`);
     await page.waitForLoadState('networkidle');
 
     const venvSection = page.locator('.venv-section');
@@ -270,7 +270,7 @@ test.describe('Python Virtual Environment Tests', () => {
         createdVenvId = newVenv.ID;
       }
 
-      await page.goto(`${BASE_URL}/settings/python`);
+      await page.goto(`${BASE_URL}/#/settings/python`);
       await page.waitForLoadState('networkidle');
       await page.waitForTimeout(2000);
 
@@ -301,7 +301,7 @@ test.describe('R Renv Environment Tests', () => {
   });
 
   test('should navigate to R settings and see renv environments section', async ({ page }) => {
-    await page.goto(`${BASE_URL}/settings/r`);
+    await page.goto(`${BASE_URL}/#/settings/r`);
     await page.waitForLoadState('networkidle');
 
     const renvSection = page.locator('.venv-section');
@@ -452,7 +452,7 @@ test.describe('R Renv Environment Tests', () => {
         createdRenvId = newRenv.ID;
       }
 
-      await page.goto(`${BASE_URL}/settings/r`);
+      await page.goto(`${BASE_URL}/#/settings/r`);
       await page.waitForLoadState('networkidle');
       await page.waitForTimeout(2000);
 
@@ -740,7 +740,7 @@ test.describe('UI Workflow Tests', () => {
   });
 
   test('should show Python environment detection spinner while loading', async ({ page }) => {
-    await page.goto(`${BASE_URL}/settings/python`);
+    await page.goto(`${BASE_URL}/#/settings/python`);
 
     const spinner = page.locator('.detecting-container mat-spinner');
 
@@ -756,7 +756,7 @@ test.describe('UI Workflow Tests', () => {
   });
 
   test('should show R environment detection spinner while loading', async ({ page }) => {
-    await page.goto(`${BASE_URL}/settings/r`);
+    await page.goto(`${BASE_URL}/#/settings/r`);
 
     const spinner = page.locator('.detecting-container mat-spinner');
 
@@ -772,7 +772,7 @@ test.describe('UI Workflow Tests', () => {
   });
 
   test('should enable create venv button when Python is selected', async ({ page }) => {
-    await page.goto(`${BASE_URL}/settings/python`);
+    await page.goto(`${BASE_URL}/#/settings/python`);
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(5000);
 
@@ -787,7 +787,7 @@ test.describe('UI Workflow Tests', () => {
   });
 
   test('should enable create renv button when R is selected', async ({ page }) => {
-    await page.goto(`${BASE_URL}/settings/r`);
+    await page.goto(`${BASE_URL}/#/settings/r`);
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(5000);
 
@@ -810,7 +810,7 @@ test.describe('UI Workflow Tests', () => {
 
     const venvsResult = await callTestAPI('/test/virtual-environments');
 
-    await page.goto(`${BASE_URL}/settings/python`);
+    await page.goto(`${BASE_URL}/#/settings/python`);
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(2000);
 
@@ -834,7 +834,7 @@ test.describe('UI Workflow Tests', () => {
       return;
     }
 
-    await page.goto(`${BASE_URL}/settings/python`);
+    await page.goto(`${BASE_URL}/#/settings/python`);
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(2000);
 
@@ -860,7 +860,7 @@ test.describe('UI Workflow Tests', () => {
       return;
     }
 
-    await page.goto(`${BASE_URL}/settings/python`);
+    await page.goto(`${BASE_URL}/#/settings/python`);
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(2000);
 

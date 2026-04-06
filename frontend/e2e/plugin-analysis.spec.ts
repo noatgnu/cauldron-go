@@ -9,7 +9,7 @@ test.describe('Plugin Analysis UI Workflow', () => {
   });
 
   test('should successfully run an analysis by clicking Load Example and Run Analysis', async ({ page }) => {
-    await page.goto(`${BASE_URL}/plugin-list`);
+    await page.goto(`${BASE_URL}/#/plugin-list`);
     await page.waitForLoadState('networkidle');
 
     const pluginCard = page.locator('mat-card').filter({ hasText: /PCA Analysis/i }).first();

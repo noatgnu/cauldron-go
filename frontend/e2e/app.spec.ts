@@ -39,7 +39,7 @@ test.describe('Cauldron E2E Integration Tests', () => {
     });
 
     test('should display settings form', async ({ page }) => {
-      await page.goto(`${BASE_URL}/settings`);
+      await page.goto(`${BASE_URL}/#/settings`);
       await page.waitForLoadState('networkidle');
 
       const form = page.locator('form, mat-card, .settings');
@@ -49,7 +49,7 @@ test.describe('Cauldron E2E Integration Tests', () => {
 
   test.describe('Jobs Page', () => {
     test('should navigate to jobs', async ({ page }) => {
-      await page.goto(`${BASE_URL}/jobs`);
+      await page.goto(`${BASE_URL}/#/jobs`);
       await page.waitForLoadState('networkidle');
 
       const jobsContent = page.locator('mat-table, .job-list, [class*="job"]');
@@ -61,7 +61,7 @@ test.describe('Cauldron E2E Integration Tests', () => {
     });
 
     test('should show empty state or job list', async ({ page }) => {
-      await page.goto(`${BASE_URL}/jobs`);
+      await page.goto(`${BASE_URL}/#/jobs`);
       await page.waitForLoadState('networkidle');
 
       const jobItems = page.locator('mat-row, .job-item, [class*="job"]');
@@ -76,7 +76,7 @@ test.describe('Cauldron E2E Integration Tests', () => {
 
   test.describe('Plugins Page', () => {
     test('should navigate to plugins', async ({ page }) => {
-      await page.goto(`${BASE_URL}/plugins`);
+      await page.goto(`${BASE_URL}/#/plugins`);
       await page.waitForLoadState('networkidle');
 
       const pageLoaded = await page.locator('body').isVisible();
@@ -84,7 +84,7 @@ test.describe('Cauldron E2E Integration Tests', () => {
     });
 
     test('should show plugin list or empty state', async ({ page }) => {
-      await page.goto(`${BASE_URL}/plugins`);
+      await page.goto(`${BASE_URL}/#/plugins`);
       await page.waitForLoadState('networkidle');
 
       await page.waitForTimeout(2000);
@@ -98,7 +98,7 @@ test.describe('Cauldron E2E Integration Tests', () => {
 
   test.describe('Files Page', () => {
     test('should navigate to files/imports', async ({ page }) => {
-      await page.goto(`${BASE_URL}/files`);
+      await page.goto(`${BASE_URL}/#/files`);
       await page.waitForLoadState('networkidle');
 
       const pageLoaded = await page.locator('body').isVisible();

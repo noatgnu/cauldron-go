@@ -9,7 +9,7 @@ test.describe('Plugin Installation Workflow', () => {
   });
 
   test('should successfully install a plugin through the UI registry', async ({ page }) => {
-    await page.goto(`${BASE_URL}/plugin-registry`);
+    await page.goto(`${BASE_URL}/#/plugin-registry`);
     await page.waitForLoadState('networkidle');
 
     await expect(page.locator('h1')).toContainText(/Plugin Registry/i);
@@ -42,7 +42,7 @@ test.describe('Plugin Installation Workflow', () => {
 
     await expect(progressDialog).not.toBeVisible({ timeout: 60000 });
 
-    await page.goto(`${BASE_URL}/plugins`);
+    await page.goto(`${BASE_URL}/#/plugins`);
     await page.waitForLoadState('networkidle');
 
     const pluginInList = page.locator('mat-card, tr').filter({ hasText: /DIA-NN to CurtainPTM Converter/i });
