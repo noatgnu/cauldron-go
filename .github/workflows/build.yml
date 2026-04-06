@@ -639,8 +639,8 @@ jobs:
 
           cd ${{ github.workspace }}
 
-          # Start HTTP server to serve frontend on port 4200
-          npx serve frontend/dist/browser -l 4200 > /tmp/serve.log 2>&1 &
+          # Start HTTP server to serve frontend on port 4200 (SPA mode for client-side routing)
+          npx serve -s frontend/dist/browser -l 4200 > /tmp/serve.log 2>&1 &
           SERVE_PID=$!
 
           # Start Wails app with TestAPI enabled
