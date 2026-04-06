@@ -638,10 +638,16 @@ jobs:
           sleep 2
 
           cd ${{ github.workspace }}
+
+          # Start HTTP server to serve frontend on port 4200
+          npx serve frontend/dist/browser -l 4200 > /tmp/serve.log 2>&1 &
+          SERVE_PID=$!
+
+          # Start Wails app with TestAPI enabled
           CAULDRON_TEST_MODE=true ./build/bin/cauldron > /tmp/cauldron-e2e.log 2>&1 &
           APP_PID=$!
 
-          echo "Waiting for application frontend..."
+          echo "Waiting for frontend server..."
           for i in {1..60}; do
             if curl -s http://localhost:4200 > /dev/null 2>&1; then
               echo "Frontend is ready on port 4200"
@@ -649,7 +655,7 @@ jobs:
             fi
             if [ $i -eq 60 ]; then
               echo "Timeout waiting for frontend"
-              cat /tmp/cauldron-e2e.log
+              cat /tmp/serve.log
               exit 1
             fi
             sleep 1
@@ -669,12 +675,13 @@ jobs:
             sleep 1
           done
 
-          sleep 5
+          sleep 3
 
           cd frontend
           npx playwright test --reporter=html
           TEST_EXIT=$?
 
+          kill $SERVE_PID 2>/dev/null || true
           kill $APP_PID 2>/dev/null || true
           exit $TEST_EXIT
 
