@@ -209,6 +209,9 @@ func main() {
 	app.SetMainWindow(mainWindow)
 	mainWindow.SetMenu(appMenu)
 
+	testAPI := NewTestAPI(app)
+	testAPI.Start(9245)
+
 	go app.Initialize()
 
 	err = wailsApp.Run()

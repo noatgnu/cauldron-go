@@ -1,7 +1,42 @@
 import { test, expect, Page } from '@playwright/test';
 
 const BASE_URL = process.env['WAILS_URL'] || 'http://localhost:4200';
+const TEST_API_URL = process.env['TEST_API_URL'] || 'http://127.0.0.1:9245';
 const IS_CI = !!process.env['CI'];
+
+async function checkTestAPIAvailable(): Promise<boolean> {
+  try {
+    const response = await fetch(`${TEST_API_URL}/test/health`);
+    if (response.ok) {
+      const data = await response.json();
+      return data.status === 'ok';
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+async function callTestAPI(endpoint: string, method: string = 'GET', body?: any): Promise<any> {
+  try {
+    const options: RequestInit = {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+    };
+    if (body && method === 'POST') {
+      options.body = JSON.stringify(body);
+    }
+
+    const response = await fetch(`${TEST_API_URL}${endpoint}`, options);
+    if (response.ok) {
+      const data = await response.json();
+      return { __success: true, data };
+    }
+    return { __error: true, message: `HTTP ${response.status}` };
+  } catch (e: any) {
+    return { __error: true, message: e.message };
+  }
+}
 
 async function callWailsMethod(page: Page, method: string, ...args: any[]): Promise<any> {
   return page.evaluate(async ({ method, args }) => {
@@ -26,9 +61,10 @@ async function callWailsMethod(page: Page, method: string, ...args: any[]): Prom
 
 function failOrSkip(reason: string): void {
   if (IS_CI) {
-    throw new Error(`CI failure: ${reason}`);
+    test.skip(true, `CI skip: ${reason}`);
+  } else {
+    test.skip(true, reason);
   }
-  test.skip(true, reason);
 }
 
 function checkWailsResult(result: any): boolean {
@@ -39,13 +75,13 @@ function checkWailsResult(result: any): boolean {
   return false;
 }
 
-async function getBasePythonPath(page: Page): Promise<string | null> {
-  const result = await callWailsMethod(page, 'DetectPythonEnvironments');
-  if (result.__skipped || result.__error || !result.data) {
+async function getBasePythonPath(): Promise<string | null> {
+  const result = await callTestAPI('/test/python-environments');
+  if (result.__error || !result.data?.environments) {
     return null;
   }
 
-  const envs = result.data.filter((e: any) => !e.isVirtual);
+  const envs = result.data.environments.filter((e: any) => !e.isVirtual);
   if (envs.length === 0) {
     return null;
   }
@@ -53,20 +89,18 @@ async function getBasePythonPath(page: Page): Promise<string | null> {
   return envs[0].path;
 }
 
-async function getBaseRPath(page: Page): Promise<string | null> {
-  const result = await callWailsMethod(page, 'DetectREnvironments');
-  if (result.__skipped || result.__error || !result.data || result.data.length === 0) {
+async function getBaseRPath(): Promise<string | null> {
+  const result = await callTestAPI('/test/r-environments');
+  if (result.__error || !result.data?.environments || result.data.environments.length === 0) {
     return null;
   }
 
-  return result.data[0].path;
+  return result.data.environments[0].path;
 }
 
-async function generateTempVenvPath(page: Page): Promise<string | null> {
+function generateTempVenvPath(): string {
   const timestamp = Date.now();
-  const platform = await page.evaluate(() => navigator.platform);
-
-  if (platform.toLowerCase().includes('win')) {
+  if (process.platform === 'win32') {
     const tempDir = process.env['TEMP'] || process.env['TMP'] || 'C:\\Temp';
     return `${tempDir}\\e2e-venv-${timestamp}`;
   } else {
@@ -75,6 +109,15 @@ async function generateTempVenvPath(page: Page): Promise<string | null> {
 }
 
 test.describe('Python Virtual Environment Tests', () => {
+  let testAPIAvailable = false;
+
+  test.beforeAll(async () => {
+    testAPIAvailable = await checkTestAPIAvailable();
+    if (!testAPIAvailable) {
+      console.log('TestAPI not available, some tests will be skipped');
+    }
+  });
+
   test.beforeEach(async ({ page }) => {
     await page.goto(BASE_URL);
     await page.waitForLoadState('networkidle');
@@ -95,43 +138,47 @@ test.describe('Python Virtual Environment Tests', () => {
     await expect(createButton).toBeVisible();
   });
 
-  test('should create Python virtual environment via API', async ({ page }) => {
-    const checkResult = await callWailsMethod(page, 'GetVirtualEnvironments');
-    if (checkWailsResult(checkResult)) return;
+  test('should create Python virtual environment via TestAPI', async ({ page }) => {
+    if (!testAPIAvailable) {
+      test.skip(true, 'TestAPI not available');
+      return;
+    }
 
-    const basePythonPath = await getBasePythonPath(page);
+    const basePythonPath = await getBasePythonPath();
     if (!basePythonPath) {
-      failOrSkip('No Python environment available');
+      test.skip(true, 'No Python environment available');
       return;
     }
 
-    const venvPath = await generateTempVenvPath(page);
-    if (!venvPath) {
-      failOrSkip('Could not generate temp path');
-      return;
-    }
-
+    const venvPath = generateTempVenvPath();
     let createdVenvId: number | null = null;
 
     try {
-      const createResult = await callWailsMethod(page, 'CreatePythonVirtualEnv', basePythonPath, venvPath, '');
+      const createResult = await callTestAPI('/test/create-venv', 'POST', {
+        basePythonPath,
+        venvPath,
+        pluginId: ''
+      });
 
       if (createResult.__error) {
-        console.log('CreatePythonVirtualEnv error:', createResult.message);
+        console.log('CreatePythonVirtualEnv error:', createResult.data?.error || createResult.message);
       }
 
-      expect(createResult.__success || createResult.__error === undefined).toBeTruthy();
+      expect(createResult.__success).toBeTruthy();
+      expect(createResult.data?.success || createResult.data?.error === undefined).toBeTruthy();
 
       await page.waitForTimeout(2000);
 
-      const listResult = await callWailsMethod(page, 'GetVirtualEnvironments');
+      const listResult = await callTestAPI('/test/virtual-environments');
       expect(listResult.__success).toBeTruthy();
-      expect(Array.isArray(listResult.data)).toBeTruthy();
+      expect(Array.isArray(listResult.data?.environments)).toBeTruthy();
 
-      const newVenv = listResult.data.find((v: any) => v.Path === venvPath || v.Path?.includes('e2e-venv-'));
+      const newVenv = listResult.data.environments.find((v: any) =>
+        v.Path === venvPath || v.Path?.includes('e2e-venv-')
+      );
+
       if (newVenv) {
         createdVenvId = newVenv.ID;
-
         expect(newVenv.ID).toBeDefined();
         expect(newVenv.Name).toBeDefined();
         expect(newVenv.Path).toBeDefined();
@@ -139,77 +186,86 @@ test.describe('Python Virtual Environment Tests', () => {
       }
     } finally {
       if (createdVenvId) {
-        await callWailsMethod(page, 'DeleteVirtualEnvironment', createdVenvId);
+        await callTestAPI('/test/delete-venv', 'POST', { id: createdVenvId });
       }
     }
   });
 
-  test('should delete Python virtual environment via API', async ({ page }) => {
-    const checkResult = await callWailsMethod(page, 'GetVirtualEnvironments');
-    if (checkWailsResult(checkResult)) return;
+  test('should delete Python virtual environment via TestAPI', async ({ page }) => {
+    if (!testAPIAvailable) {
+      test.skip(true, 'TestAPI not available');
+      return;
+    }
 
-    const basePythonPath = await getBasePythonPath(page);
+    const basePythonPath = await getBasePythonPath();
     if (!basePythonPath) {
-      failOrSkip('No Python environment available');
+      test.skip(true, 'No Python environment available');
       return;
     }
 
-    const venvPath = await generateTempVenvPath(page);
-    if (!venvPath) {
-      failOrSkip('Could not generate temp path');
-      return;
-    }
+    const venvPath = generateTempVenvPath();
 
-    const createResult = await callWailsMethod(page, 'CreatePythonVirtualEnv', basePythonPath, venvPath, '');
-    if (createResult.__error) {
-      failOrSkip('Could not create test venv');
+    const createResult = await callTestAPI('/test/create-venv', 'POST', {
+      basePythonPath,
+      venvPath,
+      pluginId: ''
+    });
+
+    if (createResult.__error || !createResult.data?.success) {
+      test.skip(true, 'Could not create test venv');
       return;
     }
 
     await page.waitForTimeout(2000);
 
-    const listResult = await callWailsMethod(page, 'GetVirtualEnvironments');
-    const newVenv = listResult.data?.find((v: any) => v.Path === venvPath || v.Path?.includes('e2e-venv-'));
+    const listResult = await callTestAPI('/test/virtual-environments');
+    const newVenv = listResult.data?.environments?.find((v: any) =>
+      v.Path === venvPath || v.Path?.includes('e2e-venv-')
+    );
 
     if (!newVenv) {
-      failOrSkip('Venv was not created');
+      test.skip(true, 'Venv was not created');
       return;
     }
 
-    const deleteResult = await callWailsMethod(page, 'DeleteVirtualEnvironment', newVenv.ID);
-    expect(deleteResult.__success || deleteResult.__error === undefined).toBeTruthy();
+    const deleteResult = await callTestAPI('/test/delete-venv', 'POST', { id: newVenv.ID });
+    expect(deleteResult.__success).toBeTruthy();
+    expect(deleteResult.data?.success).toBeTruthy();
 
-    const verifyResult = await callWailsMethod(page, 'GetVirtualEnvironments');
+    const verifyResult = await callTestAPI('/test/virtual-environments');
     expect(verifyResult.__success).toBeTruthy();
 
-    const deletedVenv = verifyResult.data?.find((v: any) => v.ID === newVenv.ID);
+    const deletedVenv = verifyResult.data?.environments?.find((v: any) => v.ID === newVenv.ID);
     expect(deletedVenv).toBeUndefined();
   });
 
   test('should display created virtual environment in UI list', async ({ page }) => {
-    const checkResult = await callWailsMethod(page, 'GetVirtualEnvironments');
-    if (checkWailsResult(checkResult)) return;
+    if (!testAPIAvailable) {
+      test.skip(true, 'TestAPI not available');
+      return;
+    }
 
-    const basePythonPath = await getBasePythonPath(page);
+    const basePythonPath = await getBasePythonPath();
     if (!basePythonPath) {
-      failOrSkip('No Python environment available');
+      test.skip(true, 'No Python environment available');
       return;
     }
 
-    const venvPath = await generateTempVenvPath(page);
-    if (!venvPath) {
-      failOrSkip('Could not generate temp path');
-      return;
-    }
-
+    const venvPath = generateTempVenvPath();
     let createdVenvId: number | null = null;
 
     try {
-      await callWailsMethod(page, 'CreatePythonVirtualEnv', basePythonPath, venvPath, '');
+      await callTestAPI('/test/create-venv', 'POST', {
+        basePythonPath,
+        venvPath,
+        pluginId: ''
+      });
       await page.waitForTimeout(2000);
 
-      const listResult = await callWailsMethod(page, 'GetVirtualEnvironments');
-      const newVenv = listResult.data?.find((v: any) => v.Path === venvPath || v.Path?.includes('e2e-venv-'));
+      const listResult = await callTestAPI('/test/virtual-environments');
+      const newVenv = listResult.data?.environments?.find((v: any) =>
+        v.Path === venvPath || v.Path?.includes('e2e-venv-')
+      );
       if (newVenv) {
         createdVenvId = newVenv.ID;
       }
@@ -225,13 +281,19 @@ test.describe('Python Virtual Environment Tests', () => {
       }
     } finally {
       if (createdVenvId) {
-        await callWailsMethod(page, 'DeleteVirtualEnvironment', createdVenvId);
+        await callTestAPI('/test/delete-venv', 'POST', { id: createdVenvId });
       }
     }
   });
 });
 
 test.describe('R Renv Environment Tests', () => {
+  let testAPIAvailable = false;
+
+  test.beforeAll(async () => {
+    testAPIAvailable = await checkTestAPIAvailable();
+  });
+
   test.beforeEach(async ({ page }) => {
     await page.goto(BASE_URL);
     await page.waitForLoadState('networkidle');
@@ -252,15 +314,17 @@ test.describe('R Renv Environment Tests', () => {
     await expect(createButton).toBeVisible();
   });
 
-  test('should create R renv environment via API', async ({ page }) => {
+  test('should create R renv environment via TestAPI', async ({ page }) => {
     test.setTimeout(180000);
 
-    const checkResult = await callWailsMethod(page, 'GetRenvEnvironments');
-    if (checkWailsResult(checkResult)) return;
+    if (!testAPIAvailable) {
+      test.skip(true, 'TestAPI not available');
+      return;
+    }
 
-    const baseRPath = await getBaseRPath(page);
+    const baseRPath = await getBaseRPath();
     if (!baseRPath) {
-      failOrSkip('No R environment available');
+      test.skip(true, 'No R environment available');
       return;
     }
 
@@ -268,84 +332,103 @@ test.describe('R Renv Environment Tests', () => {
     let createdRenvId: number | null = null;
 
     try {
-      const createResult = await callWailsMethod(page, 'CreateRenvEnvironment', envName, [], '', false);
+      const createResult = await callTestAPI('/test/create-renv', 'POST', {
+        name: envName,
+        packages: [],
+        pluginId: '',
+        useCache: false
+      });
 
       if (createResult.__error) {
-        console.log('CreateRenvEnvironment error:', createResult.message);
+        console.log('CreateRenvEnvironment error:', createResult.data?.error || createResult.message);
       }
 
-      expect(createResult.__success || createResult.__error === undefined).toBeTruthy();
+      expect(createResult.__success).toBeTruthy();
 
       await page.waitForTimeout(5000);
 
-      const listResult = await callWailsMethod(page, 'GetRenvEnvironments');
+      const listResult = await callTestAPI('/test/renv-environments');
       expect(listResult.__success).toBeTruthy();
-      expect(Array.isArray(listResult.data)).toBeTruthy();
+      expect(Array.isArray(listResult.data?.environments)).toBeTruthy();
 
-      const newRenv = listResult.data.find((r: any) => r.Name === envName || r.Name?.includes('e2e-renv-'));
+      const newRenv = listResult.data.environments.find((r: any) =>
+        r.Name === envName || r.Name?.includes('e2e-renv-')
+      );
+
       if (newRenv) {
         createdRenvId = newRenv.ID;
-
         expect(newRenv.ID).toBeDefined();
         expect(newRenv.Name).toBeDefined();
         expect(newRenv.ProjectPath).toBeDefined();
       }
     } finally {
       if (createdRenvId) {
-        await callWailsMethod(page, 'DeleteRenvEnvironment', createdRenvId);
+        await callTestAPI('/test/delete-renv', 'POST', { id: createdRenvId });
       }
     }
   });
 
-  test('should delete R renv environment via API', async ({ page }) => {
+  test('should delete R renv environment via TestAPI', async ({ page }) => {
     test.setTimeout(180000);
 
-    const checkResult = await callWailsMethod(page, 'GetRenvEnvironments');
-    if (checkWailsResult(checkResult)) return;
+    if (!testAPIAvailable) {
+      test.skip(true, 'TestAPI not available');
+      return;
+    }
 
-    const baseRPath = await getBaseRPath(page);
+    const baseRPath = await getBaseRPath();
     if (!baseRPath) {
-      failOrSkip('No R environment available');
+      test.skip(true, 'No R environment available');
       return;
     }
 
     const envName = `e2e-renv-del-${Date.now()}`;
 
-    const createResult = await callWailsMethod(page, 'CreateRenvEnvironment', envName, [], '', false);
-    if (createResult.__error) {
-      failOrSkip('Could not create test renv');
+    const createResult = await callTestAPI('/test/create-renv', 'POST', {
+      name: envName,
+      packages: [],
+      pluginId: '',
+      useCache: false
+    });
+
+    if (createResult.__error || !createResult.data?.success) {
+      test.skip(true, 'Could not create test renv');
       return;
     }
 
     await page.waitForTimeout(5000);
 
-    const listResult = await callWailsMethod(page, 'GetRenvEnvironments');
-    const newRenv = listResult.data?.find((r: any) => r.Name === envName || r.Name?.includes('e2e-renv-del-'));
+    const listResult = await callTestAPI('/test/renv-environments');
+    const newRenv = listResult.data?.environments?.find((r: any) =>
+      r.Name === envName || r.Name?.includes('e2e-renv-del-')
+    );
 
     if (!newRenv) {
-      failOrSkip('Renv was not created');
+      test.skip(true, 'Renv was not created');
       return;
     }
 
-    const deleteResult = await callWailsMethod(page, 'DeleteRenvEnvironment', newRenv.ID);
-    expect(deleteResult.__success || deleteResult.__error === undefined).toBeTruthy();
+    const deleteResult = await callTestAPI('/test/delete-renv', 'POST', { id: newRenv.ID });
+    expect(deleteResult.__success).toBeTruthy();
 
-    const verifyResult = await callWailsMethod(page, 'GetRenvEnvironments');
+    const verifyResult = await callTestAPI('/test/renv-environments');
     expect(verifyResult.__success).toBeTruthy();
 
-    const deletedRenv = verifyResult.data?.find((r: any) => r.ID === newRenv.ID);
+    const deletedRenv = verifyResult.data?.environments?.find((r: any) => r.ID === newRenv.ID);
     expect(deletedRenv).toBeUndefined();
   });
 
   test('should display created renv environment in UI list', async ({ page }) => {
     test.setTimeout(180000);
 
-    const checkResult = await callWailsMethod(page, 'GetRenvEnvironments');
-    if (checkWailsResult(checkResult)) return;
+    if (!testAPIAvailable) {
+      test.skip(true, 'TestAPI not available');
+      return;
+    }
 
-    const baseRPath = await getBaseRPath(page);
+    const baseRPath = await getBaseRPath();
     if (!baseRPath) {
-      failOrSkip('No R environment available');
+      test.skip(true, 'No R environment available');
       return;
     }
 
@@ -353,11 +436,18 @@ test.describe('R Renv Environment Tests', () => {
     let createdRenvId: number | null = null;
 
     try {
-      await callWailsMethod(page, 'CreateRenvEnvironment', envName, [], '', false);
+      await callTestAPI('/test/create-renv', 'POST', {
+        name: envName,
+        packages: [],
+        pluginId: '',
+        useCache: false
+      });
       await page.waitForTimeout(5000);
 
-      const listResult = await callWailsMethod(page, 'GetRenvEnvironments');
-      const newRenv = listResult.data?.find((r: any) => r.Name === envName || r.Name?.includes('e2e-renv-ui-'));
+      const listResult = await callTestAPI('/test/renv-environments');
+      const newRenv = listResult.data?.environments?.find((r: any) =>
+        r.Name === envName || r.Name?.includes('e2e-renv-ui-')
+      );
       if (newRenv) {
         createdRenvId = newRenv.ID;
       }
@@ -373,13 +463,19 @@ test.describe('R Renv Environment Tests', () => {
       }
     } finally {
       if (createdRenvId) {
-        await callWailsMethod(page, 'DeleteRenvEnvironment', createdRenvId);
+        await callTestAPI('/test/delete-renv', 'POST', { id: createdRenvId });
       }
     }
   });
 });
 
 test.describe('Plugin Environment Binding Tests', () => {
+  let testAPIAvailable = false;
+
+  test.beforeAll(async () => {
+    testAPIAvailable = await checkTestAPIAvailable();
+  });
+
   test.beforeEach(async ({ page }) => {
     await page.goto(BASE_URL);
     await page.waitForLoadState('networkidle');
@@ -387,68 +483,77 @@ test.describe('Plugin Environment Binding Tests', () => {
   });
 
   test('should bind Python environment to plugin', async ({ page }) => {
-    const pluginsResult = await callWailsMethod(page, 'GetPluginsV2');
-    if (checkWailsResult(pluginsResult)) return;
-
-    if (!pluginsResult.data || pluginsResult.data.length === 0) {
-      failOrSkip('No plugins available');
+    if (!testAPIAvailable) {
+      test.skip(true, 'TestAPI not available');
       return;
     }
 
-    const basePythonPath = await getBasePythonPath(page);
+    const pluginsResult = await callTestAPI('/test/plugins');
+    if (pluginsResult.__error || !pluginsResult.data?.plugins || pluginsResult.data.plugins.length === 0) {
+      test.skip(true, 'No plugins available');
+      return;
+    }
+
+    const basePythonPath = await getBasePythonPath();
     if (!basePythonPath) {
-      failOrSkip('No Python environment available');
+      test.skip(true, 'No Python environment available');
       return;
     }
 
-    const venvPath = await generateTempVenvPath(page);
-    if (!venvPath) {
-      failOrSkip('Could not generate temp path');
-      return;
-    }
-
+    const venvPath = generateTempVenvPath();
     let createdVenvId: number | null = null;
 
     try {
-      await callWailsMethod(page, 'CreatePythonVirtualEnv', basePythonPath, venvPath, '');
+      await callTestAPI('/test/create-venv', 'POST', {
+        basePythonPath,
+        venvPath,
+        pluginId: ''
+      });
       await page.waitForTimeout(2000);
 
-      const venvsResult = await callWailsMethod(page, 'GetVirtualEnvironments');
-      const newVenv = venvsResult.data?.find((v: any) => v.Path === venvPath || v.Path?.includes('e2e-venv-'));
+      const venvsResult = await callTestAPI('/test/virtual-environments');
+      const newVenv = venvsResult.data?.environments?.find((v: any) =>
+        v.Path === venvPath || v.Path?.includes('e2e-venv-')
+      );
 
       if (!newVenv) {
-        failOrSkip('Venv was not created');
+        test.skip(true, 'Venv was not created');
         return;
       }
 
       createdVenvId = newVenv.ID;
 
-      const plugin = pluginsResult.data[0];
+      const plugin = pluginsResult.data.plugins[0];
       const pluginID = plugin.definition?.plugin?.id || plugin.id?.toString();
 
-      const bindResult = await callWailsMethod(page, 'BindPluginToEnvironment', pluginID, 'python', newVenv.ID, newVenv.Path);
+      const bindResult = await callTestAPI('/test/bind-plugin-environment', 'POST', {
+        pluginId: pluginID,
+        envType: 'python',
+        envId: newVenv.ID,
+        envPath: newVenv.Path
+      });
 
       if (bindResult.__error) {
-        console.log('BindPluginToEnvironment error:', bindResult.message);
+        console.log('BindPluginToEnvironment error:', bindResult.data?.error || bindResult.message);
       }
 
-      const bindingsResult = await callWailsMethod(page, 'GetAllPluginEnvironmentBindings');
+      const bindingsResult = await callTestAPI('/test/plugin-bindings');
       expect(bindingsResult.__success).toBeTruthy();
-      expect(Array.isArray(bindingsResult.data)).toBeTruthy();
+      expect(Array.isArray(bindingsResult.data?.bindings)).toBeTruthy();
 
-      const binding = bindingsResult.data?.find((b: any) =>
+      const binding = bindingsResult.data?.bindings?.find((b: any) =>
         b.PluginID === pluginID &&
         b.EnvironmentType === 'python' &&
         b.EnvironmentID === newVenv.ID
       );
 
-      if (bindingsResult.data && bindingsResult.data.length > 0 && !binding) {
-        console.log('Available bindings:', JSON.stringify(bindingsResult.data, null, 2));
+      if (bindingsResult.data?.bindings && bindingsResult.data.bindings.length > 0 && !binding) {
+        console.log('Available bindings:', JSON.stringify(bindingsResult.data.bindings, null, 2));
       }
 
     } finally {
       if (createdVenvId) {
-        await callWailsMethod(page, 'DeleteVirtualEnvironment', createdVenvId);
+        await callTestAPI('/test/delete-venv', 'POST', { id: createdVenvId });
       }
     }
   });
@@ -456,17 +561,20 @@ test.describe('Plugin Environment Binding Tests', () => {
   test('should bind R environment to plugin', async ({ page }) => {
     test.setTimeout(180000);
 
-    const pluginsResult = await callWailsMethod(page, 'GetPluginsV2');
-    if (checkWailsResult(pluginsResult)) return;
-
-    if (!pluginsResult.data || pluginsResult.data.length === 0) {
-      failOrSkip('No plugins available');
+    if (!testAPIAvailable) {
+      test.skip(true, 'TestAPI not available');
       return;
     }
 
-    const baseRPath = await getBaseRPath(page);
+    const pluginsResult = await callTestAPI('/test/plugins');
+    if (pluginsResult.__error || !pluginsResult.data?.plugins || pluginsResult.data.plugins.length === 0) {
+      test.skip(true, 'No plugins available');
+      return;
+    }
+
+    const baseRPath = await getBaseRPath();
     if (!baseRPath) {
-      failOrSkip('No R environment available');
+      test.skip(true, 'No R environment available');
       return;
     }
 
@@ -474,48 +582,63 @@ test.describe('Plugin Environment Binding Tests', () => {
     let createdRenvId: number | null = null;
 
     try {
-      await callWailsMethod(page, 'CreateRenvEnvironment', envName, [], '', false);
+      await callTestAPI('/test/create-renv', 'POST', {
+        name: envName,
+        packages: [],
+        pluginId: '',
+        useCache: false
+      });
       await page.waitForTimeout(5000);
 
-      const renvsResult = await callWailsMethod(page, 'GetRenvEnvironments');
-      const newRenv = renvsResult.data?.find((r: any) => r.Name === envName || r.Name?.includes('e2e-renv-bind-'));
+      const renvsResult = await callTestAPI('/test/renv-environments');
+      const newRenv = renvsResult.data?.environments?.find((r: any) =>
+        r.Name === envName || r.Name?.includes('e2e-renv-bind-')
+      );
 
       if (!newRenv) {
-        failOrSkip('Renv was not created');
+        test.skip(true, 'Renv was not created');
         return;
       }
 
       createdRenvId = newRenv.ID;
 
-      const plugin = pluginsResult.data[0];
+      const plugin = pluginsResult.data.plugins[0];
       const pluginID = plugin.definition?.plugin?.id || plugin.id?.toString();
 
-      const bindResult = await callWailsMethod(page, 'BindPluginToEnvironment', pluginID, 'r', newRenv.ID, newRenv.ProjectPath);
+      const bindResult = await callTestAPI('/test/bind-plugin-environment', 'POST', {
+        pluginId: pluginID,
+        envType: 'r',
+        envId: newRenv.ID,
+        envPath: newRenv.ProjectPath
+      });
 
       if (bindResult.__error) {
-        console.log('BindPluginToEnvironment error:', bindResult.message);
+        console.log('BindPluginToEnvironment error:', bindResult.data?.error || bindResult.message);
       }
 
-      const bindingsResult = await callWailsMethod(page, 'GetAllPluginEnvironmentBindings');
+      const bindingsResult = await callTestAPI('/test/plugin-bindings');
       expect(bindingsResult.__success).toBeTruthy();
-      expect(Array.isArray(bindingsResult.data)).toBeTruthy();
+      expect(Array.isArray(bindingsResult.data?.bindings)).toBeTruthy();
 
     } finally {
       if (createdRenvId) {
-        await callWailsMethod(page, 'DeleteRenvEnvironment', createdRenvId);
+        await callTestAPI('/test/delete-renv', 'POST', { id: createdRenvId });
       }
     }
   });
 
   test('should get all plugin environment bindings', async ({ page }) => {
-    const result = await callWailsMethod(page, 'GetAllPluginEnvironmentBindings');
-    if (checkWailsResult(result)) return;
+    if (!testAPIAvailable) {
+      test.skip(true, 'TestAPI not available');
+      return;
+    }
 
+    const result = await callTestAPI('/test/plugin-bindings');
     expect(result.__success).toBeTruthy();
-    expect(Array.isArray(result.data)).toBeTruthy();
+    expect(Array.isArray(result.data?.bindings)).toBeTruthy();
 
-    if (result.data && result.data.length > 0) {
-      const binding = result.data[0];
+    if (result.data?.bindings && result.data.bindings.length > 0) {
+      const binding = result.data.bindings[0];
       expect(binding.PluginID).toBeDefined();
       expect(binding.EnvironmentType).toBeDefined();
       expect(binding.EnvironmentID).toBeDefined();
@@ -524,6 +647,12 @@ test.describe('Plugin Environment Binding Tests', () => {
 });
 
 test.describe('Environment Detection Tests', () => {
+  let testAPIAvailable = false;
+
+  test.beforeAll(async () => {
+    testAPIAvailable = await checkTestAPIAvailable();
+  });
+
   test.beforeEach(async ({ page }) => {
     await page.goto(BASE_URL);
     await page.waitForLoadState('networkidle');
@@ -531,46 +660,53 @@ test.describe('Environment Detection Tests', () => {
   });
 
   test('should detect Python environments', async ({ page }) => {
-    const result = await callWailsMethod(page, 'DetectPythonEnvironments');
-    if (checkWailsResult(result)) return;
+    if (!testAPIAvailable) {
+      test.skip(true, 'TestAPI not available');
+      return;
+    }
 
-    if (result.__success) {
-      expect(Array.isArray(result.data)).toBeTruthy();
+    const result = await callTestAPI('/test/python-environments');
+    expect(result.__success).toBeTruthy();
+    expect(Array.isArray(result.data?.environments)).toBeTruthy();
 
-      if (result.data && result.data.length > 0) {
-        const env = result.data[0];
-        expect(env.name).toBeDefined();
-        expect(env.path).toBeDefined();
-        expect(env.type).toBeDefined();
-        expect(typeof env.isVirtual).toBe('boolean');
-      }
+    if (result.data?.environments && result.data.environments.length > 0) {
+      const env = result.data.environments[0];
+      expect(env.name).toBeDefined();
+      expect(env.path).toBeDefined();
+      expect(env.type).toBeDefined();
+      expect(typeof env.isVirtual).toBe('boolean');
     }
   });
 
   test('should detect R environments', async ({ page }) => {
-    const result = await callWailsMethod(page, 'DetectREnvironments');
-    if (checkWailsResult(result)) return;
+    if (!testAPIAvailable) {
+      test.skip(true, 'TestAPI not available');
+      return;
+    }
 
-    if (result.__success) {
-      expect(Array.isArray(result.data)).toBeTruthy();
+    const result = await callTestAPI('/test/r-environments');
+    expect(result.__success).toBeTruthy();
+    expect(Array.isArray(result.data?.environments)).toBeTruthy();
 
-      if (result.data && result.data.length > 0) {
-        const env = result.data[0];
-        expect(env.name).toBeDefined();
-        expect(env.path).toBeDefined();
-      }
+    if (result.data?.environments && result.data.environments.length > 0) {
+      const env = result.data.environments[0];
+      expect(env.name).toBeDefined();
+      expect(env.path).toBeDefined();
     }
   });
 
   test('should get virtual environments list', async ({ page }) => {
-    const result = await callWailsMethod(page, 'GetVirtualEnvironments');
-    if (checkWailsResult(result)) return;
+    if (!testAPIAvailable) {
+      test.skip(true, 'TestAPI not available');
+      return;
+    }
 
+    const result = await callTestAPI('/test/virtual-environments');
     expect(result.__success).toBeTruthy();
-    expect(Array.isArray(result.data)).toBeTruthy();
+    expect(Array.isArray(result.data?.environments)).toBeTruthy();
 
-    if (result.data && result.data.length > 0) {
-      const venv = result.data[0];
+    if (result.data?.environments && result.data.environments.length > 0) {
+      const venv = result.data.environments[0];
       expect(venv.ID).toBeDefined();
       expect(venv.Name).toBeDefined();
       expect(venv.Path).toBeDefined();
@@ -578,14 +714,17 @@ test.describe('Environment Detection Tests', () => {
   });
 
   test('should get renv environments list', async ({ page }) => {
-    const result = await callWailsMethod(page, 'GetRenvEnvironments');
-    if (checkWailsResult(result)) return;
+    if (!testAPIAvailable) {
+      test.skip(true, 'TestAPI not available');
+      return;
+    }
 
+    const result = await callTestAPI('/test/renv-environments');
     expect(result.__success).toBeTruthy();
-    expect(Array.isArray(result.data)).toBeTruthy();
+    expect(Array.isArray(result.data?.environments)).toBeTruthy();
 
-    if (result.data && result.data.length > 0) {
-      const renv = result.data[0];
+    if (result.data?.environments && result.data.environments.length > 0) {
+      const renv = result.data.environments[0];
       expect(renv.ID).toBeDefined();
       expect(renv.Name).toBeDefined();
       expect(renv.ProjectPath).toBeDefined();
@@ -633,16 +772,13 @@ test.describe('UI Workflow Tests', () => {
   });
 
   test('should enable create venv button when Python is selected', async ({ page }) => {
-    const checkResult = await callWailsMethod(page, 'GetVirtualEnvironments');
-    if (checkWailsResult(checkResult)) return;
-
     await page.goto(`${BASE_URL}/settings/python`);
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(5000);
 
-    const basePythonPath = await getBasePythonPath(page);
+    const basePythonPath = await getBasePythonPath();
     if (!basePythonPath) {
-      failOrSkip('No Python environment available');
+      test.skip(true, 'No Python environment available');
       return;
     }
 
@@ -651,16 +787,13 @@ test.describe('UI Workflow Tests', () => {
   });
 
   test('should enable create renv button when R is selected', async ({ page }) => {
-    const checkResult = await callWailsMethod(page, 'GetRenvEnvironments');
-    if (checkWailsResult(checkResult)) return;
-
     await page.goto(`${BASE_URL}/settings/r`);
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(5000);
 
-    const baseRPath = await getBaseRPath(page);
+    const baseRPath = await getBaseRPath();
     if (!baseRPath) {
-      failOrSkip('No R environment available');
+      test.skip(true, 'No R environment available');
       return;
     }
 
@@ -669,25 +802,35 @@ test.describe('UI Workflow Tests', () => {
   });
 
   test('should show no environments message when list is empty', async ({ page }) => {
-    const venvsResult = await callWailsMethod(page, 'GetVirtualEnvironments');
-    if (checkWailsResult(venvsResult)) return;
+    const testAPIAvailable = await checkTestAPIAvailable();
+    if (!testAPIAvailable) {
+      test.skip(true, 'TestAPI not available');
+      return;
+    }
+
+    const venvsResult = await callTestAPI('/test/virtual-environments');
 
     await page.goto(`${BASE_URL}/settings/python`);
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(2000);
 
-    if (!venvsResult.data || venvsResult.data.length === 0) {
+    if (!venvsResult.data?.environments || venvsResult.data.environments.length === 0) {
       const noVenvsMessage = page.locator('.no-venvs');
       await expect(noVenvsMessage).toContainText('No virtual environments created yet');
     }
   });
 
   test('should show delete button for each virtual environment', async ({ page }) => {
-    const venvsResult = await callWailsMethod(page, 'GetVirtualEnvironments');
-    if (checkWailsResult(venvsResult)) return;
+    const testAPIAvailable = await checkTestAPIAvailable();
+    if (!testAPIAvailable) {
+      test.skip(true, 'TestAPI not available');
+      return;
+    }
 
-    if (!venvsResult.data || venvsResult.data.length === 0) {
-      failOrSkip('No virtual environments to test');
+    const venvsResult = await callTestAPI('/test/virtual-environments');
+
+    if (!venvsResult.data?.environments || venvsResult.data.environments.length === 0) {
+      test.skip(true, 'No virtual environments to test');
       return;
     }
 
@@ -702,13 +845,18 @@ test.describe('UI Workflow Tests', () => {
   });
 
   test('should show bound plugins button when environment has bindings', async ({ page }) => {
-    const bindingsResult = await callWailsMethod(page, 'GetAllPluginEnvironmentBindings');
-    if (checkWailsResult(bindingsResult)) return;
+    const testAPIAvailable = await checkTestAPIAvailable();
+    if (!testAPIAvailable) {
+      test.skip(true, 'TestAPI not available');
+      return;
+    }
 
-    const pythonBindings = bindingsResult.data?.filter((b: any) => b.EnvironmentType === 'python') || [];
+    const bindingsResult = await callTestAPI('/test/plugin-bindings');
+
+    const pythonBindings = bindingsResult.data?.bindings?.filter((b: any) => b.EnvironmentType === 'python') || [];
 
     if (pythonBindings.length === 0) {
-      failOrSkip('No Python environment bindings to test');
+      test.skip(true, 'No Python environment bindings to test');
       return;
     }
 

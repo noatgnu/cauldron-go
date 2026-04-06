@@ -631,22 +631,38 @@ jobs:
         env:
           DISPLAY: ':99'
           CI: 'true'
+          CAULDRON_TEST_MODE: 'true'
+          TEST_API_URL: 'http://127.0.0.1:9245'
         run: |
           Xvfb :99 -screen 0 1920x1080x24 &
           sleep 2
 
           cd ${{ github.workspace }}
-          ./build/bin/cauldron > /tmp/cauldron-e2e.log 2>&1 &
+          CAULDRON_TEST_MODE=true ./build/bin/cauldron > /tmp/cauldron-e2e.log 2>&1 &
           APP_PID=$!
 
-          echo "Waiting for application..."
+          echo "Waiting for application frontend..."
           for i in {1..60}; do
             if curl -s http://localhost:4200 > /dev/null 2>&1; then
-              echo "Application is ready"
+              echo "Frontend is ready on port 4200"
               break
             fi
             if [ $i -eq 60 ]; then
-              echo "Timeout waiting for application"
+              echo "Timeout waiting for frontend"
+              cat /tmp/cauldron-e2e.log
+              exit 1
+            fi
+            sleep 1
+          done
+
+          echo "Waiting for TestAPI..."
+          for i in {1..60}; do
+            if curl -s http://127.0.0.1:9245/test/health > /dev/null 2>&1; then
+              echo "TestAPI is ready on port 9245"
+              break
+            fi
+            if [ $i -eq 60 ]; then
+              echo "Timeout waiting for TestAPI"
               cat /tmp/cauldron-e2e.log
               exit 1
             fi
