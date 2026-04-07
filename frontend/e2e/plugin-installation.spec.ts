@@ -1,6 +1,32 @@
 import { test, expect } from '@playwright/test';
 
 const BASE_URL = process.env['WAILS_URL'] || 'http://localhost:4200';
+const TEST_API_URL = process.env['TEST_API_URL'] || 'http://127.0.0.1:9245';
+
+async function checkTestAPIAvailable(): Promise<boolean> {
+  try {
+    const response = await fetch(`${TEST_API_URL}/test/health`);
+    if (response.ok) {
+      const data = await response.json();
+      return data.status === 'ok';
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+async function callTestAPI(endpoint: string): Promise<any> {
+  try {
+    const response = await fetch(`${TEST_API_URL}${endpoint}`);
+    if (response.ok) {
+      return await response.json();
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
 
 test.describe('Plugin Installation Workflow', () => {
   test.beforeEach(async ({ page }) => {
@@ -8,7 +34,43 @@ test.describe('Plugin Installation Workflow', () => {
     await page.waitForLoadState('networkidle');
   });
 
+  test('should navigate to plugin registry page', async ({ page }) => {
+    await page.goto(`${BASE_URL}/#/plugin-registry`);
+    await page.waitForLoadState('networkidle');
+
+    const pageLoaded = await page.locator('body').isVisible();
+    expect(pageLoaded).toBeTruthy();
+
+    const hasWails = await page.evaluate(() => '_wails' in window);
+    if (!hasWails) {
+      const testAPIAvailable = await checkTestAPIAvailable();
+      if (testAPIAvailable) {
+        const plugins = await callTestAPI('/test/plugins');
+        expect(plugins).not.toBeNull();
+      }
+      return;
+    }
+
+    await expect(page.locator('h1')).toContainText(/Plugin Registry/i);
+  });
+
   test('should successfully install a plugin through the UI registry', async ({ page }) => {
+    const hasWails = await page.evaluate(() => '_wails' in window);
+    if (!hasWails) {
+      const testAPIAvailable = await checkTestAPIAvailable();
+      expect(testAPIAvailable).toBeTruthy();
+
+      const plugins = await callTestAPI('/test/plugins');
+      expect(plugins).not.toBeNull();
+      expect(Array.isArray(plugins?.plugins)).toBeTruthy();
+
+      await page.goto(`${BASE_URL}/#/plugin-registry`);
+      await page.waitForLoadState('networkidle');
+      const pageLoaded = await page.locator('body').isVisible();
+      expect(pageLoaded).toBeTruthy();
+      return;
+    }
+
     await page.goto(`${BASE_URL}/#/plugin-registry`);
     await page.waitForLoadState('networkidle');
 

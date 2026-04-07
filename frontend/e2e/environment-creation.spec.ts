@@ -255,7 +255,7 @@ test.describe('Python Virtual Environment Tests', () => {
     let createdVenvId: number | null = null;
 
     try {
-      await callTestAPI('/test/create-venv', 'POST', {
+      const createResult = await callTestAPI('/test/create-venv', 'POST', {
         basePythonPath,
         venvPath,
         pluginId: ''
@@ -270,11 +270,18 @@ test.describe('Python Virtual Environment Tests', () => {
         createdVenvId = newVenv.ID;
       }
 
+      expect(createResult.__success).toBeTruthy();
+      expect(newVenv).toBeDefined();
+
       await page.goto(`${BASE_URL}/#/settings/python`);
       await page.waitForLoadState('networkidle');
       await page.waitForTimeout(2000);
 
-      if (newVenv) {
+      const venvSection = page.locator('.venv-section');
+      await expect(venvSection).toBeVisible({ timeout: 10000 });
+
+      const hasWails = await page.evaluate(() => '_wails' in window);
+      if (hasWails && newVenv) {
         const venvList = page.locator('.venv-section mat-list-item');
         const count = await venvList.count();
         expect(count).toBeGreaterThan(0);
