@@ -7,10 +7,15 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"sync"
+	"time"
 )
 
 type TestAPI struct {
-	app *App
+	app       *App
+	jsResults sync.Map
+	resultID  int64
+	mu        sync.Mutex
 }
 
 func NewTestAPI(app *App) *TestAPI {
@@ -25,6 +30,19 @@ func (t *TestAPI) Start(port int) {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/test/health", t.handleHealth)
+	mux.HandleFunc("/test/window", t.handleWindow)
+
+	mux.HandleFunc("/test/ui/navigate", t.handleUINavigate)
+	mux.HandleFunc("/test/ui/click", t.handleUIClick)
+	mux.HandleFunc("/test/ui/fill", t.handleUIFill)
+	mux.HandleFunc("/test/ui/select", t.handleUISelect)
+	mux.HandleFunc("/test/ui/element-exists", t.handleUIElementExists)
+	mux.HandleFunc("/test/ui/element-text", t.handleUIElementText)
+	mux.HandleFunc("/test/ui/element-count", t.handleUIElementCount)
+	mux.HandleFunc("/test/ui/url", t.handleUIGetURL)
+	mux.HandleFunc("/test/ui/exec-js", t.handleUIExecJS)
+	mux.HandleFunc("/test/ui/wait-for-element", t.handleUIWaitForElement)
+
 	mux.HandleFunc("/test/settings", t.handleSettings)
 	mux.HandleFunc("/test/python-environments", t.handlePythonEnvironments)
 	mux.HandleFunc("/test/r-environments", t.handleREnvironments)
@@ -51,19 +69,567 @@ func (t *TestAPI) Start(port int) {
 	}()
 }
 
+func (t *TestAPI) isInitialized() bool {
+	select {
+	case <-t.app.initialized:
+		return true
+	default:
+		return false
+	}
+}
+
 func (t *TestAPI) handleHealth(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"status": "ok",
 	})
 }
 
+func (t *TestAPI) handleWindow(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"mainWindow": t.app.mainWindow != nil,
+		"ready":      t.isInitialized(),
+	})
+}
+
+func (t *TestAPI) handleUINavigate(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	if r.Method == http.MethodOptions {
+		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if t.app.mainWindow == nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Main window not available",
+		})
+		return
+	}
+
+	var req struct {
+		Route string `json:"route"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	log.Printf("[TestAPI] Navigating to: %s", req.Route)
+
+	js := fmt.Sprintf(`window.location.hash = %q;`, req.Route)
+	t.app.mainWindow.ExecJS(js)
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+	})
+}
+
+func (t *TestAPI) handleUIClick(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	if r.Method == http.MethodOptions {
+		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if t.app.mainWindow == nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Main window not available",
+		})
+		return
+	}
+
+	var req struct {
+		Selector string `json:"selector"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	log.Printf("[TestAPI] Clicking element: %s", req.Selector)
+
+	js := fmt.Sprintf(`
+		(function() {
+			const el = document.querySelector(%q);
+			if (el) {
+				el.click();
+				return true;
+			}
+			return false;
+		})()
+	`, req.Selector)
+	t.app.mainWindow.ExecJS(js)
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+	})
+}
+
+func (t *TestAPI) handleUIFill(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	if r.Method == http.MethodOptions {
+		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if t.app.mainWindow == nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Main window not available",
+		})
+		return
+	}
+
+	var req struct {
+		Selector string `json:"selector"`
+		Value    string `json:"value"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	log.Printf("[TestAPI] Filling element %s with value: %s", req.Selector, req.Value)
+
+	js := fmt.Sprintf(`
+		(function() {
+			const input = document.querySelector(%q);
+			if (!input) return false;
+
+			const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+				window.HTMLInputElement.prototype, 'value'
+			).set;
+			nativeInputValueSetter.call(input, %q);
+
+			input.dispatchEvent(new Event('input', { bubbles: true }));
+			input.dispatchEvent(new Event('change', { bubbles: true }));
+			return true;
+		})()
+	`, req.Selector, req.Value)
+	t.app.mainWindow.ExecJS(js)
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+	})
+}
+
+func (t *TestAPI) handleUISelect(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	if r.Method == http.MethodOptions {
+		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if t.app.mainWindow == nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Main window not available",
+		})
+		return
+	}
+
+	var req struct {
+		Selector string `json:"selector"`
+		Value    string `json:"value"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	log.Printf("[TestAPI] Selecting option %s in %s", req.Value, req.Selector)
+
+	js := fmt.Sprintf(`
+		(function() {
+			const select = document.querySelector(%q);
+			if (!select) return false;
+
+			select.value = %q;
+			select.dispatchEvent(new Event('change', { bubbles: true }));
+			return true;
+		})()
+	`, req.Selector, req.Value)
+	t.app.mainWindow.ExecJS(js)
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+	})
+}
+
+func (t *TestAPI) handleUIElementExists(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	if r.Method == http.MethodOptions {
+		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if t.app.mainWindow == nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"exists": false,
+			"error":  "Main window not available",
+		})
+		return
+	}
+
+	var req struct {
+		Selector string `json:"selector"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	resultKey := t.getNextResultID()
+
+	js := fmt.Sprintf(`
+		(function() {
+			const exists = document.querySelector(%q) !== null;
+			if (window.__testAPIResults === undefined) {
+				window.__testAPIResults = {};
+			}
+			window.__testAPIResults[%q] = { exists: exists };
+		})()
+	`, req.Selector, resultKey)
+	t.app.mainWindow.ExecJS(js)
+
+	time.Sleep(100 * time.Millisecond)
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success":   true,
+		"resultKey": resultKey,
+	})
+}
+
+func (t *TestAPI) handleUIElementText(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	if r.Method == http.MethodOptions {
+		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if t.app.mainWindow == nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"text":  "",
+			"error": "Main window not available",
+		})
+		return
+	}
+
+	var req struct {
+		Selector string `json:"selector"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	resultKey := t.getNextResultID()
+
+	js := fmt.Sprintf(`
+		(function() {
+			const el = document.querySelector(%q);
+			const text = el ? el.textContent : '';
+			if (window.__testAPIResults === undefined) {
+				window.__testAPIResults = {};
+			}
+			window.__testAPIResults[%q] = { text: text };
+		})()
+	`, req.Selector, resultKey)
+	t.app.mainWindow.ExecJS(js)
+
+	time.Sleep(100 * time.Millisecond)
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success":   true,
+		"resultKey": resultKey,
+	})
+}
+
+func (t *TestAPI) handleUIElementCount(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	if r.Method == http.MethodOptions {
+		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if t.app.mainWindow == nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"count": 0,
+			"error": "Main window not available",
+		})
+		return
+	}
+
+	var req struct {
+		Selector string `json:"selector"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	resultKey := t.getNextResultID()
+
+	js := fmt.Sprintf(`
+		(function() {
+			const elements = document.querySelectorAll(%q);
+			if (window.__testAPIResults === undefined) {
+				window.__testAPIResults = {};
+			}
+			window.__testAPIResults[%q] = { count: elements.length };
+		})()
+	`, req.Selector, resultKey)
+	t.app.mainWindow.ExecJS(js)
+
+	time.Sleep(100 * time.Millisecond)
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success":   true,
+		"resultKey": resultKey,
+	})
+}
+
+func (t *TestAPI) handleUIGetURL(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	if t.app.mainWindow == nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"url":   "",
+			"hash":  "",
+			"error": "Main window not available",
+		})
+		return
+	}
+
+	resultKey := t.getNextResultID()
+
+	js := fmt.Sprintf(`
+		(function() {
+			if (window.__testAPIResults === undefined) {
+				window.__testAPIResults = {};
+			}
+			window.__testAPIResults[%q] = {
+				url: window.location.href,
+				hash: window.location.hash
+			};
+		})()
+	`, resultKey)
+	t.app.mainWindow.ExecJS(js)
+
+	time.Sleep(100 * time.Millisecond)
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success":   true,
+		"resultKey": resultKey,
+	})
+}
+
+func (t *TestAPI) handleUIExecJS(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	if r.Method == http.MethodOptions {
+		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if t.app.mainWindow == nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Main window not available",
+		})
+		return
+	}
+
+	var req struct {
+		Script string `json:"script"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	log.Printf("[TestAPI] Executing JS: %s", req.Script)
+	t.app.mainWindow.ExecJS(req.Script)
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+	})
+}
+
+func (t *TestAPI) handleUIWaitForElement(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	if r.Method == http.MethodOptions {
+		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if t.app.mainWindow == nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"found": false,
+			"error": "Main window not available",
+		})
+		return
+	}
+
+	var req struct {
+		Selector string `json:"selector"`
+		Timeout  int    `json:"timeout"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if req.Timeout <= 0 {
+		req.Timeout = 30000
+	}
+
+	log.Printf("[TestAPI] Waiting for element: %s (timeout: %dms)", req.Selector, req.Timeout)
+
+	resultKey := t.getNextResultID()
+
+	js := fmt.Sprintf(`
+		(function() {
+			if (window.__testAPIResults === undefined) {
+				window.__testAPIResults = {};
+			}
+
+			const startTime = Date.now();
+			const timeout = %d;
+			const selector = %q;
+			const resultKey = %q;
+
+			function check() {
+				const el = document.querySelector(selector);
+				if (el) {
+					window.__testAPIResults[resultKey] = { found: true };
+					return;
+				}
+				if (Date.now() - startTime < timeout) {
+					requestAnimationFrame(check);
+				} else {
+					window.__testAPIResults[resultKey] = { found: false };
+				}
+			}
+			check();
+		})()
+	`, req.Timeout, req.Selector, resultKey)
+	t.app.mainWindow.ExecJS(js)
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success":   true,
+		"resultKey": resultKey,
+	})
+}
+
+func (t *TestAPI) getNextResultID() string {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.resultID++
+	return fmt.Sprintf("result_%d", t.resultID)
+}
+
 func (t *TestAPI) handleSettings(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
 
-	select {
-	case <-t.app.initialized:
-	default:
+	if !t.isInitialized() {
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"error": "App not initialized yet",
 		})
@@ -76,10 +642,9 @@ func (t *TestAPI) handleSettings(w http.ResponseWriter, r *http.Request) {
 
 func (t *TestAPI) handlePythonEnvironments(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
 
-	select {
-	case <-t.app.initialized:
-	default:
+	if !t.isInitialized() {
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"environments": []interface{}{},
 			"error":        "App not initialized yet",
@@ -104,10 +669,9 @@ func (t *TestAPI) handlePythonEnvironments(w http.ResponseWriter, r *http.Reques
 
 func (t *TestAPI) handleREnvironments(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
 
-	select {
-	case <-t.app.initialized:
-	default:
+	if !t.isInitialized() {
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"environments": []interface{}{},
 			"error":        "App not initialized yet",
@@ -132,10 +696,9 @@ func (t *TestAPI) handleREnvironments(w http.ResponseWriter, r *http.Request) {
 
 func (t *TestAPI) handleVirtualEnvironments(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
 
-	select {
-	case <-t.app.initialized:
-	default:
+	if !t.isInitialized() {
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"environments": []interface{}{},
 			"error":        "App not initialized yet",
@@ -159,15 +722,23 @@ func (t *TestAPI) handleVirtualEnvironments(w http.ResponseWriter, r *http.Reque
 }
 
 func (t *TestAPI) handleCreateVenv(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	if r.Method == http.MethodOptions {
+		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	select {
-	case <-t.app.initialized:
-	default:
-		w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type", "application/json")
+
+	if !t.isInitialized() {
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"success": false,
 			"error":   "App not initialized yet",
@@ -190,7 +761,6 @@ func (t *TestAPI) handleCreateVenv(w http.ResponseWriter, r *http.Request) {
 
 	err := t.app.CreatePythonVirtualEnv(req.BasePythonPath, req.VenvPath, req.PluginID)
 
-	w.Header().Set("Content-Type", "application/json")
 	if err != nil {
 		log.Printf("[TestAPI] Create venv error: %v", err)
 		json.NewEncoder(w).Encode(map[string]interface{}{
@@ -207,15 +777,23 @@ func (t *TestAPI) handleCreateVenv(w http.ResponseWriter, r *http.Request) {
 }
 
 func (t *TestAPI) handleDeleteVenv(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	if r.Method == http.MethodOptions {
+		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	select {
-	case <-t.app.initialized:
-	default:
-		w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type", "application/json")
+
+	if !t.isInitialized() {
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"success": false,
 			"error":   "App not initialized yet",
@@ -236,7 +814,6 @@ func (t *TestAPI) handleDeleteVenv(w http.ResponseWriter, r *http.Request) {
 
 	err := t.app.DeleteVirtualEnvironment(req.ID)
 
-	w.Header().Set("Content-Type", "application/json")
 	if err != nil {
 		log.Printf("[TestAPI] Delete venv error: %v", err)
 		json.NewEncoder(w).Encode(map[string]interface{}{
@@ -254,10 +831,9 @@ func (t *TestAPI) handleDeleteVenv(w http.ResponseWriter, r *http.Request) {
 
 func (t *TestAPI) handleRenvEnvironments(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
 
-	select {
-	case <-t.app.initialized:
-	default:
+	if !t.isInitialized() {
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"environments": []interface{}{},
 			"error":        "App not initialized yet",
@@ -281,15 +857,23 @@ func (t *TestAPI) handleRenvEnvironments(w http.ResponseWriter, r *http.Request)
 }
 
 func (t *TestAPI) handleCreateRenv(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	if r.Method == http.MethodOptions {
+		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	select {
-	case <-t.app.initialized:
-	default:
-		w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type", "application/json")
+
+	if !t.isInitialized() {
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"success": false,
 			"error":   "App not initialized yet",
@@ -313,7 +897,6 @@ func (t *TestAPI) handleCreateRenv(w http.ResponseWriter, r *http.Request) {
 
 	err := t.app.CreateRenvEnvironment(req.Name, req.Packages, req.PluginID, req.UseCache)
 
-	w.Header().Set("Content-Type", "application/json")
 	if err != nil {
 		log.Printf("[TestAPI] Create renv error: %v", err)
 		json.NewEncoder(w).Encode(map[string]interface{}{
@@ -330,15 +913,23 @@ func (t *TestAPI) handleCreateRenv(w http.ResponseWriter, r *http.Request) {
 }
 
 func (t *TestAPI) handleDeleteRenv(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	if r.Method == http.MethodOptions {
+		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	select {
-	case <-t.app.initialized:
-	default:
-		w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type", "application/json")
+
+	if !t.isInitialized() {
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"success": false,
 			"error":   "App not initialized yet",
@@ -359,7 +950,6 @@ func (t *TestAPI) handleDeleteRenv(w http.ResponseWriter, r *http.Request) {
 
 	err := t.app.DeleteRenvEnvironment(req.ID)
 
-	w.Header().Set("Content-Type", "application/json")
 	if err != nil {
 		log.Printf("[TestAPI] Delete renv error: %v", err)
 		json.NewEncoder(w).Encode(map[string]interface{}{
@@ -377,10 +967,9 @@ func (t *TestAPI) handleDeleteRenv(w http.ResponseWriter, r *http.Request) {
 
 func (t *TestAPI) handlePlugins(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
 
-	select {
-	case <-t.app.initialized:
-	default:
+	if !t.isInitialized() {
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"plugins": []interface{}{},
 			"error":   "App not initialized yet",
@@ -397,10 +986,9 @@ func (t *TestAPI) handlePlugins(w http.ResponseWriter, r *http.Request) {
 
 func (t *TestAPI) handlePluginBindings(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
 
-	select {
-	case <-t.app.initialized:
-	default:
+	if !t.isInitialized() {
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"bindings": []interface{}{},
 			"error":    "App not initialized yet",
@@ -424,15 +1012,23 @@ func (t *TestAPI) handlePluginBindings(w http.ResponseWriter, r *http.Request) {
 }
 
 func (t *TestAPI) handleBindPluginEnvironment(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	if r.Method == http.MethodOptions {
+		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	select {
-	case <-t.app.initialized:
-	default:
-		w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type", "application/json")
+
+	if !t.isInitialized() {
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"success": false,
 			"error":   "App not initialized yet",
@@ -456,7 +1052,6 @@ func (t *TestAPI) handleBindPluginEnvironment(w http.ResponseWriter, r *http.Req
 
 	err := t.app.BindPluginToEnvironment(req.PluginID, req.EnvType, req.EnvID, req.EnvPath)
 
-	w.Header().Set("Content-Type", "application/json")
 	if err != nil {
 		log.Printf("[TestAPI] Bind plugin error: %v", err)
 		json.NewEncoder(w).Encode(map[string]interface{}{
@@ -474,10 +1069,9 @@ func (t *TestAPI) handleBindPluginEnvironment(w http.ResponseWriter, r *http.Req
 
 func (t *TestAPI) handleJobs(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
 
-	select {
-	case <-t.app.initialized:
-	default:
+	if !t.isInitialized() {
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"jobs":  []interface{}{},
 			"error": "App not initialized yet",
@@ -494,10 +1088,9 @@ func (t *TestAPI) handleJobs(w http.ResponseWriter, r *http.Request) {
 
 func (t *TestAPI) handleImportedFiles(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
 
-	select {
-	case <-t.app.initialized:
-	default:
+	if !t.isInitialized() {
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"files": []interface{}{},
 			"error": "App not initialized yet",
@@ -522,10 +1115,9 @@ func (t *TestAPI) handleImportedFiles(w http.ResponseWriter, r *http.Request) {
 
 func (t *TestAPI) handleDefaultVenvPath(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
 
-	select {
-	case <-t.app.initialized:
-	default:
+	if !t.isInitialized() {
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"path":  "",
 			"error": "App not initialized yet",

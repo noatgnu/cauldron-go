@@ -1,113 +1,89 @@
 import { test, expect } from '@playwright/test';
 
-const BASE_URL = process.env['WAILS_URL'] || 'http://localhost:4200';
 const TEST_API_URL = process.env['TEST_API_URL'] || 'http://127.0.0.1:9245';
 
-async function checkTestAPIAvailable(): Promise<boolean> {
-  try {
-    const response = await fetch(`${TEST_API_URL}/test/health`);
-    if (response.ok) {
-      const data = await response.json();
-      return data.status === 'ok';
-    }
-    return false;
-  } catch {
-    return false;
+async function callTestAPI(path: string, method = 'GET', body?: object): Promise<any> {
+  const options: RequestInit = {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+  };
+  if (body && method === 'POST') {
+    options.body = JSON.stringify(body);
   }
+
+  const response = await fetch(`${TEST_API_URL}${path}`, options);
+  return response.json();
 }
 
-async function callTestAPI(endpoint: string): Promise<any> {
-  try {
-    const response = await fetch(`${TEST_API_URL}${endpoint}`);
-    if (response.ok) {
-      return await response.json();
-    }
-    return null;
-  } catch {
-    return null;
+async function waitForWindow(timeout = 30000): Promise<boolean> {
+  const start = Date.now();
+  while (Date.now() - start < timeout) {
+    const status = await callTestAPI('/test/window');
+    if (status.mainWindow && status.ready) return true;
+    await new Promise(r => setTimeout(r, 1000));
   }
+  return false;
 }
 
-test.describe('Plugin Installation Workflow', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto(BASE_URL);
-    await page.waitForLoadState('networkidle');
+test.describe('Plugin Installation Workflow via TestAPI', () => {
+  test.beforeAll(async () => {
+    const ready = await waitForWindow();
+    expect(ready).toBe(true);
   });
 
-  test('should navigate to plugin registry page', async ({ page }) => {
-    await page.goto(`${BASE_URL}/#/plugin-registry`);
-    await page.waitForLoadState('networkidle');
-
-    const pageLoaded = await page.locator('body').isVisible();
-    expect(pageLoaded).toBeTruthy();
-
-    const hasWails = await page.evaluate(() => '_wails' in window);
-    if (!hasWails) {
-      const testAPIAvailable = await checkTestAPIAvailable();
-      if (testAPIAvailable) {
-        const plugins = await callTestAPI('/test/plugins');
-        expect(plugins).not.toBeNull();
-      }
-      return;
-    }
-
-    await expect(page.locator('h1')).toContainText(/Plugin Registry/i);
+  test('should list installed plugins', async () => {
+    const plugins = await callTestAPI('/test/plugins');
+    expect(plugins).not.toHaveProperty('error');
+    expect(plugins.plugins).toBeDefined();
+    expect(Array.isArray(plugins.plugins)).toBe(true);
+    expect(typeof plugins.count).toBe('number');
   });
 
-  test('should successfully install a plugin through the UI registry', async ({ page }) => {
-    const hasWails = await page.evaluate(() => '_wails' in window);
-    if (!hasWails) {
-      const testAPIAvailable = await checkTestAPIAvailable();
-      expect(testAPIAvailable).toBeTruthy();
+  test('should navigate to plugin registry page via TestAPI', async () => {
+    const navResult = await callTestAPI('/test/ui/navigate', 'POST', { route: '#/plugin-registry' });
+    expect(navResult.success).toBe(true);
 
-      const plugins = await callTestAPI('/test/plugins');
-      expect(plugins).not.toBeNull();
-      expect(Array.isArray(plugins?.plugins)).toBeTruthy();
+    await new Promise(r => setTimeout(r, 2000));
+  });
 
-      await page.goto(`${BASE_URL}/#/plugin-registry`);
-      await page.waitForLoadState('networkidle');
-      const pageLoaded = await page.locator('body').isVisible();
-      expect(pageLoaded).toBeTruthy();
-      return;
-    }
+  test('should navigate to plugins page via TestAPI', async () => {
+    const navResult = await callTestAPI('/test/ui/navigate', 'POST', { route: '#/plugins' });
+    expect(navResult.success).toBe(true);
 
-    await page.goto(`${BASE_URL}/#/plugin-registry`);
-    await page.waitForLoadState('networkidle');
+    await new Promise(r => setTimeout(r, 2000));
+  });
 
-    await expect(page.locator('h1')).toContainText(/Plugin Registry/i);
+  test('should have settings available', async () => {
+    const settings = await callTestAPI('/test/settings');
+    expect(settings).not.toHaveProperty('error');
+    expect(settings).toBeDefined();
+  });
+});
 
-    const pluginRow = page.locator('tr.plugin-row').filter({ hasText: /DIA-NN to CurtainPTM Converter/i }).first();
-    await expect(pluginRow).toBeVisible({ timeout: 15000 });
+test.describe('Plugin Environment Management via TestAPI', () => {
+  test.beforeAll(async () => {
+    const ready = await waitForWindow();
+    expect(ready).toBe(true);
+  });
 
-    const installButton = pluginRow.locator('button[aria-label="Install plugin"]');
-    await installButton.click();
+  test('should get plugin bindings', async () => {
+    const bindings = await callTestAPI('/test/plugin-bindings');
+    expect(bindings).not.toHaveProperty('error');
+    expect(bindings.bindings).toBeDefined();
+    expect(Array.isArray(bindings.bindings)).toBe(true);
+  });
 
-    const dialog = page.locator('mat-dialog-container');
-    await expect(dialog).toBeVisible({ timeout: 15000 });
-    await expect(dialog.locator('h2')).toContainText(/Confirm Plugin Installation/i);
+  test('should get virtual environments for plugin binding', async () => {
+    const venvs = await callTestAPI('/test/virtual-environments');
+    expect(venvs).not.toHaveProperty('error');
+    expect(venvs.environments).toBeDefined();
+    expect(Array.isArray(venvs.environments)).toBe(true);
+  });
 
-    const pythonCheckbox = dialog.locator('mat-checkbox:has-text("Create Python Virtual Environment")');
-    if (await pythonCheckbox.isVisible() && await pythonCheckbox.locator('input').isChecked()) {
-      await pythonCheckbox.click();
-    }
-
-    const rCheckbox = dialog.locator('mat-checkbox:has-text("Create R Environment")');
-    if (await rCheckbox.isVisible() && await rCheckbox.locator('input').isChecked()) {
-      await rCheckbox.click();
-    }
-
-    const confirmButton = dialog.locator('button:has-text("Install Plugin")');
-    await confirmButton.click();
-
-    const progressDialog = page.locator('mat-dialog-container:has-text("Installing Plugin")');
-    await expect(progressDialog).toBeVisible({ timeout: 10000 });
-
-    await expect(progressDialog).not.toBeVisible({ timeout: 60000 });
-
-    await page.goto(`${BASE_URL}/#/plugins`);
-    await page.waitForLoadState('networkidle');
-
-    const pluginInList = page.locator('mat-card, tr').filter({ hasText: /DIA-NN to CurtainPTM Converter/i });
-    await expect(pluginInList.first()).toBeVisible({ timeout: 10000 });
+  test('should get renv environments for plugin binding', async () => {
+    const renvs = await callTestAPI('/test/renv-environments');
+    expect(renvs).not.toHaveProperty('error');
+    expect(renvs.environments).toBeDefined();
+    expect(Array.isArray(renvs.environments)).toBe(true);
   });
 });

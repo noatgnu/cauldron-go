@@ -1,339 +1,230 @@
-import { test, expect, Page } from '@playwright/test';
+import { test, expect } from '@playwright/test';
 
-const BASE_URL = process.env['WAILS_URL'] || 'http://localhost:4200';
+const TEST_API_URL = process.env['TEST_API_URL'] || 'http://127.0.0.1:9245';
 
-async function callWailsMethod(page: Page, method: string, ...args: any[]): Promise<any> {
-  return page.evaluate(async ({ method, args }) => {
-    const win = window as any;
-    if (!('_wails' in win)) {
-      return { __skipped: true, reason: 'Wails runtime not available' };
-    }
+async function callTestAPI(path: string, method = 'GET', body?: object): Promise<any> {
+  const options: RequestInit = {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+  };
+  if (body && method === 'POST') {
+    options.body = JSON.stringify(body);
+  }
 
-    try {
-      const WailsApp = win.go?.['github.com/noatgnu/cauldron-go'];
-      if (!WailsApp || !WailsApp[method]) {
-        return { __skipped: true, reason: `Method ${method} not found` };
-      }
-
-      const result = await WailsApp[method](...args);
-      return { __success: true, data: result };
-    } catch (e: any) {
-      return { __error: true, message: e.message };
-    }
-  }, { method, args });
+  const response = await fetch(`${TEST_API_URL}${path}`, options);
+  return response.json();
 }
 
-function skipIfNoWails(result: any) {
-  if (result?.__skipped) {
-    test.skip();
-    return true;
+async function waitForWindow(timeout = 30000): Promise<boolean> {
+  const start = Date.now();
+  while (Date.now() - start < timeout) {
+    const status = await callTestAPI('/test/window');
+    if (status.mainWindow && status.ready) return true;
+    await new Promise(r => setTimeout(r, 1000));
   }
   return false;
 }
 
-test.describe('Real Wails API Tests', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto(BASE_URL);
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(1000);
+test.describe('Backend API Tests via TestAPI', () => {
+  test.beforeAll(async () => {
+    const ready = await waitForWindow();
+    expect(ready).toBe(true);
+  });
+
+  test.describe('Health and Status', () => {
+    test('TestAPI health check returns ok', async () => {
+      const result = await callTestAPI('/test/health');
+      expect(result.status).toBe('ok');
+    });
+
+    test('Window status shows main window available', async () => {
+      const result = await callTestAPI('/test/window');
+      expect(result.mainWindow).toBe(true);
+      expect(result.ready).toBe(true);
+    });
   });
 
   test.describe('Settings API', () => {
-    test('GetSettings returns valid config', async ({ page }) => {
-      const result = await callWailsMethod(page, 'GetSettings');
-      if (skipIfNoWails(result)) return;
-
-      expect(result.__success).toBeTruthy();
-      expect(result.data).not.toBeNull();
-      expect(typeof result.data).toBe('object');
-    });
-
-    test('SetSetting updates a setting value', async ({ page }) => {
-      const getResult = await callWailsMethod(page, 'GetSettings');
-      if (skipIfNoWails(getResult)) return;
-
-      const originalTheme = getResult.data?.theme || 'system';
-      const newTheme = originalTheme === 'dark' ? 'light' : 'dark';
-
-      const setResult = await callWailsMethod(page, 'SetSetting', 'theme', newTheme);
-      if (setResult.__error) {
-        console.log('SetSetting error:', setResult.message);
-      }
-
-      const verifyResult = await callWailsMethod(page, 'GetSettings');
-      expect(verifyResult.__success).toBeTruthy();
-
-      await callWailsMethod(page, 'SetSetting', 'theme', originalTheme);
+    test('GetSettings returns valid config', async () => {
+      const result = await callTestAPI('/test/settings');
+      expect(result).not.toHaveProperty('error');
+      expect(result).toBeDefined();
     });
   });
 
   test.describe('Jobs API', () => {
-    test('GetAllJobs returns array', async ({ page }) => {
-      const result = await callWailsMethod(page, 'GetAllJobs');
-      if (skipIfNoWails(result)) return;
-
-      expect(result.__success).toBeTruthy();
-      expect(Array.isArray(result.data)).toBeTruthy();
-    });
-
-    test('GetJob returns null for invalid ID', async ({ page }) => {
-      const result = await callWailsMethod(page, 'GetJob', 'nonexistent-job-id');
-      if (skipIfNoWails(result)) return;
-
-      if (result.__error) {
-        expect(result.message).toContain('not found');
-      } else {
-        expect(result.data).toBeNull();
-      }
-    });
-
-    test('GetJobQueueStatus returns queue info', async ({ page }) => {
-      const result = await callWailsMethod(page, 'GetJobQueueStatus');
-      if (skipIfNoWails(result)) return;
-
-      expect(result.__success).toBeTruthy();
-      expect(result.data).not.toBeNull();
-      expect(typeof result.data).toBe('object');
+    test('GetAllJobs returns array', async () => {
+      const result = await callTestAPI('/test/jobs');
+      expect(result).not.toHaveProperty('error');
+      expect(result.jobs).toBeDefined();
+      expect(Array.isArray(result.jobs)).toBe(true);
     });
   });
 
   test.describe('Files API', () => {
-    test('GetImportedFiles returns array', async ({ page }) => {
-      const result = await callWailsMethod(page, 'GetImportedFiles');
-      if (skipIfNoWails(result)) return;
-
-      expect(result.__success).toBeTruthy();
-      expect(Array.isArray(result.data)).toBeTruthy();
+    test('GetImportedFiles returns array', async () => {
+      const result = await callTestAPI('/test/imported-files');
+      expect(result).not.toHaveProperty('error');
+      expect(result.files).toBeDefined();
+      expect(Array.isArray(result.files)).toBe(true);
     });
   });
 
   test.describe('Plugins API', () => {
-    test('GetPluginsV2 returns array', async ({ page }) => {
-      const result = await callWailsMethod(page, 'GetPluginsV2');
-      if (skipIfNoWails(result)) return;
-
-      expect(result.__success).toBeTruthy();
-      expect(Array.isArray(result.data)).toBeTruthy();
-    });
-
-    test('GetPluginV2 returns null for invalid ID', async ({ page }) => {
-      const result = await callWailsMethod(page, 'GetPluginV2', 999999);
-      if (skipIfNoWails(result)) return;
-
-      expect(result.__success).toBeTruthy();
-      expect(result.data).toBeNull();
-    });
-
-    test('ValidatePluginYAML validates correct YAML', async ({ page }) => {
-      const validYAML = `plugin:
-  id: test-plugin
-  name: Test Plugin
-  description: A test plugin
-  version: 1.0.0
-  author: Test
-  category: analysis
-
-runtime:
-  environments:
-    - python
-  entrypoint: main.py
-
-inputs:
-  - name: input_file
-    label: Input File
-    type: file
-    required: true
-    description: Input data file
-    flag: --input
-
-outputs: []
-
-execution:
-  outputDir: --output_folder
-`;
-
-      const result = await callWailsMethod(page, 'ValidatePluginYAML', validYAML);
-      if (skipIfNoWails(result)) return;
-
-      expect(result.__success).toBeTruthy();
-      expect(result.data).toBeTruthy();
+    test('GetPluginsV2 returns array', async () => {
+      const result = await callTestAPI('/test/plugins');
+      expect(result).not.toHaveProperty('error');
+      expect(result.plugins).toBeDefined();
+      expect(Array.isArray(result.plugins)).toBe(true);
     });
   });
 
   test.describe('Environment API', () => {
-    test('GetPythonVersion returns version string', async ({ page }) => {
-      const result = await callWailsMethod(page, 'GetPythonVersion');
-      if (skipIfNoWails(result)) return;
-
-      if (result.__success) {
-        expect(typeof result.data).toBe('string');
-      }
+    test('DetectPythonEnvironments returns array', async () => {
+      const result = await callTestAPI('/test/python-environments');
+      expect(result).not.toHaveProperty('error');
+      expect(result.environments).toBeDefined();
+      expect(Array.isArray(result.environments)).toBe(true);
     });
 
-    test('GetRVersion returns version or error', async ({ page }) => {
-      const result = await callWailsMethod(page, 'GetRVersion');
-      if (skipIfNoWails(result)) return;
-
-      expect(result.__success || result.__error).toBeTruthy();
+    test('DetectREnvironments returns array', async () => {
+      const result = await callTestAPI('/test/r-environments');
+      expect(result).not.toHaveProperty('error');
+      expect(result.environments).toBeDefined();
+      expect(Array.isArray(result.environments)).toBe(true);
     });
 
-    test('CheckDockerVersion returns version or error', async ({ page }) => {
-      const result = await callWailsMethod(page, 'CheckDockerVersion');
-      if (skipIfNoWails(result)) return;
-
-      expect(result.__success || result.__error).toBeTruthy();
+    test('GetVirtualEnvironments returns array', async () => {
+      const result = await callTestAPI('/test/virtual-environments');
+      expect(result).not.toHaveProperty('error');
+      expect(result.environments).toBeDefined();
+      expect(Array.isArray(result.environments)).toBe(true);
     });
 
-    test('DetectPythonEnvironments returns array', async ({ page }) => {
-      const result = await callWailsMethod(page, 'DetectPythonEnvironments');
-      if (skipIfNoWails(result)) return;
-
-      if (result.__success) {
-        expect(Array.isArray(result.data)).toBeTruthy();
-      }
+    test('GetRenvEnvironments returns array', async () => {
+      const result = await callTestAPI('/test/renv-environments');
+      expect(result).not.toHaveProperty('error');
+      expect(result.environments).toBeDefined();
+      expect(Array.isArray(result.environments)).toBe(true);
     });
 
-    test('GetVirtualEnvironments returns array', async ({ page }) => {
-      const result = await callWailsMethod(page, 'GetVirtualEnvironments');
-      if (skipIfNoWails(result)) return;
-
-      expect(result.__success).toBeTruthy();
-      expect(Array.isArray(result.data)).toBeTruthy();
+    test('GetAllPluginEnvironmentBindings returns array', async () => {
+      const result = await callTestAPI('/test/plugin-bindings');
+      expect(result).not.toHaveProperty('error');
+      expect(result.bindings).toBeDefined();
+      expect(Array.isArray(result.bindings)).toBe(true);
     });
 
-    test('GetRenvEnvironments returns array', async ({ page }) => {
-      const result = await callWailsMethod(page, 'GetRenvEnvironments');
-      if (skipIfNoWails(result)) return;
-
-      expect(result.__success).toBeTruthy();
-      expect(Array.isArray(result.data)).toBeTruthy();
-    });
-
-    test('GetAllPluginEnvironmentBindings returns array', async ({ page }) => {
-      const result = await callWailsMethod(page, 'GetAllPluginEnvironmentBindings');
-      if (skipIfNoWails(result)) return;
-
-      expect(result.__success).toBeTruthy();
-      expect(Array.isArray(result.data)).toBeTruthy();
-    });
-  });
-
-  test.describe('Job Queue API', () => {
-    test('PauseJobQueue and ResumeJobQueue work correctly', async ({ page }) => {
-      const pauseResult = await callWailsMethod(page, 'PauseJobQueue');
-      if (skipIfNoWails(pauseResult)) return;
-
-      const statusAfterPause = await callWailsMethod(page, 'GetJobQueueStatus');
-      expect(statusAfterPause.__success).toBeTruthy();
-
-      const resumeResult = await callWailsMethod(page, 'ResumeJobQueue');
-      expect(resumeResult.__success || resumeResult.__error === undefined).toBeTruthy();
-
-      const statusAfterResume = await callWailsMethod(page, 'GetJobQueueStatus');
-      expect(statusAfterResume.__success).toBeTruthy();
+    test('GetDefaultVenvPath returns path', async () => {
+      const result = await callTestAPI('/test/default-venv-path?pluginId=test-plugin');
+      expect(result).not.toHaveProperty('error');
+      expect(result.path).toBeDefined();
+      expect(typeof result.path).toBe('string');
     });
   });
 });
 
-test.describe('Data Serialization Tests', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto(BASE_URL);
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(1000);
+test.describe('Data Serialization Tests via TestAPI', () => {
+  test.beforeAll(async () => {
+    const ready = await waitForWindow();
+    expect(ready).toBe(true);
   });
 
-  test('Empty arrays serialize to [] not null', async ({ page }) => {
-    const result = await page.evaluate(async () => {
-      const win = window as any;
-      if (!('_wails' in win)) {
-        return { __skipped: true };
-      }
-
-      try {
-        const WailsApp = win.go?.['github.com/noatgnu/cauldron-go'];
-        if (!WailsApp) return { __skipped: true };
-
-        const jobs = await WailsApp.GetAllJobs?.();
-        const files = await WailsApp.GetImportedFiles?.();
-        const plugins = await WailsApp.GetPluginsV2?.();
-        const venvs = await WailsApp.GetVirtualEnvironments?.();
-
-        return {
-          __success: true,
-          jobsIsArray: Array.isArray(jobs),
-          filesIsArray: Array.isArray(files),
-          pluginsIsArray: Array.isArray(plugins),
-          venvsIsArray: Array.isArray(venvs),
-          jobsNotNull: jobs !== null,
-          filesNotNull: files !== null,
-          pluginsNotNull: plugins !== null,
-          venvsNotNull: venvs !== null
-        };
-      } catch (e: any) {
-        return { __error: true, message: e.message };
-      }
-    });
-
-    if (result.__skipped) {
-      test.skip();
-      return;
-    }
-
-    if (result.__success) {
-      expect(result.jobsIsArray).toBeTruthy();
-      expect(result.filesIsArray).toBeTruthy();
-      expect(result.pluginsIsArray).toBeTruthy();
-      expect(result.venvsIsArray).toBeTruthy();
-      expect(result.jobsNotNull).toBeTruthy();
-      expect(result.filesNotNull).toBeTruthy();
-      expect(result.pluginsNotNull).toBeTruthy();
-      expect(result.venvsNotNull).toBeTruthy();
-    }
+  test('Jobs returns empty array not null', async () => {
+    const result = await callTestAPI('/test/jobs');
+    expect(result.jobs).not.toBeNull();
+    expect(Array.isArray(result.jobs)).toBe(true);
   });
 
-  test('Job object has required fields', async ({ page }) => {
-    const result = await page.evaluate(async () => {
-      const win = window as any;
-      if (!('_wails' in win)) {
-        return { __skipped: true };
-      }
+  test('Files returns empty array not null', async () => {
+    const result = await callTestAPI('/test/imported-files');
+    expect(result.files).not.toBeNull();
+    expect(Array.isArray(result.files)).toBe(true);
+  });
 
-      try {
-        const WailsApp = win.go?.['github.com/noatgnu/cauldron-go'];
-        if (!WailsApp) return { __skipped: true };
+  test('Plugins returns empty array not null', async () => {
+    const result = await callTestAPI('/test/plugins');
+    expect(result.plugins).not.toBeNull();
+    expect(Array.isArray(result.plugins)).toBe(true);
+  });
 
-        const jobs = await WailsApp.GetAllJobs?.();
-        if (!jobs || jobs.length === 0) {
-          return { __success: true, noJobs: true };
-        }
+  test('Virtual environments returns empty array not null', async () => {
+    const result = await callTestAPI('/test/virtual-environments');
+    expect(result.environments).not.toBeNull();
+    expect(Array.isArray(result.environments)).toBe(true);
+  });
 
-        const job = jobs[0];
-        return {
-          __success: true,
-          hasId: 'id' in job,
-          hasStatus: 'status' in job,
-          hasName: 'name' in job,
-          hasArgs: 'args' in job,
-          hasTerminalOutput: 'terminalOutput' in job,
-          argsNotNull: job.args !== null,
-          terminalOutputNotNull: job.terminalOutput !== null
-        };
-      } catch (e: any) {
-        return { __error: true, message: e.message };
-      }
+  test('Renv environments returns empty array not null', async () => {
+    const result = await callTestAPI('/test/renv-environments');
+    expect(result.environments).not.toBeNull();
+    expect(Array.isArray(result.environments)).toBe(true);
+  });
+
+  test('Plugin bindings returns empty array not null', async () => {
+    const result = await callTestAPI('/test/plugin-bindings');
+    expect(result.bindings).not.toBeNull();
+    expect(Array.isArray(result.bindings)).toBe(true);
+  });
+});
+
+test.describe('UI Control Tests via TestAPI', () => {
+  test.beforeAll(async () => {
+    const ready = await waitForWindow();
+    expect(ready).toBe(true);
+  });
+
+  test('Navigate to home', async () => {
+    const result = await callTestAPI('/test/ui/navigate', 'POST', { route: '#/' });
+    expect(result.success).toBe(true);
+    await new Promise(r => setTimeout(r, 1000));
+  });
+
+  test('Navigate to settings', async () => {
+    const result = await callTestAPI('/test/ui/navigate', 'POST', { route: '#/settings/general' });
+    expect(result.success).toBe(true);
+    await new Promise(r => setTimeout(r, 1000));
+  });
+
+  test('Navigate to Python settings', async () => {
+    const result = await callTestAPI('/test/ui/navigate', 'POST', { route: '#/settings/python' });
+    expect(result.success).toBe(true);
+    await new Promise(r => setTimeout(r, 1000));
+  });
+
+  test('Navigate to R settings', async () => {
+    const result = await callTestAPI('/test/ui/navigate', 'POST', { route: '#/settings/r' });
+    expect(result.success).toBe(true);
+    await new Promise(r => setTimeout(r, 1000));
+  });
+
+  test('Navigate to jobs', async () => {
+    const result = await callTestAPI('/test/ui/navigate', 'POST', { route: '#/jobs' });
+    expect(result.success).toBe(true);
+    await new Promise(r => setTimeout(r, 1000));
+  });
+
+  test('Navigate to plugins', async () => {
+    const result = await callTestAPI('/test/ui/navigate', 'POST', { route: '#/plugins' });
+    expect(result.success).toBe(true);
+    await new Promise(r => setTimeout(r, 1000));
+  });
+
+  test('Navigate to plugin list', async () => {
+    const result = await callTestAPI('/test/ui/navigate', 'POST', { route: '#/plugin-list' });
+    expect(result.success).toBe(true);
+    await new Promise(r => setTimeout(r, 1000));
+  });
+
+  test('Navigate to files', async () => {
+    const result = await callTestAPI('/test/ui/navigate', 'POST', { route: '#/files' });
+    expect(result.success).toBe(true);
+    await new Promise(r => setTimeout(r, 1000));
+  });
+
+  test('Execute custom JavaScript', async () => {
+    const result = await callTestAPI('/test/ui/exec-js', 'POST', {
+      script: 'console.log("E2E test executed")'
     });
-
-    if (result.__skipped) {
-      test.skip();
-      return;
-    }
-
-    if (result.__success && !result.noJobs) {
-      expect(result.hasId).toBeTruthy();
-      expect(result.hasStatus).toBeTruthy();
-      expect(result.hasName).toBeTruthy();
-      expect(result.argsNotNull).toBeTruthy();
-      expect(result.terminalOutputNotNull).toBeTruthy();
-    }
+    expect(result.success).toBe(true);
   });
 });

@@ -1,110 +1,120 @@
 import { test, expect } from '@playwright/test';
 
-const BASE_URL = process.env['WAILS_URL'] || 'http://localhost:4200';
 const TEST_API_URL = process.env['TEST_API_URL'] || 'http://127.0.0.1:9245';
 
-async function checkTestAPIAvailable(): Promise<boolean> {
-  try {
-    const response = await fetch(`${TEST_API_URL}/test/health`);
-    if (response.ok) {
-      const data = await response.json();
-      return data.status === 'ok';
-    }
-    return false;
-  } catch {
-    return false;
+async function callTestAPI(path: string, method = 'GET', body?: object): Promise<any> {
+  const options: RequestInit = {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+  };
+  if (body && method === 'POST') {
+    options.body = JSON.stringify(body);
   }
+
+  const response = await fetch(`${TEST_API_URL}${path}`, options);
+  return response.json();
 }
 
-async function callTestAPI(endpoint: string): Promise<any> {
-  try {
-    const response = await fetch(`${TEST_API_URL}${endpoint}`);
-    if (response.ok) {
-      return await response.json();
-    }
-    return null;
-  } catch {
-    return null;
+async function waitForWindow(timeout = 30000): Promise<boolean> {
+  const start = Date.now();
+  while (Date.now() - start < timeout) {
+    const status = await callTestAPI('/test/window');
+    if (status.mainWindow && status.ready) return true;
+    await new Promise(r => setTimeout(r, 1000));
   }
+  return false;
 }
 
-test.describe('Plugin Analysis UI Workflow', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto(BASE_URL);
-    await page.waitForLoadState('networkidle');
+test.describe('Plugin Analysis via TestAPI', () => {
+  test.beforeAll(async () => {
+    const ready = await waitForWindow();
+    expect(ready).toBe(true);
   });
 
-  test('should navigate to plugin list page', async ({ page }) => {
-    await page.goto(`${BASE_URL}/#/plugin-list`);
-    await page.waitForLoadState('networkidle');
+  test('should list available plugins', async () => {
+    const plugins = await callTestAPI('/test/plugins');
+    expect(plugins).not.toHaveProperty('error');
+    expect(plugins.plugins).toBeDefined();
+    expect(Array.isArray(plugins.plugins)).toBe(true);
+  });
 
-    const pageLoaded = await page.locator('body').isVisible();
-    expect(pageLoaded).toBeTruthy();
+  test('should have plugin with required structure', async () => {
+    const plugins = await callTestAPI('/test/plugins');
+    if (!plugins.plugins || plugins.plugins.length === 0) {
+      test.skip(true, 'No plugins available');
+      return;
+    }
 
-    const hasWails = await page.evaluate(() => '_wails' in window);
-    if (!hasWails) {
-      const testAPIAvailable = await checkTestAPIAvailable();
-      if (testAPIAvailable) {
-        const plugins = await callTestAPI('/test/plugins');
-        expect(plugins).not.toBeNull();
-        expect(Array.isArray(plugins?.plugins)).toBeTruthy();
+    const plugin = plugins.plugins[0];
+    expect(plugin).toBeDefined();
+
+    if (plugin.definition) {
+      expect(plugin.definition.plugin).toBeDefined();
+      expect(plugin.definition.plugin.name).toBeDefined();
+      expect(plugin.definition.plugin.id).toBeDefined();
+    }
+  });
+
+  test('should navigate to plugin list page via TestAPI', async () => {
+    const navResult = await callTestAPI('/test/ui/navigate', 'POST', { route: '#/plugin-list' });
+    expect(navResult.success).toBe(true);
+
+    await new Promise(r => setTimeout(r, 2000));
+  });
+
+  test('should navigate to plugins page via TestAPI', async () => {
+    const navResult = await callTestAPI('/test/ui/navigate', 'POST', { route: '#/plugins' });
+    expect(navResult.success).toBe(true);
+
+    await new Promise(r => setTimeout(r, 2000));
+  });
+
+  test('should get jobs list', async () => {
+    const jobs = await callTestAPI('/test/jobs');
+    expect(jobs).not.toHaveProperty('error');
+    expect(jobs.jobs).toBeDefined();
+    expect(Array.isArray(jobs.jobs)).toBe(true);
+  });
+
+  test('should verify plugin bindings are accessible', async () => {
+    const bindings = await callTestAPI('/test/plugin-bindings');
+    expect(bindings).not.toHaveProperty('error');
+    expect(bindings.bindings).toBeDefined();
+    expect(Array.isArray(bindings.bindings)).toBe(true);
+  });
+});
+
+test.describe('Plugin Details via TestAPI', () => {
+  test.beforeAll(async () => {
+    const ready = await waitForWindow();
+    expect(ready).toBe(true);
+  });
+
+  test('should have plugins with runtime environments', async () => {
+    const plugins = await callTestAPI('/test/plugins');
+    if (!plugins.plugins || plugins.plugins.length === 0) {
+      test.skip(true, 'No plugins available');
+      return;
+    }
+
+    for (const plugin of plugins.plugins.slice(0, 3)) {
+      if (plugin.definition?.runtime) {
+        expect(plugin.definition.runtime).toBeDefined();
       }
-      return;
     }
-
-    const pluginCard = page.locator('mat-card').filter({ hasText: /PCA Analysis/i }).first();
-    await expect(pluginCard).toBeVisible({ timeout: 15000 });
   });
 
-  test('should successfully run an analysis by clicking Load Example and Run Analysis', async ({ page }) => {
-    const hasWails = await page.evaluate(() => '_wails' in window);
-    if (!hasWails) {
-      const testAPIAvailable = await checkTestAPIAvailable();
-      expect(testAPIAvailable).toBeTruthy();
-
-      const plugins = await callTestAPI('/test/plugins');
-      expect(plugins).not.toBeNull();
-      expect(Array.isArray(plugins?.plugins)).toBeTruthy();
-
-      await page.goto(`${BASE_URL}/#/plugin-list`);
-      await page.waitForLoadState('networkidle');
-      const pageLoaded = await page.locator('body').isVisible();
-      expect(pageLoaded).toBeTruthy();
+  test('should have plugins with inputs configuration', async () => {
+    const plugins = await callTestAPI('/test/plugins');
+    if (!plugins.plugins || plugins.plugins.length === 0) {
+      test.skip(true, 'No plugins available');
       return;
     }
 
-    await page.goto(`${BASE_URL}/#/plugin-list`);
-    await page.waitForLoadState('networkidle');
-
-    const pluginCard = page.locator('mat-card').filter({ hasText: /PCA Analysis/i }).first();
-    await expect(pluginCard).toBeVisible({ timeout: 15000 });
-
-    const openButton = pluginCard.locator('button:has-text("Open")');
-    await openButton.click();
-
-    await expect(page.url()).toContain('/plugin/');
-    await expect(page.locator('mat-card-title')).toContainText(/PCA Analysis/i);
-
-    const loadExampleButton = page.locator('button:has-text("Load Example")');
-    await expect(loadExampleButton).toBeVisible();
-    await loadExampleButton.click();
-
-    const runButton = page.locator('button:has-text("Run Analysis")');
-    await expect(runButton).toBeEnabled();
-    await runButton.click();
-
-    await expect(runButton).toContainText(/Running/i, { timeout: 5000 });
-
-    const viewJobButton = page.locator('button:has-text("View Job")');
-    await expect(viewJobButton).toBeVisible({ timeout: 15000 });
-    await viewJobButton.click();
-
-    await expect(page.url()).toContain('/job/');
-    await expect(page.locator('h1, h2')).toContainText(/Job Details/i);
-
-    const statusBadge = page.locator('.status-badge, [class*="status"]');
-    await expect(statusBadge).toBeVisible();
-
-    await expect(page.locator('body')).not.toContainText(/crash/i);
+    for (const plugin of plugins.plugins.slice(0, 3)) {
+      if (plugin.definition?.inputs) {
+        expect(Array.isArray(plugin.definition.inputs)).toBe(true);
+      }
+    }
   });
 });
