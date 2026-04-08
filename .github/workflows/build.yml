@@ -627,6 +627,10 @@ jobs:
         run: |
           go build -tags devtools -o ./build/bin/cauldron .
 
+      - name: Copy plugins to build directory
+        run: |
+          cp -r plugins ./build/bin/plugins
+
       - name: Start application and run Playwright tests
         env:
           DISPLAY: ':99'
