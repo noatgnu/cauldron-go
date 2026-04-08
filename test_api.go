@@ -44,6 +44,8 @@ func (t *TestAPI) Start(port int) {
 	mux.HandleFunc("/test/ui/wait-for-element", t.handleUIWaitForElement)
 
 	mux.HandleFunc("/test/settings", t.handleSettings)
+	mux.HandleFunc("/test/set-active-python-environment", t.handleSetActivePythonEnvironment)
+	mux.HandleFunc("/test/set-active-r-environment", t.handleSetActiveREnvironment)
 	mux.HandleFunc("/test/python-environments", t.handlePythonEnvironments)
 	mux.HandleFunc("/test/r-environments", t.handleREnvironments)
 	mux.HandleFunc("/test/virtual-environments", t.handleVirtualEnvironments)
@@ -623,6 +625,108 @@ func (t *TestAPI) getNextResultID() string {
 	defer t.mu.Unlock()
 	t.resultID++
 	return fmt.Sprintf("result_%d", t.resultID)
+}
+
+func (t *TestAPI) handleSetActivePythonEnvironment(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	if r.Method == http.MethodOptions {
+		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	if !t.isInitialized() {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "App not initialized yet",
+		})
+		return
+	}
+
+	var req struct {
+		Path string `json:"path"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	log.Printf("[TestAPI] Setting active Python environment: %s", req.Path)
+
+	err := t.app.SetActivePythonEnvironment(req.Path)
+	if err != nil {
+		log.Printf("[TestAPI] Set active Python environment error: %v", err)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+	})
+}
+
+func (t *TestAPI) handleSetActiveREnvironment(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	if r.Method == http.MethodOptions {
+		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	if !t.isInitialized() {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "App not initialized yet",
+		})
+		return
+	}
+
+	var req struct {
+		Path string `json:"path"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	log.Printf("[TestAPI] Setting active R environment: %s", req.Path)
+
+	err := t.app.SetActiveREnvironment(req.Path)
+	if err != nil {
+		log.Printf("[TestAPI] Set active R environment error: %v", err)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+	})
 }
 
 func (t *TestAPI) handleSettings(w http.ResponseWriter, r *http.Request) {
