@@ -19,6 +19,7 @@ type PortableEnvService struct {
 	ctx              context.Context
 	fileService      *FileService
 	progressNotifier *ProgressNotifier
+	releasesURL      string
 }
 
 type GitHubRelease struct {
@@ -41,7 +42,10 @@ func NewPortableEnvService(ctx context.Context, fileService *FileService) *Porta
 }
 
 func (p *PortableEnvService) GetPortableEnvironmentURL(platform, arch, version, environment string) (string, error) {
-	url := "https://api.github.com/repos/noatgnu/cauldron-go/releases"
+	url := p.releasesURL
+	if url == "" {
+		url = "https://api.github.com/repos/noatgnu/cauldron-go/releases"
+	}
 
 	client := &http.Client{}
 	req, err := http.NewRequest("GET", url, nil)
@@ -344,8 +348,12 @@ func (p *PortableEnvService) DownloadPortableEnvironment(url, environment string
 		return err
 	}
 
-	if err := p.copyDirWithProgress(srcPath, destPath, "move-"+fileName); err != nil {
-		return err
+	log.Printf("[DownloadPortableEnvironment] Moving environment via rename...")
+	if err := os.Rename(srcPath, destPath); err != nil {
+		log.Printf("[DownloadPortableEnvironment] Rename failed (%v), falling back to copy...", err)
+		if err := p.copyDirWithProgress(srcPath, destPath, "move-"+fileName); err != nil {
+			return err
+		}
 	}
 
 	log.Printf("[DownloadPortableEnvironment] Cleaning up temporary files...")
