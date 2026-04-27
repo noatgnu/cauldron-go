@@ -95,7 +95,7 @@ func (a *App) Initialize() {
 	a.settings = services.NewSettingsServiceV3(db)
 	a.fileService = services.NewFileServiceV3(a.wailsApp)
 	a.envService = services.NewEnvironmentServiceV3(db, a.settings, services.NewProgressNotifierV3(a.wailsApp))
-	a.portableEnvService = services.NewPortableEnvServiceV3(a.fileService)
+	a.portableEnvService = services.NewPortableEnvServiceV3(a.fileService, a.wailsApp)
 
 	log.Println("[App.Initialize] Initializing job queue...")
 	a.jobQueue = services.NewJobQueueServiceV3(db, a.wailsApp)

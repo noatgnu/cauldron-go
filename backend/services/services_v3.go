@@ -31,9 +31,10 @@ func NewEnvironmentServiceV3(db *DatabaseService, settingsService *SettingsServi
 	}
 }
 
-func NewPortableEnvServiceV3(fileService *FileService) *PortableEnvService {
+func NewPortableEnvServiceV3(fileService *FileService, wailsApp *application.App) *PortableEnvService {
 	return &PortableEnvService{
-		fileService: fileService,
+		fileService:      fileService,
+		progressNotifier: NewProgressNotifierV3(wailsApp),
 	}
 }
 
