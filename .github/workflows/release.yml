@@ -20,7 +20,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.21'
+          go-version: '1.25'
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -58,7 +58,7 @@ jobs:
           & "${{ github.workspace }}/bin/win/python/python.exe" -m pip install -r scripts/requirements.txt
 
       - name: Install Wails
-        run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.11.0
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@latest
         shell: bash
 
       - name: Build Developer Tools
@@ -102,6 +102,18 @@ jobs:
           go test -v -run "TestE2ESettingsManagement|TestE2EEnvironmentDetection|TestE2EFileOperations|TestE2EVersionChecks|TestE2ELogging|TestE2ETempFileOperations|TestE2EDefaultVenvPath|TestE2EJobQueueAdvanced|TestE2EPluginManagement" -timeout 120s
         shell: bash
 
+      - name: Generate Wails bindings
+        run: wails3 generate bindings -ts
+        shell: bash
+
+      - name: Build shared-lib
+        run: |
+          cd shared-lib
+          npm install
+          npm run build
+          cd ..
+        shell: bash
+
       - name: Generate Licenses
         run: |
           node scripts/generate-go-licenses.js
@@ -121,7 +133,7 @@ jobs:
           cd frontend
           npm run build
           cd ..
-          wails build -platform windows/amd64
+          wails3 build --platform windows/amd64
         shell: bash
 
       - name: Copy Resources
@@ -168,7 +180,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.21'
+          go-version: '1.25'
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -258,7 +270,7 @@ jobs:
 
 
       - name: Install Wails
-        run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.11.0
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@latest
 
       - name: Build Developer Tools
         run: ./build.sh tools
@@ -294,6 +306,15 @@ jobs:
         run: |
           go test -v -run "TestE2ESettingsManagement|TestE2EEnvironmentDetection|TestE2EFileOperations|TestE2EVersionChecks|TestE2ELogging|TestE2ETempFileOperations|TestE2EDefaultVenvPath|TestE2EJobQueueAdvanced|TestE2EPluginManagement" -timeout 120s
 
+      - name: Generate Wails bindings
+        run: wails3 generate bindings -ts
+
+      - name: Build shared-lib
+        run: |
+          cd shared-lib
+          npm install
+          npm run build
+
       - name: Generate Licenses
         run: |
           node scripts/generate-go-licenses.js
@@ -310,7 +331,7 @@ jobs:
           cd frontend
           npm run build
           cd ..
-          wails build -platform linux/amd64
+          wails3 build --platform linux/amd64
 
       - name: Clean up test environments
         run: |
@@ -357,7 +378,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.21'
+          go-version: '1.25'
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -365,9 +386,10 @@ jobs:
           node-version: '20'
 
       - name: Set up dependencies
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: 1
+          HOMEBREW_NO_INSTALL_CLEANUP: 1
         run: |
-          /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" || true
-          brew update
           brew install --cask xquartz
           brew install gfortran pkg-config libpng jpeg xz pcre2 curl harfbuzz fribidi libx11 libxext libxrender libxtst cairo tcl-tk hdf5 c-blosc hiredis open-mpi lzo bzip2
 
@@ -424,7 +446,7 @@ jobs:
           echo "${{ github.workspace }}/python/bin" >> $GITHUB_PATH
 
       - name: Install Wails
-        run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.11.0
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@latest
 
       - name: Build Developer Tools
         run: ./build.sh tools
@@ -456,6 +478,15 @@ jobs:
       - name: Run Backend Tests
         run: go test -v ./backend/... ./cmd/...
 
+      - name: Generate Wails bindings
+        run: wails3 generate bindings -ts
+
+      - name: Build shared-lib
+        run: |
+          cd shared-lib
+          npm install
+          npm run build
+
       - name: Generate Licenses
         run: |
           node scripts/generate-go-licenses.js
@@ -472,7 +503,7 @@ jobs:
           cd frontend
           npm run build
           cd ..
-          wails build -platform darwin/arm64
+          wails3 build --platform darwin/arm64
 
       - name: Verify Build
         run: ls -l build/bin/
