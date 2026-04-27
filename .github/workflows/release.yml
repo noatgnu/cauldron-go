@@ -133,7 +133,8 @@ jobs:
           cd frontend
           npm run build
           cd ..
-          wails3 build --platform windows/amd64
+          mkdir -p build/bin
+          CGO_ENABLED=0 go build -ldflags="-s -w -H windowsgui" -o build/bin/cauldron.exe .
         shell: bash
 
       - name: Copy Resources
@@ -331,7 +332,8 @@ jobs:
           cd frontend
           npm run build
           cd ..
-          wails3 build --platform linux/amd64
+          mkdir -p build/bin
+          CGO_ENABLED=1 go build -ldflags="-s -w" -o build/bin/cauldron .
 
       - name: Clean up test environments
         run: |
@@ -503,7 +505,8 @@ jobs:
           cd frontend
           npm run build
           cd ..
-          wails3 build --platform darwin/arm64
+          mkdir -p build/bin
+          CGO_ENABLED=1 go build -ldflags="-s -w" -o build/bin/cauldron .
 
       - name: Verify Build
         run: ls -l build/bin/
@@ -532,7 +535,7 @@ jobs:
       - name: Create Archive
         run: |
           cd build/bin
-          XZ_OPT=-9 tar -cJf ../../cauldron-darwin-arm64.tar.xz cauldron-go.app examples/ scripts/ plugins/ tools/
+          XZ_OPT=-9 tar -cJf ../../cauldron-darwin-arm64.tar.xz cauldron examples/ scripts/ plugins/ tools/
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4

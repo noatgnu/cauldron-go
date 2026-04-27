@@ -113,46 +113,15 @@ jobs:
           r-portable-win-x86_64.tar.xz.sha256
         retention-days: 30
 
-    - name: Upload Python to Release
+    - name: Upload to Release
       if: github.event_name == 'release'
-      uses: actions/upload-release-asset@v1
+      run: |
+        gh release upload ${{ github.event.release.tag_name }} `
+          python-win-x86_64.tar.xz `
+          python-win-x86_64.tar.xz.sha256 `
+          r-portable-win-x86_64.tar.xz `
+          r-portable-win-x86_64.tar.xz.sha256 `
+          --clobber
+      shell: pwsh
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ github.event.release.upload_url }}
-        asset_path: python-win-x86_64.tar.xz
-        asset_name: python-win-x86_64.tar.xz
-        asset_content_type: application/x-xz
-
-    - name: Upload Python Checksum to Release
-      if: github.event_name == 'release'
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ github.event.release.upload_url }}
-        asset_path: python-win-x86_64.tar.xz.sha256
-        asset_name: python-win-x86_64.tar.xz.sha256
-        asset_content_type: text/plain
-
-    - name: Upload R to Release
-      if: github.event_name == 'release'
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ github.event.release.upload_url }}
-        asset_path: r-portable-win-x86_64.tar.xz
-        asset_name: r-portable-win-x86_64.tar.xz
-        asset_content_type: application/x-xz
-
-    - name: Upload R Checksum to Release
-      if: github.event_name == 'release'
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ github.event.release.upload_url }}
-        asset_path: r-portable-win-x86_64.tar.xz.sha256
-        asset_name: r-portable-win-x86_64.tar.xz.sha256
-        asset_content_type: text/plain
