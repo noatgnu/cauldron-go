@@ -47,9 +47,12 @@ func (p *PortableEnvService) GetPortableEnvironmentURL(platform, arch, version, 
 		url = "https://api.github.com/repos/noatgnu/cauldron-go/releases"
 	}
 
+	log.Printf("[GetPortableEnvironmentURL] Requesting %s (platform=%s arch=%s version=%s env=%s)", url, platform, arch, version, environment)
+
 	client := &http.Client{}
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
+		log.Printf("[GetPortableEnvironmentURL] Failed to create request: %v", err)
 		return "", err
 	}
 
@@ -57,9 +60,12 @@ func (p *PortableEnvService) GetPortableEnvironmentURL(platform, arch, version, 
 
 	resp, err := client.Do(req)
 	if err != nil {
+		log.Printf("[GetPortableEnvironmentURL] HTTP request failed: %v", err)
 		return "", err
 	}
 	defer resp.Body.Close()
+
+	log.Printf("[GetPortableEnvironmentURL] Response status: %d", resp.StatusCode)
 
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("GitHub API returned status %d", resp.StatusCode)
@@ -70,25 +76,30 @@ func (p *PortableEnvService) GetPortableEnvironmentURL(platform, arch, version, 
 		return "", err
 	}
 
+	log.Printf("[GetPortableEnvironmentURL] Response body length: %d bytes", len(body))
+
 	var releases []GitHubRelease
 	if err := json.Unmarshal(body, &releases); err != nil {
+		log.Printf("[GetPortableEnvironmentURL] JSON unmarshal failed: %v (body prefix: %.200s)", err, string(body))
 		return "", err
 	}
 
-	// If version is empty or "latest", search through all releases for first match
-	// Otherwise search for specific version
+	log.Printf("[GetPortableEnvironmentURL] Parsed %d releases", len(releases))
+
 	for _, release := range releases {
 		if version != "" && version != "latest" && release.TagName != version {
 			continue
 		}
 
+		log.Printf("[GetPortableEnvironmentURL] Checking release %s with %d assets", release.TagName, len(release.Assets))
+
 		for _, asset := range release.Assets {
-			// Special handling for Windows - check it contains platform and environment but NOT darwin
 			if platform == "win" {
-				if strings.Contains(asset.Name, platform) &&
+				matched := strings.Contains(asset.Name, platform) &&
 					strings.Contains(asset.Name, environment) &&
-					!strings.Contains(asset.Name, "darwin") {
-					// Use browser_download_url for direct download
+					!strings.Contains(asset.Name, "darwin")
+				if matched {
+					log.Printf("[GetPortableEnvironmentURL] Win match: %s → %s", asset.Name, asset.BrowserDownloadURL)
 					if asset.BrowserDownloadURL != "" {
 						return asset.BrowserDownloadURL, nil
 					}
@@ -96,11 +107,10 @@ func (p *PortableEnvService) GetPortableEnvironmentURL(platform, arch, version, 
 				}
 			}
 
-			// For other platforms, check platform, arch, and environment are all in the name
 			if strings.Contains(asset.Name, platform) &&
 				strings.Contains(asset.Name, arch) &&
 				strings.Contains(asset.Name, environment) {
-				// Use browser_download_url for direct download
+				log.Printf("[GetPortableEnvironmentURL] Generic match: %s → %s", asset.Name, asset.BrowserDownloadURL)
 				if asset.BrowserDownloadURL != "" {
 					return asset.BrowserDownloadURL, nil
 				}
@@ -108,13 +118,12 @@ func (p *PortableEnvService) GetPortableEnvironmentURL(platform, arch, version, 
 			}
 		}
 
-		// If we found a matching release but no matching asset, continue to next release
-		// If version was specified and we checked it, break
 		if version != "" && version != "latest" {
 			break
 		}
 	}
 
+	log.Printf("[GetPortableEnvironmentURL] No match found for %s/%s/%s/%s", platform, arch, version, environment)
 	return "", fmt.Errorf("no matching release asset found for %s/%s/%s in environment %s", platform, arch, version, environment)
 }
 
@@ -257,7 +266,8 @@ func (p *PortableEnvService) DownloadPortableEnvironment(url, environment string
 
 	platformName := translatePlatform(goruntime.GOOS)
 
-	if err := p.fileService.ExtractTarXz(tempFilePath, tempFolder); err != nil {
+	discoveredExecutable, err := p.fileService.ExtractTarXz(tempFilePath, tempFolder)
+	if err != nil {
 		return err
 	}
 
@@ -354,6 +364,13 @@ func (p *PortableEnvService) DownloadPortableEnvironment(url, environment string
 		if err := p.copyDirWithProgress(srcPath, destPath, "move-"+fileName); err != nil {
 			return err
 		}
+	}
+
+	if discoveredExecutable != "" {
+		installedExecutable := strings.Replace(discoveredExecutable, srcPath, destPath, 1)
+		markerPath := filepath.Join(destPath, ".executable-path")
+		os.WriteFile(markerPath, []byte(installedExecutable), 0644)
+		log.Printf("[DownloadPortableEnvironment] Recorded executable path: %s", installedExecutable)
 	}
 
 	log.Printf("[DownloadPortableEnvironment] Cleaning up temporary files...")
@@ -466,6 +483,12 @@ func (p *PortableEnvService) GetPortableEnvironmentPath(environment string) (str
 			exePath = filepath.Join(binFolder, "python", "python.exe")
 		} else {
 			exePath = filepath.Join(binFolder, "python", "bin", "python")
+			if _, err := os.Stat(exePath); os.IsNotExist(err) {
+				markerPath := filepath.Join(binFolder, "python", ".executable-path")
+				if data, err := os.ReadFile(markerPath); err == nil {
+					exePath = strings.TrimSpace(string(data))
+				}
+			}
 		}
 	} else {
 		if goruntime.GOOS == "windows" {

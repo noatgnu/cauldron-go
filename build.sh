@@ -410,8 +410,9 @@ build_wails() {
     local arch_part="${PLATFORM#*/}"
     local current_os="$(go env GOOS)"
     local current_arch="$(go env GOARCH)"
+    local platform_dir="$PROJECT_ROOT/build/bin/${os_part}-${arch_part}"
 
-    mkdir -p "$PROJECT_ROOT/build/bin"
+    mkdir -p "$platform_dir"
 
     local output_name="cauldron"
     if [ "$os_part" = "windows" ]; then
@@ -422,17 +423,17 @@ build_wails() {
 
     if [ "$os_part" = "$current_os" ] && [ "$arch_part" = "$current_arch" ]; then
         echo "Native build detected"
-        if go build -o "$PROJECT_ROOT/build/bin/$output_name" . 2>&1 | tee /tmp/wails-build.log; then
+        if go build -o "$platform_dir/$output_name" . 2>&1 | tee /tmp/wails-build.log; then
             if grep -q "undefined:" /tmp/wails-build.log; then
                 print_error "Wails v3 build failed with errors"
                 echo "Check /tmp/wails-build.log for details"
                 exit 1
             fi
-            copy_resources "$PROJECT_ROOT/build/bin" "$PLATFORM" || print_error "Warning: Failed to copy some resources, but build succeeded"
+            copy_resources "$platform_dir" "$PLATFORM" || print_error "Warning: Failed to copy some resources, but build succeeded"
             print_success "Wails v3 build completed for $PLATFORM"
             echo ""
-            echo "Executable location: $PROJECT_ROOT/build/bin/"
-            ls -lh "$PROJECT_ROOT/build/bin/"
+            echo "Executable location: $platform_dir/"
+            ls -lh "$platform_dir/"
         else
             print_error "Wails v3 build failed"
             echo "Check /tmp/wails-build.log for details"
@@ -442,17 +443,17 @@ build_wails() {
         local windows_cc
         if windows_cc=$(get_windows_cc "$arch_part"); then
             echo "Cross-compiling to Windows with CGO (CC=$windows_cc)..."
-            if CGO_ENABLED=1 CC="$windows_cc" GOOS="$os_part" GOARCH="$arch_part" go build -o "$PROJECT_ROOT/build/bin/$output_name" . 2>&1 | tee /tmp/wails-build.log; then
+            if CGO_ENABLED=1 CC="$windows_cc" GOOS="$os_part" GOARCH="$arch_part" go build -o "$platform_dir/$output_name" . 2>&1 | tee /tmp/wails-build.log; then
                 if grep -q "undefined:" /tmp/wails-build.log; then
                     print_error "Wails v3 build failed with errors"
                     echo "Check /tmp/wails-build.log for details"
                     exit 1
                 fi
-                copy_resources "$PROJECT_ROOT/build/bin" "$PLATFORM" || print_error "Warning: Failed to copy some resources, but build succeeded"
+                copy_resources "$platform_dir" "$PLATFORM" || print_error "Warning: Failed to copy some resources, but build succeeded"
                 print_success "Wails v3 build completed for $PLATFORM (CGO enabled)"
                 echo ""
-                echo "Executable location: $PROJECT_ROOT/build/bin/"
-                ls -lh "$PROJECT_ROOT/build/bin/"
+                echo "Executable location: $platform_dir/"
+                ls -lh "$platform_dir/"
             else
                 print_error "Wails v3 build failed"
                 echo "Check /tmp/wails-build.log for details"
@@ -460,17 +461,17 @@ build_wails() {
             fi
         else
             print_info "mingw-w64 not found, building without CGO..."
-            if CGO_ENABLED=0 GOOS="$os_part" GOARCH="$arch_part" go build -o "$PROJECT_ROOT/build/bin/$output_name" . 2>&1 | tee /tmp/wails-build.log; then
+            if CGO_ENABLED=0 GOOS="$os_part" GOARCH="$arch_part" go build -o "$platform_dir/$output_name" . 2>&1 | tee /tmp/wails-build.log; then
                 if grep -q "undefined:" /tmp/wails-build.log; then
                     print_error "Wails v3 build failed with errors"
                     echo "Check /tmp/wails-build.log for details"
                     exit 1
                 fi
-                copy_resources "$PROJECT_ROOT/build/bin" "$PLATFORM" || print_error "Warning: Failed to copy some resources, but build succeeded"
+                copy_resources "$platform_dir" "$PLATFORM" || print_error "Warning: Failed to copy some resources, but build succeeded"
                 print_success "Wails v3 build completed for $PLATFORM (CGO disabled)"
                 echo ""
-                echo "Executable location: $PROJECT_ROOT/build/bin/"
-                ls -lh "$PROJECT_ROOT/build/bin/"
+                echo "Executable location: $platform_dir/"
+                ls -lh "$platform_dir/"
             else
                 print_error "Wails v3 build failed"
                 echo "Check /tmp/wails-build.log for details"
@@ -481,17 +482,17 @@ build_wails() {
         local darwin_cc
         if darwin_cc=$(get_darwin_cc "$arch_part"); then
             echo "Cross-compiling to macOS with CGO (CC=$darwin_cc)..."
-            if CGO_ENABLED=1 CC="$darwin_cc" GOOS="$os_part" GOARCH="$arch_part" go build -o "$PROJECT_ROOT/build/bin/$output_name" . 2>&1 | tee /tmp/wails-build.log; then
+            if CGO_ENABLED=1 CC="$darwin_cc" GOOS="$os_part" GOARCH="$arch_part" go build -o "$platform_dir/$output_name" . 2>&1 | tee /tmp/wails-build.log; then
                 if grep -q "undefined:" /tmp/wails-build.log; then
                     print_error "Wails v3 build failed with errors"
                     echo "Check /tmp/wails-build.log for details"
                     exit 1
                 fi
-                copy_resources "$PROJECT_ROOT/build/bin" "$PLATFORM" || print_error "Warning: Failed to copy some resources, but build succeeded"
+                copy_resources "$platform_dir" "$PLATFORM" || print_error "Warning: Failed to copy some resources, but build succeeded"
                 print_success "Wails v3 build completed for $PLATFORM (CGO enabled)"
                 echo ""
-                echo "Executable location: $PROJECT_ROOT/build/bin/"
-                ls -lh "$PROJECT_ROOT/build/bin/"
+                echo "Executable location: $platform_dir/"
+                ls -lh "$platform_dir/"
             else
                 print_error "Wails v3 build failed"
                 echo "Check /tmp/wails-build.log for details"

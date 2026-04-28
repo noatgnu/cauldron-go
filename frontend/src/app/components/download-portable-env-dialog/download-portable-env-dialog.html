@@ -1,7 +1,7 @@
 <h2 mat-dialog-title>Download {{ environment === 'python' ? 'Python' : 'R' }} Portable Environment</h2>
 
 <mat-dialog-content>
-  <form [formGroup]="form" class="download-form">
+  <form [formGroup]="form" class="download-form" style="margin-top: 4px;">
     <mat-form-field appearance="outline" class="full-width">
       <mat-label>Operating Platform</mat-label>
       <mat-select formControlName="platform">
@@ -70,12 +70,14 @@
           }
           @if (message.startsWith('Extracting') || message.startsWith('Moving') || message.startsWith('Removing')) {
             <mat-progress-bar
-              mode="determinate"
+              [mode]="progressItems[message].percentage === 0 ? 'indeterminate' : 'determinate'"
               [value]="progressItems[message].percentage">
             </mat-progress-bar>
-            <small>{{ progressItems[message].percentage.toFixed(1) }}%</small>
+            @if (progressItems[message].percentage > 0) {
+              <small>{{ progressItems[message].percentage.toFixed(1) }}%</small>
+            }
             @if (progressItems[message].files) {
-              <small> - {{ progressItems[message].files }} files</small>
+              <small> - {{ progressItems[message].files }} files moved</small>
             }
           }
         </div>

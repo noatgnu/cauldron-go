@@ -214,10 +214,10 @@ func (f *FileService) ExtractTarGz(archivePath string, destPath string) error {
 	return nil
 }
 
-func (f *FileService) ExtractTarXz(archivePath string, destPath string) error {
+func (f *FileService) ExtractTarXz(archivePath string, destPath string) (string, error) {
 	file, err := os.Open(archivePath)
 	if err != nil {
-		return err
+		return "", err
 	}
 	defer file.Close()
 
@@ -225,7 +225,7 @@ func (f *FileService) ExtractTarXz(archivePath string, destPath string) error {
 
 	xzReader, err := xz.NewReader(bufferedFile)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	tarReader := tar.NewReader(xzReader)
@@ -242,13 +242,15 @@ func (f *FileService) ExtractTarXz(archivePath string, destPath string) error {
 
 	buffer := make([]byte, 4*1024*1024)
 
+	var discoveredExecutable string
+
 	for {
 		header, err := tarReader.Next()
 		if err == io.EOF {
 			break
 		}
 		if err != nil {
-			return err
+			return "", err
 		}
 
 		target := filepath.Join(destPath, header.Name)
@@ -257,7 +259,7 @@ func (f *FileService) ExtractTarXz(archivePath string, destPath string) error {
 		case tar.TypeDir:
 			if !dirCache[target] {
 				if err := os.MkdirAll(target, 0755); err != nil {
-					return err
+					return "", err
 				}
 				dirCache[target] = true
 			}
@@ -265,14 +267,14 @@ func (f *FileService) ExtractTarXz(archivePath string, destPath string) error {
 			dir := filepath.Dir(target)
 			if !dirCache[dir] {
 				if err := os.MkdirAll(dir, 0755); err != nil {
-					return err
+					return "", err
 				}
 				dirCache[dir] = true
 			}
 
 			outFile, err := os.Create(target)
 			if err != nil {
-				return err
+				return "", err
 			}
 
 			bufferedWriter := bufio.NewWriterSize(outFile, 256*1024)
@@ -281,14 +283,24 @@ func (f *FileService) ExtractTarXz(archivePath string, destPath string) error {
 			if err != nil {
 				bufferedWriter.Flush()
 				outFile.Close()
-				return err
+				return "", err
 			}
 
 			if err := bufferedWriter.Flush(); err != nil {
 				outFile.Close()
-				return err
+				return "", err
 			}
 			outFile.Close()
+			mode := header.FileInfo().Mode()
+			os.Chmod(target, mode)
+
+			if discoveredExecutable == "" && mode&0111 != 0 {
+				base := filepath.Base(header.Name)
+				parentDir := filepath.Base(filepath.Dir(header.Name))
+				if parentDir == "bin" && strings.HasPrefix(base, "python") {
+					discoveredExecutable = target
+				}
+			}
 
 			filesExtracted++
 
@@ -306,7 +318,7 @@ func (f *FileService) ExtractTarXz(archivePath string, destPath string) error {
 	f.progressNotifier.EmitComplete(ProgressTypeExtract, messageKey,
 		fmt.Sprintf("Extracted %s (%d files)", fileName, filesExtracted))
 
-	return nil
+	return discoveredExecutable, nil
 }
 
 func (f *FileService) DownloadFile(url string, destPath string) error {

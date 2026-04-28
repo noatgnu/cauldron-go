@@ -1,8 +1,8 @@
 .download-form {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  margin-bottom: 16px;
+  gap: 8px;
+  margin-bottom: 12px;
 }
 
 .full-width {
@@ -10,15 +10,15 @@
 }
 
 .download-actions {
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
 .overall-progress {
-  margin: 24px 0;
-  padding: 16px;
-  background: #f5f5f5;
+  margin: 8px 0;
+  padding: 12px;
+  background: var(--mat-sys-surface-container);
   border-radius: 4px;
-  border-left: 4px solid #2196f3;
+  border-left: 4px solid var(--mat-sys-primary);
 
   .phase-info {
     display: flex;
@@ -27,35 +27,35 @@
     margin-bottom: 8px;
 
     strong {
-      font-size: 14px;
-      color: rgba(0, 0, 0, 0.87);
+      font-size: 13px;
+      color: var(--mat-sys-on-surface);
     }
 
     .overall-percentage {
-      font-size: 16px;
+      font-size: 14px;
       font-weight: 500;
-      color: #2196f3;
+      color: var(--mat-sys-primary);
     }
   }
 
   .overall-progress-bar {
-    height: 8px;
+    height: 6px;
   }
 }
 
 .terminal {
-  background: #1e1e1e;
-  color: #d4d4d4;
-  padding: 16px;
+  background: var(--mat-sys-surface-container-lowest, #1e1e1e);
+  color: var(--mat-sys-on-surface-variant, #d4d4d4);
+  padding: 12px;
   border-radius: 4px;
-  max-height: 300px;
+  max-height: 240px;
   overflow-y: auto;
   font-family: 'Courier New', monospace;
   font-size: 12px;
 }
 
 .terminal-line {
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 
   pre {
     margin: 0 0 4px 0;
@@ -64,21 +64,17 @@
   }
 
   small {
-    color: #4caf50;
+    color: var(--mat-sys-tertiary, #4caf50);
     margin-left: 8px;
   }
 
   mat-progress-bar {
     margin: 4px 0;
   }
-
-  .success-message {
-    color: #4caf50;
-    font-weight: bold;
-  }
 }
 
 mat-dialog-content {
-  min-width: 500px;
-  max-width: 600px;
+  min-width: 480px;
+  max-width: 580px;
+  padding-top: 8px !important;
 }

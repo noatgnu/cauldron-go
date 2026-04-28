@@ -82,7 +82,13 @@ func (pi *PluginInstaller) InstallPlugin(repoURL string, commitHash string, regi
 
 	var existing models.PluginRegistry
 	if err := pi.db.GetDB().Where("repository = ?", repoURL).First(&existing).Error; err == nil {
-		return "", fmt.Errorf("plugin from this repository already installed [ID:%d]", existing.ID)
+		if existing.FolderPath != "" {
+			if _, statErr := os.Stat(existing.FolderPath); statErr == nil {
+				return "", fmt.Errorf("plugin from this repository already installed [ID:%d]", existing.ID)
+			}
+		}
+		log.Printf("[PluginInstaller] Stale registry entry found for %s (ID:%d, missing folder), removing", repoURL, existing.ID)
+		pi.db.GetDB().Delete(&existing)
 	}
 
 	tempDir := filepath.Join(pi.pluginsDir, ".temp-"+fmt.Sprintf("%d", time.Now().Unix()))

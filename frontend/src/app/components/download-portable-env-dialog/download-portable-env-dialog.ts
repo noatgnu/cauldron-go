@@ -67,9 +67,15 @@ export class DownloadPortableEnvDialogComponent implements OnInit {
       }
 
       const { message, percentage, status, type, data } = progress;
+      const finalInstallId = this.environment === 'python' ? 'python.tar.xz' : 'r-portable.tar.xz';
 
       if (status === 'completed') {
-        if (type === 'install') {
+        if (type === 'install' && progress.id === finalInstallId) {
+          Object.keys(this.progressItems).forEach(key => {
+            if (this.progressItems[key].percentage === 0) {
+              this.progressItems[key] = { ...this.progressItems[key], percentage: 100 };
+            }
+          });
           this.currentPhase = 'Installation complete!';
           this.overallProgress = 100;
           this.downloading = false;

@@ -12,10 +12,11 @@ import (
 )
 
 type TestAPI struct {
-	app       *App
-	jsResults sync.Map
-	resultID  int64
-	mu        sync.Mutex
+	app         *App
+	jsResults   sync.Map
+	jsCallbacks sync.Map
+	resultID    int64
+	mu          sync.Mutex
 }
 
 func NewTestAPI(app *App) *TestAPI {
@@ -39,6 +40,8 @@ func (t *TestAPI) Start(port int) {
 	mux.HandleFunc("/test/ui/element-exists", t.handleUIElementExists)
 	mux.HandleFunc("/test/ui/element-text", t.handleUIElementText)
 	mux.HandleFunc("/test/ui/element-count", t.handleUIElementCount)
+	mux.HandleFunc("/test/ui/js-result", t.handleUIJSResult)
+	mux.HandleFunc("/test/ui/query", t.handleUIQuery)
 	mux.HandleFunc("/test/ui/url", t.handleUIGetURL)
 	mux.HandleFunc("/test/ui/exec-js", t.handleUIExecJS)
 	mux.HandleFunc("/test/ui/wait-for-element", t.handleUIWaitForElement)
@@ -60,6 +63,9 @@ func (t *TestAPI) Start(port int) {
 	mux.HandleFunc("/test/jobs", t.handleJobs)
 	mux.HandleFunc("/test/imported-files", t.handleImportedFiles)
 	mux.HandleFunc("/test/default-venv-path", t.handleDefaultVenvPath)
+	mux.HandleFunc("/test/portable-env-url", t.handlePortableEnvURL)
+	mux.HandleFunc("/test/download-portable-env", t.handleDownloadPortableEnv)
+	mux.HandleFunc("/test/portable-env-path", t.handlePortableEnvPath)
 
 	addr := fmt.Sprintf("127.0.0.1:%d", port)
 	log.Printf("[TestAPI] Starting test API server on %s", addr)
@@ -618,6 +624,107 @@ func (t *TestAPI) handleUIWaitForElement(w http.ResponseWriter, r *http.Request)
 		"success":   true,
 		"resultKey": resultKey,
 	})
+}
+
+func (t *TestAPI) handleUIJSResult(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	if r.Method == http.MethodOptions {
+		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	var payload struct {
+		ID    string      `json:"id"`
+		Value interface{} `json:"value"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if ch, ok := t.jsCallbacks.LoadAndDelete(payload.ID); ok {
+		ch.(chan interface{}) <- payload.Value
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (t *TestAPI) execJSBlocking(script string, timeout time.Duration) (interface{}, error) {
+	id := t.getNextResultID()
+	ch := make(chan interface{}, 1)
+	t.jsCallbacks.Store(id, ch)
+
+	callbackJS := fmt.Sprintf(`
+		(function() {
+			try {
+				const __result = (function() { %s })();
+				fetch('http://127.0.0.1:9245/test/ui/js-result', {
+					method: 'POST',
+					headers: {'Content-Type': 'application/json'},
+					body: JSON.stringify({id: %q, value: __result})
+				});
+			} catch(e) {
+				fetch('http://127.0.0.1:9245/test/ui/js-result', {
+					method: 'POST',
+					headers: {'Content-Type': 'application/json'},
+					body: JSON.stringify({id: %q, value: null})
+				});
+			}
+		})()
+	`, script, id, id)
+
+	t.app.mainWindow.ExecJS(callbackJS)
+
+	select {
+	case result := <-ch:
+		return result, nil
+	case <-time.After(timeout):
+		t.jsCallbacks.Delete(id)
+		return nil, fmt.Errorf("JS execution timed out after %v", timeout)
+	}
+}
+
+func (t *TestAPI) handleUIQuery(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	if r.Method == http.MethodOptions {
+		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if t.app.mainWindow == nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{"error": "Main window not available"})
+		return
+	}
+
+	var req struct {
+		Script string `json:"script"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	result, err := t.execJSBlocking(req.Script, 10*time.Second)
+	if err != nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{"error": err.Error()})
+		return
+	}
+
+	json.NewEncoder(w).Encode(map[string]interface{}{"result": result})
 }
 
 func (t *TestAPI) getNextResultID() string {
@@ -1245,5 +1352,148 @@ func (t *TestAPI) handleDefaultVenvPath(w http.ResponseWriter, r *http.Request) 
 
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"path": path,
+	})
+}
+
+func (t *TestAPI) handlePortableEnvURL(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	if !t.isInitialized() {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"url":   "",
+			"error": "App not initialized yet",
+		})
+		return
+	}
+
+	platform := r.URL.Query().Get("platform")
+	arch := r.URL.Query().Get("arch")
+	version := r.URL.Query().Get("version")
+	envType := r.URL.Query().Get("type")
+
+	if platform == "" || arch == "" || envType == "" {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"url":   "",
+			"error": "platform, arch, and type query params are required",
+		})
+		return
+	}
+	if version == "" {
+		version = "latest"
+	}
+
+	log.Printf("[TestAPI] Getting portable env URL: platform=%s arch=%s version=%s type=%s", platform, arch, version, envType)
+
+	url, err := t.app.GetPortableEnvironmentURL(platform, arch, version, envType)
+	if err != nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"url":   "",
+			"error": err.Error(),
+		})
+		return
+	}
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"url": url,
+	})
+}
+
+func (t *TestAPI) handleDownloadPortableEnv(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	if r.Method == http.MethodOptions {
+		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	if !t.isInitialized() {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "App not initialized yet",
+		})
+		return
+	}
+
+	var req struct {
+		URL         string `json:"url"`
+		Environment string `json:"environment"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if req.URL == "" || req.Environment == "" {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "url and environment are required",
+		})
+		return
+	}
+
+	log.Printf("[TestAPI] Downloading portable env: url=%s environment=%s", req.URL, req.Environment)
+
+	if err := t.app.DownloadPortableEnvironment(req.URL, req.Environment); err != nil {
+		log.Printf("[TestAPI] Download portable env error: %v", err)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	log.Printf("[TestAPI] Portable env downloaded successfully")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+	})
+}
+
+func (t *TestAPI) handlePortableEnvPath(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	if !t.isInitialized() {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"path":      "",
+			"installed": false,
+			"error":     "App not initialized yet",
+		})
+		return
+	}
+
+	envType := r.URL.Query().Get("type")
+	if envType == "" {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"path":      "",
+			"installed": false,
+			"error":     "type query param is required (python or r-portable)",
+		})
+		return
+	}
+
+	path, err := t.app.GetPortableEnvironmentPath(envType)
+	if err != nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"path":      "",
+			"installed": false,
+			"error":     err.Error(),
+		})
+		return
+	}
+
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"path":      path,
+		"installed": path != "",
 	})
 }

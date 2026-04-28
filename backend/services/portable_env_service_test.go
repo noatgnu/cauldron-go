@@ -273,6 +273,54 @@ func TestGetPortableEnvironmentURL_Match(t *testing.T) {
 	}
 }
 
+func TestGetPortableEnvironmentURL_RealAPI_Win(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping real network test")
+	}
+	svc := &PortableEnvService{}
+	url, err := svc.GetPortableEnvironmentURL("win", "x86_64", "latest", "python")
+	if err != nil {
+		t.Fatalf("GetPortableEnvironmentURL(win/x86_64/latest/python) error: %v", err)
+	}
+	if url == "" {
+		t.Error("expected non-empty URL")
+	}
+	t.Logf("Found URL: %s", url)
+}
+
+func TestGetPortableEnvironmentURL_RealAPI_AllCombinations(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping real network test")
+	}
+	cases := []struct {
+		platform    string
+		arch        string
+		environment string
+	}{
+		{"win", "x86_64", "python"},
+		{"win", "x86_64", "r-portable"},
+		{"linux", "x86_64", "python"},
+		{"linux", "x86_64", "r-portable"},
+		{"darwin", "arm64", "python"},
+		{"darwin", "arm64", "r-portable"},
+	}
+	svc := &PortableEnvService{}
+	for _, tc := range cases {
+		t.Run(tc.platform+"_"+tc.arch+"_"+tc.environment, func(t *testing.T) {
+			url, err := svc.GetPortableEnvironmentURL(tc.platform, tc.arch, "latest", tc.environment)
+			if err != nil {
+				t.Errorf("error: %v", err)
+				return
+			}
+			if url == "" {
+				t.Error("expected non-empty URL")
+				return
+			}
+			t.Logf("URL: %s", url)
+		})
+	}
+}
+
 func TestGetPortableEnvironmentURL_NoMatch(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
