@@ -460,6 +460,13 @@ func (j *JobQueueService) processJob(job *models.Job) {
 		job.OutputPath = outputDir
 	}
 
+	j.mu.RLock()
+	_, stillExists := j.jobs[job.ID]
+	j.mu.RUnlock()
+	if !stillExists {
+		return
+	}
+
 	j.db.GetDB().Save(job)
 	j.emitJobUpdate(job)
 }
