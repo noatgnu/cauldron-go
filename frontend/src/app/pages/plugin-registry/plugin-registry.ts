@@ -171,7 +171,7 @@ export class PluginRegistry implements OnInit {
 
     dialogRef.afterClosed().subscribe((result: InstallPluginResult) => {
       if (result && result.repoURL) {
-        this.dialog.open(PluginInstallProgress, {
+        const progressRef = this.dialog.open(PluginInstallProgress, {
           data: {
             repoURL: result.repoURL,
             commitHash: result.commitHash,
@@ -180,6 +180,11 @@ export class PluginRegistry implements OnInit {
           },
           disableClose: true,
           width: '500px'
+        });
+        progressRef.afterClosed().subscribe(completed => {
+          if (completed) {
+            this.pluginService.notifyPluginListChanged();
+          }
         });
       }
     });
@@ -255,8 +260,11 @@ export class PluginRegistry implements OnInit {
             width: '500px'
           });
 
-          progressDialogRef.afterClosed().subscribe(async () => {
+          progressDialogRef.afterClosed().subscribe(async (completed) => {
             await this.loadInstalledPlugins();
+            if (completed) {
+              this.pluginService.notifyPluginListChanged();
+            }
           });
         }
       });

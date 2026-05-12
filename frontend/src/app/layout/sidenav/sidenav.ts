@@ -8,7 +8,6 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatDividerModule } from '@angular/material/divider';
 import { FormsModule } from '@angular/forms';
 import { Router, NavigationEnd } from '@angular/router';
-import { Events } from '@wailsio/runtime';
 import { PluginV2Service } from '../../core/services/plugin-v2';
 import * as models from '../../../../bindings/github.com/noatgnu/cauldron-go/backend/models/models';
 import { filter } from 'rxjs';
@@ -195,22 +194,17 @@ export class Sidenav implements OnInit {
       this.isSettingsRoute.set(this.router.url.startsWith('/settings'));
     });
     this.isSettingsRoute.set(this.router.url.startsWith('/settings'));
+
+    effect(() => {
+      const version = this.pluginService.pluginListVersion();
+      if (version > 0) {
+        this.loadPlugins();
+      }
+    });
   }
 
   async ngOnInit() {
     await this.loadPlugins();
-
-    Events.On('plugin:install:success', () => {
-      this.loadPlugins();
-    });
-
-    Events.On('plugin:uninstall:success', () => {
-      this.loadPlugins();
-    });
-
-    Events.On('plugin:enabled:changed', () => {
-      this.loadPlugins();
-    });
   }
 
   async loadPlugins() {

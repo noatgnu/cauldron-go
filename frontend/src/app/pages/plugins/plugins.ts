@@ -14,6 +14,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { Wails, PluginEnvironmentBinding } from '../../core/services/wails';
+import { PluginV2Service } from '../../core/services/plugin-v2';
 import { Plugin, PluginInput, PluginExecutionRequest } from '../../core/models/plugin';
 import { EnvironmentIndicator } from '../../components/environment-indicator/environment-indicator';
 import { InstallPluginDialog, InstallPluginResult } from '../../components/install-plugin-dialog/install-plugin-dialog';
@@ -54,7 +55,8 @@ export class Plugins implements OnInit {
   constructor(
     private wails: Wails,
     private fb: FormBuilder,
-    private dialog: MatDialog
+    private dialog: MatDialog,
+    private pluginService: PluginV2Service
   ) {
     effect(() => {
       const _ = this.wails.bindingsUpdated();
@@ -264,6 +266,7 @@ export class Plugins implements OnInit {
         progressRef.afterClosed().subscribe(completed => {
           if (completed) {
             this.loadPlugins();
+            this.pluginService.notifyPluginListChanged();
           }
         });
       }

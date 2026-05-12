@@ -2,6 +2,7 @@ package services
 
 import (
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -34,12 +35,16 @@ func NewPluginInstaller(pluginsDir string, db *DatabaseService, loader *PluginLo
 }
 
 func (pi *PluginInstaller) IsPluginInstalled(repoURL string) (bool, error) {
-	var count int64
-	err := pi.db.GetDB().Model(&models.PluginRegistry{}).Where("repository = ?", repoURL).Count(&count).Error
-	if err != nil {
-		return false, err
+	var registry models.PluginRegistry
+	if err := pi.db.GetDB().Where("repository = ?", repoURL).First(&registry).Error; err != nil {
+		return false, nil
 	}
-	return count > 0, nil
+	if registry.FolderPath != "" {
+		if _, err := os.Stat(registry.FolderPath); os.IsNotExist(err) {
+			return false, nil
+		}
+	}
+	return true, nil
 }
 
 func (pi *PluginInstaller) FetchPluginInfo(repoURL string) (*models.PluginDefinition, error) {
@@ -82,12 +87,27 @@ func (pi *PluginInstaller) InstallPlugin(repoURL string, commitHash string, regi
 
 	var existing models.PluginRegistry
 	if err := pi.db.GetDB().Where("repository = ?", repoURL).First(&existing).Error; err == nil {
-		if existing.FolderPath != "" {
-			if _, statErr := os.Stat(existing.FolderPath); statErr == nil {
-				return "", fmt.Errorf("plugin from this repository already installed [ID:%d]", existing.ID)
+		folderExists := existing.FolderPath != ""
+		if folderExists {
+			if _, statErr := os.Stat(existing.FolderPath); os.IsNotExist(statErr) {
+				folderExists = false
 			}
 		}
-		log.Printf("[PluginInstaller] Stale registry entry found for %s (ID:%d, missing folder), removing", repoURL, existing.ID)
+
+		if folderExists {
+			// Only block reinstall if the plugin is actually functional (loaded in memory).
+			// If the folder exists but the plugin failed to load (broken/corrupt install),
+			// clean up and allow a fresh install.
+			if _, loadErr := pi.pluginLoader.GetPluginByStringID(existing.PluginID); loadErr == nil {
+				return "", fmt.Errorf("plugin from this repository already installed [ID:%d]", existing.ID)
+			}
+			log.Printf("[PluginInstaller] Plugin folder exists but not loaded (ID:%d), removing for fresh install", existing.ID)
+			if removeErr := os.RemoveAll(existing.FolderPath); removeErr != nil {
+				log.Printf("[PluginInstaller] Warning: failed to remove broken plugin folder: %v", removeErr)
+			}
+		}
+
+		log.Printf("[PluginInstaller] Removing stale registry entry for %s (ID:%d)", repoURL, existing.ID)
 		pi.db.GetDB().Delete(&existing)
 	}
 
@@ -237,7 +257,7 @@ func (pi *PluginInstaller) UpdatePluginWithForce(repoURL string, force bool) err
 
 	repo, err := git.PlainOpen(registry.FolderPath)
 	if err != nil {
-		if os.IsNotExist(err) || strings.Contains(err.Error(), "repository does not exist") {
+		if errors.Is(err, git.ErrRepositoryNotExists) || os.IsNotExist(err) || strings.Contains(err.Error(), "repository does not exist") {
 			log.Printf("[PluginInstaller] Plugin folder missing, reinstalling from: %s", repoURL)
 			return pi.ReinstallPlugin(repoURL)
 		}
@@ -391,6 +411,13 @@ func (pi *PluginInstaller) ReinstallPlugin(repoURL string) error {
 	commitHash := registry.CommitHash
 	folderPath := registry.FolderPath
 
+	// If stored folder path is outside the current plugins dir (e.g. after an app upgrade),
+	// relocate to the current plugins dir so ReloadPlugins can find it.
+	if folderPath == "" || !strings.HasPrefix(filepath.Clean(folderPath), filepath.Clean(pi.pluginsDir)) {
+		folderPath = filepath.Join(pi.pluginsDir, fmt.Sprintf("%s-%d", registry.PluginID, registry.ID))
+		log.Printf("[PluginInstaller] Relocating plugin to current plugins dir: %s", folderPath)
+	}
+
 	if _, err := os.Stat(folderPath); err == nil {
 		log.Printf("[PluginInstaller] Removing plugin folder: %s", folderPath)
 		if err := os.RemoveAll(folderPath); err != nil {
@@ -423,15 +450,11 @@ func (pi *PluginInstaller) ReinstallPlugin(repoURL string) error {
 		log.Printf("[PluginInstaller] Checking out commit: %s", commitHash)
 		w, err := repo.Worktree()
 		if err != nil {
-			return fmt.Errorf("failed to get worktree: %w", err)
-		}
-
-		err = w.Checkout(&git.CheckoutOptions{
-			Hash:  plumbing.NewHash(commitHash),
-			Force: true,
-		})
-		if err != nil {
-			return fmt.Errorf("failed to checkout commit %s: %w", commitHash, err)
+			log.Printf("[PluginInstaller] Warning: failed to get worktree for commit checkout, using latest: %v", err)
+		} else {
+			if err = w.Checkout(&git.CheckoutOptions{Hash: plumbing.NewHash(commitHash), Force: true}); err != nil {
+				log.Printf("[PluginInstaller] Warning: failed to checkout commit %s, using latest: %v", commitHash, err)
+			}
 		}
 	}
 
@@ -444,6 +467,7 @@ func (pi *PluginInstaller) ReinstallPlugin(repoURL string) error {
 		return fmt.Errorf("failed to move plugin to final location: %w", err)
 	}
 
+	registry.FolderPath = folderPath
 	registry.UpdatedAt = time.Now()
 	if err := pi.db.GetDB().Save(&registry).Error; err != nil {
 		log.Printf("[PluginInstaller] Warning: failed to update registry: %v", err)

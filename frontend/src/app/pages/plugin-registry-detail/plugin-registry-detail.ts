@@ -347,8 +347,11 @@ export class PluginRegistryDetail implements OnInit {
         });
 
         try {
-          await progressRef.afterClosed().toPromise();
+          const completed = await progressRef.afterClosed().toPromise();
           await this.checkIfInstalled(plugin);
+          if (completed) {
+            this.pluginService.notifyPluginListChanged();
+          }
           this.notification.showSuccess('Plugin installed successfully');
         } catch (error) {
           await this.wails.logToFile(`[PluginRegistryDetail] Installation failed: ${error}`);

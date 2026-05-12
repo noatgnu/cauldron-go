@@ -274,9 +274,7 @@ export class PluginList implements OnInit {
         { duration: 3000 }
       );
 
-      if (window.runtime) {
-        window.runtime.EventsEmit('plugin:enabled:changed');
-      }
+      this.pluginService.notifyPluginListChanged();
     } catch (error) {
       this.snackBar.open(
         `Failed to ${newEnabledState ? 'enable' : 'disable'} plugin`,
@@ -404,6 +402,7 @@ export class PluginList implements OnInit {
           this.updateInfo.set(updateMap);
 
           await this.loadPlugins();
+          this.pluginService.notifyPluginListChanged();
 
         } catch (err) {
           this.notification.showError(`Uninstall failed: ${err}`);

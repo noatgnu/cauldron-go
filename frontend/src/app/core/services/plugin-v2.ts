@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, signal } from '@angular/core';
 import { GetPluginsV2, GetPluginV2, ExecutePluginV2, ReloadPluginsV2 } from '../../../../bindings/github.com/noatgnu/cauldron-go/app';
 import * as models from '../../../../bindings/github.com/noatgnu/cauldron-go/backend/models/models';
 
@@ -6,7 +6,13 @@ import * as models from '../../../../bindings/github.com/noatgnu/cauldron-go/bac
   providedIn: 'root'
 })
 export class PluginV2Service {
+  readonly pluginListVersion = signal(0);
+
   constructor() { }
+
+  notifyPluginListChanged(): void {
+    this.pluginListVersion.update(v => v + 1);
+  }
 
   async getAllPlugins(): Promise<models.PluginV2[]> {
     const result = await GetPluginsV2();

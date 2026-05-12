@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"log"
 	"os"
 	"path/filepath"
@@ -456,6 +457,9 @@ func (d *DatabaseService) GetPluginEnvironmentBinding(pluginID string, envType s
 	var binding PluginEnvironmentBinding
 	err := d.db.Where("plugin_id = ? AND environment_type = ?", pluginID, envType).First(&binding).Error
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
 		return nil, err
 	}
 	return &binding, nil
