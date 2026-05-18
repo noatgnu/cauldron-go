@@ -73,6 +73,9 @@ export class Wails {
   private _queueStatus = signal<any | null>(null);
   queueStatus: Signal<any | null> = this._queueStatus.asReadonly();
 
+  private _jobOutput = signal<{jobId: string, output: string} | null>(null);
+  jobOutput: Signal<{jobId: string, output: string} | null> = this._jobOutput.asReadonly();
+
   private _bindingsUpdated = signal<number>(0);
   bindingsUpdated: Signal<number> = this._bindingsUpdated.asReadonly();
 
@@ -114,8 +117,12 @@ export class Wails {
       Events.On('queue:status', (ev: any) => {
         this._queueStatus.set(ev.data);
       });
+
+      Events.On('job:output', (ev: any) => {
+        this._jobOutput.set(ev.data as {jobId: string, output: string});
+      });
     } catch (error) {
-      console.error('Failed to setup event listeners:', error);
+      this.logToFile(`[Wails] Failed to setup event listeners: ${error}`);
     }
   }
 
@@ -214,21 +221,9 @@ export class Wails {
   }
 
   async getAllJobs(): Promise<Job[]> {
-    console.log('[Wails Service] getAllJobs() called, isWails:', this.isWails);
-    if (!this.isWails) {
-      console.error('[Wails Service] Wails not available!');
-      throw new Error('Wails not available');
-    }
-
-    try {
-      console.log('[Wails Service] Calling WailsApp.GetAllJobs()...');
-      const result = await WailsApp.GetAllJobs();
-      console.log('[Wails Service] GetAllJobs() returned:', result);
-      return (result || []).filter((job): job is Job => job !== null);
-    } catch (error) {
-      console.error('[Wails Service] GetAllJobs() failed:', error);
-      throw error;
-    }
+    if (!this.isWails) throw new Error('Wails not available');
+    const result = await WailsApp.GetAllJobs();
+    return (result || []).filter((job): job is Job => job !== null);
   }
 
   async deleteJob(id: string): Promise<void> {

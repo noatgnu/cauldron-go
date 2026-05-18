@@ -1,5 +1,5 @@
 import { DataFrame } from 'data-forge';
-import { Component, OnInit, OnDestroy, AfterViewChecked, signal, ViewChild, ElementRef, computed, ChangeDetectionStrategy } from '@angular/core';
+import { Component, OnInit, AfterViewChecked, signal, ViewChild, ElementRef, computed, ChangeDetectionStrategy, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -15,7 +15,6 @@ import { MatInputModule } from '@angular/material/input';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatDialog } from '@angular/material/dialog';
-import { Events } from '@wailsio/runtime';
 import { Wails, Job } from '../../core/services/wails';
 import * as models from '../../../../bindings/github.com/noatgnu/cauldron-go/backend/models/models';
 import { PcaPlot } from './pca-plot/pca-plot';
@@ -53,7 +52,7 @@ import { NotificationService } from '../../core/services/notification.service';
   styleUrl: './job-detail.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class JobDetail implements OnInit, OnDestroy, AfterViewChecked {
+export class JobDetail implements OnInit, AfterViewChecked {
   protected job = signal<Job | null>(null);
   protected loading = signal(true);
   protected error = signal('');
@@ -106,53 +105,49 @@ export class JobDetail implements OnInit, OnDestroy, AfterViewChecked {
     private dialog: MatDialog,
     private annotationService: AnnotationService,
     private notificationService: NotificationService
-  ) {}
+  ) {
+    effect(() => {
+      const jobUpdate = this.wails.jobUpdate();
+      if (!jobUpdate || !this.jobId || jobUpdate.id !== this.jobId) return;
+
+      const previousStatus = this.job()?.status;
+      const currentTerminalOutput = this.job()?.terminalOutput || [];
+
+      this.job.set(new models.Job({
+        ...jobUpdate,
+        terminalOutput: currentTerminalOutput.length > (jobUpdate.terminalOutput?.length || 0)
+          ? currentTerminalOutput
+          : jobUpdate.terminalOutput
+      }));
+
+      if (previousStatus !== 'completed' && jobUpdate.status === 'completed') {
+        this.detectPluginPlots();
+      }
+    });
+
+    effect(() => {
+      const outputData = this.wails.jobOutput();
+      if (!outputData || !this.jobId || outputData.jobId !== this.jobId) return;
+
+      this.job.update(currentJob => {
+        if (!currentJob) return currentJob;
+        const newJob = new models.Job({
+          ...currentJob,
+          terminalOutput: [...(currentJob.terminalOutput || []), outputData.output]
+        });
+        this.shouldAutoScroll = true;
+        const newLineCount = newJob.terminalOutput?.length || 0;
+        this.displayedLogLines.set(newLineCount);
+        this.totalLogLines.set(newLineCount);
+        return newJob;
+      });
+    });
+  }
 
   async ngOnInit() {
     this.route.params.subscribe(async params => {
       this.jobId = params['id'];
       await this.loadJob();
-    });
-
-    Events.On('job:update', async (ev: any) => {
-        const data = ev.data as Job;
-        if (data.id === this.jobId) {
-          const previousStatus = this.job()?.status;
-          const currentTerminalOutput = this.job()?.terminalOutput || [];
-
-          this.job.set(new models.Job({
-            ...data,
-            terminalOutput: currentTerminalOutput.length > (data.terminalOutput?.length || 0)
-              ? currentTerminalOutput
-              : data.terminalOutput
-          }));
-
-          if (previousStatus !== 'completed' && data.status === 'completed') {
-            await this.detectPluginPlots();
-          }
-        }
-      });
-
-    Events.On('job:output', (ev: any) => {
-      const data = ev.data as { jobId: string; output: string };
-      if (data.jobId === this.jobId) {
-        this.job.update(currentJob => {
-          if (currentJob) {
-            const newJob = new models.Job({
-              ...currentJob,
-              terminalOutput: [...(currentJob.terminalOutput || []), data.output]
-            });
-            this.shouldAutoScroll = true;
-
-            const newLineCount = newJob.terminalOutput?.length || 0;
-            this.displayedLogLines.set(newLineCount);
-            this.totalLogLines.set(newLineCount);
-
-            return newJob;
-          }
-          return currentJob;
-        });
-      }
     });
   }
 
@@ -163,13 +158,6 @@ export class JobDetail implements OnInit, OnDestroy, AfterViewChecked {
       } catch (err) {
       }
       this.shouldAutoScroll = false;
-    }
-  }
-
-  ngOnDestroy() {
-    if (window.runtime) {
-      window.runtime.EventsOff('job:update');
-      window.runtime.EventsOff('job:output');
     }
   }
 
@@ -289,7 +277,6 @@ export class JobDetail implements OnInit, OnDestroy, AfterViewChecked {
         annotation: annotations.length > 0 ? new DataFrame(annotations.map(a => ({ Sample: a.sample, Condition: a.condition || '', BioReplicate: a.bioreplicate || '', Batch: a.batch || '', Color: a.color || '' }))) : undefined,
       };
 
-      console.log('[Job Detail] Dialog data:', { mode: dialogData.mode, hasAnnotations: !!dialogData.annotation, hasSamples: !!dialogData.samples });
       await this.wails.logToFile(`[Job Detail] Opening dialog in ${dialogData.mode} mode with ${annotations.length} annotations and ${samples.length} samples`);
 
       const dialogRef = this.dialog.open(SampleAnnotation, {
