@@ -17,27 +17,28 @@ export class Toolbar implements OnInit {
   menuToggle = output<void>();
   protected activeJobsCount = signal(0);
 
+  private readonly activeJobIds = new Map<string, boolean>();
+
   constructor(private router: Router, private wails: Wails) {
     effect(() => {
       const job = this.wails.jobUpdate();
-      if (job) {
-        this.updateActiveJobsCount();
-      }
+      if (!job) return;
+      const isActive = job.status === 'in_progress' || job.status === 'pending';
+      this.activeJobIds.set(job.id, isActive);
+      const count = Array.from(this.activeJobIds.values()).filter(Boolean).length;
+      this.activeJobsCount.set(count);
     });
   }
 
   async ngOnInit() {
-    await this.updateActiveJobsCount();
-  }
-
-  async updateActiveJobsCount() {
     try {
       const jobs = await this.wails.getAllJobs();
-      const activeCount = jobs.filter(job =>
-        job.status === 'in_progress' || job.status === 'pending'
-      ).length;
-      this.activeJobsCount.set(activeCount);
-    } catch (err) {
+      for (const job of jobs) {
+        this.activeJobIds.set(job.id, job.status === 'in_progress' || job.status === 'pending');
+      }
+      const count = Array.from(this.activeJobIds.values()).filter(Boolean).length;
+      this.activeJobsCount.set(count);
+    } catch {
       this.activeJobsCount.set(0);
     }
   }

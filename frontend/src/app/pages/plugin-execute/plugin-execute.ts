@@ -1,5 +1,6 @@
-import { Component, OnInit, signal, ViewChild, ChangeDetectionStrategy, effect } from '@angular/core';
+import { Component, OnInit, OnDestroy, signal, ViewChild, ChangeDetectionStrategy } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
+import { Subscription } from 'rxjs';
 import { CommonModule } from '@angular/common';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
@@ -31,8 +32,9 @@ import { Wails } from '../../core/services/wails';
   styleUrl: './plugin-execute.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class PluginExecute implements OnInit {
+export class PluginExecute implements OnInit, OnDestroy {
   @ViewChild(DynamicFormComponent) dynamicForm?: DynamicFormComponent;
+  private paramMapSubscription?: Subscription;
 
   plugin = signal<models.PluginV2 | null>(null);
   loading = signal(true);
@@ -50,18 +52,14 @@ export class PluginExecute implements OnInit {
     private pluginService: PluginV2Service,
     private notification: NotificationService,
     private wails: Wails
-  ) {
-    effect(() => {
-      const _ = this.wails.bindingsUpdated();
-      const p = this.plugin();
-      if (p) {
-        this.loadPluginBinding(p.definition.plugin.id);
-      }
-    });
+  ) {}
+
+  ngOnDestroy() {
+    this.paramMapSubscription?.unsubscribe();
   }
 
-  async ngOnInit() {
-    this.route.paramMap.subscribe(async params => {
+  ngOnInit() {
+    this.paramMapSubscription = this.route.paramMap.subscribe(async params => {
       const pluginIdStr = params.get('id');
       if (!pluginIdStr) {
         this.error.set('Plugin ID not provided');
@@ -155,6 +153,26 @@ export class PluginExecute implements OnInit {
 
     try {
       this.executing.set(true);
+
+      const envs = plugin.definition.runtime.environments || [];
+      const pluginStringId = plugin.definition.plugin.id;
+
+      if (envs.includes('python') && !this.pythonBound()) {
+        const bound = await this.ensurePythonBinding(pluginStringId);
+        if (!bound) {
+          this.notification.showError('No Python environment configured. Please set an active Python environment in Settings.');
+          return;
+        }
+      }
+
+      if (envs.includes('r') && !this.rBound()) {
+        const bound = await this.ensureRBinding(pluginStringId);
+        if (!bound) {
+          this.notification.showError('No R environment configured. Please set an active R environment in Settings.');
+          return;
+        }
+      }
+
       const jobId = await this.pluginService.executePlugin(plugin.id, parameters);
       this.createdJobId.set(jobId);
 
@@ -163,6 +181,32 @@ export class PluginExecute implements OnInit {
       this.notification.showError(`Failed to execute plugin: ${err}`);
     } finally {
       this.executing.set(false);
+    }
+  }
+
+  private async ensurePythonBinding(pluginStringId: string): Promise<boolean> {
+    try {
+      const pythonEnv = await this.wails.getActivePythonEnvironment();
+      if (!pythonEnv?.path) return false;
+      await this.wails.bindPluginToEnvironment(pluginStringId, 'python', 0, pythonEnv.path);
+      this.pythonBound.set(true);
+      this.hasCustomBinding.set(true);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  private async ensureRBinding(pluginStringId: string): Promise<boolean> {
+    try {
+      const rEnv = await this.wails.getActiveREnvironment();
+      if (!rEnv?.path) return false;
+      await this.wails.bindPluginToEnvironment(pluginStringId, 'r', 0, rEnv.path);
+      this.rBound.set(true);
+      this.hasCustomBinding.set(true);
+      return true;
+    } catch {
+      return false;
     }
   }
 
@@ -175,7 +219,7 @@ export class PluginExecute implements OnInit {
     this.dynamicForm?.loadExample();
   }
 
-  viewJob() {
+  viewJob(): void {
     const jobId = this.createdJobId();
     if (jobId) {
       this.router.navigate(['/job', jobId]);

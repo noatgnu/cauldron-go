@@ -89,7 +89,6 @@ export class Home implements OnInit {
       this.debugInfo.set({ ...this.debugInfo(), logs: [...logs, `[${new Date().toLocaleTimeString()}] ${msg}`] });
     };
 
-    // Force stop loading after 5 seconds
     setTimeout(() => {
       if (this.loading()) {
         addLog('⚠️ Timeout: Stopping loading spinner after 5 seconds');
@@ -169,20 +168,17 @@ export class Home implements OnInit {
   }
 
   async loadImportedFiles() {
-    console.log('Starting to load imported files...');
     this.loadingFiles.set(true);
     try {
       const files = await this.wails.getImportedFiles();
-      console.log('Loaded imported files:', files);
       this.importedFiles.set(files);
       this.debugInfo.set({ ...this.debugInfo(), filesLoaded: `✓ ${files.length} files` });
     } catch (error: any) {
-      console.error('Failed to load imported files:', error);
       const errorMsg = error?.message || String(error);
+      await this.wails.logToFile(`[Home] Failed to load imported files: ${errorMsg}`);
       this.debugInfo.set({ ...this.debugInfo(), filesLoaded: `✗ Error: ${errorMsg}`, lastError: errorMsg });
     } finally {
       this.loadingFiles.set(false);
-      console.log('Finished loading imported files');
     }
   }
 
@@ -242,13 +238,10 @@ export class Home implements OnInit {
   }
 
   async loadJobs() {
-    console.log('Starting to load jobs...');
     this.debugInfo.set({ ...this.debugInfo(), jobsLoaded: 'Calling backend...' });
 
     try {
-      console.log('About to call wails.getAllJobs()');
       const allJobs = await this.wails.getAllJobs();
-      console.log('Received response from getAllJobs():', allJobs);
 
       if (!allJobs) {
         throw new Error('getAllJobs() returned null/undefined');
@@ -256,13 +249,11 @@ export class Home implements OnInit {
 
       this.jobs.set(allJobs);
       this.debugInfo.set({ ...this.debugInfo(), jobsLoaded: `✓ ${allJobs.length} jobs` });
-      console.log('Successfully loaded jobs');
     } catch (error: any) {
-      console.error('Failed to load jobs:', error);
       const errorMsg = error?.message || String(error);
+      await this.wails.logToFile(`[Home] Failed to load jobs: ${errorMsg}`);
       this.debugInfo.set({ ...this.debugInfo(), jobsLoaded: `✗ ${errorMsg}`, lastError: errorMsg });
     }
-    console.log('Finished loading jobs');
   }
 
   getStatusColor(status: string): string {
@@ -287,19 +278,45 @@ export class Home implements OnInit {
     try {
       await this.wails.deleteJob(id);
       this.jobs.update(jobs => jobs.filter(j => j.id !== id));
-    } catch (error) {
-      console.error('Failed to delete job:', error);
+    } catch (error: any) {
+      await this.wails.logToFile(`[Home] Failed to delete job: ${error?.message || String(error)}`);
     }
   }
 
   async rerunJob(id: string): Promise<void> {
     try {
+      const job = this.jobs().find(j => j.id === id);
+      if (job?.type) {
+        await this.ensureJobBinding(job.type);
+      }
       const newJobId = await this.wails.rerunJob(id, true, '', '');
       this.notificationService.showSuccess(`Job ${id} was successfully rerun as new job ${newJobId}`);
-      await this.loadJobs(); // Refresh the job list
-    } catch (error) {
-      console.error('Failed to rerun job:', error);
+      await this.loadJobs();
+    } catch (error: any) {
+      await this.wails.logToFile(`[Home] Failed to rerun job: ${error?.message || String(error)}`);
       this.notificationService.showError('Failed to rerun job.');
+    }
+  }
+
+  private async ensureJobBinding(pluginStringId: string): Promise<void> {
+    if (!pluginStringId) return;
+    try {
+      const pythonBinding = await this.wails.getPluginEnvironmentBinding(pluginStringId, 'python').catch(() => null);
+      if (!pythonBinding) {
+        const pythonEnv = await this.wails.getActivePythonEnvironment();
+        if (pythonEnv?.path) {
+          await this.wails.bindPluginToEnvironment(pluginStringId, 'python', 0, pythonEnv.path).catch(() => {});
+        }
+      }
+      const rBinding = await this.wails.getPluginEnvironmentBinding(pluginStringId, 'r').catch(() => null);
+      if (!rBinding) {
+        const rEnv = await this.wails.getActiveREnvironment();
+        if (rEnv?.path) {
+          await this.wails.bindPluginToEnvironment(pluginStringId, 'r', 0, rEnv.path).catch(() => {});
+        }
+      }
+    } catch (error: any) {
+      await this.wails.logToFile(`[Home] Failed to ensure binding for ${pluginStringId}: ${error?.message || String(error)}`);
     }
   }
 
@@ -324,8 +341,8 @@ export class Home implements OnInit {
     try {
       await this.wails.deleteImportedFile(id);
       this.importedFiles.update(files => files.filter(f => f.id !== id));
-    } catch (error) {
-      console.error('Failed to delete imported file:', error);
+    } catch (error: any) {
+      await this.wails.logToFile(`[Home] Failed to delete imported file: ${error?.message || String(error)}`);
     }
   }
 }

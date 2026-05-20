@@ -1,9 +1,9 @@
-import { Component, OnInit, signal, ChangeDetectionStrategy } from '@angular/core';
-import { RouterOutlet, Router } from '@angular/router';
+import { Component, OnInit, signal, ChangeDetectionStrategy, HostListener, ChangeDetectorRef } from '@angular/core';
+import { RouterOutlet, Router, NavigationEnd } from '@angular/router';
+import { filter, firstValueFrom } from 'rxjs';
 import { MatSidenavModule } from '@angular/material/sidenav';
 import { MatDialog } from '@angular/material/dialog';
-import { firstValueFrom } from 'rxjs';
-import { Events } from '@wailsio/runtime';
+import { Events, Window } from '@wailsio/runtime';
 import { Sidenav } from './layout/sidenav/sidenav';
 import { Breadcrumbs } from './layout/breadcrumbs/breadcrumbs';
 import { ProtocolHandlerService } from './core/services/protocol-handler.service';
@@ -26,12 +26,24 @@ export class App implements OnInit {
 
   constructor(
     private router: Router,
+    private cdr: ChangeDetectorRef,
     private protocolHandler: ProtocolHandlerService,
     private loadingService: LoadingService,
     private dialog: MatDialog,
     private notification: NotificationService,
     private themeService: ThemeService
-  ) {}
+  ) {
+    this.router.events.pipe(filter(e => e instanceof NavigationEnd)).subscribe(() => {
+      setTimeout(() => this.cdr.detectChanges());
+    });
+  }
+
+  @HostListener('document:keydown', ['$event'])
+  onKeyDown(event: KeyboardEvent): void {
+    if (event.key === 'F12') {
+      Window.OpenDevTools().catch(() => {});
+    }
+  }
 
   ngOnInit(): void {
     this.setupMenuEventListeners();

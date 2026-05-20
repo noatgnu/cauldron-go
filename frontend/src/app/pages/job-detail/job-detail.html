@@ -138,7 +138,7 @@
           }
         }
 
-        @if (job()!.terminalOutput && job()!.terminalOutput.length > 0) {
+        @if (liveOutput().length > 0) {
           <div class="terminal-section">
             <mat-expansion-panel [expanded]="job()!.status === 'in_progress'">
               <mat-expansion-panel-header>

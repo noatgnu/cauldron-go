@@ -1,5 +1,5 @@
 import { DataFrame } from 'data-forge';
-import { Component, OnInit, AfterViewChecked, signal, ViewChild, ElementRef, computed, ChangeDetectionStrategy, effect } from '@angular/core';
+import { Component, OnInit, AfterViewChecked, signal, ViewChild, ElementRef, computed, ChangeDetectionStrategy, effect, untracked } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -54,7 +54,7 @@ import { NotificationService } from '../../core/services/notification.service';
 })
 export class JobDetail implements OnInit, AfterViewChecked {
   protected job = signal<Job | null>(null);
-  protected loading = signal(true);
+  protected loading = signal(false);
   protected error = signal('');
   protected jobId: string = '';
   protected pluginPlots = signal<Array<{ fileName: string, title: string, type: string }>>([]);
@@ -67,13 +67,14 @@ export class JobDetail implements OnInit, AfterViewChecked {
   protected fullLogLoaded = signal<boolean>(false);
   protected totalLogLines = signal<number>(0);
   protected displayedLogLines = signal<number>(0);
+  protected liveOutput = signal<string[]>([]);
   private fullLog: string[] = [];
   protected searchTerm = signal<string>('');
   protected caseSensitive = signal<boolean>(false);
   protected currentMatchIndex = signal<number>(0);
   protected filteredOutput = computed(() => {
     const term = this.searchTerm();
-    const output = this.job()?.terminalOutput || [];
+    const output = this.liveOutput();
 
     if (!term.trim()) {
       return output.map((line, index) => ({ line, originalIndex: index, highlighted: line }));
@@ -110,8 +111,8 @@ export class JobDetail implements OnInit, AfterViewChecked {
       const jobUpdate = this.wails.jobUpdate();
       if (!jobUpdate || !this.jobId || jobUpdate.id !== this.jobId) return;
 
-      const previousStatus = this.job()?.status;
-      const currentTerminalOutput = this.job()?.terminalOutput || [];
+      const previousStatus = untracked(() => this.job()?.status);
+      const currentTerminalOutput = untracked(() => this.job()?.terminalOutput) || [];
 
       this.job.set(new models.Job({
         ...jobUpdate,
@@ -122,6 +123,7 @@ export class JobDetail implements OnInit, AfterViewChecked {
 
       if (previousStatus !== 'completed' && jobUpdate.status === 'completed') {
         this.detectPluginPlots();
+        this.loadExecutionLogAfterCompletion();
       }
     });
 
@@ -129,22 +131,20 @@ export class JobDetail implements OnInit, AfterViewChecked {
       const outputData = this.wails.jobOutput();
       if (!outputData || !this.jobId || outputData.jobId !== this.jobId) return;
 
-      this.job.update(currentJob => {
-        if (!currentJob) return currentJob;
-        const newJob = new models.Job({
-          ...currentJob,
-          terminalOutput: [...(currentJob.terminalOutput || []), outputData.output]
-        });
-        this.shouldAutoScroll = true;
-        const newLineCount = newJob.terminalOutput?.length || 0;
-        this.displayedLogLines.set(newLineCount);
-        this.totalLogLines.set(newLineCount);
-        return newJob;
+      let newLength = 0;
+      this.liveOutput.update(current => {
+        const updated = [...current, ...outputData.outputs];
+        const result = updated.length > 500 ? updated.slice(-500) : updated;
+        newLength = result.length;
+        return result;
       });
+      this.shouldAutoScroll = true;
+      this.totalLogLines.update(t => t + outputData.outputs.length);
+      this.displayedLogLines.set(newLength);
     });
   }
 
-  async ngOnInit() {
+  ngOnInit() {
     this.route.params.subscribe(async params => {
       this.jobId = params['id'];
       await this.loadJob();
@@ -166,31 +166,46 @@ export class JobDetail implements OnInit, AfterViewChecked {
     try {
       const jobData = await this.wails.getJob(this.jobId);
 
-      try {
-        const executionLog = await this.wails.getJobExecutionLog(this.jobId);
-        if (executionLog && executionLog.trim()) {
-          this.fullLog = executionLog.split('\n').filter((line: string) => line.trim());
-          this.totalLogLines.set(this.fullLog.length);
+      if (jobData.status === 'completed') {
+        try {
+          const executionLog = await this.wails.getJobExecutionLog(this.jobId);
+          if (executionLog && executionLog.trim()) {
+            this.fullLog = executionLog.split('\n').filter((line: string) => line.trim());
+            this.totalLogLines.set(this.fullLog.length);
 
-          const maxLines = 1000;
-          if (this.fullLog.length > maxLines) {
-            jobData.terminalOutput = this.fullLog.slice(-maxLines);
-            this.displayedLogLines.set(maxLines);
-            this.fullLogLoaded.set(false);
+            const maxLines = 200;
+            if (this.fullLog.length > maxLines) {
+              const initialLines = this.fullLog.slice(-maxLines);
+              jobData.terminalOutput = initialLines;
+              this.liveOutput.set(initialLines);
+              this.displayedLogLines.set(maxLines);
+              this.fullLogLoaded.set(false);
+            } else {
+              jobData.terminalOutput = this.fullLog;
+              this.liveOutput.set(this.fullLog);
+              this.displayedLogLines.set(this.fullLog.length);
+              this.fullLogLoaded.set(true);
+            }
           } else {
-            jobData.terminalOutput = this.fullLog;
-            this.displayedLogLines.set(this.fullLog.length);
+            const fallback = jobData.terminalOutput || [];
+            this.liveOutput.set(fallback);
+            this.displayedLogLines.set(fallback.length);
+            this.totalLogLines.set(fallback.length);
             this.fullLogLoaded.set(true);
           }
-        } else {
-          this.displayedLogLines.set(jobData.terminalOutput?.length || 0);
-          this.totalLogLines.set(jobData.terminalOutput?.length || 0);
+        } catch (err) {
+          await this.wails.logToFile(`[Job Detail] Could not load execution log: ${err}`);
+          const fallback = jobData.terminalOutput || [];
+          this.liveOutput.set(fallback);
+          this.displayedLogLines.set(fallback.length);
+          this.totalLogLines.set(fallback.length);
           this.fullLogLoaded.set(true);
         }
-      } catch (err) {
-        await this.wails.logToFile(`[Job Detail] Could not load execution log: ${err}`);
-        this.displayedLogLines.set(jobData.terminalOutput?.length || 0);
-        this.totalLogLines.set(jobData.terminalOutput?.length || 0);
+      } else {
+        const fallback = jobData.terminalOutput || [];
+        this.liveOutput.set(fallback);
+        this.displayedLogLines.set(fallback.length);
+        this.totalLogLines.set(fallback.length);
         this.fullLogLoaded.set(true);
       }
 
@@ -208,31 +223,47 @@ export class JobDetail implements OnInit, AfterViewChecked {
         }
       }
 
-      if (jobData.status === 'completed') {
-        await this.detectPluginPlots();
-      }
     } catch (err: any) {
       this.error.set(err.message || 'Failed to load job');
     } finally {
       this.loading.set(false);
     }
+
+    if (this.job()?.status === 'completed') {
+      this.detectPluginPlots().catch(err =>
+        this.wails.logToFile(`[Job Detail] Error detecting plots: ${err}`)
+      );
+    }
+  }
+
+  private async loadExecutionLogAfterCompletion() {
+    try {
+      const executionLog = await this.wails.getJobExecutionLog(this.jobId);
+      if (executionLog && executionLog.trim()) {
+        this.fullLog = executionLog.split('\n').filter((line: string) => line.trim());
+        this.totalLogLines.set(this.fullLog.length);
+        const maxLines = 200;
+        if (this.fullLog.length > maxLines) {
+          this.liveOutput.set(this.fullLog.slice(-maxLines));
+          this.displayedLogLines.set(maxLines);
+          this.fullLogLoaded.set(false);
+        } else {
+          this.liveOutput.set(this.fullLog);
+          this.displayedLogLines.set(this.fullLog.length);
+          this.fullLogLoaded.set(true);
+        }
+      }
+    } catch (err) {
+      await this.wails.logToFile(`[Job Detail] Error loading execution log after completion: ${err}`);
+    }
   }
 
   loadFullLog() {
     if (this.fullLog.length > 0) {
-      this.job.update(currentJob => {
-        if (currentJob) {
-          const updatedJob = new models.Job({
-            ...currentJob,
-            terminalOutput: this.fullLog
-          });
-          this.displayedLogLines.set(this.fullLog.length);
-          this.fullLogLoaded.set(true);
-          this.shouldAutoScroll = true;
-          return updatedJob;
-        }
-        return currentJob;
-      });
+      this.liveOutput.set(this.fullLog);
+      this.displayedLogLines.set(this.fullLog.length);
+      this.fullLogLoaded.set(true);
+      this.shouldAutoScroll = true;
     }
   }
 
@@ -410,79 +441,57 @@ export class JobDetail implements OnInit, AfterViewChecked {
   }
 
   async detectPluginPlots() {
-    try {
-      const jsonPlots: Array<{ fileName: string, title: string, type: string }> = [];
-      const dynamicPlotsArray: Array<{ config: any, outputs: any[] }> = [];
-      const dedicatedPlotsArray: Array<{ config: any }> = [];
+    const jsonPlots: Array<{ fileName: string, title: string, type: string }> = [];
+    const dynamicPlotsArray: Array<{ config: any, outputs: any[] }> = [];
+    const dedicatedPlotsArray: Array<{ config: any }> = [];
 
-      if (!this.currentPlugin) {
-        await this.wails.logToFile('[Job Detail] No plugin loaded for plot detection');
-        return;
-      }
+    if (!this.currentPlugin) return;
 
-      const plugin = this.currentPlugin;
-      await this.wails.logToFile(`[Job Detail] Plugin definition: ${JSON.stringify(plugin.definition)}`);
+    const plugin = this.currentPlugin;
+    const knownComponents = ['PcaPlot', 'PhatePlot', 'FuzzyClusteringPlot'];
 
-      if (plugin.definition.plots && plugin.definition.plots.length > 0) {
-        await this.wails.logToFile(`[Job Detail] Found ${plugin.definition.plots.length} plot(s) in plugin definition`);
-        for (let i = 0; i < plugin.definition.plots.length; i++) {
-          const plotConfig = plugin.definition.plots[i];
-          const component = plotConfig.component;
-          const plotType = plotConfig.type;
-          const knownComponents = ['PcaPlot', 'PhatePlot', 'FuzzyClusteringPlot'];
+    if (plugin.definition.plots && plugin.definition.plots.length > 0) {
+      for (const plotConfig of plugin.definition.plots) {
+        const component = plotConfig.component;
+        const plotType = plotConfig.type;
 
-          await this.wails.logToFile(`[Job Detail] Processing plot: ${plotConfig.id}, type: ${plotType}, component: ${component}, default: ${plotConfig.default}`);
-
-          if (component && knownComponents.includes(component)) {
-            dedicatedPlotsArray.push({ config: plotConfig });
-            await this.wails.logToFile(`[Job Detail] Added dedicated plot: ${plotConfig.id}`);
-          } else if (plotType === 'image-grid') {
-            const plotsBeforeImageGrid = jsonPlots.length;
-            await this.detectImageGridPlots(plotConfig, jsonPlots);
-            if (plotConfig.default && jsonPlots.length > plotsBeforeImageGrid) {
-              this.defaultPluginPlotIndex.set(plotsBeforeImageGrid);
-              await this.wails.logToFile(`[Job Detail] Set default plugin plot index to ${plotsBeforeImageGrid}`);
-            }
-          } else if (!component) {
-            if (plotConfig.default) {
-              this.defaultDynamicPlotIndex.set(dynamicPlotsArray.length);
-              await this.wails.logToFile(`[Job Detail] Set default dynamic plot index to ${dynamicPlotsArray.length}`);
-            }
-            dynamicPlotsArray.push({
-              config: plotConfig,
-              outputs: plugin.definition.outputs || []
-            });
-            await this.wails.logToFile(`[Job Detail] Added dynamic plot: ${plotConfig.id}`);
+        if (component && knownComponents.includes(component)) {
+          dedicatedPlotsArray.push({ config: plotConfig });
+        } else if (plotType === 'image-grid') {
+          const plotsBeforeImageGrid = jsonPlots.length;
+          await this.detectImageGridPlots(plotConfig, jsonPlots);
+          if (plotConfig.default && jsonPlots.length > plotsBeforeImageGrid) {
+            this.defaultPluginPlotIndex.set(plotsBeforeImageGrid);
           }
-        }
-      } else {
-        await this.wails.logToFile('[Job Detail] No plots defined in plugin definition');
-      }
-
-      for (let i = 1; i <= 10; i++) {
-        try {
-          const fileName = `plot_${i}.json`;
-          await this.wails.readJobOutputFile(this.jobId, fileName);
-          jsonPlots.push({
-            fileName: fileName,
-            title: `Plot ${i}`,
-            type: 'json'
-          });
-        } catch (e) {
-          break;
+        } else if (!component) {
+          if (plotConfig.default) {
+            this.defaultDynamicPlotIndex.set(dynamicPlotsArray.length);
+          }
+          dynamicPlotsArray.push({ config: plotConfig, outputs: plugin.definition.outputs || [] });
         }
       }
+    }
 
-      this.dedicatedPlots.set(dedicatedPlotsArray);
-      this.dynamicPlots.set(dynamicPlotsArray);
-      this.pluginPlots.set(jsonPlots);
-
-      if (dedicatedPlotsArray.length > 0 || dynamicPlotsArray.length > 0 || jsonPlots.length > 0) {
-        await this.wails.logToFile(`[Job Detail] Found ${dedicatedPlotsArray.length} dedicated, ${dynamicPlotsArray.length} dynamic, and ${jsonPlots.length} JSON plot(s) for job ${this.jobId}`);
+    try {
+      const outputFiles = await this.wails.listJobOutputFiles(this.jobId);
+      const plotFiles = outputFiles
+        .filter((f: string) => /^plot_\d+\.json$/.test(f))
+        .sort((a: string, b: string) => {
+          const numA = parseInt(a.match(/\d+/)?.[0] || '0', 10);
+          const numB = parseInt(b.match(/\d+/)?.[0] || '0', 10);
+          return numA - numB;
+        });
+      for (const fileName of plotFiles) {
+        const plotNum = fileName.match(/\d+/)?.[0] || '';
+        jsonPlots.push({ fileName, title: `Plot ${plotNum}`, type: 'json' });
       }
     } catch (err) {
-      await this.wails.logToFile(`[Job Detail] Error detecting plugin plots: ${err}`);
+      await this.wails.logToFile(`[Job Detail] Error listing output files: ${err}`);
     }
+
+    this.dedicatedPlots.set(dedicatedPlotsArray);
+    this.dynamicPlots.set(dynamicPlotsArray);
+    this.pluginPlots.set(jsonPlots);
   }
 
   async openResultFolder() {

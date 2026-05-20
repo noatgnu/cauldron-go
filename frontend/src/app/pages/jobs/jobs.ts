@@ -117,8 +117,8 @@ export class Jobs implements OnInit {
       ]);
       this.pythonEnvironments.set(pythonEnvs);
       this.rEnvironments.set(rEnvs);
-    } catch (error) {
-      console.error('Failed to load environments:', error);
+    } catch (error: any) {
+      await this.wails.logToFile(`[Jobs] Failed to load environments: ${error?.message || String(error)}`);
     }
   }
 
@@ -127,21 +127,42 @@ export class Jobs implements OnInit {
     try {
       const allJobs = await this.wails.getAllJobs();
       this.jobs.set(allJobs);
-    } catch (error) {
-      console.error('Failed to load jobs:', error);
+    } catch (error: any) {
+      await this.wails.logToFile(`[Jobs] Failed to load jobs: ${error?.message || String(error)}`);
     } finally {
       this.loading.set(false);
     }
   }
 
+  private async ensureJobBinding(pluginStringId: string): Promise<void> {
+    if (!pluginStringId) return;
+    try {
+      const pythonBinding = await this.wails.getPluginEnvironmentBinding(pluginStringId, 'python').catch(() => null);
+      if (!pythonBinding) {
+        const pythonEnv = await this.wails.getActivePythonEnvironment();
+        if (pythonEnv?.path) {
+          await this.wails.bindPluginToEnvironment(pluginStringId, 'python', 0, pythonEnv.path).catch(() => {});
+        }
+      }
+      const rBinding = await this.wails.getPluginEnvironmentBinding(pluginStringId, 'r').catch(() => null);
+      if (!rBinding) {
+        const rEnv = await this.wails.getActiveREnvironment();
+        if (rEnv?.path) {
+          await this.wails.bindPluginToEnvironment(pluginStringId, 'r', 0, rEnv.path).catch(() => {});
+        }
+      }
+    } catch (error: any) {
+      await this.wails.logToFile(`[Jobs] Failed to ensure binding for ${pluginStringId}: ${error?.message || String(error)}`);
+    }
+  }
 
   async deleteJob(event: Event, id: string): Promise<void> {
     event.stopPropagation();
     try {
       await this.wails.deleteJob(id);
       this.jobs.update(jobs => jobs.filter(j => j.id !== id));
-    } catch (error) {
-      console.error('Failed to delete job:', error);
+    } catch (error: any) {
+      await this.wails.logToFile(`[Jobs] Failed to delete job: ${error?.message || String(error)}`);
     }
   }
 
@@ -209,11 +230,12 @@ export class Jobs implements OnInit {
   async rerunWithSameEnvironment(event: Event, job: Job): Promise<void> {
     event.stopPropagation();
     try {
+      await this.ensureJobBinding(job.type);
       const newJobId = await this.wails.rerunJob(job.id, true, '', '');
       await this.loadJobs();
       this.router.navigate(['/jobs', newJobId]);
-    } catch (error) {
-      console.error('Failed to rerun job:', error);
+    } catch (error: any) {
+      await this.wails.logToFile(`[Jobs] Failed to rerun job: ${error?.message || String(error)}`);
     }
   }
 
@@ -221,6 +243,7 @@ export class Jobs implements OnInit {
     event.stopPropagation();
 
     try {
+      await this.ensureJobBinding(job.type);
       const settings = await this.wails.getSettings();
 
       const newJobId = await this.wails.rerunJob(
@@ -231,8 +254,8 @@ export class Jobs implements OnInit {
       );
       await this.loadJobs();
       this.router.navigate(['/jobs', newJobId]);
-    } catch (error) {
-      console.error('Failed to rerun job:', error);
+    } catch (error: any) {
+      await this.wails.logToFile(`[Jobs] Failed to rerun job: ${error?.message || String(error)}`);
     }
   }
 
@@ -265,8 +288,8 @@ export class Jobs implements OnInit {
     }
     try {
       await this.wails.openDirectoryInExplorer(job.outputPath);
-    } catch (error) {
-      console.error('Failed to open output directory:', error);
+    } catch (error: any) {
+      await this.wails.logToFile(`[Jobs] Failed to open output directory: ${error?.message || String(error)}`);
     }
   }
 

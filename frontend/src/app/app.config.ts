@@ -1,5 +1,6 @@
 import { ApplicationConfig, importProvidersFrom, provideBrowserGlobalErrorListeners, provideZonelessChangeDetection } from '@angular/core';
 import { provideRouter, withHashLocation } from '@angular/router';
+import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import * as PlotlyJS from 'plotly.js-dist-min';
 import { PlotlyModule } from 'angular-plotly.js';
 import {
@@ -18,6 +19,7 @@ import { routes } from './app.routes';
 export const appConfig: ApplicationConfig = {
   providers: [
     provideZonelessChangeDetection(),
+    provideNoopAnimations(),
     provideBrowserGlobalErrorListeners(),
     provideRouter(routes, withHashLocation()),
     importProvidersFrom(PlotlyModule.forRoot(PlotlyJS)),
