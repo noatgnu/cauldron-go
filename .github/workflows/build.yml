@@ -164,14 +164,14 @@ jobs:
           echo "[]" > resources/licenses/npm-licenses.json
 
       - name: Run backend unit tests
-        run: go test -v ./backend/... ./cmd/...
+        run: go test -v -tags gtk4 ./backend/... ./cmd/...
 
       - name: Run job queue service tests
-        run: go test -v -run "TestJobQueue" -timeout 60s
+        run: go test -v -tags gtk4 -run "TestJobQueue" -timeout 60s
 
       - name: Run basic E2E tests (no plugins required)
         run: |
-          go test -v -run "TestE2ESettingsManagement|TestE2EEnvironmentDetection|TestE2EFileOperations|TestE2EVersionChecks|TestE2ELicenseInfo|TestE2ELogging|TestE2ETempFileOperations|TestE2EDefaultVenvPath|TestE2EJobQueueAdvanced" -timeout 120s
+          go test -v -tags gtk4 -run "TestE2ESettingsManagement|TestE2EEnvironmentDetection|TestE2EFileOperations|TestE2EVersionChecks|TestE2ELicenseInfo|TestE2ELogging|TestE2ETempFileOperations|TestE2EDefaultVenvPath|TestE2EJobQueueAdvanced" -timeout 120s
 
   build-frontend:
     name: Build Frontend
@@ -372,19 +372,19 @@ jobs:
 
       - name: Run E2E plugin management tests
         run: |
-          go test -v -run "TestE2EPluginManagement" -timeout 60s
+          go test -v -tags gtk4 -run "TestE2EPluginManagement" -timeout 60s
 
       - name: Run E2E plugin requirements tests
         env:
           BUILD_DIR: ${{ github.workspace }}/build/bin
         run: |
-          go test -v -run "TestE2EPluginRequirements" -timeout 120s
+          go test -v -tags gtk4 -run "TestE2EPluginRequirements" -timeout 120s
 
       - name: Run E2E process job code path tests
         env:
           BUILD_DIR: ${{ github.workspace }}/build/bin
         run: |
-          go test -v -run "TestE2EProcessJobCodePath" -timeout 120s
+          go test -v -tags gtk4 -run "TestE2EProcessJobCodePath" -timeout 120s
 
   e2e-full-plugin-execution:
     name: E2E Full Plugin Execution
@@ -493,13 +493,13 @@ jobs:
         env:
           BUILD_DIR: ${{ github.workspace }}/build/bin
         run: |
-          go test -v -run "TestE2EWithActualPlugins" -timeout 300s
+          go test -v -tags gtk4 -run "TestE2EWithActualPlugins" -timeout 300s
 
       - name: Run E2E job output operations test
         env:
           BUILD_DIR: ${{ github.workspace }}/build/bin
         run: |
-          go test -v -run "TestE2EJobOutputOperations" -timeout 300s
+          go test -v -tags gtk4 -run "TestE2EJobOutputOperations" -timeout 300s
 
   e2e-playwright-tests:
     name: Playwright E2E Tests
@@ -620,7 +620,7 @@ jobs:
 
       - name: Build application
         run: |
-          go build -tags devtools -o ./build/bin/cauldron .
+          go build -tags "gtk4 devtools" -o ./build/bin/cauldron .
 
       - name: Copy plugins to build directory
         run: |

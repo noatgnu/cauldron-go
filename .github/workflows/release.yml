@@ -290,11 +290,11 @@ jobs:
           echo "[]" > resources/licenses/npm-licenses.json
 
       - name: Run Backend Tests
-        run: go test -v ./backend/... ./cmd/...
+        run: go test -v -tags gtk4 ./backend/... ./cmd/...
 
       - name: Run E2E Tests (no plugins required)
         run: |
-          go test -v -run "TestE2ESettingsManagement|TestE2EEnvironmentDetection|TestE2EFileOperations|TestE2EVersionChecks|TestE2ELogging|TestE2ETempFileOperations|TestE2EDefaultVenvPath|TestE2EJobQueueAdvanced|TestE2EPluginManagement" -timeout 120s
+          go test -v -tags gtk4 -run "TestE2ESettingsManagement|TestE2EEnvironmentDetection|TestE2EFileOperations|TestE2EVersionChecks|TestE2ELogging|TestE2ETempFileOperations|TestE2EDefaultVenvPath|TestE2EJobQueueAdvanced|TestE2EPluginManagement" -timeout 120s
 
       - name: Generate Wails bindings
         run: wails3 generate bindings -ts
@@ -322,7 +322,7 @@ jobs:
           npm run build
           cd ..
           mkdir -p build/bin/linux-amd64
-          CGO_ENABLED=1 go build -ldflags="-s -w" -o build/bin/linux-amd64/cauldron .
+          CGO_ENABLED=1 go build -tags gtk4 -ldflags="-s -w" -o build/bin/linux-amd64/cauldron .
 
       - name: Clean up test environments
         run: |
