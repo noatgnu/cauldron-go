@@ -255,19 +255,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
-
-      - name: Link WebKitGTK 4.0 for pkg-config
-        run: |
-          PC_FILE=$(find /usr -name "webkit2gtk-4.1.pc" 2>/dev/null | head -n 1)
-          if [ -z "$PC_FILE" ]; then
-            echo "::error::webkit2gtk-4.1.pc not found!"
-            exit 1
-          fi
-          echo "Found webkit2gtk-4.1.pc at ${PC_FILE}"
-          sudo ln -s "$PC_FILE" /usr/share/pkgconfig/webkit2gtk-4.0.pc
-          echo "Symlink created. Verifying with pkg-config:"
-          pkg-config --modversion webkit2gtk-4.0
+          sudo apt-get update
+          sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev
 
 
       - name: Install Wails
