@@ -620,7 +620,7 @@ jobs:
 
       - name: Build application
         run: |
-          go build -tags "gtk4 devtools" -o ./build/bin/cauldron .
+          go build -tags gtk4 -o ./build/bin/cauldron .
 
       - name: Copy plugins to build directory
         run: |
@@ -632,13 +632,17 @@ jobs:
           CI: 'true'
           CAULDRON_TEST_MODE: 'true'
           TEST_API_URL: 'http://127.0.0.1:9245'
+          GDK_BACKEND: 'x11'
+          WEBKIT_DISABLE_COMPOSITING_MODE: '1'
+          WEBKIT_FORCE_SANDBOX: '0'
+          GDK_SCALE: '1'
+          GTK_A11Y: 'none'
         run: |
           Xvfb :99 -screen 0 1920x1080x24 &
           sleep 2
 
           cd ${{ github.workspace }}
 
-          # Start Wails app with TestAPI enabled (serves embedded frontend + TestAPI)
           CAULDRON_TEST_MODE=true ./build/bin/cauldron > /tmp/cauldron-e2e.log 2>&1 &
           APP_PID=$!
 
@@ -679,6 +683,10 @@ jobs:
           TEST_EXIT=$?
 
           kill $APP_PID 2>/dev/null || true
+
+          echo "=== Cauldron app log ==="
+          cat /tmp/cauldron-e2e.log || true
+
           exit $TEST_EXIT
 
       - name: Upload Playwright report
