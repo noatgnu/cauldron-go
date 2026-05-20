@@ -549,7 +549,9 @@ jobs:
             bzip2 \
             libgtk-4-dev \
             libwebkitgtk-6.0-dev \
-            xvfb
+            xvfb \
+            libgl1-mesa-dri \
+            mesa-utils
 
       - name: Compile R
         run: |
@@ -635,10 +637,14 @@ jobs:
           GDK_BACKEND: 'x11'
           WEBKIT_DISABLE_COMPOSITING_MODE: '1'
           WEBKIT_FORCE_SANDBOX: '0'
+          WEBKIT_DISABLE_DMABUF_RENDERER: '1'
           GDK_SCALE: '1'
           GTK_A11Y: 'none'
+          LIBGL_ALWAYS_SOFTWARE: '1'
+          MESA_GL_VERSION_OVERRIDE: '3.3'
+          MESA_GLSL_VERSION_OVERRIDE: '330'
         run: |
-          Xvfb :99 -screen 0 1920x1080x24 &
+          Xvfb :99 -screen 0 1920x1080x24 -ac &
           sleep 2
 
           cd ${{ github.workspace }}
