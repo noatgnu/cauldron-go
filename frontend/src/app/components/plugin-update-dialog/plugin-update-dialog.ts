@@ -6,6 +6,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTableModule } from '@angular/material/table';
 import { MatCheckboxModule } from '@angular/material/checkbox';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { SelectionModel } from '@angular/cdk/collections';
 import { Wails } from '../../core/services/wails';
 import * as models from '../../../../bindings/github.com/noatgnu/cauldron-go/backend/models/models';
@@ -27,7 +28,8 @@ interface PluginUpdateInfo {
     MatIconModule,
     MatProgressSpinnerModule,
     MatTableModule,
-    MatCheckboxModule
+    MatCheckboxModule,
+    MatTooltipModule
   ],
   templateUrl: './plugin-update-dialog.html',
   styleUrl: './plugin-update-dialog.scss',
