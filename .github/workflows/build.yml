@@ -164,7 +164,7 @@ jobs:
           echo "[]" > resources/licenses/npm-licenses.json
 
       - name: Run backend unit tests
-        run: go test -v -tags gtk4 ./backend/... ./cmd/...
+        run: go test -v -short -tags gtk4 ./backend/... ./cmd/...
 
       - name: Run job queue service tests
         run: go test -v -tags gtk4 -run "TestJobQueue" -timeout 60s

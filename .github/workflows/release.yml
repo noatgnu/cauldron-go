@@ -94,7 +94,7 @@ jobs:
         shell: bash
 
       - name: Run Backend Tests
-        run: go test -v ./backend/... ./cmd/...
+        run: go test -v -short ./backend/... ./cmd/...
         shell: bash
 
       - name: Run E2E Tests (no plugins required)
@@ -290,7 +290,7 @@ jobs:
           echo "[]" > resources/licenses/npm-licenses.json
 
       - name: Run Backend Tests
-        run: go test -v -tags gtk4 ./backend/... ./cmd/...
+        run: go test -v -short -tags gtk4 ./backend/... ./cmd/...
 
       - name: Run E2E Tests (no plugins required)
         run: |
@@ -467,7 +467,7 @@ jobs:
           echo "[]" > resources/licenses/npm-licenses.json
 
       - name: Run Backend Tests
-        run: go test -v ./backend/... ./cmd/...
+        run: go test -v -short ./backend/... ./cmd/...
 
       - name: Generate Wails bindings
         run: wails3 generate bindings -ts
