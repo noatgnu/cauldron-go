@@ -668,7 +668,12 @@ jobs:
 
           echo "Waiting for app to be fully initialized..."
           for i in {1..60}; do
-            RESPONSE=$(curl -s http://127.0.0.1:9245/test/window)
+            if ! kill -0 $APP_PID 2>/dev/null; then
+              echo "App process exited unexpectedly while waiting for initialization"
+              cat /tmp/cauldron-e2e.log
+              exit 1
+            fi
+            RESPONSE=$(curl -s http://127.0.0.1:9245/test/window || true)
             if echo "$RESPONSE" | grep -q '"ready":true'; then
               echo "App is fully initialized"
               break
