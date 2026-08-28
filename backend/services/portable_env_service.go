@@ -239,7 +239,7 @@ func (p *PortableEnvService) DownloadPortableEnvironment(url, environment string
 	checksumURL := url + ".sha256"
 	log.Printf("[DownloadPortableEnvironment] Downloading checksum from: %s", checksumURL)
 
-	expectedHash, err := p.downloadChecksum(checksumURL, checksumFilePath)
+	expectedHash, err := downloadChecksum(checksumURL, checksumFilePath)
 	if err != nil {
 		log.Printf("[DownloadPortableEnvironment] Warning: Failed to download checksum: %v", err)
 		log.Printf("[DownloadPortableEnvironment] Proceeding without hash verification")
@@ -385,7 +385,7 @@ func (p *PortableEnvService) DownloadPortableEnvironment(url, environment string
 	return nil
 }
 
-func (p *PortableEnvService) downloadChecksum(url, filePath string) (string, error) {
+func downloadChecksum(url, filePath string) (string, error) {
 	client := &http.Client{}
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {

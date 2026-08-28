@@ -12,10 +12,11 @@ import { MatDividerModule } from '@angular/material/divider';
 import { MatListModule } from '@angular/material/list';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatDialog } from '@angular/material/dialog';
-import { Wails, PythonEnvironment, VirtualEnvironment, Config, PluginEnvironmentBinding } from '../../../core/services/wails';
+import { Wails, PythonEnvironment, VirtualEnvironment, Config, PluginEnvironmentBinding, UvPythonVersion } from '../../../core/services/wails';
 import { NotificationService } from '../../../core/services/notification.service';
 import { PackagesModal } from '../../../components/packages-modal/packages-modal';
 import { DownloadPortableEnvDialogComponent } from '../../../components/download-portable-env-dialog/download-portable-env-dialog';
+import { UvInstallDialog } from '../../../components/uv-install-dialog/uv-install-dialog';
 import { BoundPluginsDialogComponent, BoundPlugin } from '../../../components/bound-plugins-dialog/bound-plugins-dialog';
 
 @Component({
@@ -55,6 +56,13 @@ export class SettingsPython implements OnInit {
   protected bindings = signal<PluginEnvironmentBinding[]>([]);
   protected plugins = signal<any[]>([]);
 
+  protected uvAvailable = signal(false);
+  protected uvPath = signal('');
+  protected uvManagedPythons = signal<UvPythonVersion[]>([]);
+  protected loadingUvPythons = signal(false);
+  protected creatingUvVenv = signal(false);
+  protected uvVenvCreationProgress = signal<{message: string, percentage: number} | null>(null);
+
   constructor(
     private wails: Wails,
     private dialog: MatDialog,
@@ -82,8 +90,14 @@ export class SettingsPython implements OnInit {
               this.creatingVenvEnv.set(false);
             }
             break;
+          case 'uv-venv':
+            this.uvVenvCreationProgress.set(isCompleted ? null : progressData);
+            if (isCompleted) {
+              this.creatingUvVenv.set(false);
+            }
+            break;
           default:
-            if (progress.id?.includes('python')) {
+            if (progress.id?.includes('python') && !progress.id?.startsWith('uv-')) {
               this.pythonInstallProgress.set(isCompleted ? null : progressData);
             }
             break;
@@ -99,6 +113,7 @@ export class SettingsPython implements OnInit {
     this.detectAllPythonEnvironments();
     await this.loadVirtualEnvironments();
     await this.loadPlugins();
+    await this.refreshUvStatus();
   }
 
   async loadPlugins(): Promise<void> {
@@ -440,6 +455,69 @@ export class SettingsPython implements OnInit {
       this.notification.showSuccess('Using default venv storage location');
     } catch (error) {
       await this.wails.logToFile(`[SettingsPython] Failed to clear venv storage: ${error}`);
+    }
+  }
+
+  async refreshUvStatus(): Promise<void> {
+    try {
+      const available = await this.wails.isUvAvailable();
+      this.uvAvailable.set(available);
+      if (available) {
+        this.uvPath.set(await this.wails.getUvPath());
+        await this.loadUvManagedPythons();
+      } else {
+        this.uvPath.set('');
+        this.uvManagedPythons.set([]);
+      }
+    } catch (error) {
+      this.uvAvailable.set(false);
+      await this.wails.logToFile(`[SettingsPython] Failed to check uv status: ${error}`);
+    }
+  }
+
+  async loadUvManagedPythons(): Promise<void> {
+    this.loadingUvPythons.set(true);
+    try {
+      const pythons = await this.wails.listUvManagedPythons();
+      this.uvManagedPythons.set(pythons || []);
+    } catch (error) {
+      this.uvManagedPythons.set([]);
+      await this.wails.logToFile(`[SettingsPython] Failed to list uv-managed Python versions: ${error}`);
+    } finally {
+      this.loadingUvPythons.set(false);
+    }
+  }
+
+  openUvInstallDialog(): void {
+    const dialogRef = this.dialog.open(UvInstallDialog, {
+      width: '600px',
+      disableClose: true
+    });
+
+    dialogRef.afterClosed().subscribe((changed) => {
+      if (changed) {
+        this.refreshUvStatus();
+      }
+    });
+  }
+
+  async createUvVirtualEnv(pythonVersion: string): Promise<void> {
+    if (this.creatingUvVenv()) return;
+
+    try {
+      const venvPath = await this.wails.openDirectoryDialog('Select location for uv virtual environment');
+      if (!venvPath) return;
+
+      this.creatingUvVenv.set(true);
+      await this.wails.createUvVirtualEnv(pythonVersion, venvPath);
+
+      await this.loadVirtualEnvironments();
+    } catch (error) {
+      await this.wails.logToFile(`[SettingsPython] Failed to create uv virtual environment: ${error}`);
+      this.notification.showError('Failed to create uv virtual environment');
+    } finally {
+      this.creatingUvVenv.set(false);
+      this.uvVenvCreationProgress.set(null);
     }
   }
 }

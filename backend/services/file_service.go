@@ -2,6 +2,7 @@ package services
 
 import (
 	"archive/tar"
+	"archive/zip"
 	"bufio"
 	"compress/gzip"
 	"context"
@@ -319,6 +320,71 @@ func (f *FileService) ExtractTarXz(archivePath string, destPath string) (string,
 		fmt.Sprintf("Extracted %s (%d files)", fileName, filesExtracted))
 
 	return discoveredExecutable, nil
+}
+
+func (f *FileService) ExtractZip(archivePath string, destPath string) error {
+	reader, err := zip.OpenReader(archivePath)
+	if err != nil {
+		return err
+	}
+	defer reader.Close()
+
+	fileName := filepath.Base(archivePath)
+	messageKey := fmt.Sprintf("Extracting %s", fileName)
+	f.progressNotifier.EmitStart(ProgressTypeExtract, messageKey, messageKey)
+
+	totalFiles := len(reader.File)
+	dirCache := make(map[string]bool)
+
+	for i, zipFile := range reader.File {
+		target := filepath.Join(destPath, zipFile.Name)
+
+		if zipFile.FileInfo().IsDir() {
+			if !dirCache[target] {
+				if err := os.MkdirAll(target, 0755); err != nil {
+					return err
+				}
+				dirCache[target] = true
+			}
+			continue
+		}
+
+		dir := filepath.Dir(target)
+		if !dirCache[dir] {
+			if err := os.MkdirAll(dir, 0755); err != nil {
+				return err
+			}
+			dirCache[dir] = true
+		}
+
+		srcFile, err := zipFile.Open()
+		if err != nil {
+			return err
+		}
+
+		outFile, err := os.OpenFile(target, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, zipFile.Mode())
+		if err != nil {
+			srcFile.Close()
+			return err
+		}
+
+		_, err = io.Copy(outFile, srcFile)
+		outFile.Close()
+		srcFile.Close()
+		if err != nil {
+			return err
+		}
+
+		if totalFiles > 0 {
+			percentage := float64(i+1) / float64(totalFiles) * 100
+			f.progressNotifier.EmitProgress(ProgressTypeExtract, messageKey, messageKey, percentage)
+		}
+	}
+
+	f.progressNotifier.EmitComplete(ProgressTypeExtract, messageKey,
+		fmt.Sprintf("Extracted %s (%d files)", fileName, totalFiles))
+
+	return nil
 }
 
 func (f *FileService) DownloadFile(url string, destPath string) error {

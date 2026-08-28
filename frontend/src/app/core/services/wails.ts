@@ -21,6 +21,7 @@ export type VirtualEnvironment = services.VirtualEnvironment;
 export type RenvEnvironment = services.RenvEnvironment;
 export type PluginEnvironmentBinding = services.PluginEnvironmentBinding;
 export type CustomEnvVar = services.CustomEnvVar;
+export type UvPythonVersion = services.UvPythonVersion;
 
 export interface GitAuthConfig {
   id: number;
@@ -562,6 +563,65 @@ export class Wails {
     if (!this.isWails) throw new Error('Wails not available');
     await this.waitForBackend();
     return WailsApp.GetPortableEnvironmentPath(environment);
+  }
+
+  async getUvPath(): Promise<string> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.GetUvPath();
+  }
+
+  async downloadUv(): Promise<void> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    await WailsApp.DownloadUv();
+    this.notifyBindingsUpdated();
+  }
+
+  async isUvAvailable(): Promise<boolean> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.IsUvAvailable();
+  }
+
+  async listUvManagedPythons(): Promise<services.UvPythonVersion[]> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.ListUvManagedPythons();
+  }
+
+  async installUvPythonVersion(version: string): Promise<void> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    await WailsApp.InstallUvPythonVersion(version);
+    this.notifyBindingsUpdated();
+  }
+
+  async createUvVirtualEnv(pythonVersion: string, venvPath: string, pluginID: string = '', pluginFolderPath: string = ''): Promise<void> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    await WailsApp.CreateUvVirtualEnv(pythonVersion, venvPath, pluginID, pluginFolderPath);
+    this.notifyBindingsUpdated();
+  }
+
+  async installUvPackages(venvPythonPath: string, packages: string[]): Promise<void> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    await WailsApp.InstallUvPackages(venvPythonPath, packages);
+    this.notifyBindingsUpdated();
+  }
+
+  async installUvRequirements(venvPythonPath: string, requirementsPath: string): Promise<void> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    await WailsApp.InstallUvRequirements(venvPythonPath, requirementsPath);
+    this.notifyBindingsUpdated();
+  }
+
+  async listUvPackages(venvPythonPath: string): Promise<string[]> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.ListUvPackages(venvPythonPath);
   }
 
   async getPlugins(): Promise<any[]> {

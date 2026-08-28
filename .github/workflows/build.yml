@@ -6,7 +6,7 @@ on:
       - master
       - main
       - develop
-      - wails-v3-beta-migration
+      - uv-integration
   pull_request:
     branches:
       - master

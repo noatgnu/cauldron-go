@@ -225,6 +225,66 @@ mat-divider {
   }
 }
 
+.venv-source-chip {
+  font-size: 10px;
+  min-height: 18px;
+  padding: 2px 6px;
+}
+
+.uv-section {
+  margin-top: 8px;
+
+  h3 {
+    font-size: 16px;
+    font-weight: 500;
+    margin: 0 0 8px 0;
+  }
+
+  h4 {
+    font-size: 13px;
+    font-weight: 500;
+    margin: 0;
+  }
+
+  .section-description {
+    color: var(--on-surface-variant);
+    font-size: 13px;
+    margin: 0 0 16px 0;
+  }
+
+  .uv-pythons-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 12px 0 4px 0;
+  }
+
+  .no-venvs {
+    color: var(--on-surface-variant);
+    font-size: 13px;
+    margin: 0 0 16px 0;
+    padding: 8px 0;
+  }
+
+  mat-list {
+    padding: 0;
+  }
+
+  mat-list-item {
+    border-bottom: 1px solid var(--border);
+    height: auto !important;
+    min-height: 48px;
+    overflow: visible;
+  }
+
+  .venv-details {
+    display: flex;
+    gap: 16px;
+    font-size: 12px;
+    color: var(--on-surface-variant);
+  }
+}
+
 .info-box {
   display: flex;
   gap: 12px;
