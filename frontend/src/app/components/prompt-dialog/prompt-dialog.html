@@ -1,7 +1,7 @@
 <h2 mat-dialog-title>{{ data.title }}</h2>
 <mat-dialog-content>
   <p *ngIf="data.message" class="dialog-message">{{ data.message }}</p>
-  <mat-form-field appearance="outline" class="w-full">
+  <mat-form-field appearance="outline" class="w-full" floatLabel="always">
     <mat-label>{{ data.label }}</mat-label>
     <input matInput [placeholder]="data.placeholder || ''" [(ngModel)]="inputValue" (keyup.enter)="onConfirm()" cdkFocusInitial>
   </mat-form-field>

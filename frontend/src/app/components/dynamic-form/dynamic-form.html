@@ -66,7 +66,7 @@
             </div>
           }
           @case ('text') {
-            <mat-form-field appearance="outline" class="full-width">
+            <mat-form-field appearance="outline" class="full-width" floatLabel="always">
               <mat-label>{{ input.label }}</mat-label>
               <input matInput [formControlName]="input.name" [placeholder]="input.default != null && input.default !== '' ? '' : (input.placeholder || '')">
               @if (input.description) {

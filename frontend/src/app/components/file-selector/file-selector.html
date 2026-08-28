@@ -1,5 +1,5 @@
 <div class="file-selector-container">
-  <mat-form-field appearance="outline" class="file-select-field">
+  <mat-form-field appearance="outline" class="file-select-field" floatLabel="always">
     <mat-label>{{ label() }}</mat-label>
     <mat-select [value]="currentSelection()"
                 (valueChange)="onSelectionChange($event)"

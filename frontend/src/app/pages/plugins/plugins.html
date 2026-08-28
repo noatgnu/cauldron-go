@@ -98,7 +98,7 @@
                 @for (input of plugin.config.inputs; track input.name) {
                     <div class="form-field-wrapper">
                       @if (input.type === 'file') {
-                      <mat-form-field appearance="outline" class="full-width">
+                      <mat-form-field appearance="outline" class="full-width" floatLabel="always">
                       <mat-label>{{ input.label }}</mat-label>
                       <input matInput readonly [formControlName]="input.name" [placeholder]="input.placeholder || ''">
                       <mat-icon matPrefix>{{ getInputIcon(input.type) }}</mat-icon>
@@ -110,7 +110,7 @@
                       }
                     </mat-form-field>
                   } @else if (input.type === 'number') {
-                    <mat-form-field appearance="outline" class="full-width">
+                    <mat-form-field appearance="outline" class="full-width" floatLabel="always">
                       <mat-label>{{ input.label }}</mat-label>
                       <input matInput type="number" [formControlName]="input.name" [placeholder]="input.placeholder || ''">
                       <mat-icon matPrefix>{{ getInputIcon(input.type) }}</mat-icon>
@@ -152,7 +152,7 @@
                       }
                     </mat-form-field>
                   } @else {
-                    <mat-form-field appearance="outline" class="full-width">
+                    <mat-form-field appearance="outline" class="full-width" floatLabel="always">
                       <mat-label>{{ input.label }}</mat-label>
                       <input matInput [formControlName]="input.name" [placeholder]="input.placeholder || ''">
                       <mat-icon matPrefix>{{ getInputIcon(input.type) }}</mat-icon>
