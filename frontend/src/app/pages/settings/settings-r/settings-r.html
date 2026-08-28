@@ -95,7 +95,7 @@
     <h3>Renv Environments</h3>
     <p class="section-description">Create isolated R environments with project-specific packages using renv</p>
 
-    <mat-form-field appearance="outline" class="full-width-field">
+    <mat-form-field appearance="outline" class="full-width-field" floatLabel="always">
       <mat-label>R Environments Storage Path</mat-label>
       <input matInput [value]="config().renvStoragePath || ''" readonly placeholder="Default location">
       <button mat-icon-button matSuffix (click)="browseRenvStorage()" matTooltip="Select renv storage directory" aria-label="Select renv storage directory">

@@ -102,7 +102,7 @@
     <h3>Virtual Environments</h3>
     <p class="section-description">Create isolated Python environments with project-specific packages using venv</p>
 
-    <mat-form-field appearance="outline" class="full-width-field">
+    <mat-form-field appearance="outline" class="full-width-field" floatLabel="always">
       <mat-label>Virtual Environments Storage Path</mat-label>
       <input matInput [value]="config().venvStoragePath || ''" readonly placeholder="Default location">
       <button mat-icon-button matSuffix (click)="browseVenvStorage()" matTooltip="Select venv storage directory" aria-label="Select venv storage directory">

@@ -6,6 +6,7 @@ on:
       - master
       - main
       - develop
+      - wails-v3-beta-migration
   pull_request:
     branches:
       - master
@@ -198,7 +199,7 @@ jobs:
             libwebkitgtk-6.0-dev
 
       - name: Install Wails CLI
-        run: go install github.com/wailsapp/wails/v3/cmd/wails3@latest
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.15
 
       - name: Generate Wails bindings
         run: wails3 generate bindings -ts
@@ -329,7 +330,7 @@ jobs:
         run: chmod +x build.sh
 
       - name: Install Wails CLI
-        run: go install github.com/wailsapp/wails/v3/cmd/wails3@latest
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.15
 
       - name: Generate Wails bindings
         run: wails3 generate bindings -ts
@@ -439,7 +440,7 @@ jobs:
         run: chmod +x build.sh
 
       - name: Install Wails CLI
-        run: go install github.com/wailsapp/wails/v3/cmd/wails3@latest
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.15
 
       - name: Generate Wails bindings
         run: wails3 generate bindings -ts
@@ -592,7 +593,7 @@ jobs:
         run: chmod +x build.sh
 
       - name: Install Wails CLI
-        run: go install github.com/wailsapp/wails/v3/cmd/wails3@latest
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.15
 
       - name: Generate Wails bindings
         run: wails3 generate bindings -ts
@@ -623,7 +624,7 @@ jobs:
 
       - name: Build application
         run: |
-          go build -o ./build/bin/cauldron .
+          go build -tags mcp -o ./build/bin/cauldron .
 
       - name: Copy plugins to build directory
         run: |
@@ -635,13 +636,15 @@ jobs:
           CI: 'true'
           CAULDRON_TEST_MODE: 'true'
           TEST_API_URL: 'http://127.0.0.1:9245'
+          WAILS_MCP: '1'
+          MCP_URL: 'http://127.0.0.1:9099/mcp'
         run: |
           Xvfb :99 -screen 0 1920x1080x24 &
           sleep 2
 
           cd ${{ github.workspace }}
 
-          CAULDRON_TEST_MODE=true ./build/bin/cauldron > /tmp/cauldron-e2e.log 2>&1 &
+          CAULDRON_TEST_MODE=true WAILS_MCP=1 ./build/bin/cauldron > /tmp/cauldron-e2e.log 2>&1 &
           APP_PID=$!
 
           echo "Waiting for TestAPI..."
@@ -668,6 +671,22 @@ jobs:
             if [ $i -eq 60 ]; then
               echo "Timeout waiting for app initialization"
               echo "Last response: $RESPONSE"
+              cat /tmp/cauldron-e2e.log
+              exit 1
+            fi
+            sleep 1
+          done
+
+          echo "Waiting for MCP server..."
+          for i in {1..60}; do
+            if curl -s -X POST http://127.0.0.1:9099/mcp \
+                 -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" \
+                 -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | grep -q '"tools"'; then
+              echo "MCP server is ready on port 9099"
+              break
+            fi
+            if [ $i -eq 60 ]; then
+              echo "Timeout waiting for MCP server"
               cat /tmp/cauldron-e2e.log
               exit 1
             fi
