@@ -92,7 +92,7 @@ func (s *ScriptExecutor) ExecutePythonScript(ctx context.Context, jobID string, 
 	binding, err := s.db.GetPluginEnvironmentBinding(config.Type, "python")
 	if err != nil {
 		log.Printf("[ExecutePythonScript] No binding found for plugin %s (type: %s): %v", jobID, config.Type, err)
-	} else {
+	} else if binding != nil {
 		log.Printf("[ExecutePythonScript] Found binding for plugin %s: %s", jobID, binding.EnvironmentPath)
 	}
 
@@ -209,7 +209,7 @@ func (s *ScriptExecutor) ExecuteRScript(ctx context.Context, jobID string, confi
 	binding, err := s.db.GetPluginEnvironmentBinding(config.Type, "r")
 	if err != nil {
 		log.Printf("[ExecuteRScript] No binding found for plugin %s (type: %s): %v", jobID, config.Type, err)
-	} else {
+	} else if binding != nil {
 		log.Printf("[ExecuteRScript] Found binding for plugin %s: ID=%d", jobID, binding.EnvironmentID)
 	}
 

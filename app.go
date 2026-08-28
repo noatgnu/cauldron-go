@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	goruntime "runtime"
+	"runtime/debug"
 	"sort"
 	"strconv"
 	"strings"
@@ -74,6 +75,22 @@ func (a *App) emitEvent(name string, data interface{}) {
 
 func (a *App) Initialize() {
 	log.Println("[App.Initialize] Starting application...")
+	// GetPluginsV2 (and, through it, the frontend's entire backend-ready
+	// gate) blocks on <-a.ready. Close it on every exit path, including
+	// early returns and a recovered panic below, so a failed startup
+	// surfaces as an empty state instead of hanging the whole UI forever.
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("[App.Initialize] PANIC: %v\n%s", r, debug.Stack())
+		}
+		close(a.ready)
+		close(a.initialized)
+	}()
+
+	// Give the webview time to finish wiring up its event listeners
+	// before Initialize starts emitting events (e.g. checkUnfinishedJobs'
+	// "unfinished-jobs-found") — a fixed delay rather than a real
+	// readiness signal, so it's a heuristic, not a guarantee.
 	time.Sleep(1 * time.Second)
 
 	log.Println("[App.Initialize] Initializing database...")
@@ -220,8 +237,6 @@ func (a *App) Initialize() {
 	go a.checkUnfinishedJobs()
 
 	log.Println("[App.Initialize] Application initialization complete!")
-	close(a.ready)
-	close(a.initialized)
 }
 
 func getUserDataPath() (string, error) {
@@ -237,6 +252,8 @@ func getUserDataPath() (string, error) {
 }
 
 func (a *App) Shutdown() {
+	log.Println("[App.Shutdown] Starting shutdown...")
+
 	if a.httpInstallServer != nil {
 		log.Println("[App.Shutdown] Stopping HTTP install server...")
 		if err := a.httpInstallServer.Stop(); err != nil {
@@ -249,6 +266,8 @@ func (a *App) Shutdown() {
 	if a.db != nil {
 		a.db.Close()
 	}
+
+	log.Println("[App.Shutdown] Shutdown complete")
 }
 
 func (a *App) GetSettings() *models.Config {
@@ -984,6 +1003,9 @@ func (a *App) ExecutePlugin(req models.PluginExecutionRequest) (string, error) {
 
 func (a *App) GetPluginsV2() []*models.PluginV2 {
 	<-a.ready
+	if a.pluginLoaderV2 == nil {
+		return nil
+	}
 	return a.pluginLoaderV2.GetAllPlugins()
 }
 
@@ -1406,6 +1428,15 @@ func (a *App) HasInProgressJobs() bool {
 }
 
 func (a *App) checkUnfinishedJobs() {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("[checkUnfinishedJobs] PANIC: %v\n%s", r, debug.Stack())
+		}
+	}()
+
+	// Same fixed-delay heuristic as Initialize's leading sleep: give the
+	// webview time to register its "unfinished-jobs-found" listener
+	// before this emits it.
 	time.Sleep(1 * time.Second)
 
 	if a.jobQueue == nil || a.db == nil {

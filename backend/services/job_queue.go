@@ -691,6 +691,15 @@ func (j *JobQueueService) Shutdown() {
 	// Signal all workers to shut down immediately
 	close(j.shutdownChan)
 
+	// Workers only check shutdownChan between jobs, so a worker blocked
+	// inside processJob's cmd.Wait() would otherwise outlive the app as
+	// an orphaned process. Kill in-flight subprocesses first so those
+	// workers can return within the wait window below.
+	if j.scriptExecutor != nil {
+		log.Println("[Shutdown] Killing any in-flight job subprocesses...")
+		j.scriptExecutor.KillAllJobs()
+	}
+
 	// Close the queue channel
 	close(j.queue)
 
