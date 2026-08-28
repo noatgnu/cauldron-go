@@ -14,8 +14,6 @@ import { Events } from '@wailsio/runtime';
 import { Wails, Job, ImportedFile } from '../core/services/wails';
 import { ImportDialog } from '../pages/import-dialog/import-dialog';
 import { NotificationService } from '../core/services/notification.service';
-import {BoilingProgressBarComponent} from '../components/boiling-progress-bar/boiling-progress-bar';
-import {CauldronLoaderComponent} from '../components/cauldron-loader/cauldron-loader';
 
 @Component({
   selector: 'app-home',
@@ -28,9 +26,7 @@ import {CauldronLoaderComponent} from '../components/cauldron-loader/cauldron-lo
     MatProgressSpinnerModule,
     MatChipsModule,
     MatTableModule,
-    MatTooltipModule,
-    BoilingProgressBarComponent,
-    CauldronLoaderComponent
+    MatTooltipModule
   ],
   templateUrl: './home.html',
   styleUrl: './home.scss',

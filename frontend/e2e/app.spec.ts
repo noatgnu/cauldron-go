@@ -1,174 +1,108 @@
 import { test, expect } from '@playwright/test';
+import * as mcp from './helpers/mcp-client';
 
-const TEST_API_URL = process.env['TEST_API_URL'] || 'http://127.0.0.1:9245';
-
-async function callTestAPI(path: string, method = 'GET', body?: object): Promise<any> {
-  const options: RequestInit = {
-    method,
-    headers: { 'Content-Type': 'application/json' },
-  };
-  if (body && method === 'POST') {
-    options.body = JSON.stringify(body);
-  }
-
-  const response = await fetch(`${TEST_API_URL}${path}`, options);
-  return response.json();
-}
-
-async function waitForWindow(timeout = 30000): Promise<boolean> {
-  const start = Date.now();
-  while (Date.now() - start < timeout) {
-    const status = await callTestAPI('/test/window');
-    if (status.mainWindow && status.ready) return true;
-    await new Promise(r => setTimeout(r, 1000));
-  }
-  return false;
-}
-
-test.describe('Cauldron E2E Integration Tests via TestAPI', () => {
+test.describe('Cauldron E2E Integration Tests via MCP', () => {
   test.beforeAll(async () => {
-    const ready = await waitForWindow();
+    const ready = await mcp.waitForWindow();
     expect(ready).toBe(true);
   });
 
-  test.describe('TestAPI Health', () => {
-    test('should return healthy status', async () => {
-      const result = await callTestAPI('/test/health');
-      expect(result.status).toBe('ok');
-    });
-
-    test('should confirm main window is available', async () => {
-      const result = await callTestAPI('/test/window');
-      expect(result.mainWindow).toBe(true);
-      expect(result.ready).toBe(true);
+  test.describe('MCP Health', () => {
+    test('should report app info with a visible window', async () => {
+      const info = await mcp.appInfo();
+      expect(info.windows?.[0]?.visible).toBe(true);
     });
   });
 
-  test.describe('Settings API', () => {
+  test.describe('Settings', () => {
     test('should return settings', async () => {
-      const result = await callTestAPI('/test/settings');
+      const result = await mcp.callBoundMethod('main.App.GetSettings');
       expect(result).not.toHaveProperty('error');
       expect(result).toBeDefined();
     });
   });
 
-  test.describe('Jobs API', () => {
+  test.describe('Jobs', () => {
     test('should return jobs list', async () => {
-      const result = await callTestAPI('/test/jobs');
-      expect(result).not.toHaveProperty('error');
-      expect(result.jobs).toBeDefined();
-      expect(Array.isArray(result.jobs)).toBe(true);
+      const result = await mcp.callBoundMethod('main.App.GetAllJobs');
+      expect(Array.isArray(result)).toBe(true);
     });
   });
 
-  test.describe('Plugins API', () => {
+  test.describe('Plugins', () => {
     test('should return plugins list', async () => {
-      const result = await callTestAPI('/test/plugins');
-      expect(result).not.toHaveProperty('error');
-      expect(result.plugins).toBeDefined();
-      expect(Array.isArray(result.plugins)).toBe(true);
+      const result = await mcp.callBoundMethod('main.App.GetPluginsV2');
+      expect(Array.isArray(result)).toBe(true);
     });
   });
 
-  test.describe('Imported Files API', () => {
+  test.describe('Imported Files', () => {
     test('should return imported files list', async () => {
-      const result = await callTestAPI('/test/imported-files');
-      expect(result).not.toHaveProperty('error');
-      expect(result.files).toBeDefined();
-      expect(Array.isArray(result.files)).toBe(true);
+      const result = await mcp.callBoundMethod('main.App.GetImportedFiles');
+      expect(Array.isArray(result)).toBe(true);
     });
   });
 
-  test.describe('UI Navigation via TestAPI', () => {
+  test.describe('UI Navigation', () => {
     test('should navigate to settings page', async () => {
-      const navResult = await callTestAPI('/test/ui/navigate', 'POST', { route: '#/settings/general' });
-      expect(navResult.success).toBe(true);
-
-      await new Promise(r => setTimeout(r, 2000));
+      await mcp.navigate('#/settings/general');
+      expect(await mcp.getUrl()).toContain('#/settings/general');
     });
 
     test('should navigate to jobs page', async () => {
-      const navResult = await callTestAPI('/test/ui/navigate', 'POST', { route: '#/jobs' });
-      expect(navResult.success).toBe(true);
-
-      await new Promise(r => setTimeout(r, 2000));
+      await mcp.navigate('#/jobs');
+      expect(await mcp.getUrl()).toContain('#/jobs');
     });
 
     test('should navigate to plugins page', async () => {
-      const navResult = await callTestAPI('/test/ui/navigate', 'POST', { route: '#/plugins' });
-      expect(navResult.success).toBe(true);
-
-      await new Promise(r => setTimeout(r, 2000));
-    });
-
-    test('should navigate to files page', async () => {
-      const navResult = await callTestAPI('/test/ui/navigate', 'POST', { route: '#/files' });
-      expect(navResult.success).toBe(true);
-
-      await new Promise(r => setTimeout(r, 2000));
+      await mcp.navigate('#/plugins');
+      expect(await mcp.getUrl()).toContain('#/plugins');
     });
 
     test('should navigate to Python settings page', async () => {
-      const navResult = await callTestAPI('/test/ui/navigate', 'POST', { route: '#/settings/python' });
-      expect(navResult.success).toBe(true);
-
-      await new Promise(r => setTimeout(r, 2000));
+      await mcp.navigate('#/settings/python');
+      expect(await mcp.waitForElement('.python-settings')).toBe(true);
     });
 
     test('should navigate to R settings page', async () => {
-      const navResult = await callTestAPI('/test/ui/navigate', 'POST', { route: '#/settings/r' });
-      expect(navResult.success).toBe(true);
-
-      await new Promise(r => setTimeout(r, 2000));
+      await mcp.navigate('#/settings/r');
+      expect(await mcp.waitForElement('.r-settings')).toBe(true);
     });
   });
 
-  test.describe('Environment Detection via TestAPI', () => {
+  test.describe('Environment Detection', () => {
     test('should detect Python environments', async () => {
-      const result = await callTestAPI('/test/python-environments');
-      expect(result).not.toHaveProperty('error');
-      expect(result.environments).toBeDefined();
-      expect(Array.isArray(result.environments)).toBe(true);
-      expect(typeof result.count).toBe('number');
+      const result = await mcp.callBoundMethod('main.App.DetectPythonEnvironments');
+      expect(Array.isArray(result)).toBe(true);
     });
 
     test('should detect R environments', async () => {
-      const result = await callTestAPI('/test/r-environments');
-      expect(result).not.toHaveProperty('error');
-      expect(result.environments).toBeDefined();
-      expect(Array.isArray(result.environments)).toBe(true);
+      const result = await mcp.callBoundMethod('main.App.DetectREnvironments');
+      expect(Array.isArray(result)).toBe(true);
     });
 
     test('should get virtual environments', async () => {
-      const result = await callTestAPI('/test/virtual-environments');
-      expect(result).not.toHaveProperty('error');
-      expect(result.environments).toBeDefined();
-      expect(Array.isArray(result.environments)).toBe(true);
+      const result = await mcp.callBoundMethod('main.App.GetVirtualEnvironments');
+      expect(Array.isArray(result)).toBe(true);
     });
 
     test('should get renv environments', async () => {
-      const result = await callTestAPI('/test/renv-environments');
-      expect(result).not.toHaveProperty('error');
-      expect(result.environments).toBeDefined();
-      expect(Array.isArray(result.environments)).toBe(true);
+      const result = await mcp.callBoundMethod('main.App.GetRenvEnvironments');
+      expect(Array.isArray(result)).toBe(true);
     });
   });
 
-  test.describe('Plugin Bindings via TestAPI', () => {
+  test.describe('Plugin Bindings', () => {
     test('should get plugin environment bindings', async () => {
-      const result = await callTestAPI('/test/plugin-bindings');
-      expect(result).not.toHaveProperty('error');
-      expect(result.bindings).toBeDefined();
-      expect(Array.isArray(result.bindings)).toBe(true);
+      const result = await mcp.callBoundMethod('main.App.GetAllPluginEnvironmentBindings');
+      expect(Array.isArray(result)).toBe(true);
     });
   });
 
-  test.describe('Default Paths via TestAPI', () => {
+  test.describe('Default Paths', () => {
     test('should get default venv path', async () => {
-      const result = await callTestAPI('/test/default-venv-path?pluginId=test');
-      expect(result).not.toHaveProperty('error');
-      expect(result.path).toBeDefined();
-      expect(typeof result.path).toBe('string');
+      const result = await mcp.callBoundMethod('main.App.GetDefaultVenvPath', 'test');
+      expect(typeof result).toBe('string');
     });
   });
 });

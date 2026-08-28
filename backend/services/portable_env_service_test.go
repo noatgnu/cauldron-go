@@ -115,6 +115,7 @@ func TestGetAppDataFolder(t *testing.T) {
 
 func TestGetPortableEnvironmentPath_NotInstalled(t *testing.T) {
 	svc := &PortableEnvService{}
+	setAppDataEnv(t, t.TempDir())
 
 	_, err := svc.GetPortableEnvironmentPath("python")
 	if err == nil {
