@@ -37,6 +37,7 @@ type App struct {
 	envService            *services.EnvironmentService
 	scriptExecutor        *services.ScriptExecutor
 	portableEnvService    *services.PortableEnvService
+	uvService             *services.UvService
 	pluginService         *services.PluginService
 	pluginLoaderV2        *services.PluginLoaderV2
 	pluginExecutor        *services.PluginExecutor
@@ -96,6 +97,7 @@ func (a *App) Initialize() {
 	a.fileService = services.NewFileServiceV3(a.wailsApp)
 	a.envService = services.NewEnvironmentServiceV3(db, a.settings, services.NewProgressNotifierV3(a.wailsApp))
 	a.portableEnvService = services.NewPortableEnvServiceV3(a.fileService, a.wailsApp)
+	a.uvService = services.NewUvServiceV3(a.fileService, db, a.settings, a.wailsApp)
 
 	log.Println("[App.Initialize] Initializing job queue...")
 	a.jobQueue = services.NewJobQueueServiceV3(db, a.wailsApp)
@@ -809,6 +811,42 @@ func (a *App) DownloadPortableEnvironment(url, environment string) error {
 
 func (a *App) GetPortableEnvironmentPath(environment string) (string, error) {
 	return a.portableEnvService.GetPortableEnvironmentPath(environment)
+}
+
+func (a *App) GetUvPath() (string, error) {
+	return a.uvService.GetUvPath()
+}
+
+func (a *App) DownloadUv() error {
+	return a.uvService.DownloadUv()
+}
+
+func (a *App) IsUvAvailable() bool {
+	return a.uvService.IsUvAvailable()
+}
+
+func (a *App) ListUvManagedPythons() ([]services.UvPythonVersion, error) {
+	return a.uvService.ListUvManagedPythons()
+}
+
+func (a *App) InstallUvPythonVersion(version string) error {
+	return a.uvService.InstallUvPythonVersion(version)
+}
+
+func (a *App) CreateUvVirtualEnv(pythonVersion string, venvPath string, pluginID string, pluginFolderPath string) error {
+	return a.uvService.CreateUvVirtualEnv(pythonVersion, venvPath, pluginID, pluginFolderPath)
+}
+
+func (a *App) InstallUvPackages(venvPythonPath string, packages []string) error {
+	return a.uvService.InstallUvPackages(venvPythonPath, packages)
+}
+
+func (a *App) InstallUvRequirements(venvPythonPath string, requirementsPath string) error {
+	return a.uvService.InstallUvRequirements(venvPythonPath, requirementsPath)
+}
+
+func (a *App) ListUvPackages(venvPythonPath string) ([]string, error) {
+	return a.uvService.ListUvPackages(venvPythonPath)
 }
 
 func (a *App) GetPlugins() []*models.Plugin {

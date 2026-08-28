@@ -141,6 +141,7 @@
             <div matListItemLine class="venv-details">
               <small>Base: {{ getBasePythonName(venv.BasePythonPath) }}</small>
               <small class="venv-date">Created: {{ formatDate(venv.CreatedAt) }}</small>
+              <mat-chip class="venv-source-chip">{{ venv.Source === 'uv' ? 'uv' : 'venv' }}</mat-chip>
             </div>
             <div matListItemMeta>
               <div class="meta-actions">
@@ -176,6 +177,88 @@
     @if (venvCreationProgress()) {
       <div class="install-progress">
         <small>{{ venvCreationProgress()?.message }}</small>
+      </div>
+    }
+  </div>
+
+  <mat-divider></mat-divider>
+
+  <div class="uv-section">
+    <h3>uv (experimental)</h3>
+    <p class="section-description">Manage Python versions and virtual environments using uv, a fast package/version manager from Astral</p>
+
+    @if (uvAvailable()) {
+      <div class="info-box">
+        <mat-icon color="primary">check_circle</mat-icon>
+        <div>
+          <strong>uv is installed</strong><br>
+          <code>{{ uvPath() }}</code>
+        </div>
+      </div>
+
+      <div class="uv-pythons-header">
+        <h4>Managed Python Versions</h4>
+        <button mat-icon-button (click)="loadUvManagedPythons()" [disabled]="loadingUvPythons()" matTooltip="Refresh" aria-label="Refresh managed Python versions">
+          <mat-icon>refresh</mat-icon>
+        </button>
+      </div>
+
+      @if (loadingUvPythons()) {
+        <div class="detecting-container">
+          <mat-spinner diameter="20"></mat-spinner>
+          <span>Loading managed Python versions...</span>
+        </div>
+      } @else if (uvManagedPythons().length > 0) {
+        <mat-list>
+          @for (py of uvManagedPythons(); track py.path) {
+            <mat-list-item>
+              <mat-icon matListItemIcon>code</mat-icon>
+              <div matListItemTitle>{{ py.version }}</div>
+              <div matListItemLine class="venv-details">
+                <small>{{ py.implementation }}</small>
+              </div>
+              <div matListItemMeta>
+                <button mat-raised-button color="primary" (click)="createUvVirtualEnv(py.version)" [disabled]="creatingUvVenv()" matTooltip="Create a venv using this Python version">
+                  <mat-icon>add_circle</mat-icon>
+                  Create venv
+                </button>
+              </div>
+            </mat-list-item>
+          }
+        </mat-list>
+      } @else {
+        <p class="no-venvs">No Python versions installed via uv yet</p>
+      }
+
+      <div class="button-row">
+        <button mat-raised-button color="accent" (click)="openUvInstallDialog()">
+          <mat-icon>download</mat-icon>
+          Install Python Version
+        </button>
+        @if (creatingUvVenv()) {
+          <mat-spinner diameter="20"></mat-spinner>
+        }
+      </div>
+
+      @if (uvVenvCreationProgress()) {
+        <div class="install-progress">
+          <small>{{ uvVenvCreationProgress()?.message }}</small>
+        </div>
+      }
+    } @else {
+      <div class="info-box">
+        <mat-icon>info</mat-icon>
+        <div>
+          <strong>uv is not installed</strong><br>
+          Install uv to manage Python versions and create virtual environments without needing python3-venv.
+        </div>
+      </div>
+
+      <div class="button-row">
+        <button mat-raised-button color="primary" (click)="openUvInstallDialog()">
+          <mat-icon>download</mat-icon>
+          Install uv
+        </button>
       </div>
     }
   </div>

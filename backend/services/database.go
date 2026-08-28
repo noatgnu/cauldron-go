@@ -41,6 +41,7 @@ type VirtualEnvironment struct {
 	Path           string `gorm:"not null;unique"`
 	BasePythonPath string `gorm:"not null"`
 	CreatedAt      int64  `gorm:"not null"`
+	Source         string `gorm:"default:'venv'"`
 }
 
 type PythonEnvironmentDB struct {

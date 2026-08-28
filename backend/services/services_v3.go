@@ -38,6 +38,15 @@ func NewPortableEnvServiceV3(fileService *FileService, wailsApp *application.App
 	}
 }
 
+func NewUvServiceV3(fileService *FileService, db *DatabaseService, settingsService *SettingsService, wailsApp *application.App) *UvService {
+	return &UvService{
+		fileService:      fileService,
+		db:               db,
+		settingsService:  settingsService,
+		progressNotifier: NewProgressNotifierV3(wailsApp),
+	}
+}
+
 func NewJobQueueServiceV3(db *DatabaseService, wailsApp *application.App) *JobQueueService {
 	service := newJobQueueServiceInternal(db, context.Background())
 	service.wailsApp = wailsApp

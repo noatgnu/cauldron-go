@@ -98,10 +98,14 @@ func (e *EnvironmentService) DetectPythonEnvironments() ([]PythonEnvironment, er
 		log.Printf("[DetectPythonEnvironments] Found %d virtual environments, adding to list\n", len(venvs))
 		for _, venv := range venvs {
 			version := e.getPythonVersion(venv.Path)
+			venvType := "venv"
+			if venv.Source == "uv" {
+				venvType = "uv-venv"
+			}
 			environments = append(environments, PythonEnvironment{
 				Name:      venv.Name,
 				Path:      venv.Path,
-				Type:      "venv",
+				Type:      venvType,
 				Version:   version,
 				IsVirtual: true,
 			})
@@ -855,7 +859,7 @@ func (e *EnvironmentService) ListRPackages(rPath string) ([]string, error) {
 	return packages, nil
 }
 
-func (e *EnvironmentService) loadPluginDefinition(pluginYamlPath string) (*models.PluginDefinition, error) {
+func loadPluginDefinition(pluginYamlPath string) (*models.PluginDefinition, error) {
 	data, err := os.ReadFile(pluginYamlPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read plugin.yaml: %w", err)
@@ -942,7 +946,7 @@ func (e *EnvironmentService) CreatePythonVirtualEnv(basePythonPath string, venvP
 		var requirementsFile string
 
 		log.Printf("[CreatePythonVirtualEnv] Looking for plugin.yaml at: %s", pluginYamlPath)
-		if pluginDef, err := e.loadPluginDefinition(pluginYamlPath); err == nil {
+		if pluginDef, err := loadPluginDefinition(pluginYamlPath); err == nil {
 			inlinePackages = pluginDef.Execution.Requirements.Packages
 			requirementsFile = pluginDef.Execution.Requirements.PythonRequirementsFile
 			log.Printf("[CreatePythonVirtualEnv] Found plugin definition - inline packages: %v, requirements file: %s", inlinePackages, requirementsFile)
@@ -1170,7 +1174,7 @@ func (e *EnvironmentService) CreateRenvEnvironment(name string, packages []strin
 		var inlinePackages []string
 		var packagesFile string
 
-		if pluginDef, err := e.loadPluginDefinition(pluginYamlPath); err == nil {
+		if pluginDef, err := loadPluginDefinition(pluginYamlPath); err == nil {
 			inlinePackages = pluginDef.Execution.Requirements.Packages
 			packagesFile = pluginDef.Execution.Requirements.RPackagesFile
 		}
@@ -1379,34 +1383,7 @@ func (e *EnvironmentService) GetRenvLibPath(projectPath string) string {
 }
 
 func (e *EnvironmentService) getDefaultAppFolder() (string, error) {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
-	}
-
-	var appFolder string
-	switch runtime.GOOS {
-	case "windows":
-		localAppData := os.Getenv("LOCALAPPDATA")
-		if localAppData != "" {
-			appFolder = filepath.Join(localAppData, "cauldron")
-		} else {
-			appFolder = filepath.Join(homeDir, "AppData", "Local", "cauldron")
-		}
-	case "darwin":
-		appFolder = filepath.Join(homeDir, "Library", "Application Support", "cauldron")
-	case "linux":
-		xdgDataHome := os.Getenv("XDG_DATA_HOME")
-		if xdgDataHome != "" {
-			appFolder = filepath.Join(xdgDataHome, "cauldron")
-		} else {
-			appFolder = filepath.Join(homeDir, ".local", "share", "cauldron")
-		}
-	default:
-		appFolder = filepath.Join(homeDir, ".cauldron")
-	}
-
-	return appFolder, nil
+	return getAppDataFolder()
 }
 
 func (e *EnvironmentService) getRenvCachePath() (string, error) {
