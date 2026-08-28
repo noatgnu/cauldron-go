@@ -26,6 +26,7 @@ describe('JobDetail', () => {
       getJobExecutionLog: vi.fn().mockResolvedValue(''),
       listJobOutputFiles: vi.fn().mockResolvedValue([]),
       jobUpdate: signal(null),
+      jobOutput: signal(null),
       logToFile: vi.fn().mockResolvedValue(undefined)
     };
     activatedRouteMock = {
