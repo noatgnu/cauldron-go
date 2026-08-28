@@ -700,8 +700,10 @@ jobs:
           sleep 2
 
           cd frontend
+          set +e
           npx playwright test --reporter=html
           TEST_EXIT=$?
+          set -e
 
           kill $APP_PID 2>/dev/null || true
 
