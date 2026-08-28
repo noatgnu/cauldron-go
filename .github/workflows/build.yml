@@ -648,7 +648,7 @@ jobs:
 
           cd ${{ github.workspace }}
 
-          CAULDRON_TEST_MODE=true WAILS_MCP=1 ./build/bin/cauldron > /tmp/cauldron-e2e.log 2>&1 &
+          CAULDRON_TEST_MODE=true WAILS_MCP=1 WEBKIT_DISABLE_SANDBOX=1 ./build/bin/cauldron > /tmp/cauldron-e2e.log 2>&1 &
           APP_PID=$!
 
           echo "Waiting for TestAPI..."
