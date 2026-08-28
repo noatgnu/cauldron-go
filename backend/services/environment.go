@@ -98,10 +98,14 @@ func (e *EnvironmentService) DetectPythonEnvironments() ([]PythonEnvironment, er
 		log.Printf("[DetectPythonEnvironments] Found %d virtual environments, adding to list\n", len(venvs))
 		for _, venv := range venvs {
 			version := e.getPythonVersion(venv.Path)
+			venvType := "venv"
+			if venv.Source == "uv" {
+				venvType = "uv-venv"
+			}
 			environments = append(environments, PythonEnvironment{
 				Name:      venv.Name,
 				Path:      venv.Path,
-				Type:      "venv",
+				Type:      venvType,
 				Version:   version,
 				IsVirtual: true,
 			})

@@ -96,6 +96,9 @@ export class SettingsPython implements OnInit {
               this.creatingUvVenv.set(false);
             }
             break;
+          case 'uv-requirements':
+            this.pythonInstallProgress.set(isCompleted ? null : progressData);
+            break;
           default:
             if (progress.id?.includes('python') && !progress.id?.startsWith('uv-')) {
               this.pythonInstallProgress.set(isCompleted ? null : progressData);
@@ -215,10 +218,16 @@ export class SettingsPython implements OnInit {
       return;
     }
 
+    const isUvEnv = this.pythonEnvironments().find(e => e.path === pythonPath)?.type === 'uv-venv';
+
     try {
       this.installingPythonPackages.set(true);
       const requirementsPath = await this.wails.getBundledRequirementsPath('python');
-      await this.wails.installPythonRequirements(pythonPath, requirementsPath);
+      if (isUvEnv) {
+        await this.wails.installUvRequirements(pythonPath, requirementsPath);
+      } else {
+        await this.wails.installPythonRequirements(pythonPath, requirementsPath);
+      }
     } catch (error) {
       this.notification.showError('Failed to install Python packages');
     } finally {
@@ -231,6 +240,7 @@ export class SettingsPython implements OnInit {
       case 'system': return 'System';
       case 'conda': return 'Conda';
       case 'venv': return 'Virtual Env';
+      case 'uv-venv': return 'uv Virtual Env';
       case 'poetry': return 'Poetry';
       case 'portable': return 'Portable';
       default: return type;
@@ -249,7 +259,9 @@ export class SettingsPython implements OnInit {
     });
 
     try {
-      const packages = await this.wails.listPythonPackages(env.path);
+      const packages = env.type === 'uv-venv'
+        ? await this.wails.listUvPackages(env.path)
+        : await this.wails.listPythonPackages(env.path);
       dialogRef.componentInstance.setPackages(packages);
       dialogRef.componentInstance.setLoading(false);
     } catch (error) {
@@ -295,6 +307,7 @@ export class SettingsPython implements OnInit {
       case 'portable': return 'accent';
       case 'system': return 'primary';
       case 'venv': return 'warn';
+      case 'uv-venv': return 'accent';
       default: return 'primary';
     }
   }
