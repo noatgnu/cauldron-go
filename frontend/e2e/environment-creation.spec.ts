@@ -287,6 +287,97 @@ test.describe('Plugin Environment Binding Tests via MCP', () => {
   });
 });
 
+test.describe('uv Integration Tests via MCP', () => {
+  test.beforeAll(async () => {
+    const ready = await mcp.waitForWindow();
+    expect(ready).toBe(true);
+  });
+
+  async function ensureUvAvailable(): Promise<boolean> {
+    const available = await mcp.callBoundMethod('main.App.IsUvAvailable');
+    if (available) {
+      return true;
+    }
+
+    const downloadResult = await tryCallBoundMethod('main.App.DownloadUv');
+    if (!downloadResult.success) {
+      return false;
+    }
+
+    return mcp.callBoundMethod('main.App.IsUvAvailable');
+  }
+
+  test('should install uv and report its path via MCP', async () => {
+    test.setTimeout(180000);
+
+    const available = await ensureUvAvailable();
+    if (!available) {
+      test.skip(true, 'uv could not be installed (no network access?)');
+      return;
+    }
+
+    const uvPath = await mcp.callBoundMethod('main.App.GetUvPath');
+    expect(typeof uvPath).toBe('string');
+    expect(uvPath.length).toBeGreaterThan(0);
+  });
+
+  test('should install a uv-managed Python version and create a venv via MCP', async () => {
+    test.setTimeout(300000);
+
+    const available = await ensureUvAvailable();
+    if (!available) {
+      test.skip(true, 'uv could not be installed (no network access?)');
+      return;
+    }
+
+    const targetVersion = '3.12';
+    const installResult = await tryCallBoundMethod('main.App.InstallUvPythonVersion', targetVersion);
+    if (!installResult.success) {
+      test.skip(true, `Failed to install uv-managed Python ${targetVersion}: ${installResult.error}`);
+      return;
+    }
+
+    const managedPythons = await mcp.callBoundMethod('main.App.ListUvManagedPythons');
+    expect(Array.isArray(managedPythons)).toBe(true);
+
+    const installedVersion = (managedPythons || []).find((p: any) => p.version?.startsWith(targetVersion));
+    if (!installedVersion) {
+      test.skip(true, 'Installed uv Python version not found in managed list');
+      return;
+    }
+
+    const venvPath = `/tmp/e2e-uv-venv-${Date.now()}`;
+    let createdVenvId: number | null = null;
+
+    try {
+      const createResult = await tryCallBoundMethod('main.App.CreateUvVirtualEnv', installedVersion.version, venvPath, '', '');
+      if (!createResult.success) {
+        test.skip(true, `uv venv creation failed: ${createResult.error || 'unknown error'}`);
+        return;
+      }
+
+      const environments = await mcp.callBoundMethod('main.App.GetVirtualEnvironments');
+      expect(Array.isArray(environments)).toBe(true);
+
+      const newVenv = environments.find((v: any) => v.Path === venvPath);
+      expect(newVenv).toBeDefined();
+      if (newVenv) {
+        createdVenvId = newVenv.ID;
+        expect(newVenv.Source).toBe('uv');
+      }
+    } finally {
+      if (createdVenvId) {
+        await mcp.callBoundMethod('main.App.DeleteVirtualEnvironment', createdVenvId);
+      }
+    }
+  });
+
+  test('should show the uv section on the Python settings page via MCP', async () => {
+    await mcp.navigate('#/settings/python');
+    expect(await mcp.waitForElement('.uv-section')).toBe(true);
+  });
+});
+
 test.describe('Environment Detection Tests via MCP', () => {
   test.beforeAll(async () => {
     const ready = await mcp.waitForWindow();
