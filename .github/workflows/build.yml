@@ -554,7 +554,8 @@ jobs:
             libgtk-4-dev \
             libwebkitgtk-6.0-dev \
             xvfb \
-            fluxbox
+            fluxbox \
+            dbus-x11
 
       - name: Compile R
         run: |
@@ -648,7 +649,7 @@ jobs:
 
           cd ${{ github.workspace }}
 
-          CAULDRON_TEST_MODE=true WAILS_MCP=1 WEBKIT_DISABLE_SANDBOX=1 ./build/bin/cauldron > /tmp/cauldron-e2e.log 2>&1 &
+          dbus-run-session -- env CAULDRON_TEST_MODE=true WAILS_MCP=1 WEBKIT_DISABLE_SANDBOX=1 ./build/bin/cauldron > /tmp/cauldron-e2e.log 2>&1 &
           APP_PID=$!
 
           echo "Waiting for TestAPI..."
