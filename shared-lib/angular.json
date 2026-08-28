@@ -13,7 +13,7 @@
       "prefix": "cld",
       "architect": {
         "build": {
-          "builder": "@angular-devkit/build-angular:ng-packagr",
+          "builder": "@angular/build:ng-packagr",
           "options": {
             "project": "projects/cauldron-forms/ng-package.json"
           },
