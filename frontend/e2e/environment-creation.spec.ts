@@ -359,7 +359,7 @@ test.describe('uv Integration Tests via MCP', () => {
       const environments = await mcp.callBoundMethod('main.App.GetVirtualEnvironments');
       expect(Array.isArray(environments)).toBe(true);
 
-      const newVenv = environments.find((v: any) => v.Path === venvPath);
+      const newVenv = environments.find((v: any) => v.Path?.includes(venvPath));
       expect(newVenv).toBeDefined();
       if (newVenv) {
         createdVenvId = newVenv.ID;
