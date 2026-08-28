@@ -640,8 +640,6 @@ jobs:
         env:
           DISPLAY: ':99'
           CI: 'true'
-          CAULDRON_TEST_MODE: 'true'
-          TEST_API_URL: 'http://127.0.0.1:9245'
           WAILS_MCP: '1'
           MCP_URL: 'http://127.0.0.1:9099/mcp'
         run: |
@@ -653,49 +651,19 @@ jobs:
 
           cd ${{ github.workspace }}
 
-          dbus-run-session -- env CAULDRON_TEST_MODE=true WAILS_MCP=1 WEBKIT_DISABLE_SANDBOX=1 ./build/bin/cauldron > /tmp/cauldron-e2e.log 2>&1 &
+          dbus-run-session -- env WAILS_MCP=1 WEBKIT_DISABLE_SANDBOX=1 ./build/bin/cauldron > /tmp/cauldron-e2e.log 2>&1 &
           APP_PID=$!
-
-          echo "Waiting for TestAPI..."
-          for i in {1..60}; do
-            if curl -s http://127.0.0.1:9245/test/health | grep -q '"status":"ok"'; then
-              echo "TestAPI is ready on port 9245"
-              break
-            fi
-            if [ $i -eq 60 ]; then
-              echo "Timeout waiting for TestAPI"
-              cat /tmp/cauldron-e2e.log
-              exit 1
-            fi
-            sleep 1
-          done
-
-          echo "Waiting for app to be fully initialized..."
-          for i in {1..60}; do
-            if ! kill -0 $APP_PID 2>/dev/null; then
-              echo "App process exited unexpectedly while waiting for initialization"
-              cat /tmp/cauldron-e2e.log
-              exit 1
-            fi
-            RESPONSE=$(curl -s http://127.0.0.1:9245/test/window || true)
-            if echo "$RESPONSE" | grep -q '"ready":true'; then
-              echo "App is fully initialized"
-              break
-            fi
-            if [ $i -eq 60 ]; then
-              echo "Timeout waiting for app initialization"
-              echo "Last response: $RESPONSE"
-              cat /tmp/cauldron-e2e.log
-              exit 1
-            fi
-            sleep 1
-          done
 
           echo "Waiting for MCP server..."
           for i in {1..60}; do
+            if ! kill -0 $APP_PID 2>/dev/null; then
+              echo "App process exited unexpectedly while waiting for MCP server"
+              cat /tmp/cauldron-e2e.log
+              exit 1
+            fi
             if curl -s -X POST http://127.0.0.1:9099/mcp \
                  -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" \
-                 -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | grep -q '"tools"'; then
+                 -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' 2>/dev/null | grep -q '"tools"'; then
               echo "MCP server is ready on port 9099"
               break
             fi
