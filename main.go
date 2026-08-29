@@ -146,6 +146,10 @@ func cleanOldLogs(logDir string, maxFiles int) {
 }
 
 func main() {
+	if runCLI(os.Args[1:]) {
+		return
+	}
+
 	userConfigDir, _ := os.UserConfigDir()
 	logDir := filepath.Join(userConfigDir, "cauldron")
 
