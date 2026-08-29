@@ -2,11 +2,11 @@
   "name": "@cauldron/forms",
   "version": "0.0.1",
   "peerDependencies": {
-    "@angular/common": "^21.1.0",
-    "@angular/core": "^21.1.0",
-    "@angular/forms": "^21.1.0",
-    "@angular/material": "~21.2.0",
-    "@angular/cdk": "~21.2.0"
+    "@angular/common": "^22.1.4",
+    "@angular/core": "^22.1.4",
+    "@angular/forms": "^22.1.4",
+    "@angular/material": "~22.1.4",
+    "@angular/cdk": "~22.1.4"
   },
   "dependencies": {
     "tslib": "^2.3.0"
