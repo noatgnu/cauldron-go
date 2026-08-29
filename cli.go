@@ -60,6 +60,15 @@ func runCLI(args []string) bool {
 			os.Exit(1)
 		}
 		return true
+	case "uv":
+		if !verbose {
+			log.SetOutput(io.Discard)
+		}
+		if err := cliUv(filtered[1:]); err != nil {
+			fmt.Fprintln(os.Stderr, "Error:", err)
+			os.Exit(1)
+		}
+		return true
 	default:
 		return false
 	}
@@ -313,5 +322,151 @@ func cliDoctor() error {
 	plugins := ctx.pluginLoaderV2.GetAllPlugins()
 	report(true, "Plugins", fmt.Sprintf("%d loaded", len(plugins)))
 
+	return nil
+}
+
+func cliUv(args []string) error {
+	if len(args) == 0 {
+		return fmt.Errorf("usage: cauldron uv install | cauldron uv python install <version> | cauldron uv python list | cauldron uv venv create <path> [--python <version>]")
+	}
+
+	switch args[0] {
+	case "install":
+		return cliUvInstall()
+	case "python":
+		return cliUvPython(args[1:])
+	case "venv":
+		return cliUvVenv(args[1:])
+	default:
+		return fmt.Errorf("unknown uv subcommand: %s", args[0])
+	}
+}
+
+func cliUvInstall() error {
+	ctx, err := newCLIContext()
+	if err != nil {
+		return fmt.Errorf("failed to initialize: %w", err)
+	}
+	defer ctx.db.Close()
+
+	if ctx.uvService.IsUvAvailable() {
+		path, _ := ctx.uvService.GetUvPath()
+		if path == "" {
+			path = "(system PATH)"
+		}
+		fmt.Printf("uv is already available: %s\n", path)
+		return nil
+	}
+
+	fmt.Println("Downloading uv...")
+	if err := ctx.uvService.DownloadUv(); err != nil {
+		return fmt.Errorf("failed to install uv: %w", err)
+	}
+	path, _ := ctx.uvService.GetUvPath()
+	fmt.Printf("OK: uv installed at %s\n", path)
+	return nil
+}
+
+func cliUvPython(args []string) error {
+	if len(args) == 0 {
+		return fmt.Errorf("usage: cauldron uv python install <version> | cauldron uv python list")
+	}
+
+	switch args[0] {
+	case "install":
+		if len(args) < 2 {
+			return fmt.Errorf("usage: cauldron uv python install <version>")
+		}
+		return cliUvPythonInstall(args[1])
+	case "list":
+		return cliUvPythonList()
+	default:
+		return fmt.Errorf("unknown uv python subcommand: %s", args[0])
+	}
+}
+
+func cliUvPythonInstall(version string) error {
+	ctx, err := newCLIContext()
+	if err != nil {
+		return fmt.Errorf("failed to initialize: %w", err)
+	}
+	defer ctx.db.Close()
+
+	if !ctx.uvService.IsUvAvailable() {
+		return fmt.Errorf("uv is not installed; run 'cauldron uv install' first")
+	}
+
+	fmt.Printf("Installing Python %s via uv...\n", version)
+	if err := ctx.uvService.InstallUvPythonVersion(version); err != nil {
+		return fmt.Errorf("failed to install Python %s: %w", version, err)
+	}
+	fmt.Println("  OK")
+	return nil
+}
+
+func cliUvPythonList() error {
+	ctx, err := newCLIContext()
+	if err != nil {
+		return fmt.Errorf("failed to initialize: %w", err)
+	}
+	defer ctx.db.Close()
+
+	if !ctx.uvService.IsUvAvailable() {
+		return fmt.Errorf("uv is not installed; run 'cauldron uv install' first")
+	}
+
+	versions, err := ctx.uvService.ListUvManagedPythons()
+	if err != nil {
+		return fmt.Errorf("failed to list uv-managed Python versions: %w", err)
+	}
+	if len(versions) == 0 {
+		fmt.Println("No Python versions installed via uv.")
+		return nil
+	}
+	for _, v := range versions {
+		fmt.Printf("%-12s %-14s %s\n", v.Version, v.Implementation, v.Path)
+	}
+	return nil
+}
+
+func cliUvVenv(args []string) error {
+	if len(args) == 0 {
+		return fmt.Errorf("usage: cauldron uv venv create <path> [--python <version>]")
+	}
+
+	switch args[0] {
+	case "create":
+		return cliUvVenvCreate(args[1:])
+	default:
+		return fmt.Errorf("unknown uv venv subcommand: %s", args[0])
+	}
+}
+
+func cliUvVenvCreate(args []string) error {
+	fs := flag.NewFlagSet("uv venv create", flag.ContinueOnError)
+	pythonVersion := fs.String("python", "", "Python version to use (uv-managed)")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if fs.NArg() == 0 {
+		return fmt.Errorf("usage: cauldron uv venv create <path> [--python <version>]")
+	}
+	venvPath := fs.Arg(0)
+
+	ctx, err := newCLIContext()
+	if err != nil {
+		return fmt.Errorf("failed to initialize: %w", err)
+	}
+	defer ctx.db.Close()
+
+	if !ctx.uvService.IsUvAvailable() {
+		return fmt.Errorf("uv is not installed; run 'cauldron uv install' first")
+	}
+
+	fmt.Printf("Creating venv at %s...\n", venvPath)
+	if err := ctx.uvService.CreateUvVirtualEnv(*pythonVersion, venvPath, "", ""); err != nil {
+		return fmt.Errorf("failed to create venv: %w", err)
+	}
+	fmt.Println("  OK")
 	return nil
 }

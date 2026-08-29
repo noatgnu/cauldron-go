@@ -206,3 +206,106 @@ func TestRunCLI_Doctor(t *testing.T) {
 		}
 	})
 }
+
+func TestCLIUv_Dispatch(t *testing.T) {
+	if err := cliUv(nil); err == nil {
+		t.Error("expected usage error with no subcommand, got nil")
+	}
+	if err := cliUv([]string{"frobnicate"}); err == nil {
+		t.Error("expected error for unknown uv subcommand, got nil")
+	}
+}
+
+func TestCLIUvPython_Dispatch(t *testing.T) {
+	if err := cliUvPython(nil); err == nil {
+		t.Error("expected usage error with no subcommand, got nil")
+	}
+	if err := cliUvPython([]string{"install"}); err == nil {
+		t.Error("expected error for 'install' with no version argument, got nil")
+	}
+	if err := cliUvPython([]string{"frobnicate"}); err == nil {
+		t.Error("expected error for unknown uv python subcommand, got nil")
+	}
+}
+
+func TestCLIUvVenv_Dispatch(t *testing.T) {
+	if err := cliUvVenv(nil); err == nil {
+		t.Error("expected usage error with no subcommand, got nil")
+	}
+	if err := cliUvVenv([]string{"frobnicate"}); err == nil {
+		t.Error("expected error for unknown uv venv subcommand, got nil")
+	}
+}
+
+func TestCLIUvVenvCreate_UsageError(t *testing.T) {
+	if err := cliUvVenvCreate(nil); err == nil {
+		t.Error("expected usage error with no path argument, got nil")
+	}
+}
+
+// ensureUvAvailableForTest installs uv (via the real CLI action) if it
+// isn't already available, skipping the calling test if that's not
+// possible in this environment (e.g. no network access).
+func ensureUvAvailableForTest(t *testing.T, ctx *cliContext) {
+	t.Helper()
+
+	if ctx.uvService.IsUvAvailable() {
+		return
+	}
+	if err := cliUvInstall(); err != nil {
+		t.Skipf("uv could not be installed (no network access?): %v", err)
+	}
+	if !ctx.uvService.IsUvAvailable() {
+		t.Skip("uv still not available after install attempt")
+	}
+}
+
+func TestCLIUvActions_Integration(t *testing.T) {
+	ctx, err := newCLIContext()
+	if err != nil {
+		t.Fatalf("newCLIContext error: %v", err)
+	}
+	defer ctx.db.Close()
+
+	ensureUvAvailableForTest(t, ctx)
+
+	if err := cliUvInstall(); err != nil {
+		t.Fatalf("cliUvInstall error: %v", err)
+	}
+
+	const pythonVersion = "3.12"
+	if err := cliUvPythonInstall(pythonVersion); err != nil {
+		t.Skipf("could not install Python %s via uv (no network access?): %v", pythonVersion, err)
+	}
+
+	if err := cliUvPythonList(); err != nil {
+		t.Errorf("cliUvPythonList error: %v", err)
+	}
+
+	venvPath := filepath.Join(t.TempDir(), "cli-uv-venv-test")
+	if err := cliUvVenvCreate([]string{"--python", pythonVersion, venvPath}); err != nil {
+		t.Fatalf("cliUvVenvCreate error: %v", err)
+	}
+
+	venvs, err := ctx.envService.GetVirtualEnvironments()
+	if err != nil {
+		t.Fatalf("GetVirtualEnvironments error: %v", err)
+	}
+	var created *services.VirtualEnvironment
+	for i := range venvs {
+		if strings.Contains(venvs[i].Path, venvPath) {
+			created = &venvs[i]
+			break
+		}
+	}
+	if created == nil {
+		t.Fatal("created uv venv not found via GetVirtualEnvironments()")
+	}
+	if created.Source != "uv" {
+		t.Errorf("venv Source = %q, want \"uv\"", created.Source)
+	}
+
+	if err := ctx.envService.DeleteVirtualEnvironment(created.ID); err != nil {
+		t.Errorf("failed to clean up test venv DB entry: %v", err)
+	}
+}
