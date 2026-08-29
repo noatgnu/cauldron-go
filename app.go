@@ -75,10 +75,7 @@ func (a *App) emitEvent(name string, data interface{}) {
 
 func (a *App) Initialize() {
 	log.Println("[App.Initialize] Starting application...")
-	// GetPluginsV2 (and, through it, the frontend's entire backend-ready
-	// gate) blocks on <-a.ready. Close it on every exit path, including
-	// early returns and a recovered panic below, so a failed startup
-	// surfaces as an empty state instead of hanging the whole UI forever.
+	// GetPluginsV2 (the frontend's backend-ready gate) blocks on <-a.ready; close it on every exit path, including early returns and panics.
 	defer func() {
 		if r := recover(); r != nil {
 			log.Printf("[App.Initialize] PANIC: %v\n%s", r, debug.Stack())
@@ -87,10 +84,7 @@ func (a *App) Initialize() {
 		close(a.initialized)
 	}()
 
-	// Give the webview time to finish wiring up its event listeners
-	// before Initialize starts emitting events (e.g. checkUnfinishedJobs'
-	// "unfinished-jobs-found") — a fixed delay rather than a real
-	// readiness signal, so it's a heuristic, not a guarantee.
+	// Fixed-delay heuristic (not a real readiness signal) giving the webview time to register its event listeners before Initialize emits any.
 	time.Sleep(1 * time.Second)
 
 	log.Println("[App.Initialize] Initializing database...")
@@ -1032,16 +1026,27 @@ func (a *App) ExecutePluginV2(req models.PluginExecutionRequestV2) (string, erro
 	log.Printf("[ExecutePluginV2] Plugin loaded: %s [ID:%d] (%s), Environments: %v",
 		plugin.Definition.Plugin.Name, plugin.ID, plugin.Definition.Plugin.ID, plugin.Definition.Runtime.GetEnvironments())
 
-	if err := a.pluginExecutor.ValidateParameters(plugin, req.Parameters); err != nil {
+	jobID, err := executePluginJob(a.pluginExecutor, a.jobQueue, a.settings, plugin, req.Parameters)
+	if err != nil {
+		return "", err
+	}
+
+	log.Printf("[ExecutePluginV2] Created job %s - will be processed by job queue worker", jobID)
+	return jobID, nil
+}
+
+// executePluginJob validates, builds args, and enqueues a job; shared between App.ExecutePluginV2 (GUI) and the CLI's "job run" so both stay identical.
+func executePluginJob(pluginExecutor *services.PluginExecutor, jobQueue *services.JobQueueService, settings *services.SettingsService, plugin *models.PluginV2, parameters map[string]interface{}) (string, error) {
+	if err := pluginExecutor.ValidateParameters(plugin, parameters); err != nil {
 		return "", fmt.Errorf("parameter validation failed: %w", err)
 	}
 
-	args, err := a.pluginExecutor.BuildArguments(plugin, req.Parameters)
+	args, err := pluginExecutor.BuildArguments(plugin, parameters)
 	if err != nil {
 		return "", fmt.Errorf("failed to build arguments: %w", err)
 	}
 
-	cfg := a.settings.GetConfig()
+	cfg := settings.GetConfig()
 	baseOutputDir := cfg.OutputDirectory
 	if baseOutputDir == "" {
 		baseOutputDir = "outputs"
@@ -1052,18 +1057,16 @@ func (a *App) ExecutePluginV2(req models.PluginExecutionRequestV2) (string, erro
 		time.Now().Format("20060102_150405")))
 	os.MkdirAll(outputDir, 0755)
 
-	log.Printf("[ExecutePluginV2] Args before outputDir append: %v", args)
 	if plugin.Definition.Execution.OutputDir != "" {
 		args = append(args, plugin.Definition.Execution.OutputDir, outputDir)
-		log.Printf("[ExecutePluginV2] Args after outputDir append: %v", args)
 	}
 
-	parameters := make(map[string]interface{})
-	for k, v := range req.Parameters {
-		parameters[k] = v
+	params := make(map[string]interface{}, len(parameters)+2)
+	for k, v := range parameters {
+		params[k] = v
 	}
-	parameters["outputDir"] = outputDir
-	parameters["pluginId"] = plugin.ID
+	params["outputDir"] = outputDir
+	params["pluginId"] = plugin.ID
 
 	envs := plugin.Definition.Runtime.GetEnvironments()
 	runtimeTypeForJob := ""
@@ -1073,21 +1076,15 @@ func (a *App) ExecutePluginV2(req models.PluginExecutionRequestV2) (string, erro
 		runtimeTypeForJob = envs[0]
 	}
 
-	jobID, err := a.jobQueue.CreateJobWithParameters(
+	return jobQueue.CreateJobWithParameters(
 		plugin.Definition.Plugin.ID,
 		plugin.Definition.Plugin.Name,
 		runtimeTypeForJob,
 		args,
-		parameters,
+		params,
 		plugin.Definition.Plugin.Version,
 		plugin.CommitHash,
 	)
-	if err != nil {
-		return "", err
-	}
-
-	log.Printf("[ExecutePluginV2] Created job %s - will be processed by job queue worker", jobID)
-	return jobID, nil
 }
 
 func (a *App) ReloadPluginsV2() error {
@@ -1434,9 +1431,7 @@ func (a *App) checkUnfinishedJobs() {
 		}
 	}()
 
-	// Same fixed-delay heuristic as Initialize's leading sleep: give the
-	// webview time to register its "unfinished-jobs-found" listener
-	// before this emits it.
+	// Same fixed-delay heuristic as Initialize's leading sleep, for the webview to register its "unfinished-jobs-found" listener first.
 	time.Sleep(1 * time.Second)
 
 	if a.jobQueue == nil || a.db == nil {

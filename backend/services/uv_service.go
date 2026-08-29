@@ -87,10 +87,7 @@ func (u *UvService) GetUvPath() (string, error) {
 	return uvPath, nil
 }
 
-// resolveUvPath returns the app-managed uv binary path if present, falling
-// back to a system-wide "uv" on PATH. Every uv-invoking method must resolve
-// through this (not GetUvPath directly) so they stay consistent with what
-// IsUvAvailable reports as available.
+// resolveUvPath returns the app-managed uv path, falling back to system PATH; every uv-invoking method must use this (not GetUvPath) to match IsUvAvailable.
 func (u *UvService) resolveUvPath() (string, error) {
 	if path, err := u.GetUvPath(); err == nil {
 		return path, nil
@@ -476,9 +473,7 @@ func streamCommandProgress(cmd *exec.Cmd, notifier *ProgressNotifier, id, logPre
 	return cmd.Wait()
 }
 
-// fetchGitHubRelease fetches and parses a GitHub release (or releases-list) JSON response.
-// When the URL returns a single release object, callers pass the exact release URL
-// (e.g. .../releases/latest); when it returns an array, the first entry is used.
+// fetchGitHubRelease fetches and parses a GitHub release (or releases-list) JSON response; when the URL returns an array, the first entry is used.
 func fetchGitHubRelease(url string) (*GitHubRelease, error) {
 	client := &http.Client{}
 	req, err := http.NewRequest("GET", url, nil)

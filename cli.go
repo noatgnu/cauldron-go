@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -10,15 +11,15 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime/debug"
+	"strconv"
 	"strings"
+	"time"
 
+	"github.com/noatgnu/cauldron-go/backend/models"
 	"github.com/noatgnu/cauldron-go/backend/services"
 )
 
-// runCLI checks args (os.Args[1:]) for a recognized CLI subcommand and, if
-// found, runs it headlessly (no GUI, no window) and returns true. Any
-// unrecognized or empty args falls through so main() proceeds with the
-// normal desktop GUI launch.
+// runCLI runs a recognized CLI subcommand headlessly and returns true; unrecognized/empty args fall through to the normal GUI launch.
 func runCLI(args []string) bool {
 	if len(args) == 0 {
 		return false
@@ -42,8 +43,7 @@ func runCLI(args []string) bool {
 		cliVersion()
 		return true
 	case "plugin":
-		// Backend services log through the standard `log` package; quiet
-		// it by default so command output isn't drowned out.
+		// Backend services log via the standard `log` package; quiet it by default so command output isn't drowned out.
 		if !verbose {
 			log.SetOutput(io.Discard)
 		}
@@ -65,6 +65,15 @@ func runCLI(args []string) bool {
 			log.SetOutput(io.Discard)
 		}
 		if err := cliUv(filtered[1:]); err != nil {
+			fmt.Fprintln(os.Stderr, "Error:", err)
+			os.Exit(1)
+		}
+		return true
+	case "job":
+		if !verbose {
+			log.SetOutput(io.Discard)
+		}
+		if err := cliJob(filtered[1:]); err != nil {
 			fmt.Fprintln(os.Stderr, "Error:", err)
 			os.Exit(1)
 		}
@@ -97,10 +106,7 @@ func cliVersion() {
 	fmt.Printf("cauldron %s%s (built with %s)\n", revision, dirty, info.GoVersion)
 }
 
-// cliContext bundles the subset of backend services usable headlessly, i.e.
-// without a running Wails application/window. Every service constructor
-// here accepts a nil *application.App and degrades gracefully (progress
-// notifications and dialogs are simply skipped).
+// cliContext bundles backend services usable headlessly; every constructor here accepts a nil *application.App and degrades gracefully.
 type cliContext struct {
 	db                 *services.DatabaseService
 	settings           *services.SettingsService
@@ -109,9 +115,24 @@ type cliContext struct {
 	dockerImageBuilder *services.DockerImageBuilder
 	pluginLoaderV2     *services.PluginLoaderV2
 	pluginInstaller    *services.PluginInstaller
+	pluginExecutor     *services.PluginExecutor
+	jobQueue           *services.JobQueueService
+}
+
+// close shuts down the job queue (killing any in-flight subprocess first, same as App.Shutdown) before closing the database.
+func (c *cliContext) close() {
+	if c.jobQueue != nil {
+		c.jobQueue.Shutdown()
+	}
+	c.db.Close()
 }
 
 func newCLIContext() (*cliContext, error) {
+	return newCLIContextWithPluginsDir("")
+}
+
+// newCLIContextWithPluginsDir is newCLIContext with an explicit plugins directory, used by tests to point at the repo's built-in plugins/ folder.
+func newCLIContextWithPluginsDir(pluginsDir string) (*cliContext, error) {
 	userDataPath, err := getUserDataPath()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user data path: %w", err)
@@ -129,14 +150,58 @@ func newCLIContext() (*cliContext, error) {
 	gitAuthService := services.NewGitAuthService(db)
 	dockerImageBuilder := services.NewDockerImageBuilder(db)
 
-	pluginLoaderV2 := services.NewPluginLoaderV2("", db, dockerImageBuilder)
+	pluginLoaderV2 := services.NewPluginLoaderV2(pluginsDir, db, dockerImageBuilder)
 	if err := pluginLoaderV2.LoadPlugins(); err != nil {
 		fmt.Fprintf(os.Stderr, "warning: failed to load plugins: %v\n", err)
 	}
 
-	exePath, _ := os.Executable()
-	pluginsDir := filepath.Join(filepath.Dir(exePath), "plugins")
+	if pluginsDir == "" {
+		exePath, _ := os.Executable()
+		pluginsDir = filepath.Join(filepath.Dir(exePath), "plugins")
+	}
 	pluginInstaller := services.NewPluginInstallerV3(pluginsDir, db, pluginLoaderV2, gitAuthService, nil)
+	pluginExecutor := services.NewPluginExecutor()
+
+	jobQueue := services.NewJobQueueServiceV3(db, nil)
+	scriptExecutor := services.NewScriptExecutor(settings, db)
+	scriptExecutor.SetUpdateCallback(func(jobID string, update models.Job) {
+		job, err := jobQueue.GetJob(jobID)
+		if err != nil {
+			return
+		}
+		if update.Status != "" {
+			job.Status = update.Status
+		}
+		if update.Progress > 0 {
+			job.Progress = update.Progress
+		}
+		if update.Error != "" {
+			job.Error = update.Error
+		}
+		if update.OutputPath != "" {
+			job.OutputPath = update.OutputPath
+		}
+		if update.Status == "completed" {
+			now := time.Now()
+			job.CompletedAt = &now
+		}
+		db.GetDB().Save(job)
+	})
+	scriptExecutor.SetOutputCallback(func(jobID string, line string) {
+		job, err := jobQueue.GetJob(jobID)
+		if err != nil {
+			return
+		}
+		job.TerminalOutput = append(job.TerminalOutput, line)
+		const maxLines = 100
+		if len(job.TerminalOutput) > maxLines {
+			job.TerminalOutput = job.TerminalOutput[len(job.TerminalOutput)-maxLines:]
+		}
+		db.GetDB().Save(job)
+	})
+	scriptExecutor.SetPluginLoader(pluginLoaderV2)
+	jobQueue.SetScriptExecutor(scriptExecutor)
+	jobQueue.SetPluginLoader(pluginLoaderV2)
 
 	return &cliContext{
 		db:                 db,
@@ -146,12 +211,14 @@ func newCLIContext() (*cliContext, error) {
 		dockerImageBuilder: dockerImageBuilder,
 		pluginLoaderV2:     pluginLoaderV2,
 		pluginInstaller:    pluginInstaller,
+		pluginExecutor:     pluginExecutor,
+		jobQueue:           jobQueue,
 	}, nil
 }
 
 func cliPlugin(args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("usage: cauldron plugin install <repo-url> [--ref <commit>] [--registry <source>] | cauldron plugin install --file <path>")
+		return fmt.Errorf("usage: cauldron plugin install <repo-url> [--ref <commit>] [--registry <source>] | cauldron plugin install --file <path> | cauldron plugin uninstall <repo-url> | cauldron plugin list | cauldron plugin inputs [--json] <plugin-id>")
 	}
 
 	switch args[0] {
@@ -159,9 +226,112 @@ func cliPlugin(args []string) error {
 		return cliPluginInstall(args[1:])
 	case "uninstall":
 		return cliPluginUninstall(args[1:])
+	case "list":
+		return cliPluginList()
+	case "inputs":
+		return cliPluginInputs(args[1:])
 	default:
 		return fmt.Errorf("unknown plugin subcommand: %s", args[0])
 	}
+}
+
+func cliPluginList() error {
+	ctx, err := newCLIContext()
+	if err != nil {
+		return fmt.Errorf("failed to initialize: %w", err)
+	}
+	defer ctx.close()
+
+	plugins := ctx.pluginLoaderV2.GetAllPlugins()
+	if len(plugins) == 0 {
+		fmt.Println("No plugins installed.")
+		return nil
+	}
+	for _, p := range plugins {
+		fmt.Printf("%-4d %-32s %s\n", p.ID, p.Definition.Plugin.ID, p.Definition.Plugin.Name)
+	}
+	return nil
+}
+
+// cliPluginInputs prints a plugin's parameter schema, for building --param/--params-json values for "cauldron job run".
+func cliPluginInputs(args []string) error {
+	fs := flag.NewFlagSet("plugin inputs", flag.ContinueOnError)
+	asJSON := fs.Bool("json", false, "output the raw input schema as JSON")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if fs.NArg() == 0 {
+		return fmt.Errorf("usage: cauldron plugin inputs [--json] <plugin-id>")
+	}
+	if fs.NArg() > 1 {
+		return fmt.Errorf("unexpected extra arguments %v -- flags must come before the plugin id", fs.Args()[1:])
+	}
+
+	ctx, err := newCLIContext()
+	if err != nil {
+		return fmt.Errorf("failed to initialize: %w", err)
+	}
+	defer ctx.close()
+
+	plugin, err := findPlugin(ctx.pluginLoaderV2, fs.Arg(0))
+	if err != nil {
+		return err
+	}
+
+	if *asJSON {
+		data, err := json.MarshalIndent(plugin.Definition.Inputs, "", "  ")
+		if err != nil {
+			return fmt.Errorf("failed to marshal inputs: %w", err)
+		}
+		fmt.Println(string(data))
+		return nil
+	}
+
+	fmt.Printf("Plugin: %s (%s)\n", plugin.Definition.Plugin.Name, plugin.Definition.Plugin.ID)
+	if plugin.Definition.Plugin.Description != "" {
+		fmt.Println(plugin.Definition.Plugin.Description)
+	}
+	fmt.Println()
+
+	if len(plugin.Definition.Inputs) == 0 {
+		fmt.Println("This plugin takes no inputs.")
+		return nil
+	}
+
+	for _, input := range plugin.Definition.Inputs {
+		required := ""
+		if input.Required {
+			required = " (required)"
+		}
+		fmt.Printf("--param %s=<%s>%s\n", input.Name, input.Type, required)
+		if input.Label != "" && input.Label != input.Name {
+			fmt.Printf("    label:       %s\n", input.Label)
+		}
+		if input.Description != "" {
+			fmt.Printf("    description: %s\n", input.Description)
+		}
+		if input.Default != nil {
+			fmt.Printf("    default:     %v\n", input.Default)
+		}
+		if input.Placeholder != "" {
+			fmt.Printf("    example:     %s\n", input.Placeholder)
+		}
+		if len(input.Options) > 0 {
+			opts := make([]string, len(input.Options))
+			for i, o := range input.Options {
+				opts[i] = o.Value
+			}
+			fmt.Printf("    options:     %s\n", strings.Join(opts, ", "))
+		}
+		if input.Min != nil {
+			fmt.Printf("    min:         %v\n", *input.Min)
+		}
+		if input.Max != nil {
+			fmt.Printf("    max:         %v\n", *input.Max)
+		}
+		fmt.Println()
+	}
+	return nil
 }
 
 func cliPluginUninstall(args []string) error {
@@ -179,7 +349,7 @@ func cliPluginUninstall(args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to initialize: %w", err)
 	}
-	defer ctx.db.Close()
+	defer ctx.close()
 
 	repoURL := fs.Arg(0)
 	fmt.Printf("Uninstalling %s...\n", repoURL)
@@ -220,7 +390,7 @@ func cliPluginInstall(args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to initialize: %w", err)
 	}
-	defer ctx.db.Close()
+	defer ctx.close()
 
 	var registrySource *string
 	if *registry != "" {
@@ -275,7 +445,7 @@ func cliDoctor() error {
 		fmt.Printf("[FAIL]    Startup                  %v\n", err)
 		return err
 	}
-	defer ctx.db.Close()
+	defer ctx.close()
 
 	report := func(ok bool, label string, detail string) {
 		status := "OK"
@@ -347,7 +517,7 @@ func cliUvInstall() error {
 	if err != nil {
 		return fmt.Errorf("failed to initialize: %w", err)
 	}
-	defer ctx.db.Close()
+	defer ctx.close()
 
 	if ctx.uvService.IsUvAvailable() {
 		path, _ := ctx.uvService.GetUvPath()
@@ -390,7 +560,7 @@ func cliUvPythonInstall(version string) error {
 	if err != nil {
 		return fmt.Errorf("failed to initialize: %w", err)
 	}
-	defer ctx.db.Close()
+	defer ctx.close()
 
 	if !ctx.uvService.IsUvAvailable() {
 		return fmt.Errorf("uv is not installed; run 'cauldron uv install' first")
@@ -409,7 +579,7 @@ func cliUvPythonList() error {
 	if err != nil {
 		return fmt.Errorf("failed to initialize: %w", err)
 	}
-	defer ctx.db.Close()
+	defer ctx.close()
 
 	if !ctx.uvService.IsUvAvailable() {
 		return fmt.Errorf("uv is not installed; run 'cauldron uv install' first")
@@ -457,7 +627,7 @@ func cliUvVenvCreate(args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to initialize: %w", err)
 	}
-	defer ctx.db.Close()
+	defer ctx.close()
 
 	if !ctx.uvService.IsUvAvailable() {
 		return fmt.Errorf("uv is not installed; run 'cauldron uv install' first")
@@ -468,5 +638,287 @@ func cliUvVenvCreate(args []string) error {
 		return fmt.Errorf("failed to create venv: %w", err)
 	}
 	fmt.Println("  OK")
+	return nil
+}
+
+// jobSpec describes one plugin invocation: a single --param/--params-json call, or one entry of a --file batch (a JSON array of jobSpec).
+type jobSpec struct {
+	Plugin string                 `json:"plugin"`
+	Params map[string]interface{} `json:"params"`
+}
+
+// stringSliceFlag implements flag.Value to accept a repeatable string flag, used for --param key=value.
+type stringSliceFlag []string
+
+func (s *stringSliceFlag) String() string { return strings.Join(*s, ",") }
+func (s *stringSliceFlag) Set(v string) error {
+	*s = append(*s, v)
+	return nil
+}
+
+func cliJob(args []string) error {
+	if len(args) == 0 {
+		return fmt.Errorf("usage: cauldron job run [--param key=value]... <plugin-id> | cauldron job run --file <path> | cauldron job list | cauldron job status <job-id>")
+	}
+
+	switch args[0] {
+	case "run":
+		return cliJobRun(args[1:])
+	case "list":
+		return cliJobList()
+	case "status":
+		return cliJobStatus(args[1:])
+	default:
+		return fmt.Errorf("unknown job subcommand: %s", args[0])
+	}
+}
+
+func cliJobRun(args []string) error {
+	fs := flag.NewFlagSet("job run", flag.ContinueOnError)
+	var paramFlags stringSliceFlag
+	fs.Var(&paramFlags, "param", "a key=value parameter (repeatable); coerced to the plugin input's declared type")
+	paramsJSON := fs.String("params-json", "", "parameters as a raw JSON object")
+	file := fs.String("file", "", "path to a JSON array of {\"plugin\":..., \"params\":{...}} job specs, for batch processing")
+	timeout := fs.Duration("timeout", 30*time.Minute, "max time to wait for each job to finish")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+
+	var specs []jobSpec
+	if *file != "" {
+		data, err := os.ReadFile(*file)
+		if err != nil {
+			return fmt.Errorf("failed to read %s: %w", *file, err)
+		}
+		if err := json.Unmarshal(data, &specs); err != nil {
+			return fmt.Errorf("failed to parse %s: %w", *file, err)
+		}
+	} else {
+		if fs.NArg() == 0 {
+			return fmt.Errorf("usage: cauldron job run [--param key=value]... [--params-json '{...}'] <plugin-id>")
+		}
+		if fs.NArg() > 1 {
+			// flag.Parse stops recognizing flags at the first positional argument, so a misplaced --param lands here instead of erroring cleanly.
+			return fmt.Errorf("unexpected extra arguments %v -- flags must come before the plugin id, e.g. cauldron job run --param key=value cv-plot", fs.Args()[1:])
+		}
+
+		params := map[string]interface{}{}
+		if *paramsJSON != "" {
+			if err := json.Unmarshal([]byte(*paramsJSON), &params); err != nil {
+				return fmt.Errorf("invalid --params-json: %w", err)
+			}
+		}
+		for _, kv := range paramFlags {
+			key, value, ok := strings.Cut(kv, "=")
+			if !ok {
+				return fmt.Errorf("invalid --param %q, expected key=value", kv)
+			}
+			params[key] = value
+		}
+
+		specs = []jobSpec{{Plugin: fs.Arg(0), Params: params}}
+	}
+	if len(specs) == 0 {
+		return fmt.Errorf("no jobs to run")
+	}
+
+	ctx, err := newCLIContext()
+	if err != nil {
+		return fmt.Errorf("failed to initialize: %w", err)
+	}
+	defer ctx.close()
+
+	var jobIDs []string
+	for _, spec := range specs {
+		plugin, err := findPlugin(ctx.pluginLoaderV2, spec.Plugin)
+		if err != nil {
+			return fmt.Errorf("plugin %q: %w", spec.Plugin, err)
+		}
+
+		coerced, err := coercePluginParams(plugin, spec.Params)
+		if err != nil {
+			return fmt.Errorf("plugin %q: %w", spec.Plugin, err)
+		}
+
+		jobID, err := executePluginJob(ctx.pluginExecutor, ctx.jobQueue, ctx.settings, plugin, coerced)
+		if err != nil {
+			return fmt.Errorf("failed to start job for plugin %q: %w", spec.Plugin, err)
+		}
+		fmt.Printf("Queued job %s for plugin %s (%s)\n", jobID, plugin.Definition.Plugin.ID, plugin.Definition.Plugin.Name)
+		jobIDs = append(jobIDs, jobID)
+	}
+
+	failed := 0
+	for _, jobID := range jobIDs {
+		job, err := waitForJob(ctx, jobID, *timeout)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "  %s: %v\n", jobID, err)
+			failed++
+			continue
+		}
+		fmt.Printf("  %s: %s", jobID, job.Status)
+		if job.OutputPath != "" {
+			fmt.Printf(" (output: %s)", job.OutputPath)
+		}
+		fmt.Println()
+		if job.Status != models.JobStatusCompleted {
+			if job.Error != "" {
+				fmt.Fprintf(os.Stderr, "    error: %s\n", job.Error)
+			}
+			failed++
+		}
+	}
+
+	if failed > 0 {
+		return fmt.Errorf("%d/%d job(s) did not complete successfully", failed, len(jobIDs))
+	}
+	return nil
+}
+
+// findPlugin resolves a CLI-supplied plugin reference: a numeric database ID, or the plugin's string id/name from its plugin.yaml.
+func findPlugin(loader *services.PluginLoaderV2, ref string) (*models.PluginV2, error) {
+	if id, err := strconv.ParseUint(ref, 10, 64); err == nil {
+		if plugin, err := loader.GetPlugin(uint(id)); err == nil {
+			return plugin, nil
+		}
+	}
+	for _, p := range loader.GetAllPlugins() {
+		if p.Definition.Plugin.ID == ref || p.Definition.Plugin.Name == ref {
+			return p, nil
+		}
+	}
+	return nil, fmt.Errorf("no plugin found matching %q", ref)
+}
+
+// coercePluginParams converts --param key=value strings into the Go type the plugin's declared input expects (float64/bool/[]interface{}); values already typed via --params-json or --file pass through unchanged.
+func coercePluginParams(plugin *models.PluginV2, params map[string]interface{}) (map[string]interface{}, error) {
+	coerced := make(map[string]interface{}, len(params))
+	for key, value := range params {
+		strValue, isString := value.(string)
+		if !isString {
+			coerced[key] = value
+			continue
+		}
+
+		var input *models.PluginInputV2
+		for i := range plugin.Definition.Inputs {
+			if plugin.Definition.Inputs[i].Name == key {
+				input = &plugin.Definition.Inputs[i]
+				break
+			}
+		}
+		if input == nil {
+			coerced[key] = strValue
+			continue
+		}
+
+		switch input.Type {
+		case models.PluginInputTypeNumber:
+			f, err := strconv.ParseFloat(strValue, 64)
+			if err != nil {
+				return nil, fmt.Errorf("--param %s: expected a number, got %q", key, strValue)
+			}
+			coerced[key] = f
+		case models.PluginInputTypeBoolean:
+			b, err := strconv.ParseBool(strValue)
+			if err != nil {
+				return nil, fmt.Errorf("--param %s: expected true/false, got %q", key, strValue)
+			}
+			coerced[key] = b
+		case models.PluginInputTypeMultiSelect:
+			parts := strings.Split(strValue, ",")
+			arr := make([]interface{}, len(parts))
+			for i, p := range parts {
+				arr[i] = strings.TrimSpace(p)
+			}
+			coerced[key] = arr
+		default:
+			coerced[key] = strValue
+		}
+	}
+	return coerced, nil
+}
+
+// waitForJob polls a job until it reaches a terminal status, printing new output lines as they appear, since the process must stay alive for the queue's workers to run it at all.
+func waitForJob(ctx *cliContext, jobID string, timeout time.Duration) (*models.Job, error) {
+	deadline := time.Now().Add(timeout)
+	printedLines := 0
+
+	for {
+		job, err := ctx.jobQueue.GetJob(jobID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to look up job: %w", err)
+		}
+
+		if len(job.TerminalOutput) > printedLines {
+			for _, line := range job.TerminalOutput[printedLines:] {
+				fmt.Println("   ", line)
+			}
+			printedLines = len(job.TerminalOutput)
+		}
+
+		if job.Status == models.JobStatusCompleted || job.Status == models.JobStatusFailed {
+			return job, nil
+		}
+
+		if time.Now().After(deadline) {
+			return job, fmt.Errorf("timed out waiting for job to finish (status: %s)", job.Status)
+		}
+
+		time.Sleep(500 * time.Millisecond)
+	}
+}
+
+func cliJobList() error {
+	ctx, err := newCLIContext()
+	if err != nil {
+		return fmt.Errorf("failed to initialize: %w", err)
+	}
+	defer ctx.close()
+
+	jobs := ctx.jobQueue.GetAllJobs()
+	if len(jobs) == 0 {
+		fmt.Println("No jobs found.")
+		return nil
+	}
+	for _, job := range jobs {
+		fmt.Printf("%-38s %-24s %-12s %s\n", job.ID, job.Name, job.Status, job.CreatedAt.Format(time.RFC3339))
+	}
+	return nil
+}
+
+func cliJobStatus(args []string) error {
+	if len(args) == 0 {
+		return fmt.Errorf("usage: cauldron job status <job-id>")
+	}
+
+	ctx, err := newCLIContext()
+	if err != nil {
+		return fmt.Errorf("failed to initialize: %w", err)
+	}
+	defer ctx.close()
+
+	job, err := ctx.jobQueue.GetJob(args[0])
+	if err != nil {
+		return fmt.Errorf("job not found: %w", err)
+	}
+
+	fmt.Printf("ID:       %s\n", job.ID)
+	fmt.Printf("Name:     %s\n", job.Name)
+	fmt.Printf("Status:   %s\n", job.Status)
+	fmt.Printf("Progress: %.0f%%\n", job.Progress)
+	fmt.Printf("Created:  %s\n", job.CreatedAt.Format(time.RFC3339))
+	if job.OutputPath != "" {
+		fmt.Printf("Output:   %s\n", job.OutputPath)
+	}
+	if job.Error != "" {
+		fmt.Printf("Error:    %s\n", job.Error)
+	}
+	if len(job.TerminalOutput) > 0 {
+		fmt.Println("Output log:")
+		for _, line := range job.TerminalOutput {
+			fmt.Println("  " + line)
+		}
+	}
 	return nil
 }

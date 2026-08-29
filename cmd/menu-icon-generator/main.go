@@ -150,9 +150,7 @@ func max3(a, b, c int) int {
 	return m
 }
 
-// renderGlyph draws draw with a light halo (via 8-directional offsets) then
-// a dark fill on top, so the glyph stays visible on both light and dark
-// native menu backgrounds.
+// renderGlyph draws a light halo (via 8-directional offsets) then a dark fill on top, so the glyph stays visible on light and dark menu backgrounds.
 func renderGlyph(draw drawFunc) *image.RGBA {
 	img := image.NewRGBA(image.Rect(0, 0, canvasSize, canvasSize))
 	for oy := -1; oy <= 1; oy++ {
