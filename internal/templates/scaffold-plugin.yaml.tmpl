@@ -1,0 +1,65 @@
+plugin:
+  id: "{{ .ID }}"
+  name: "{{ .Name }}"
+  description: "{{ .Description }}"
+  version: "{{ .Version }}"
+  author: "{{ .Author }}"
+  category: "{{ .Category }}"
+  icon: "analytics"
+
+runtime:
+  type: "{{ .Runtime }}"
+  script: "{{ .Script }}"
+
+inputs:
+  - name: "input_file"
+    label: "Input File"
+    type: "file"
+    required: true
+    accept: ".csv,.tsv,.txt"
+    description: "Input data file"
+
+  # Add more inputs as needed
+  # - name: "parameter1"
+  #   label: "Parameter 1"
+  #   type: "number"
+  #   default: 10
+  #   min: 1
+  #   max: 100
+  #   description: "Example numeric parameter"
+
+outputs:
+  - name: "output_data"
+    path: "output.txt"
+    type: "data"
+    description: "Analysis results"
+    format: "tsv"
+
+execution:
+  argsMapping:
+    input_file: "--input_file"
+    # Add more argument mappings here
+
+  outputDir: "--output_folder"
+
+  requirements:
+{{- if .HasPython }}
+    python: ">=3.11"
+{{- end }}
+{{- if .HasR }}
+    r: ">=4.0"
+{{- end }}
+    packages:
+{{- if .HasPython }}
+      - "pandas>=2.0.0"
+      - "numpy>=1.24.0"
+{{- end }}
+{{- if .HasR }}
+      - "tidyverse"
+{{- end }}
+
+# example:
+#   enabled: true
+#   values:
+#     input_file: "diann/imputed.data.txt"
+#     # Add more example values here

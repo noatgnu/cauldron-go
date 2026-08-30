@@ -1,5 +1,6 @@
 process {{ .ProcessName | upper }} {
     label '{{ .Label }}'
+    publishDir "${params.outdir}/{{ .ProcessName }}", mode: 'copy'
 
     container "${ workflow.containerEngine == 'singularity' ?
         '{{ .ContainerImageSingularity }}' :

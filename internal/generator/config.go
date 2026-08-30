@@ -24,7 +24,6 @@ func GenerateConfig(definition *models.PluginDefinition, tmplStr string) (string
 	}
 
 	data := ConfigData{}
-	data.Params = append(data.Params, ConfigParam{Name: "input", Default: "null"})
 	data.Params = append(data.Params, ConfigParam{Name: "outdir", Default: "'./results'"})
 
 	for _, input := range definition.Inputs {

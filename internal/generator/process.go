@@ -3,6 +3,7 @@ package generator
 import (
 	"bytes"
 	"fmt"
+	"sort"
 	"strings"
 	"text/template"
 
@@ -17,6 +18,7 @@ type EnvVarData struct {
 
 type ProcessData struct {
 	ProcessName               string
+	ModulePath                string
 	Label                     string
 	ContainerImageSingularity string
 	ContainerImageDocker      string
@@ -142,6 +144,7 @@ func GenerateProcess(definition *models.PluginDefinition, tmplStr string) (strin
 
 	data := ProcessData{
 		ProcessName:               toNextflowID(definition.Plugin.ID),
+		ModulePath:                definition.Plugin.ID,
 		Label:                     "process_medium",
 		ContainerImageSingularity: singularityImage,
 		ContainerImageDocker:      imageName,
@@ -174,43 +177,27 @@ func GenerateProcess(definition *models.PluginDefinition, tmplStr string) (strin
 		})
 	}
 
-	// Map ArgsMapping to ArgData
-	for inputName, mapping := range definition.Execution.ArgsMapping {
-		arg := ArgData{
-			InputName: inputName,
+	// Map ArgsMapping to ArgData in a deterministic order: declared-input order first, then any leftover keys sorted alphabetically.
+	handled := make(map[string]bool, len(definition.Execution.ArgsMapping))
+	for _, input := range definition.Inputs {
+		mapping, ok := definition.Execution.ArgsMapping[input.Name]
+		if !ok {
+			continue
 		}
-
-		// Find the corresponding input definition
-		for _, input := range definition.Inputs {
-			if input.Name == inputName {
-				arg.InputType = string(input.Type)
-				arg.IsMultiple = input.Multiple
-				break
-			}
+		handled[input.Name] = true
+		if arg := buildArgData(input.Name, mapping, definition.Inputs); arg.Flag != "" || arg.StaticValue != "" {
+			data.Args = append(data.Args, arg)
 		}
-
-		switch v := mapping.(type) {
-		case string:
-			arg.Flag = v
-		case map[string]interface{}:
-			if f, ok := v["flag"].(string); ok {
-				arg.Flag = f
-			}
-			if t, ok := v["transform"].(string); ok {
-				arg.Transform = t
-			}
-			if w, ok := v["when"].(string); ok {
-				arg.When = w
-			}
-			if sv, ok := v["value"].(string); ok {
-				arg.StaticValue = sv
-			}
-			if pav, ok := v["passAsValue"].(bool); ok {
-				arg.PassAsValue = pav
-			}
+	}
+	remaining := make([]string, 0, len(definition.Execution.ArgsMapping))
+	for inputName := range definition.Execution.ArgsMapping {
+		if !handled[inputName] {
+			remaining = append(remaining, inputName)
 		}
-
-		if arg.Flag != "" || arg.StaticValue != "" {
+	}
+	sort.Strings(remaining)
+	for _, inputName := range remaining {
+		if arg := buildArgData(inputName, definition.Execution.ArgsMapping[inputName], definition.Inputs); arg.Flag != "" || arg.StaticValue != "" {
 			data.Args = append(data.Args, arg)
 		}
 	}
@@ -221,6 +208,41 @@ func GenerateProcess(definition *models.PluginDefinition, tmplStr string) (strin
 	}
 
 	return buf.String(), nil
+}
+
+func buildArgData(inputName string, mapping interface{}, inputs []models.PluginInputV2) ArgData {
+	arg := ArgData{InputName: inputName}
+
+	for _, input := range inputs {
+		if input.Name == inputName {
+			arg.InputType = string(input.Type)
+			arg.IsMultiple = input.Multiple
+			break
+		}
+	}
+
+	switch v := mapping.(type) {
+	case string:
+		arg.Flag = v
+	case map[string]interface{}:
+		if f, ok := v["flag"].(string); ok {
+			arg.Flag = f
+		}
+		if t, ok := v["transform"].(string); ok {
+			arg.Transform = t
+		}
+		if w, ok := v["when"].(string); ok {
+			arg.When = w
+		}
+		if sv, ok := v["value"].(string); ok {
+			arg.StaticValue = sv
+		}
+		if pav, ok := v["passAsValue"].(bool); ok {
+			arg.PassAsValue = pav
+		}
+	}
+
+	return arg
 }
 
 func discoverImage(definition *models.PluginDefinition) string {
@@ -234,18 +256,22 @@ func discoverImage(definition *models.PluginDefinition) string {
 }
 
 func GenerateREADME(definition *models.PluginDefinition, tmplStr string) (string, error) {
-	tmpl, err := template.New("readme").Parse(tmplStr)
+	tmpl, err := template.New("readme").Funcs(template.FuncMap{
+		"upper": strings.ToUpper,
+	}).Parse(tmplStr)
 	if err != nil {
 		return "", fmt.Errorf("failed to parse readme template: %w", err)
 	}
 
 	data := ProcessData{
-		ProcessName: definition.Plugin.ID,
-		ToolName:    definition.Plugin.Name,
-		Version:     definition.Plugin.Version,
-		Description: definition.Plugin.Description,
-		Author:      definition.Plugin.Author,
-		Inputs:      definition.Inputs,
+		ProcessName:          toNextflowID(definition.Plugin.ID),
+		ModulePath:           definition.Plugin.ID,
+		ToolName:             definition.Plugin.Name,
+		Version:              definition.Plugin.Version,
+		Description:          definition.Plugin.Description,
+		Author:               definition.Plugin.Author,
+		Inputs:               definition.Inputs,
+		ContainerImageDocker: discoverImage(definition),
 	}
 
 	var buf bytes.Buffer

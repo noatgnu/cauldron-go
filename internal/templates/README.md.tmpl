@@ -13,7 +13,7 @@ This pipeline was automatically generated from a CauldronGO plugin.
 
 ### Run with Docker (Local)
 ```bash
-nextflow run main.nf -profile docker --input 'path/to/data.tsv'
+nextflow run main.nf -profile docker --input_file 'path/to/data.tsv'
 ```
 
 ### Build from Dockerfile (Optional)
@@ -25,14 +25,14 @@ docker build -t {{ .ContainerImageDocker }} -f containers/Dockerfile .
 ### Run without cloning (Remote)
 If this plugin is hosted on GitHub, you can run it directly:
 ```bash
-nextflow run <github_user>/<repo_name> -r nextflow -profile docker --input 'path/to/samplesheet.csv'
+nextflow run <github_user>/<repo_name> -r nextflow -profile docker --input_file 'path/to/samplesheet.csv'
 ```
 
 ## Integration as a Module
 You can include this plugin as a step in your own custom Nextflow pipeline:
 
 ```nextflow
-include { {{ .ProcessName | upper }} } from './path/to/{{ .ProcessName }}/modules/local/{{ .ProcessName }}/main'
+include { {{ .ProcessName | upper }} } from './path/to/{{ .ModulePath }}/modules/local/{{ .ModulePath }}/main'
 
 workflow {
     {{ .ProcessName | upper }}(ch_input, ...)
@@ -45,7 +45,7 @@ workflow {
 {{- end }}
 
 ## Plugin Metadata
-- **ID**: {{ .ProcessName }}
+- **ID**: {{ .ModulePath }}
 - **Version**: {{ .Version }}
 - **Author**: {{ .Author }}
 
