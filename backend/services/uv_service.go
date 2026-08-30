@@ -87,12 +87,20 @@ func (u *UvService) GetUvPath() (string, error) {
 	return uvPath, nil
 }
 
+// resolveUvPath returns the app-managed uv path, falling back to system PATH; every uv-invoking method must use this (not GetUvPath) to match IsUvAvailable.
+func (u *UvService) resolveUvPath() (string, error) {
+	if path, err := u.GetUvPath(); err == nil {
+		return path, nil
+	}
+	if path, err := exec.LookPath("uv"); err == nil {
+		return path, nil
+	}
+	return "", fmt.Errorf("uv is not installed")
+}
+
 // IsUvAvailable reports whether a managed uv install exists, falling back to checking PATH.
 func (u *UvService) IsUvAvailable() bool {
-	if _, err := u.GetUvPath(); err == nil {
-		return true
-	}
-	_, err := exec.LookPath("uv")
+	_, err := u.resolveUvPath()
 	return err == nil
 }
 
@@ -238,7 +246,7 @@ func (u *UvService) DownloadUv() error {
 
 // ListUvManagedPythons returns the Python versions uv has already installed.
 func (u *UvService) ListUvManagedPythons() ([]UvPythonVersion, error) {
-	uvPath, err := u.GetUvPath()
+	uvPath, err := u.resolveUvPath()
 	if err != nil {
 		return nil, err
 	}
@@ -274,7 +282,7 @@ func (u *UvService) ListUvManagedPythons() ([]UvPythonVersion, error) {
 
 // InstallUvPythonVersion downloads and installs a Python version via uv.
 func (u *UvService) InstallUvPythonVersion(version string) error {
-	uvPath, err := u.GetUvPath()
+	uvPath, err := u.resolveUvPath()
 	if err != nil {
 		return err
 	}
@@ -296,7 +304,7 @@ func (u *UvService) InstallUvPythonVersion(version string) error {
 
 // CreateUvVirtualEnv creates a virtual environment with uv, optionally installing plugin requirements.
 func (u *UvService) CreateUvVirtualEnv(pythonVersion, venvPath, pluginID, pluginFolderPath string) error {
-	uvPath, err := u.GetUvPath()
+	uvPath, err := u.resolveUvPath()
 	if err != nil {
 		return err
 	}
@@ -374,7 +382,7 @@ func (u *UvService) InstallUvPackages(venvPythonPath string, packages []string) 
 		return nil
 	}
 
-	uvPath, err := u.GetUvPath()
+	uvPath, err := u.resolveUvPath()
 	if err != nil {
 		return err
 	}
@@ -397,7 +405,7 @@ func (u *UvService) InstallUvPackages(venvPythonPath string, packages []string) 
 
 // InstallUvRequirements installs a requirements file into a uv-managed Python environment.
 func (u *UvService) InstallUvRequirements(venvPythonPath, requirementsPath string) error {
-	uvPath, err := u.GetUvPath()
+	uvPath, err := u.resolveUvPath()
 	if err != nil {
 		return err
 	}
@@ -419,7 +427,7 @@ func (u *UvService) InstallUvRequirements(venvPythonPath, requirementsPath strin
 
 // ListUvPackages lists installed packages in a uv-managed Python environment.
 func (u *UvService) ListUvPackages(venvPythonPath string) ([]string, error) {
-	uvPath, err := u.GetUvPath()
+	uvPath, err := u.resolveUvPath()
 	if err != nil {
 		return nil, err
 	}
@@ -465,9 +473,7 @@ func streamCommandProgress(cmd *exec.Cmd, notifier *ProgressNotifier, id, logPre
 	return cmd.Wait()
 }
 
-// fetchGitHubRelease fetches and parses a GitHub release (or releases-list) JSON response.
-// When the URL returns a single release object, callers pass the exact release URL
-// (e.g. .../releases/latest); when it returns an array, the first entry is used.
+// fetchGitHubRelease fetches and parses a GitHub release (or releases-list) JSON response; when the URL returns an array, the first entry is used.
 func fetchGitHubRelease(url string) (*GitHubRelease, error) {
 	client := &http.Client{}
 	req, err := http.NewRequest("GET", url, nil)

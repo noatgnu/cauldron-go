@@ -146,7 +146,8 @@ export class Sidenav implements OnInit {
     { label: 'R', icon: 'analytics', route: '/settings/r' },
     { label: 'Environment Variables', icon: 'tune', route: '/settings/env' },
     { label: 'Git Authentication', icon: 'key', route: '/settings/git' },
-    { label: 'Plugin Registry', icon: 'cloud', route: '/settings/registry' }
+    { label: 'Plugin Registry', icon: 'cloud', route: '/settings/registry' },
+    { label: 'Backup & Restore', icon: 'backup', route: '/settings/backup' }
   ];
 
   filteredNavItems = computed(() => {

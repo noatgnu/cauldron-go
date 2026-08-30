@@ -22,6 +22,8 @@ export type RenvEnvironment = services.RenvEnvironment;
 export type PluginEnvironmentBinding = services.PluginEnvironmentBinding;
 export type CustomEnvVar = services.CustomEnvVar;
 export type UvPythonVersion = services.UvPythonVersion;
+export type BackupSummary = services.BackupSummary;
+export type RestoreResult = services.RestoreResult;
 
 export interface GitAuthConfig {
   id: number;
@@ -203,6 +205,26 @@ export class Wails {
     if (!this.isWails) throw new Error('Wails not available');
     await this.waitForBackend();
     return WailsApp.SaveFile(title, defaultName);
+  }
+
+  async createSettingsBackup(path: string, includeSecrets: boolean): Promise<services.BackupSummary | null> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.CreateSettingsBackup(path, includeSecrets);
+  }
+
+  async previewSettingsBackup(path: string): Promise<services.BackupSummary | null> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.PreviewSettingsBackup(path);
+  }
+
+  async restoreSettingsBackup(path: string): Promise<services.RestoreResult | null> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    const result = await WailsApp.RestoreSettingsBackup(path);
+    this.notifyBindingsUpdated();
+    return result;
   }
 
   async readFile(path: string): Promise<string> {

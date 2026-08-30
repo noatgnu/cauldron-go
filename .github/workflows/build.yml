@@ -6,7 +6,7 @@ on:
       - master
       - main
       - develop
-      - uv-integration
+      - cli-tooling
   pull_request:
     branches:
       - master
@@ -173,6 +173,10 @@ jobs:
       - name: Run basic E2E tests (no plugins required)
         run: |
           go test -v -tags gtk4 -run "TestE2ESettingsManagement|TestE2EEnvironmentDetection|TestE2EFileOperations|TestE2EVersionChecks|TestE2ELicenseInfo|TestE2ELogging|TestE2ETempFileOperations|TestE2EDefaultVenvPath|TestE2EJobQueueAdvanced" -timeout 120s
+
+      - name: Run CLI tests
+        run: |
+          go test -v -tags gtk4 -run "TestCLI|TestRunCLI|TestReadNonEmptyLines|TestNewCLIContext|TestBackupRestore|TestReadBackupFile" -timeout 120s
 
   build-frontend:
     name: Build Frontend

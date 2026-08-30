@@ -1,0 +1,60 @@
+<div class="backup-settings-container">
+  <mat-card class="info-card">
+    <mat-card-content>
+      <mat-icon>info</mat-icon>
+      <p>Back up your settings and installed-plugin list to a file, or restore them from a previous backup. Job history and Git credentials are not included.</p>
+    </mat-card-content>
+  </mat-card>
+
+  <div class="backup-section">
+    <h3>Backup</h3>
+    <mat-checkbox [checked]="includeSecrets()" (change)="includeSecrets.set($event.checked)">
+      Include custom environment variables (may contain plugin API keys/secrets)
+    </mat-checkbox>
+    <div class="action-buttons">
+      <button mat-raised-button color="primary" (click)="backupNow()" [disabled]="backingUp()">
+        <mat-icon>{{ backingUp() ? 'hourglass_empty' : 'save' }}</mat-icon>
+        {{ backingUp() ? 'Backing up...' : 'Backup Now' }}
+      </button>
+    </div>
+
+    @if (lastBackup(); as summary) {
+      <div class="result-panel">
+        <div class="result-row"><mat-icon class="result-icon">check_circle</mat-icon>Backup complete</div>
+        <div class="result-row">{{ summary.settingsCount }} setting(s), {{ summary.pluginsCount }} plugin(s){{ summary.includesSecrets ? ', ' + summary.envVarsCount + ' env var(s)' : '' }}</div>
+      </div>
+    }
+  </div>
+
+  <mat-divider></mat-divider>
+
+  <div class="restore-section">
+    <h3>Restore</h3>
+    <div class="action-buttons">
+      <button mat-raised-button (click)="restoreFromFile()" [disabled]="restoring()">
+        <mat-icon>{{ restoring() ? 'hourglass_empty' : 'restore' }}</mat-icon>
+        {{ restoring() ? 'Restoring...' : 'Restore from File' }}
+      </button>
+    </div>
+
+    @if (lastRestore(); as result) {
+      <div class="result-panel">
+        <div class="result-row"><mat-icon class="result-icon">check_circle</mat-icon>{{ result.settingsRestored }} setting(s) restored</div>
+        @if (result.pluginsInstalled.length > 0) {
+          <div class="result-row">Installed: {{ result.pluginsInstalled.join(', ') }}</div>
+        }
+        @if (result.pluginsSkipped.length > 0) {
+          <div class="result-row">Skipped (builtin or no repository): {{ result.pluginsSkipped.join(', ') }}</div>
+        }
+        @if (result.envVarsRestored > 0) {
+          <div class="result-row">{{ result.envVarsRestored }} environment variable(s) restored</div>
+        }
+        @for (failure of failedPluginEntries(result); track failure.id) {
+          <div class="result-row error">
+            <mat-icon class="result-icon error">error</mat-icon>{{ failure.id }}: {{ failure.message }}
+          </div>
+        }
+      </div>
+    }
+  </div>
+</div>

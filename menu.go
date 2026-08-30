@@ -10,9 +10,7 @@ import (
 //go:embed resources/menu-icons/*.png
 var menuIconsFS embed.FS
 
-// menuIcon returns the PNG bytes for a menu-icons/<name>.png asset. The set
-// of names is fixed at build time (see cmd/menu-icon-generator), so a lookup
-// failure here means the embed and this call site have drifted apart.
+// menuIcon returns the PNG bytes for a menu-icons/<name>.png asset; a lookup failure means the embed and this call site have drifted apart.
 func menuIcon(name string) []byte {
 	data, err := menuIconsFS.ReadFile("resources/menu-icons/" + name + ".png")
 	if err != nil {
