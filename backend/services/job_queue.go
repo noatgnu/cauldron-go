@@ -34,6 +34,14 @@ type JobQueueService struct {
 	wailsApp       *application.App
 }
 
+// GenerateJobOutputDir builds a pluginID+timestamp+random output dir name so same-second concurrent runs of the same plugin never collide.
+func GenerateJobOutputDir(baseDir, pluginID string) string {
+	return filepath.Join(baseDir, fmt.Sprintf("%s_%s_%s",
+		pluginID,
+		time.Now().Format("20060102_150405"),
+		uuid.New().String()[:8]))
+}
+
 func getScriptName(plugin *models.PluginV2) string {
 	if plugin.Definition.Runtime.IsDockerRuntime() {
 		return plugin.Definition.Runtime.GetEntrypoint()
@@ -529,76 +537,38 @@ func (j *JobQueueService) RerunJob(jobID string, useSameEnvironment bool, python
 		}
 	}
 
-	// Create new output directory with timestamp for rerun
 	newArgs := make([]string, len(originalJob.Args))
 	copy(newArgs, originalJob.Args)
 
-	// Update output directory in args if present
-	for i := 0; i < len(newArgs)-1; i++ {
-		if newArgs[i] == "--output_folder" || newArgs[i] == "--output_dir" || newArgs[i] == "-o" {
-			// Found output directory argument
-			if oldOutputDir, ok := originalJob.Parameters["outputDir"].(string); ok {
-				// Extract base directory and plugin ID
-				basePath := filepath.Dir(oldOutputDir)
-				pluginID := filepath.Base(strings.Split(filepath.Base(oldOutputDir), "_")[0])
-
-				// Create new output directory with new timestamp
-				newOutputDir := filepath.Join(basePath, fmt.Sprintf("%s_%s",
-					pluginID,
-					time.Now().Format("20060102_150405")))
-
-				newArgs[i+1] = newOutputDir
-
-				// Update parameters map
-				newParameters := make(map[string]interface{})
-				for k, v := range originalJob.Parameters {
-					if k == "outputDir" {
-						newParameters[k] = newOutputDir
-					} else {
-						newParameters[k] = v
-					}
-				}
-
-				newJob := &models.Job{
-					ID:               uuid.New().String(),
-					Type:             originalJob.Type,
-					Name:             originalJob.Name + " (Rerun)",
-					Status:           models.JobStatusPending,
-					Progress:         0,
-					Command:          originalJob.Command,
-					Args:             newArgs,
-					Parameters:       newParameters,
-					PythonEnvPath:    newPythonPath,
-					PythonEnvType:    newPythonType,
-					REnvPath:         newRPath,
-					REnvType:         newRType,
-					TerminalOutput:   []string{},
-					PluginVersion:    originalJob.PluginVersion,
-					PluginCommitHash: originalJob.PluginCommitHash,
-					CreatedAt:        time.Now(),
-				}
-
-				j.mu.Lock()
-				j.jobs[newJob.ID] = newJob
-				j.mu.Unlock()
-
-				if err := j.db.GetDB().Create(newJob).Error; err != nil {
-					return "", err
-				}
-
-				j.queue <- newJob
-				j.emitJobUpdate(newJob)
-
-				return newJob.ID, nil
-			}
-			break
-		}
+	newParameters := make(map[string]interface{}, len(originalJob.Parameters))
+	for k, v := range originalJob.Parameters {
+		newParameters[k] = v
 	}
 
-	// Fallback: if no output directory found, use original behavior
-	fallbackParameters := make(map[string]interface{})
-	for k, v := range originalJob.Parameters {
-		fallbackParameters[k] = v
+	if oldOutputDir, ok := originalJob.Parameters["outputDir"].(string); ok && oldOutputDir != "" {
+		newOutputDir := GenerateJobOutputDir(filepath.Dir(oldOutputDir), originalJob.Type)
+
+		// Prefer the plugin's real output flag over guessing, so a miss never falls back to silently overwriting the original run's output.
+		candidateFlags := []string{j.pluginOutputFlag(originalJob.Type), "--output_folder", "--output_dir", "-o"}
+		replaced := false
+		for _, flag := range candidateFlags {
+			if flag == "" || replaced {
+				continue
+			}
+			for i := 0; i < len(newArgs)-1; i++ {
+				if newArgs[i] == flag && newArgs[i+1] == oldOutputDir {
+					newArgs[i+1] = newOutputDir
+					replaced = true
+					break
+				}
+			}
+		}
+
+		if !replaced {
+			return "", fmt.Errorf("could not locate the output directory argument to rewrite for rerun; refusing to reuse %s and overwrite its results", oldOutputDir)
+		}
+
+		newParameters["outputDir"] = newOutputDir
 	}
 
 	newJob := &models.Job{
@@ -608,8 +578,8 @@ func (j *JobQueueService) RerunJob(jobID string, useSameEnvironment bool, python
 		Status:           models.JobStatusPending,
 		Progress:         0,
 		Command:          originalJob.Command,
-		Args:             originalJob.Args,
-		Parameters:       fallbackParameters,
+		Args:             newArgs,
+		Parameters:       newParameters,
 		PythonEnvPath:    newPythonPath,
 		PythonEnvType:    newPythonType,
 		REnvPath:         newRPath,
@@ -632,6 +602,18 @@ func (j *JobQueueService) RerunJob(jobID string, useSameEnvironment bool, python
 	j.emitJobUpdate(newJob)
 
 	return newJob.ID, nil
+}
+
+// pluginOutputFlag looks up the CLI flag a plugin uses for its output directory (plugin.yaml's execution.outputDir).
+func (j *JobQueueService) pluginOutputFlag(pluginStringID string) string {
+	if j.pluginLoader == nil {
+		return ""
+	}
+	plugin, err := j.pluginLoader.GetPluginByStringID(pluginStringID)
+	if err != nil {
+		return ""
+	}
+	return plugin.Definition.Execution.OutputDir
 }
 
 func (j *JobQueueService) loadFromDatabase() error {

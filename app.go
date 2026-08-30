@@ -1052,9 +1052,7 @@ func executePluginJob(pluginExecutor *services.PluginExecutor, jobQueue *service
 		baseOutputDir = "outputs"
 	}
 
-	outputDir := filepath.Join(baseOutputDir, fmt.Sprintf("%s_%s",
-		plugin.Definition.Plugin.ID,
-		time.Now().Format("20060102_150405")))
+	outputDir := services.GenerateJobOutputDir(baseOutputDir, plugin.Definition.Plugin.ID)
 	os.MkdirAll(outputDir, 0755)
 
 	if plugin.Definition.Execution.OutputDir != "" {
