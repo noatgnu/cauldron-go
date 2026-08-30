@@ -226,6 +226,24 @@ func (d *DatabaseService) GetSetting(key string) (string, error) {
 	return setting.Value, err
 }
 
+func (d *DatabaseService) GetAllPluginRegistryEntries() ([]models.PluginRegistry, error) {
+	var entries []models.PluginRegistry
+	err := d.db.Find(&entries).Error
+	return entries, err
+}
+
+func (d *DatabaseService) GetPluginRegistryByPluginID(pluginID string) (*models.PluginRegistry, error) {
+	var entry models.PluginRegistry
+	err := d.db.Where("plugin_id = ?", pluginID).First(&entry).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &entry, nil
+}
+
 func (d *DatabaseService) GetAllSettings() (map[string]string, error) {
 	var settings []Setting
 	if err := d.db.Find(&settings).Error; err != nil {

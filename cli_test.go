@@ -534,3 +534,160 @@ func TestCLIPluginInputs_UsageErrors(t *testing.T) {
 		t.Error("expected error for an unknown plugin reference, got nil")
 	}
 }
+
+func TestCLIDb_Dispatch(t *testing.T) {
+	if err := cliDb(nil); err == nil {
+		t.Error("expected usage error with no subcommand, got nil")
+	}
+	if err := cliDb([]string{"frobnicate"}); err == nil {
+		t.Error("expected error for unknown db subcommand, got nil")
+	}
+}
+
+func TestCLIDbBackup_UsageErrors(t *testing.T) {
+	if err := cliDbBackup(nil); err == nil {
+		t.Error("expected usage error with no path, got nil")
+	}
+	if err := cliDbBackup([]string{"a", "b"}); err == nil {
+		t.Error("expected usage error with more than one positional argument, got nil")
+	}
+}
+
+func TestCLIDbRestore_UsageErrors(t *testing.T) {
+	if err := cliDbRestore(nil); err == nil {
+		t.Error("expected usage error with no path, got nil")
+	}
+	if err := cliDbRestore([]string{filepath.Join(t.TempDir(), "does-not-exist.json")}); err == nil {
+		t.Error("expected error reading a nonexistent backup file, got nil")
+	}
+}
+
+func TestReadBackupFile_UnsupportedVersion(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "backup.json")
+	if err := os.WriteFile(path, []byte(`{"version": 999}`), 0644); err != nil {
+		t.Fatalf("failed to write test file: %v", err)
+	}
+	if _, err := services.ReadBackupFile(path); err == nil {
+		t.Error("expected error for an unsupported backup format version, got nil")
+	}
+}
+
+// TestBackupRestore_Roundtrip exercises the service layer directly against the real local database (matching this
+// codebase's established pattern for CLI integration tests), using marker keys so it doesn't disturb real config.
+func TestBackupRestore_Roundtrip(t *testing.T) {
+	ctx, err := newCLIContext()
+	if err != nil {
+		t.Fatalf("newCLIContext error: %v", err)
+	}
+	defer ctx.close()
+
+	const markerKey = "cliTestBackupMarker"
+	const markerValue = "roundtrip-value"
+	const envKey = "CLI_TEST_BACKUP_VAR"
+	const envValue = "roundtrip-secret"
+
+	if err := ctx.db.SaveSetting(markerKey, markerValue); err != nil {
+		t.Fatalf("SaveSetting error: %v", err)
+	}
+	if err := ctx.db.SaveCustomEnvVar(services.CustomEnvVar{PluginID: 0, Key: envKey, Value: envValue}); err != nil {
+		t.Fatalf("SaveCustomEnvVar error: %v", err)
+	}
+	defer ctx.db.DeleteCustomEnvVarByKey(0, envKey)
+
+	data, err := ctx.backupService.CreateBackup(true)
+	if err != nil {
+		t.Fatalf("CreateBackup error: %v", err)
+	}
+	if data.Settings[markerKey] != markerValue {
+		t.Fatalf("backup settings missing marker key: got %q", data.Settings[markerKey])
+	}
+	found := false
+	for _, v := range data.CustomEnvVars {
+		if v.PluginID == "" && v.Key == envKey && v.Value == envValue {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("backup env vars missing global marker %q, got: %+v", envKey, data.CustomEnvVars)
+	}
+
+	path := filepath.Join(t.TempDir(), "backup.json")
+	if err := services.WriteBackupFile(path, data); err != nil {
+		t.Fatalf("WriteBackupFile error: %v", err)
+	}
+
+	// Mutate live state so restore has something real to undo.
+	if err := ctx.db.SaveSetting(markerKey, "mutated"); err != nil {
+		t.Fatalf("SaveSetting (mutate) error: %v", err)
+	}
+	if err := ctx.db.DeleteCustomEnvVarByKey(0, envKey); err != nil {
+		t.Fatalf("DeleteCustomEnvVarByKey error: %v", err)
+	}
+
+	readBack, err := services.ReadBackupFile(path)
+	if err != nil {
+		t.Fatalf("ReadBackupFile error: %v", err)
+	}
+
+	result, err := ctx.backupService.RestoreBackup(readBack, ctx.pluginInstaller, nil)
+	if err != nil {
+		t.Fatalf("RestoreBackup error: %v", err)
+	}
+	if result.SettingsRestored == 0 {
+		t.Error("expected at least one setting to be restored")
+	}
+	if result.EnvVarsRestored != 1 {
+		t.Errorf("expected 1 env var restored, got %d", result.EnvVarsRestored)
+	}
+
+	restoredValue, err := ctx.db.GetSetting(markerKey)
+	if err != nil {
+		t.Fatalf("GetSetting error: %v", err)
+	}
+	if restoredValue != markerValue {
+		t.Errorf("marker setting = %q after restore, want %q", restoredValue, markerValue)
+	}
+
+	envVars, err := ctx.db.GetGlobalCustomEnvVars()
+	if err != nil {
+		t.Fatalf("GetGlobalCustomEnvVars error: %v", err)
+	}
+	restoredEnv := false
+	for _, v := range envVars {
+		if v.Key == envKey && v.Value == envValue {
+			restoredEnv = true
+		}
+	}
+	if !restoredEnv {
+		t.Errorf("expected global env var %q to be restored with value %q", envKey, envValue)
+	}
+}
+
+// TestCLIDbBackupAndRestore_Integration exercises the CLI-level cliDbBackup/cliDbRestore functions end to end.
+func TestCLIDbBackupAndRestore_Integration(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "backup.json")
+
+	backupOutput := captureStdout(t, func() {
+		if err := cliDbBackup([]string{path}); err != nil {
+			t.Fatalf("cliDbBackup error: %v", err)
+		}
+	})
+	if !strings.Contains(backupOutput, "Backup written to") {
+		t.Errorf("expected backup output to confirm the file was written, got: %q", backupOutput)
+	}
+	if !strings.Contains(backupOutput, "not included") {
+		t.Errorf("expected backup output to note secrets were excluded by default, got: %q", backupOutput)
+	}
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("expected backup file to exist: %v", err)
+	}
+
+	restoreOutput := captureStdout(t, func() {
+		if err := cliDbRestore([]string{path}); err != nil {
+			t.Fatalf("cliDbRestore error: %v", err)
+		}
+	})
+	if !strings.Contains(restoreOutput, "Settings restored:") {
+		t.Errorf("expected restore output to report settings restored, got: %q", restoreOutput)
+	}
+}

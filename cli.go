@@ -78,6 +78,15 @@ func runCLI(args []string) bool {
 			os.Exit(1)
 		}
 		return true
+	case "db":
+		if !verbose {
+			log.SetOutput(io.Discard)
+		}
+		if err := cliDb(filtered[1:]); err != nil {
+			fmt.Fprintln(os.Stderr, "Error:", err)
+			os.Exit(1)
+		}
+		return true
 	default:
 		return false
 	}
@@ -117,6 +126,7 @@ type cliContext struct {
 	pluginInstaller    *services.PluginInstaller
 	pluginExecutor     *services.PluginExecutor
 	jobQueue           *services.JobQueueService
+	backupService      *services.BackupService
 }
 
 // close shuts down the job queue (killing any in-flight subprocess first, same as App.Shutdown) before closing the database.
@@ -213,6 +223,7 @@ func newCLIContextWithPluginsDir(pluginsDir string) (*cliContext, error) {
 		pluginInstaller:    pluginInstaller,
 		pluginExecutor:     pluginExecutor,
 		jobQueue:           jobQueue,
+		backupService:      services.NewBackupService(db),
 	}, nil
 }
 
@@ -919,6 +930,117 @@ func cliJobStatus(args []string) error {
 		for _, line := range job.TerminalOutput {
 			fmt.Println("  " + line)
 		}
+	}
+	return nil
+}
+
+func cliDb(args []string) error {
+	if len(args) == 0 {
+		return fmt.Errorf("usage: cauldron db backup <path> [--include-secrets] | cauldron db restore <path>")
+	}
+
+	switch args[0] {
+	case "backup":
+		return cliDbBackup(args[1:])
+	case "restore":
+		return cliDbRestore(args[1:])
+	default:
+		return fmt.Errorf("unknown db subcommand: %s", args[0])
+	}
+}
+
+// cliDbBackup writes settings + installed-plugin metadata to a JSON file. Custom env vars (which may hold secrets like API keys) are excluded unless --include-secrets is passed.
+func cliDbBackup(args []string) error {
+	fs := flag.NewFlagSet("db backup", flag.ContinueOnError)
+	includeSecrets := fs.Bool("include-secrets", false, "also back up custom environment variables (may contain secrets)")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if fs.NArg() != 1 {
+		return fmt.Errorf("usage: cauldron db backup <path> [--include-secrets]")
+	}
+	path := fs.Arg(0)
+
+	ctx, err := newCLIContext()
+	if err != nil {
+		return fmt.Errorf("failed to initialize: %w", err)
+	}
+	defer ctx.close()
+
+	data, err := ctx.backupService.CreateBackup(*includeSecrets)
+	if err != nil {
+		return fmt.Errorf("failed to create backup: %w", err)
+	}
+	if err := services.WriteBackupFile(path, data); err != nil {
+		return err
+	}
+
+	fmt.Printf("Backup written to %s\n", path)
+	fmt.Printf("  %d setting(s), %d plugin(s)", len(data.Settings), len(data.Plugins))
+	if *includeSecrets {
+		fmt.Printf(", %d env var(s)", len(data.CustomEnvVars))
+	}
+	fmt.Println()
+	if !*includeSecrets {
+		fmt.Println("  (custom environment variables were not included; pass --include-secrets to include them)")
+	} else {
+		fmt.Println("  WARNING: this file contains secrets in cleartext -- store it securely")
+	}
+	return nil
+}
+
+// cliDbRestore applies settings, reinstalls missing remote plugins, and restores enabled state + env vars from a backup file.
+func cliDbRestore(args []string) error {
+	fs := flag.NewFlagSet("db restore", flag.ContinueOnError)
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if fs.NArg() != 1 {
+		return fmt.Errorf("usage: cauldron db restore <path>")
+	}
+	path := fs.Arg(0)
+
+	data, err := services.ReadBackupFile(path)
+	if err != nil {
+		return err
+	}
+
+	ctx, err := newCLIContext()
+	if err != nil {
+		return fmt.Errorf("failed to initialize: %w", err)
+	}
+	defer ctx.close()
+
+	result, err := ctx.backupService.RestoreBackup(data, ctx.pluginInstaller, func(status string) {
+		fmt.Println("  " + status)
+	})
+	if err != nil {
+		return fmt.Errorf("restore failed partway through: %w", err)
+	}
+
+	fmt.Printf("Settings restored: %d\n", result.SettingsRestored)
+	fmt.Printf("Plugins installed: %d\n", len(result.PluginsInstalled))
+	for _, id := range result.PluginsInstalled {
+		fmt.Printf("  + %s\n", id)
+	}
+	if len(result.PluginsSkipped) > 0 {
+		fmt.Printf("Plugins skipped (builtin or missing repository): %d\n", len(result.PluginsSkipped))
+		for _, id := range result.PluginsSkipped {
+			fmt.Printf("  - %s\n", id)
+		}
+	}
+	if len(result.PluginsFailed) > 0 {
+		fmt.Printf("Plugins failed: %d\n", len(result.PluginsFailed))
+		for id, msg := range result.PluginsFailed {
+			fmt.Printf("  ! %s: %s\n", id, msg)
+		}
+	}
+	if result.EnvVarsRestored > 0 {
+		fmt.Printf("Env vars restored: %d\n", result.EnvVarsRestored)
+	}
+
+	if len(result.PluginsFailed) > 0 {
+		return fmt.Errorf("%d plugin(s) failed to restore", len(result.PluginsFailed))
 	}
 	return nil
 }

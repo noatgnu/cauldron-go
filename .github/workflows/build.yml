@@ -176,7 +176,7 @@ jobs:
 
       - name: Run CLI tests
         run: |
-          go test -v -tags gtk4 -run "TestCLI|TestRunCLI|TestReadNonEmptyLines|TestNewCLIContext" -timeout 120s
+          go test -v -tags gtk4 -run "TestCLI|TestRunCLI|TestReadNonEmptyLines|TestNewCLIContext|TestBackupRestore|TestReadBackupFile" -timeout 120s
 
   build-frontend:
     name: Build Frontend

@@ -11,8 +11,9 @@ import { SettingsEnv } from './settings-env/settings-env';
 import { SettingsGit } from './settings-git/settings-git';
 import { SettingsAppearance } from './settings-appearance/settings-appearance';
 import { SettingsAccessibilityComponent } from './settings-accessibility/settings-accessibility';
+import { SettingsBackup } from './settings-backup/settings-backup';
 
-type SettingsSection = 'general' | 'appearance' | 'accessibility' | 'python' | 'r' | 'registry' | 'env' | 'git';
+type SettingsSection = 'general' | 'appearance' | 'accessibility' | 'python' | 'r' | 'registry' | 'env' | 'git' | 'backup';
 
 @Component({
   selector: 'app-settings',
@@ -26,7 +27,8 @@ type SettingsSection = 'general' | 'appearance' | 'accessibility' | 'python' | '
     SettingsEnv,
     SettingsGit,
     SettingsAppearance,
-    SettingsAccessibilityComponent
+    SettingsAccessibilityComponent,
+    SettingsBackup
   ],
   templateUrl: './settings.html',
   styleUrl: './settings.scss',
@@ -59,6 +61,7 @@ export class Settings implements OnInit {
       case 'registry': return 'Plugin Registry';
       case 'env': return 'Environment Variables';
       case 'git': return 'Git Authentication';
+      case 'backup': return 'Backup & Restore';
       default: return 'Settings';
     }
   }
@@ -73,6 +76,7 @@ export class Settings implements OnInit {
       case 'registry': return 'cloud';
       case 'env': return 'tune';
       case 'git': return 'key';
+      case 'backup': return 'backup';
       default: return 'settings';
     }
   }

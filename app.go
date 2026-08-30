@@ -47,6 +47,7 @@ type App struct {
 	httpInstallServer     *services.HTTPInstallServer
 	pluginRegistryService *services.PluginRegistryService
 	gitAuthService        *services.GitAuthService
+	backupService         *services.BackupService
 	ready                 chan bool
 	logFilePath           string
 	initialized           chan struct{}
@@ -196,6 +197,8 @@ func (a *App) Initialize() {
 	a.gitAuthService = services.NewGitAuthService(a.db)
 	log.Println("[App.Initialize] Git authentication service initialized")
 
+	a.backupService = services.NewBackupService(a.db)
+
 	exePath, _ := os.Executable()
 	pluginsDir := filepath.Join(filepath.Dir(exePath), "plugins")
 	a.pluginInstaller = services.NewPluginInstallerV3(pluginsDir, a.db, a.pluginLoaderV2, a.gitAuthService, a.wailsApp)
@@ -294,6 +297,38 @@ func (a *App) SaveFile(title string, defaultName string) (string, error) {
 
 func (a *App) OpenDirectoryInExplorer(path string) error {
 	return a.fileService.OpenDirectoryInExplorer(path)
+}
+
+// CreateSettingsBackup writes settings + installed-plugin metadata to path. includeSecrets also backs up custom environment variables, which may hold plugin API keys in cleartext.
+func (a *App) CreateSettingsBackup(path string, includeSecrets bool) (*services.BackupSummary, error) {
+	data, err := a.backupService.CreateBackup(includeSecrets)
+	if err != nil {
+		return nil, err
+	}
+	if err := services.WriteBackupFile(path, data); err != nil {
+		return nil, err
+	}
+	summary := data.Summary()
+	return &summary, nil
+}
+
+// PreviewSettingsBackup reads a backup file's counts (never secret values) so the UI can confirm before restoring.
+func (a *App) PreviewSettingsBackup(path string) (*services.BackupSummary, error) {
+	data, err := services.ReadBackupFile(path)
+	if err != nil {
+		return nil, err
+	}
+	summary := data.Summary()
+	return &summary, nil
+}
+
+// RestoreSettingsBackup applies settings, reinstalls missing remote plugins, and restores enabled state + env vars from a backup file.
+func (a *App) RestoreSettingsBackup(path string) (*services.RestoreResult, error) {
+	data, err := services.ReadBackupFile(path)
+	if err != nil {
+		return nil, err
+	}
+	return a.backupService.RestoreBackup(data, a.pluginInstaller, nil)
 }
 
 func (a *App) ReadJobOutputFile(jobID string, filename string) (string, error) {
