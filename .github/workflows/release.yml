@@ -14,14 +14,14 @@ jobs:
       windows_asset_url: ${{ steps.resolve.outputs.windows_asset_url }}
       linux_asset_url: ${{ steps.resolve.outputs.linux_asset_url }}
       darwin_asset_url: ${{ steps.resolve.outputs.darwin_asset_url }}
-      darwin_r_version: ${{ steps.resolve.outputs.darwin_r_version }}
-      darwin_r_asset_url: ${{ steps.resolve.outputs.darwin_r_asset_url }}
-      darwin_r_checksum_url: ${{ steps.resolve.outputs.darwin_r_checksum_url }}
-      darwin_r_asset_filename: ${{ steps.resolve.outputs.darwin_r_asset_filename }}
-      windows_r_version: ${{ steps.resolve.outputs.windows_r_version }}
-      windows_r_asset_url: ${{ steps.resolve.outputs.windows_r_asset_url }}
-      windows_r_checksum_url: ${{ steps.resolve.outputs.windows_r_checksum_url }}
-      windows_r_asset_filename: ${{ steps.resolve.outputs.windows_r_asset_filename }}
+      darwin_r_version: ${{ steps.resolve_r.outputs.darwin_r_version }}
+      darwin_r_asset_url: ${{ steps.resolve_r.outputs.darwin_r_asset_url }}
+      darwin_r_checksum_url: ${{ steps.resolve_r.outputs.darwin_r_checksum_url }}
+      darwin_r_asset_filename: ${{ steps.resolve_r.outputs.darwin_r_asset_filename }}
+      windows_r_version: ${{ steps.resolve_r.outputs.windows_r_version }}
+      windows_r_asset_url: ${{ steps.resolve_r.outputs.windows_r_asset_url }}
+      windows_r_checksum_url: ${{ steps.resolve_r.outputs.windows_r_checksum_url }}
+      windows_r_asset_filename: ${{ steps.resolve_r.outputs.windows_r_asset_filename }}
     steps:
       - name: Resolve all 3 platforms' cooker asset URLs from one API call, shared by every build job
         id: resolve
