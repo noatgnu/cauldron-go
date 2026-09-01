@@ -113,22 +113,16 @@ jobs:
             libgtk-4-dev \
             libwebkitgtk-6.0-dev
 
-      - name: Compile R
+      - name: Install portable R via cooker (downloads the tested, genuinely relocatable r-portable build instead of compiling a broken from-source one)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          curl -O https://cran.r-project.org/src/base/R-4/R-4.5.2.tar.gz
-          tar -xzvf R-4.5.2.tar.gz
-          cd R-4.5.2
-          CPPFLAGS="-I/usr/include -I/usr/include/xorg" \
-          LDFLAGS="-L/usr/lib -L/usr/lib/xorg" \
-          CFLAGS="-I/usr/include" \
-          TCL_LIBRARY="/usr/lib/tcltk" \
-          TK_LIBRARY="/usr/lib/tcltk" \
-          PKG_CONFIG_PATH="/usr/lib/pkgconfig" \
-          C_INCLUDE_PATH="/usr/include" \
-          LIBRARY_PATH="/usr/lib" \
-          ./configure --prefix=${{ github.workspace }}/R --enable-R-shlib --with-blas --with-lapack --with-tcltk --with-mpi
-          make -j$(nproc)
-          make install
+          ASSET_URL=$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" https://api.github.com/repos/noatgnu/cookeR/releases/latest | jq -r '.assets[] | select(.name | endswith("linux-x86_64")) | .browser_download_url')
+          curl -fsSL -o cooker "$ASSET_URL"
+          chmod +x cooker
+          R_VERSION=$(./cooker r list --available --json | jq -r '.[0].version')
+          COOKER_INSTALL_DIR="${{ github.workspace }}" ./cooker r install "$R_VERSION"
+          mv "${{ github.workspace }}/$R_VERSION" "${{ github.workspace }}/R"
 
       - name: Set R environment variables
         run: |
@@ -565,22 +559,16 @@ jobs:
         run: |
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
 
-      - name: Compile R
+      - name: Install portable R via cooker (downloads the tested, genuinely relocatable r-portable build instead of compiling a broken from-source one)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          curl -O https://cran.r-project.org/src/base/R-4/R-4.5.2.tar.gz
-          tar -xzvf R-4.5.2.tar.gz
-          cd R-4.5.2
-          CPPFLAGS="-I/usr/include -I/usr/include/xorg" \
-          LDFLAGS="-L/usr/lib -L/usr/lib/xorg" \
-          CFLAGS="-I/usr/include" \
-          TCL_LIBRARY="/usr/lib/tcltk" \
-          TK_LIBRARY="/usr/lib/tcltk" \
-          PKG_CONFIG_PATH="/usr/lib/pkgconfig" \
-          C_INCLUDE_PATH="/usr/include" \
-          LIBRARY_PATH="/usr/lib" \
-          ./configure --prefix=${{ github.workspace }}/R --enable-R-shlib --with-blas --with-lapack --with-tcltk --with-mpi
-          make -j$(nproc)
-          make install
+          ASSET_URL=$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" https://api.github.com/repos/noatgnu/cookeR/releases/latest | jq -r '.assets[] | select(.name | endswith("linux-x86_64")) | .browser_download_url')
+          curl -fsSL -o cooker "$ASSET_URL"
+          chmod +x cooker
+          R_VERSION=$(./cooker r list --available --json | jq -r '.[0].version')
+          COOKER_INSTALL_DIR="${{ github.workspace }}" ./cooker r install "$R_VERSION"
+          mv "${{ github.workspace }}/$R_VERSION" "${{ github.workspace }}/R"
 
       - name: Set R environment variables
         run: |
