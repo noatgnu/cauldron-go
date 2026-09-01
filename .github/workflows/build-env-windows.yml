@@ -19,11 +19,10 @@ jobs:
         $release = Invoke-RestMethod -Uri "https://api.github.com/repos/noatgnu/cookeR/releases/latest" -Headers @{ Authorization = "Bearer $env:GH_TOKEN" }
         $assetUrl = ($release.assets | Where-Object { $_.name -like "*windows-x86_64.exe" }).browser_download_url
         Invoke-WebRequest -Uri $assetUrl -OutFile cooker.exe
-        $available = & .\cooker.exe r list --available --json | ConvertFrom-Json
-        $rVersion = $available[0].version
         New-Item -ItemType Directory -Force -Path bin/win | Out-Null
         $env:COOKER_INSTALL_DIR = "${{ github.workspace }}/bin/win"
-        & .\cooker.exe r install $rVersion
+        & .\cooker.exe r install latest
+        $rVersion = (& .\cooker.exe r list --json | ConvertFrom-Json)[0]
         Move-Item -Path "bin/win/$rVersion" -Destination "bin/win/R-Portable"
 
     - name: Clean up R installation

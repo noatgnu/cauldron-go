@@ -47,9 +47,10 @@ jobs:
           ASSET_URL=$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" https://api.github.com/repos/noatgnu/cookeR/releases/latest | jq -r '.assets[] | select(.name | endswith("linux-x86_64")) | .browser_download_url')
           curl -fsSL -o cooker "$ASSET_URL"
           chmod +x cooker
-          R_VERSION=$(./cooker r list --available --json | jq -r '.[0].version')
           mkdir -p "${{ github.workspace }}/bin/linux"
-          COOKER_INSTALL_DIR="${{ github.workspace }}/bin/linux" ./cooker r install "$R_VERSION"
+          export COOKER_INSTALL_DIR="${{ github.workspace }}/bin/linux"
+          ./cooker r install latest
+          R_VERSION=$(./cooker r list --json | jq -r '.[0]')
           mv "${{ github.workspace }}/bin/linux/$R_VERSION" "${{ github.workspace }}/bin/linux/R-Portable"
       - name: Strip R binaries
         run: |

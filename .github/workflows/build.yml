@@ -14,6 +14,31 @@ on:
       - develop
 
 jobs:
+  resolve-r-env:
+    name: Resolve R Environment Info
+    runs-on: ubuntu-latest
+    outputs:
+      cooker_asset_url: ${{ steps.resolve.outputs.cooker_asset_url }}
+      r_version: ${{ steps.resolve.outputs.r_version }}
+      r_asset_url: ${{ steps.resolve.outputs.r_asset_url }}
+      r_checksum_url: ${{ steps.resolve.outputs.r_checksum_url }}
+      r_asset_filename: ${{ steps.resolve.outputs.r_asset_filename }}
+    steps:
+      - name: Resolve cooker binary and latest R release info once, shared by every downstream job that needs it
+        id: resolve
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          COOKER_ASSET_URL=$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" https://api.github.com/repos/noatgnu/cookeR/releases/latest | jq -r '.assets[] | select(.name | endswith("linux-x86_64")) | .browser_download_url')
+          echo "cooker_asset_url=$COOKER_ASSET_URL" >> "$GITHUB_OUTPUT"
+          curl -fsSL -o cooker "$COOKER_ASSET_URL"
+          chmod +x cooker
+          INFO=$(./cooker r list --available --json | jq -c '.[0]')
+          echo "r_version=$(echo "$INFO" | jq -r '.version')" >> "$GITHUB_OUTPUT"
+          echo "r_asset_url=$(echo "$INFO" | jq -r '.assetUrl')" >> "$GITHUB_OUTPUT"
+          echo "r_checksum_url=$(echo "$INFO" | jq -r '.checksumUrl')" >> "$GITHUB_OUTPUT"
+          echo "r_asset_filename=$(echo "$INFO" | jq -r '.assetFileName')" >> "$GITHUB_OUTPUT"
+
   build-dev-tools:
     name: Build Developer Tools
     runs-on: ubuntu-latest
@@ -68,6 +93,7 @@ jobs:
 
   build-backend:
     name: Build Backend
+    needs: [resolve-r-env]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -113,16 +139,16 @@ jobs:
             libgtk-4-dev \
             libwebkitgtk-6.0-dev
 
-      - name: Install portable R via cooker (downloads the tested, genuinely relocatable r-portable build instead of compiling a broken from-source one)
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install portable R via cooker (asset info pre-resolved once by resolve-r-env; no API calls in this job)
         run: |
-          ASSET_URL=$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" https://api.github.com/repos/noatgnu/cookeR/releases/latest | jq -r '.assets[] | select(.name | endswith("linux-x86_64")) | .browser_download_url')
-          curl -fsSL -o cooker "$ASSET_URL"
+          curl -fsSL -o cooker "${{ needs.resolve-r-env.outputs.cooker_asset_url }}"
           chmod +x cooker
-          R_VERSION=$(./cooker r list --available --json | jq -r '.[0].version')
-          COOKER_INSTALL_DIR="${{ github.workspace }}" ./cooker r install "$R_VERSION"
-          mv "${{ github.workspace }}/$R_VERSION" "${{ github.workspace }}/R"
+          COOKER_INSTALL_DIR="${{ github.workspace }}" ./cooker r install \
+            --asset-url="${{ needs.resolve-r-env.outputs.r_asset_url }}" \
+            --checksum-url="${{ needs.resolve-r-env.outputs.r_checksum_url }}" \
+            --asset-filename="${{ needs.resolve-r-env.outputs.r_asset_filename }}" \
+            "${{ needs.resolve-r-env.outputs.r_version }}"
+          mv "${{ github.workspace }}/${{ needs.resolve-r-env.outputs.r_version }}" "${{ github.workspace }}/R"
 
       - name: Set R environment variables
         run: |
@@ -502,7 +528,7 @@ jobs:
 
   e2e-playwright-tests:
     name: Playwright E2E Tests
-    needs: [build-dev-tools, build-backend, build-frontend]
+    needs: [build-dev-tools, build-backend, build-frontend, resolve-r-env]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -559,16 +585,16 @@ jobs:
         run: |
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
 
-      - name: Install portable R via cooker (downloads the tested, genuinely relocatable r-portable build instead of compiling a broken from-source one)
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install portable R via cooker (asset info pre-resolved once by resolve-r-env; no API calls in this job)
         run: |
-          ASSET_URL=$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" https://api.github.com/repos/noatgnu/cookeR/releases/latest | jq -r '.assets[] | select(.name | endswith("linux-x86_64")) | .browser_download_url')
-          curl -fsSL -o cooker "$ASSET_URL"
+          curl -fsSL -o cooker "${{ needs.resolve-r-env.outputs.cooker_asset_url }}"
           chmod +x cooker
-          R_VERSION=$(./cooker r list --available --json | jq -r '.[0].version')
-          COOKER_INSTALL_DIR="${{ github.workspace }}" ./cooker r install "$R_VERSION"
-          mv "${{ github.workspace }}/$R_VERSION" "${{ github.workspace }}/R"
+          COOKER_INSTALL_DIR="${{ github.workspace }}" ./cooker r install \
+            --asset-url="${{ needs.resolve-r-env.outputs.r_asset_url }}" \
+            --checksum-url="${{ needs.resolve-r-env.outputs.r_checksum_url }}" \
+            --asset-filename="${{ needs.resolve-r-env.outputs.r_asset_filename }}" \
+            "${{ needs.resolve-r-env.outputs.r_version }}"
+          mv "${{ github.workspace }}/${{ needs.resolve-r-env.outputs.r_version }}" "${{ github.workspace }}/R"
 
       - name: Set R environment variables
         run: |

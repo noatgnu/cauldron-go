@@ -7,7 +7,26 @@ on:
   workflow_dispatch:
 
 jobs:
+  resolve-cooker-assets:
+    name: Resolve cookeR Release Assets
+    runs-on: ubuntu-latest
+    outputs:
+      windows_asset_url: ${{ steps.resolve.outputs.windows_asset_url }}
+      linux_asset_url: ${{ steps.resolve.outputs.linux_asset_url }}
+      darwin_asset_url: ${{ steps.resolve.outputs.darwin_asset_url }}
+    steps:
+      - name: Resolve all 3 platforms' cooker asset URLs from one API call, shared by every build job
+        id: resolve
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          COOKER_JSON=$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" https://api.github.com/repos/noatgnu/cookeR/releases/latest)
+          echo "windows_asset_url=$(echo "$COOKER_JSON" | jq -r '.assets[] | select(.name | endswith("windows-x86_64.exe")) | .browser_download_url')" >> "$GITHUB_OUTPUT"
+          echo "linux_asset_url=$(echo "$COOKER_JSON" | jq -r '.assets[] | select(.name | endswith("linux-x86_64")) | .browser_download_url')" >> "$GITHUB_OUTPUT"
+          echo "darwin_asset_url=$(echo "$COOKER_JSON" | jq -r '.assets[] | select(.name | endswith("macos-arm64")) | .browser_download_url')" >> "$GITHUB_OUTPUT"
+
   build-windows:
+    needs: [resolve-cooker-assets]
     runs-on: windows-latest
     steps:
       - name: Checkout code
@@ -29,12 +48,8 @@ jobs:
 
       - name: Setup R Environment via cooker (downloads the tested, genuinely relocatable r-portable build instead of the CRAN installer)
         shell: pwsh
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          $release = Invoke-RestMethod -Uri "https://api.github.com/repos/noatgnu/cookeR/releases/latest" -Headers @{ Authorization = "Bearer $env:GH_TOKEN" }
-          $assetUrl = ($release.assets | Where-Object { $_.name -like "*windows-x86_64.exe" }).browser_download_url
-          Invoke-WebRequest -Uri $assetUrl -OutFile cooker.exe
+          Invoke-WebRequest -Uri "${{ needs.resolve-cooker-assets.outputs.windows_asset_url }}" -OutFile cooker.exe
           $available = & .\cooker.exe r list --available --json | ConvertFrom-Json
           $rVersion = $available[0].version
           New-Item -ItemType Directory -Force -Path bin/win | Out-Null
@@ -168,6 +183,7 @@ jobs:
           path: cauldron-windows-amd64.zip
 
   build-linux:
+    needs: [resolve-cooker-assets]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -217,11 +233,8 @@ jobs:
             python3-venv
 
       - name: Install portable R via cooker (downloads the tested, genuinely relocatable r-portable build instead of compiling a broken from-source one)
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          ASSET_URL=$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" https://api.github.com/repos/noatgnu/cookeR/releases/latest | jq -r '.assets[] | select(.name | endswith("linux-x86_64")) | .browser_download_url')
-          curl -fsSL -o cooker "$ASSET_URL"
+          curl -fsSL -o cooker "${{ needs.resolve-cooker-assets.outputs.linux_asset_url }}"
           chmod +x cooker
           R_VERSION=$(./cooker r list --available --json | jq -r '.[0].version')
           COOKER_INSTALL_DIR="${{ github.workspace }}" ./cooker r install "$R_VERSION"
@@ -350,6 +363,7 @@ jobs:
 
 
   build-macos-arm64:
+    needs: [resolve-cooker-assets]
     runs-on: macos-latest
     steps:
       - name: Checkout code
@@ -390,11 +404,8 @@ jobs:
           echo "$(brew --prefix bzip2)/bin" >> $GITHUB_PATH
 
       - name: Install portable R via cooker (downloads the tested, genuinely relocatable r-portable build instead of compiling a broken from-source one)
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          ASSET_URL=$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" https://api.github.com/repos/noatgnu/cookeR/releases/latest | jq -r '.assets[] | select(.name | endswith("macos-arm64")) | .browser_download_url')
-          curl -fsSL -o cooker "$ASSET_URL"
+          curl -fsSL -o cooker "${{ needs.resolve-cooker-assets.outputs.darwin_asset_url }}"
           chmod +x cooker
           R_VERSION=$(./cooker r list --available --json | jq -r '.[0].version')
           COOKER_INSTALL_DIR="${{ github.workspace }}" ./cooker r install "$R_VERSION"
