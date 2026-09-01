@@ -2,23 +2,40 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"text/template"
+
+	"github.com/noatgnu/cauldron-go/internal/templates"
 )
 
-func prompt(text string, defaultValue string) string {
-	reader := bufio.NewReader(os.Stdin)
+// stdinReader is shared across every prompt: a fresh bufio.Reader per call would buffer and
+// then discard any not-yet-read piped input, breaking non-interactive/scripted use.
+var stdinReader = bufio.NewReader(os.Stdin)
 
+func readLine() (string, bool) {
+	input, err := stdinReader.ReadString('\n')
+	if err != nil && input == "" {
+		return "", false
+	}
+	return strings.TrimSpace(input), true
+}
+
+func prompt(text string, defaultValue string) string {
 	if defaultValue != "" {
 		fmt.Printf("%s [%s]: ", text, defaultValue)
 	} else {
 		fmt.Printf("%s: ", text)
 	}
 
-	input, _ := reader.ReadString('\n')
-	input = strings.TrimSpace(input)
+	input, ok := readLine()
+	if !ok {
+		fmt.Println("[ERROR] Unexpected end of input")
+		os.Exit(1)
+	}
 
 	if input == "" && defaultValue != "" {
 		return defaultValue
@@ -34,10 +51,12 @@ func selectOption(promptText string, options []string) string {
 	}
 
 	for {
-		reader := bufio.NewReader(os.Stdin)
 		fmt.Print("Select option (number): ")
-		input, _ := reader.ReadString('\n')
-		input = strings.TrimSpace(input)
+		input, ok := readLine()
+		if !ok {
+			fmt.Println("[ERROR] Unexpected end of input")
+			os.Exit(1)
+		}
 
 		var selected int
 		if _, err := fmt.Sscanf(input, "%d", &selected); err == nil {
@@ -51,10 +70,12 @@ func selectOption(promptText string, options []string) string {
 }
 
 func confirm(text string) bool {
-	reader := bufio.NewReader(os.Stdin)
 	fmt.Printf("%s (y/n): ", text)
-	input, _ := reader.ReadString('\n')
-	input = strings.ToLower(strings.TrimSpace(input))
+	input, ok := readLine()
+	if !ok {
+		return false
+	}
+	input = strings.ToLower(input)
 	return input == "y" || input == "yes"
 }
 
@@ -68,206 +89,74 @@ func titleCase(s string) string {
 	return strings.Join(words, " ")
 }
 
+func renderTemplate(name string, data interface{}) (string, error) {
+	tmplStr, err := templates.GetTemplate(name)
+	if err != nil {
+		return "", fmt.Errorf("failed to load template %s: %w", name, err)
+	}
+	tmpl, err := template.New(name).Parse(tmplStr)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse template %s: %w", name, err)
+	}
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, data); err != nil {
+		return "", fmt.Errorf("failed to execute template %s: %w", name, err)
+	}
+	return buf.String(), nil
+}
+
 func createPluginYAML(dir string, data map[string]string) error {
-	content := fmt.Sprintf(`plugin:
-  id: "%s"
-  name: "%s"
-  description: "%s"
-  version: "%s"
-  author: "%s"
-  category: "%s"
-  icon: "analytics"
-
-runtime:
-  type: "%s"
-  script: "%s"
-
-inputs:
-  - name: "input_file"
-    label: "Input File"
-    type: "file"
-    required: true
-    accept: ".csv,.tsv,.txt"
-    description: "Input data file"
-
-  # Add more inputs as needed
-  # - name: "parameter1"
-  #   label: "Parameter 1"
-  #   type: "number"
-  #   default: 10
-  #   min: 1
-  #   max: 100
-  #   description: "Example numeric parameter"
-
-outputs:
-  - name: "output_data"
-    path: "output.txt"
-    type: "data"
-    description: "Analysis results"
-    format: "tsv"
-
-execution:
-  argsMapping:
-    input_file: "--input_file"
-    # Add more argument mappings here
-
-  outputDir: "--output_folder"
-
-  requirements:
-`,
-		data["id"],
-		data["name"],
-		data["description"],
-		data["version"],
-		data["author"],
-		data["category"],
-		data["runtime"],
-		data["script"])
-
-	if data["runtime"] == "python" || data["runtime"] == "pythonWithR" {
-		content += `    python: ">=3.11"
-    packages:
-      - "pandas>=2.0.0"
-      - "numpy>=1.24.0"
-`
+	content, err := renderTemplate("scaffold-plugin.yaml.tmpl", map[string]interface{}{
+		"ID":          data["id"],
+		"Name":        data["name"],
+		"Description": data["description"],
+		"Version":     data["version"],
+		"Author":      data["author"],
+		"Category":    data["category"],
+		"Runtime":     data["runtime"],
+		"Script":      data["script"],
+		"HasPython":   data["runtime"] == "python" || data["runtime"] == "pythonWithR",
+		"HasR":        data["runtime"] == "r" || data["runtime"] == "pythonWithR",
+	})
+	if err != nil {
+		return err
 	}
-
-	if data["runtime"] == "r" || data["runtime"] == "pythonWithR" {
-		content += `    r: ">=4.0"
-    packages:
-      - "tidyverse"
-`
-	}
-
-	content += `
-# example:
-#   enabled: true
-#   values:
-#     input_file: "diann/imputed.data.txt"
-#     # Add more example values here
-`
 
 	yamlPath := filepath.Join(dir, "plugin.yaml")
 	return os.WriteFile(yamlPath, []byte(content), 0644)
 }
 
 func createPythonScript(dir, scriptName, pluginName, description string) error {
-	content := fmt.Sprintf(`#!/usr/bin/env python3
-"""
-%s
-%s
-"""
-
-import argparse
-import sys
-import pandas as pd
-from pathlib import Path
-
-
-def parse_args():
-    """Parse command line arguments."""
-    parser = argparse.ArgumentParser(description='%s')
-
-    parser.add_argument('--input_file', required=True, help='Input data file')
-    parser.add_argument('--output_folder', required=True, help='Output directory')
-
-    # Add more arguments as needed
-    # parser.add_argument('--parameter1', type=int, default=10, help='Example parameter')
-
-    return parser.parse_args()
-
-
-def main():
-    """Main execution function."""
-    args = parse_args()
-
-    # Create output directory
-    output_dir = Path(args.output_folder)
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    print(f"Loading data from {args.input_file}...")
-    # TODO: Implement your analysis logic here
-    # df = pd.read_csv(args.input_file, sep='\t')
-
-    print("Processing...")
-    # TODO: Add processing logic
-
-    # Save results
-    output_file = output_dir / 'output.txt'
-    print(f"Saving results to {output_file}...")
-    # TODO: Save results
-    # df.to_csv(output_file, sep='\t', index=False)
-
-    print("Analysis complete!")
-    return 0
-
-
-if __name__ == '__main__':
-    sys.exit(main())
-`, pluginName, description, description)
-
-	scriptPath := filepath.Join(dir, scriptName)
-	if err := os.WriteFile(scriptPath, []byte(content), 0755); err != nil {
+	content, err := renderTemplate("scaffold-script.py.tmpl", map[string]string{
+		"PluginName":  pluginName,
+		"Description": description,
+	})
+	if err != nil {
 		return err
 	}
 
-	return nil
+	scriptPath := filepath.Join(dir, scriptName)
+	return os.WriteFile(scriptPath, []byte(content), 0755)
 }
 
 func createRScript(dir, scriptName, pluginName, description string) error {
-	content := fmt.Sprintf(`#!/usr/bin/env Rscript
-
-# %s
-# %s
-
-library(optparse)
-
-# Parse command line arguments
-option_list <- list(
-  make_option(c("--input_file"), type="character", help="Input data file"),
-  make_option(c("--output_folder"), type="character", help="Output directory")
-  # Add more options as needed
-)
-
-parser <- OptionParser(option_list=option_list)
-args <- parse_args(parser)
-
-# Create output directory
-dir.create(args$output_folder, showWarnings = FALSE, recursive = TRUE)
-
-cat("Loading data from", args$input_file, "...\n")
-# TODO: Implement your analysis logic here
-# data <- read.delim(args$input_file)
-
-cat("Processing...\n")
-# TODO: Add processing logic
-
-# Save results
-output_file <- file.path(args$output_folder, "output.txt")
-cat("Saving results to", output_file, "...\n")
-# TODO: Save results
-# write.table(data, output_file, sep="\t", quote=FALSE, row.names=FALSE)
-
-cat("Analysis complete!\n")
-`, pluginName, description)
-
-	scriptPath := filepath.Join(dir, scriptName)
-	if err := os.WriteFile(scriptPath, []byte(content), 0755); err != nil {
+	content, err := renderTemplate("scaffold-script.R.tmpl", map[string]string{
+		"PluginName":  pluginName,
+		"Description": description,
+	})
+	if err != nil {
 		return err
 	}
 
-	return nil
+	scriptPath := filepath.Join(dir, scriptName)
+	return os.WriteFile(scriptPath, []byte(content), 0755)
 }
 
 func createGitignore(dir string) error {
-	content := `__pycache__/
-*.pyc
-.Rhistory
-.RData
-*.swp
-*.swo
-*~
-`
+	content, err := templates.GetTemplate("scaffold-gitignore.tmpl")
+	if err != nil {
+		return err
+	}
 	gitignorePath := filepath.Join(dir, ".gitignore")
 	return os.WriteFile(gitignorePath, []byte(content), 0644)
 }

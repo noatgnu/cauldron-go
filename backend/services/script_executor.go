@@ -194,38 +194,59 @@ func (s *ScriptExecutor) ExecutePythonScript(ctx context.Context, jobID string, 
 	return s.executeCommand(ctx, jobID, cmd, config.OutputDir, envInfo)
 }
 
-func (s *ScriptExecutor) ExecuteRScript(ctx context.Context, jobID string, config ScriptConfig) error {
-	log.Printf("[ExecuteRScript] Starting execution for job %s with config.Type=%s", jobID, config.Type)
-
+// resolveRExecutable picks which Rscript binary and (if bound) renv project a plugin run should use:
+// a plugin bound to a renv project runs with the R interpreter that renv was created against
+// (renvEnv.BaseRPath), the same self-contained-per-binding model ExecutePythonScript already uses
+// for venvs, falling back to the global configured R only when no binding exists or its recorded
+// interpreter is no longer present on disk.
+func (s *ScriptExecutor) resolveRExecutable(pluginType string) (rPath string, renvProjectPath string, envInfo string, err error) {
 	cfg := s.settingsService.GetConfig()
-	if cfg.RPath == "" {
-		return fmt.Errorf("R path not configured")
-	}
 
-	rPath := cfg.RPath
-	var envInfo string
-
-	// Check for plugin-specific renv binding
-	binding, err := s.db.GetPluginEnvironmentBinding(config.Type, "r")
-	if err != nil {
-		log.Printf("[ExecuteRScript] No binding found for plugin %s (type: %s): %v", jobID, config.Type, err)
+	binding, bindingErr := s.db.GetPluginEnvironmentBinding(pluginType, "r")
+	if bindingErr != nil {
+		log.Printf("[ExecuteRScript] No binding found for plugin type %s: %v", pluginType, bindingErr)
 	} else if binding != nil {
-		log.Printf("[ExecuteRScript] Found binding for plugin %s: ID=%d", jobID, binding.EnvironmentID)
+		log.Printf("[ExecuteRScript] Found binding for plugin type %s: ID=%d", pluginType, binding.EnvironmentID)
 	}
 
-	var renvProjectPath string
 	if binding != nil && binding.EnvironmentPath != "" {
-		renvEnv, err := s.db.GetRenvEnvironmentByID(binding.EnvironmentID)
-		if err == nil {
+		renvEnv, renvErr := s.db.GetRenvEnvironmentByID(binding.EnvironmentID)
+		if renvErr == nil {
 			renvProjectPath = renvEnv.ProjectPath
-			envInfo = fmt.Sprintf("R (Bound renv): %s", renvProjectPath)
+			if renvEnv.BaseRPath != "" {
+				if _, statErr := os.Stat(renvEnv.BaseRPath); statErr == nil {
+					rPath = renvEnv.BaseRPath
+					envInfo = fmt.Sprintf("R (Bound renv): %s [%s]", renvProjectPath, rPath)
+				} else {
+					log.Printf("[ExecuteRScript] Warning: renv's recorded R interpreter not found at %s, falling back to global R", renvEnv.BaseRPath)
+				}
+			}
+			if rPath == "" {
+				envInfo = fmt.Sprintf("R (Bound renv): %s", renvProjectPath)
+			}
 		}
 	}
 
-	// Fall back to global R if no binding
-	if envInfo == "" {
-		envInfo = fmt.Sprintf("R (Global): %s", rPath)
+	if rPath == "" {
+		if cfg.RPath == "" {
+			return "", "", "", fmt.Errorf("R path not configured")
+		}
+		rPath = cfg.RPath
+		if envInfo == "" {
+			envInfo = fmt.Sprintf("R (Global): %s", rPath)
+		}
 		log.Printf("[ExecuteRScript] Using global R: %s", rPath)
+	}
+
+	return rPath, renvProjectPath, envInfo, nil
+}
+
+func (s *ScriptExecutor) ExecuteRScript(ctx context.Context, jobID string, config ScriptConfig) error {
+	log.Printf("[ExecuteRScript] Starting execution for job %s with config.Type=%s", jobID, config.Type)
+
+	rPath, renvProjectPath, envInfo, err := s.resolveRExecutable(config.Type)
+	if err != nil {
+		return err
 	}
 
 	var pluginDir string

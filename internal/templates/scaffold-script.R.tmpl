@@ -1,0 +1,31 @@
+#!/usr/bin/env Rscript
+
+# {{ .PluginName }}
+# {{ .Description }}
+
+library(optparse)
+
+# Parse command line arguments
+option_list <- list(
+  make_option(c("--input_file"), type="character", help="Input data file"),
+  make_option(c("--output_folder"), type="character", help="Output directory")
+  # Add more options as needed
+)
+
+parser <- OptionParser(option_list=option_list)
+args <- parse_args(parser)
+
+# Create output directory
+dir.create(args$output_folder, showWarnings = FALSE, recursive = TRUE)
+
+cat("Loading data from", args$input_file, "...\n")
+# data <- read.delim(args$input_file)
+
+cat("Processing...\n")
+
+# Save results
+output_file <- file.path(args$output_folder, "output.txt")
+cat("Saving results to", output_file, "...\n")
+# write.table(data, output_file, sep="\t", quote=FALSE, row.names=FALSE)
+
+cat("Analysis complete!\n")

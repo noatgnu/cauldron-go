@@ -4,6 +4,7 @@ import * as WailsApp from '../../../../bindings/github.com/noatgnu/cauldron-go/a
 import { Events } from '@wailsio/runtime';
 import * as models from '../../../../bindings/github.com/noatgnu/cauldron-go/backend/models/models';
 import * as services from '../../../../bindings/github.com/noatgnu/cauldron-go/backend/services/models';
+import * as rversion from '../../../../bindings/github.com/noatgnu/cookeR/rversion/models';
 
 declare global {
   interface Window {
@@ -21,6 +22,7 @@ export type VirtualEnvironment = services.VirtualEnvironment;
 export type RenvEnvironment = services.RenvEnvironment;
 export type PluginEnvironmentBinding = services.PluginEnvironmentBinding;
 export type CustomEnvVar = services.CustomEnvVar;
+export type RVersionRelease = rversion.Release;
 export type UvPythonVersion = services.UvPythonVersion;
 export type BackupSummary = services.BackupSummary;
 export type RestoreResult = services.RestoreResult;
@@ -585,6 +587,36 @@ export class Wails {
     if (!this.isWails) throw new Error('Wails not available');
     await this.waitForBackend();
     return WailsApp.GetPortableEnvironmentPath(environment);
+  }
+
+  async listAvailableRVersions(): Promise<RVersionRelease[]> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.ListAvailableRVersions();
+  }
+
+  async listInstalledRVersions(): Promise<string[]> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.ListInstalledRVersions();
+  }
+
+  async installRVersion(version: string): Promise<void> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.InstallRVersion(version);
+  }
+
+  async uninstallRVersion(version: string): Promise<void> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.UninstallRVersion(version);
+  }
+
+  async getRPortablePath(version: string): Promise<string> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.GetRPortablePath(version);
   }
 
   async getUvPath(): Promise<string> {

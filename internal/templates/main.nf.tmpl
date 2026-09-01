@@ -14,7 +14,7 @@ workflow PIPELINE {
         {{- if eq .Type "file" }}
         params.{{ .Name }} ? Channel.fromPath(params.{{ .Name }}).collect() : Channel.of([]),
         {{- else }}
-        Channel.value(params.{{ .Name }} ?: ''),
+        Channel.value(params.{{ .Name }} != null ? params.{{ .Name }} : ''),
         {{- end }}
         {{- end }}
     )

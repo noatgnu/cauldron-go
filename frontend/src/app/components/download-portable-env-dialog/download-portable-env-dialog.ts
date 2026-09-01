@@ -1,27 +1,55 @@
 import { Component, Input, OnInit, ChangeDetectorRef, inject, ChangeDetectionStrategy, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormBuilder, FormGroup, ReactiveFormsModule } from '@angular/forms';
+import { FormBuilder, FormGroup, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { MatDialogModule, MatDialogRef, MatDialog } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
 import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
-import { Wails } from '../../core/services/wails';
+import { MatIconModule } from '@angular/material/icon';
+import { Wails, RVersionRelease, ProgressNotification } from '../../core/services/wails';
 import { ConfirmDialogComponent } from '../confirm-dialog/confirm-dialog';
+
+type StepStatus = 'pending' | 'active' | 'done' | 'error';
+
+interface InstallStep {
+  key: string;
+  label: string;
+  status: StepStatus;
+  detail?: string;
+  percentage?: number;
+  downloaded?: number;
+  total?: number;
+}
+
+const PYTHON_STEPS: Omit<InstallStep, 'status'>[] = [
+  { key: 'download', label: 'Download' },
+  { key: 'extract', label: 'Extract' },
+  { key: 'install', label: 'Install' }
+];
+
+const R_STEPS: Omit<InstallStep, 'status'>[] = [
+  { key: 'download', label: 'Download' },
+  { key: 'verify', label: 'Verify checksum' },
+  { key: 'extract', label: 'Extract' },
+  { key: 'install', label: 'Install' }
+];
 
 @Component({
   selector: 'app-download-portable-env-dialog',
   standalone: true,
   imports: [
     CommonModule,
+    FormsModule,
     ReactiveFormsModule,
     MatDialogModule,
     MatFormFieldModule,
     MatSelectModule,
     MatInputModule,
     MatButtonModule,
-    MatProgressBarModule
+    MatProgressBarModule,
+    MatIconModule
   ],
   templateUrl: './download-portable-env-dialog.html',
   styleUrl: './download-portable-env-dialog.scss',
@@ -31,18 +59,16 @@ export class DownloadPortableEnvDialogComponent implements OnInit {
   @Input() environment: 'python' | 'r-portable' = 'python';
 
   form: FormGroup;
-  platforms = ['win', 'linux', 'darwin'];
-  archs = ['x86_64', 'arm64'];
 
-  downloading = false;
-  progressItems: Record<string, {
-    percentage: number;
-    downloaded?: number;
-    total?: number;
-    files?: number;
-  }> = {};
-  currentPhase = '';
-  overallProgress = 0;
+  availableRVersions: RVersionRelease[] = [];
+  installedRVersions: string[] = [];
+  selectedRVersion = '';
+  loadingRVersions = false;
+
+  installing = false;
+  steps: InstallStep[] = [];
+  finished = false;
+  errorMessage = '';
 
   private dialog = inject(MatDialog);
 
@@ -61,83 +87,48 @@ export class DownloadPortableEnvDialogComponent implements OnInit {
     effect(() => {
       const progress = this.wails.progress();
       if (!progress) return;
-
-      if (progress.type !== 'download' && progress.type !== 'extract' && progress.type !== 'install') {
-        return;
-      }
-
-      const { message, percentage, status, type, data } = progress;
-      const finalInstallId = this.environment === 'python' ? 'python.tar.xz' : 'r-portable.tar.xz';
-
-      if (status === 'completed') {
-        if (type === 'install' && progress.id === finalInstallId) {
-          Object.keys(this.progressItems).forEach(key => {
-            if (this.progressItems[key].percentage === 0) {
-              this.progressItems[key] = { ...this.progressItems[key], percentage: 100 };
-            }
-          });
-          this.currentPhase = 'Installation complete!';
-          this.overallProgress = 100;
-          this.downloading = false;
-          this.form.enable();
-          this.cdr.detectChanges();
-
-          this.wails.getPortableEnvironmentPath(this.environment).then(path => {
-            if (this.environment === 'python') {
-              this.wails.setSetting('pythonPath', path);
-            } else {
-              this.wails.setSetting('rPath', path);
-            }
-          }).catch(err => {
-            const errorMessage = err instanceof Error ? err.message : String(err);
-            this.currentPhase = 'Warning: ' + errorMessage;
-            this.cdr.detectChanges();
-          });
-        }
-      } else if (status === 'error') {
-        this.currentPhase = 'Error: ' + message;
-        this.downloading = false;
-        this.form.enable();
-        this.cdr.detectChanges();
+      if (this.environment === 'python') {
+        this.handlePythonProgress(progress);
       } else {
-        let phaseWeight = 0;
-        let phaseOffset = 0;
-
-        if (type === 'download') {
-          this.currentPhase = 'Downloading...';
-          phaseWeight = 0.6;
-          phaseOffset = 0;
-        } else if (type === 'extract') {
-          this.currentPhase = 'Extracting files...';
-          phaseWeight = 0.2;
-          phaseOffset = 60;
-        } else if (type === 'install') {
-          this.currentPhase = 'Installing...';
-          phaseWeight = 0.2;
-          phaseOffset = 80;
-        }
-
-        this.overallProgress = Math.round(phaseOffset + (percentage * phaseWeight));
-
-        const downloaded = data?.['downloaded'] || 0;
-        const total = data?.['total'] || 0;
-        const files = data?.['files'] || 0;
-
-        this.progressItems[message] = {
-          percentage,
-          downloaded: type === 'download' ? downloaded : undefined,
-          total: type === 'download' ? total : undefined,
-          files: (type === 'extract' || type === 'install') && files > 0 ? files : undefined
-        };
-        this.cdr.detectChanges();
+        this.handleRProgress(progress);
       }
     });
   }
 
   ngOnInit() {
-    this.detectPlatformAndArch();
-    this.setupFormListeners();
-    this.updateURL();
+    if (this.environment === 'python') {
+      this.detectPlatformAndArch();
+      this.setupFormListeners();
+      this.updateURL();
+    } else {
+      this.refreshRVersions();
+    }
+  }
+
+  isInstalled(version: string): boolean {
+    return this.installedRVersions.includes(version);
+  }
+
+  private async refreshRVersions() {
+    this.loadingRVersions = true;
+    this.cdr.detectChanges();
+    try {
+      const [available, installed] = await Promise.all([
+        this.wails.listAvailableRVersions(),
+        this.wails.listInstalledRVersions()
+      ]);
+      this.availableRVersions = available;
+      this.installedRVersions = installed;
+      if (!this.selectedRVersion && available.length > 0) {
+        this.selectedRVersion = available[0].version;
+      }
+    } catch (error) {
+      await this.wails.logToFile(`[DownloadPortableEnv] Failed to list R versions: ${error}`);
+      this.errorMessage = error instanceof Error ? error.message : String(error);
+    } finally {
+      this.loadingRVersions = false;
+      this.cdr.detectChanges();
+    }
   }
 
   private detectPlatformAndArch() {
@@ -166,24 +157,130 @@ export class DownloadPortableEnvDialogComponent implements OnInit {
   private async updateURL() {
     const platform = this.form.get('platform')?.value;
     const arch = this.form.get('arch')?.value;
-    const version = 'latest'; // Use latest release
+    const version = 'latest';
 
     try {
-      const url = await this.wails.getPortableEnvironmentURL(
-        platform,
-        arch,
-        version,
-        this.environment
-      );
+      const url = await this.wails.getPortableEnvironmentURL(platform, arch, version, this.environment);
       this.form.patchValue({ url });
     } catch (error) {
-      console.error('Failed to get download URL:', error);
+      await this.wails.logToFile(`[DownloadPortableEnv] Failed to get download URL: ${error}`);
       this.form.patchValue({ url: 'Error: Could not fetch download URL - ' + (error as Error).message });
     }
   }
 
+  private startSteps(template: Omit<InstallStep, 'status'>[]) {
+    this.steps = template.map((s, i) => ({ ...s, status: i === 0 ? 'active' : 'pending' }));
+    this.installing = true;
+    this.finished = false;
+    this.errorMessage = '';
+    this.cdr.detectChanges();
+  }
+
+  private setStep(key: string, patch: Partial<InstallStep>) {
+    const step = this.steps.find(s => s.key === key);
+    if (step) Object.assign(step, patch);
+  }
+
+  private completeUpTo(key: string) {
+    const idx = this.steps.findIndex(s => s.key === key);
+    if (idx < 0) return;
+    for (let i = 0; i < idx; i++) {
+      this.steps[i].status = 'done';
+    }
+    this.steps[idx].status = 'active';
+  }
+
+  private failAllFrom(message: string) {
+    const active = this.steps.find(s => s.status === 'active');
+    if (active) active.status = 'error';
+    this.errorMessage = message;
+    this.installing = false;
+    this.cdr.detectChanges();
+  }
+
+  private handlePythonProgress(progress: ProgressNotification) {
+    if (progress.type !== 'download' && progress.type !== 'extract' && progress.type !== 'install') return;
+    if (!this.installing) return;
+
+    const { message, percentage, status, type, data } = progress;
+
+    if (status === 'error') {
+      this.failAllFrom(message);
+      return;
+    }
+
+    this.completeUpTo(type);
+
+    if (status === 'completed' && type === 'install' && progress.id === 'python.tar.xz') {
+      this.steps.forEach(s => (s.status = 'done'));
+      this.finished = true;
+      this.installing = false;
+      this.cdr.detectChanges();
+      this.wails.getPortableEnvironmentPath(this.environment).then(path => {
+        this.wails.setSetting('pythonPath', path);
+      }).catch(err => {
+        this.errorMessage = 'Warning: ' + (err instanceof Error ? err.message : String(err));
+        this.cdr.detectChanges();
+      });
+      return;
+    }
+
+    this.setStep(type, {
+      detail: message,
+      percentage,
+      downloaded: type === 'download' ? (data?.['downloaded'] as number) : undefined,
+      total: type === 'download' ? (data?.['total'] as number) : undefined
+    });
+    this.cdr.detectChanges();
+  }
+
+  private handleRProgress(progress: ProgressNotification) {
+    if (progress.type !== 'install' || !this.installing) return;
+    if (progress.id !== 'r-portable-' + this.selectedRVersion) return;
+
+    const { message, status } = progress;
+
+    if (status === 'error') {
+      this.failAllFrom(message);
+      return;
+    }
+
+    if (status === 'completed') {
+      this.steps.forEach(s => (s.status = 'done'));
+      this.finished = true;
+      this.installing = false;
+      this.cdr.detectChanges();
+      this.wails.getRPortablePath(this.selectedRVersion).then(async path => {
+        await this.wails.setSetting('rPath', path);
+        // detectREnvironments persists this version's DB row -- setActiveREnvironment needs it to already exist.
+        await this.wails.detectREnvironments();
+        await this.wails.setActiveREnvironment(path);
+      }).catch(err => {
+        this.errorMessage = 'Warning: ' + (err instanceof Error ? err.message : String(err));
+        this.cdr.detectChanges();
+      });
+      this.refreshRVersions();
+      return;
+    }
+
+    if (message.startsWith('Downloading')) {
+      this.completeUpTo('download');
+      this.setStep('download', { detail: message });
+    } else if (message.startsWith('Verifying')) {
+      this.completeUpTo('verify');
+      this.setStep('verify', { detail: message });
+    } else if (message.startsWith('Extracting')) {
+      this.completeUpTo('extract');
+      this.setStep('extract', { detail: message });
+    } else {
+      this.completeUpTo('install');
+      this.setStep('install', { detail: message });
+    }
+    this.cdr.detectChanges();
+  }
+
   async download() {
-    if (this.downloading) return;
+    if (this.installing) return;
 
     const url = this.form.get('url')?.value;
     if (!url || url.startsWith('Error:')) {
@@ -193,50 +290,84 @@ export class DownloadPortableEnvDialogComponent implements OnInit {
 
     try {
       const existingPath = await this.wails.getPortableEnvironmentPath(this.environment);
-
       if (existingPath && existingPath !== '') {
-        const envName = this.environment === 'python' ? 'Python' : 'R';
-        const dialogRef = this.dialog.open(ConfirmDialogComponent, {
-          width: '400px',
-          disableClose: true,
-          data: {
-            title: `Replace Existing ${envName} Environment?`,
-            message: `A portable ${envName} environment is already installed at:\n\n${existingPath}\n\nDownloading a new environment will remove the existing one. Do you want to continue?`,
-            confirmText: 'Yes, Replace',
-            cancelText: 'Cancel'
-          }
-        });
-
-        const confirmed = await dialogRef.afterClosed().toPromise();
-        if (!confirmed) {
-          await this.wails.logToFile('[DownloadPortableEnv] User cancelled download - existing environment found');
-          return;
-        }
-
-        await this.wails.logToFile('[DownloadPortableEnv] User confirmed replacement of existing environment');
+        const confirmed = await this.confirmReplace('Python', existingPath);
+        if (!confirmed) return;
       }
     } catch (error) {
       await this.wails.logToFile(`[DownloadPortableEnv] Could not check existing environment: ${error}`);
     }
 
-    this.progressItems = {};
-    this.downloading = true;
+    this.startSteps(PYTHON_STEPS);
     this.form.disable();
 
     try {
       await this.wails.downloadPortableEnvironment(url, this.environment);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      this.progressItems['Error: ' + errorMessage] = { percentage: 0 };
-      this.downloading = false;
+      this.failAllFrom(errorMessage);
       this.form.enable();
-      this.cdr.detectChanges();
       await this.wails.logToFile(`[DownloadPortableEnv] Download error: ${errorMessage}`);
     }
   }
 
-  getProgressMessages(): string[] {
-    return Object.keys(this.progressItems);
+  async installR() {
+    if (this.installing || !this.selectedRVersion) return;
+
+    if (this.isInstalled(this.selectedRVersion)) {
+      const confirmed = await this.confirmReplace('R ' + this.selectedRVersion, this.selectedRVersion);
+      if (!confirmed) return;
+      try {
+        await this.wails.uninstallRVersion(this.selectedRVersion);
+      } catch (error) {
+        this.errorMessage = error instanceof Error ? error.message : String(error);
+        this.cdr.detectChanges();
+        return;
+      }
+    }
+
+    this.startSteps(R_STEPS);
+
+    try {
+      await this.wails.installRVersion(this.selectedRVersion);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.failAllFrom(errorMessage);
+      await this.wails.logToFile(`[DownloadPortableEnv] R install error: ${errorMessage}`);
+    }
+  }
+
+  async uninstallR(version: string) {
+    const confirmed = await this.confirmReplace('R ' + version, version, true);
+    if (!confirmed) return;
+    try {
+      await this.wails.uninstallRVersion(version);
+      await this.refreshRVersions();
+    } catch (error) {
+      this.errorMessage = error instanceof Error ? error.message : String(error);
+      this.cdr.detectChanges();
+    }
+  }
+
+  private async confirmReplace(envName: string, existingPath: string, uninstallOnly = false): Promise<boolean> {
+    const dialogRef = this.dialog.open(ConfirmDialogComponent, {
+      width: '400px',
+      disableClose: true,
+      data: uninstallOnly
+        ? {
+            title: `Remove ${envName}?`,
+            message: `This will remove the installed environment. Do you want to continue?`,
+            confirmText: 'Yes, Remove',
+            cancelText: 'Cancel'
+          }
+        : {
+            title: `Replace Existing ${envName} Environment?`,
+            message: `A portable ${envName} environment is already installed at:\n\n${existingPath}\n\nContinuing will remove the existing one first. Do you want to continue?`,
+            confirmText: 'Yes, Replace',
+            cancelText: 'Cancel'
+          }
+    });
+    return !!(await dialogRef.afterClosed().toPromise());
   }
 
   close() {
@@ -244,7 +375,7 @@ export class DownloadPortableEnvDialogComponent implements OnInit {
   }
 
   formatBytes(bytes: number): string {
-    if (bytes === 0) return '0 Bytes';
+    if (!bytes) return '0 Bytes';
     const k = 1024;
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));

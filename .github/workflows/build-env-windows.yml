@@ -1,8 +1,6 @@
 name: Build R and Python Environment for Windows x64
 
 on:
-  release:
-    types: [created]
   workflow_dispatch:
 
 jobs:
@@ -13,12 +11,20 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Install R
+    - name: Install portable R via cooker (downloads the tested, genuinely relocatable r-portable build instead of the CRAN installer)
       shell: pwsh
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        Invoke-WebRequest -Uri https://cran.r-project.org/bin/windows/base/old/4.5.2/R-4.5.2-win.exe -OutFile R-Installer.exe
-        New-Item -ItemType Directory -Force -Path bin/win/R-Portable
-        Start-Process -FilePath R-Installer.exe -ArgumentList "/VERYSILENT", "/DIR=${{ github.workspace }}/bin/win/R-Portable" -Wait
+        $release = Invoke-RestMethod -Uri "https://api.github.com/repos/noatgnu/cookeR/releases/latest" -Headers @{ Authorization = "Bearer $env:GH_TOKEN" }
+        $assetUrl = ($release.assets | Where-Object { $_.name -like "*windows-x86_64.exe" }).browser_download_url
+        Invoke-WebRequest -Uri $assetUrl -OutFile cooker.exe
+        $available = & .\cooker.exe r list --available --json | ConvertFrom-Json
+        $rVersion = $available[0].version
+        New-Item -ItemType Directory -Force -Path bin/win | Out-Null
+        $env:COOKER_INSTALL_DIR = "${{ github.workspace }}/bin/win"
+        & .\cooker.exe r install $rVersion
+        Move-Item -Path "bin/win/$rVersion" -Destination "bin/win/R-Portable"
 
     - name: Clean up R installation
       shell: pwsh

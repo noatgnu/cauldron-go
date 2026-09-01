@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/noatgnu/cauldron-go/backend/models"
 	"github.com/noatgnu/cauldron-go/internal/generator"
 	"github.com/noatgnu/cauldron-go/internal/parser"
 	"github.com/noatgnu/cauldron-go/internal/templates"
@@ -58,7 +59,15 @@ func convertPluginsBatch(dir, outDir string, generateGithubAction bool) error {
 	fmt.Printf("Found %d plugins for batch conversion\n", len(pluginFiles))
 
 	for _, path := range pluginFiles {
-		if err := convertPlugin(path, outDir, generateGithubAction); err != nil {
+		definition, err := parser.ParsePlugin(path)
+		if err != nil {
+			fmt.Printf("[WARNING] Failed to parse plugin at %s: %v\n", path, err)
+			continue
+		}
+
+		// Pipeline-level files (main.nf, config, README) are single-plugin-scoped, so each plugin needs its own subdirectory.
+		pluginOutDir := filepath.Join(outDir, definition.Plugin.ID)
+		if err := convertPluginDefinition(definition, path, pluginOutDir, generateGithubAction); err != nil {
 			fmt.Printf("[WARNING] Failed to convert plugin at %s: %v\n", path, err)
 		}
 	}
@@ -71,7 +80,10 @@ func convertPlugin(path, outDir string, generateGithubAction bool) error {
 	if err != nil {
 		return err
 	}
+	return convertPluginDefinition(definition, path, outDir, generateGithubAction)
+}
 
+func convertPluginDefinition(definition *models.PluginDefinition, path, outDir string, generateGithubAction bool) error {
 	fmt.Printf("Converting plugin: %s (%s)\n", definition.Plugin.Name, definition.Plugin.ID)
 
 	moduleDir := filepath.Join(outDir, "modules", "local", definition.Plugin.ID)
@@ -107,40 +119,60 @@ func convertPlugin(path, outDir string, generateGithubAction bool) error {
 	}
 
 	schemaContent, err := generator.GenerateSchema(definition)
-	if err == nil {
-		os.WriteFile(filepath.Join(outDir, "nextflow_schema.json"), []byte(schemaContent), 0644)
+	if err != nil {
+		fmt.Printf("[WARNING] Failed to generate nextflow_schema.json: %v\n", err)
+	} else if err := os.WriteFile(filepath.Join(outDir, "nextflow_schema.json"), []byte(schemaContent), 0644); err != nil {
+		fmt.Printf("[WARNING] Failed to write nextflow_schema.json: %v\n", err)
 	}
 
 	containerDir := filepath.Join(outDir, "containers")
-	os.MkdirAll(containerDir, 0755)
+	if err := os.MkdirAll(containerDir, 0755); err != nil {
+		return fmt.Errorf("failed to create containers directory: %w", err)
+	}
 
 	if definition.Runtime.IsDockerRuntime() && definition.Runtime.Docker != nil && definition.Runtime.Docker.Dockerfile != "" {
 		pluginDir := filepath.Dir(path)
 		customDockerPath := filepath.Join(pluginDir, definition.Runtime.Docker.Dockerfile)
 		dockerContent, err := os.ReadFile(customDockerPath)
-		if err == nil {
-			os.WriteFile(filepath.Join(containerDir, "Dockerfile"), dockerContent, 0644)
+		if err != nil {
+			fmt.Printf("[WARNING] Failed to read custom Dockerfile %s: %v\n", customDockerPath, err)
+		} else if err := os.WriteFile(filepath.Join(containerDir, "Dockerfile"), dockerContent, 0644); err != nil {
+			fmt.Printf("[WARNING] Failed to write Dockerfile: %v\n", err)
 		}
 	} else {
 		dockerTmpl, _ := templates.GetTemplate("Dockerfile.tmpl")
 		dockerContent, err := generator.GenerateContainer(definition, dockerTmpl)
-		if err == nil && dockerContent != "" {
-			os.WriteFile(filepath.Join(containerDir, "Dockerfile"), []byte(dockerContent), 0644)
+		if err != nil {
+			fmt.Printf("[WARNING] Failed to generate Dockerfile: %v\n", err)
+		} else if dockerContent != "" {
+			if err := os.WriteFile(filepath.Join(containerDir, "Dockerfile"), []byte(dockerContent), 0644); err != nil {
+				fmt.Printf("[WARNING] Failed to write Dockerfile: %v\n", err)
+			}
 		}
 	}
 
-	if readmeTmpl, err := templates.GetTemplate("README.md.tmpl"); err == nil {
-		if readmeContent, err := generator.GenerateREADME(definition, readmeTmpl); err == nil {
-			os.WriteFile(filepath.Join(outDir, "README.md"), []byte(readmeContent), 0644)
-		}
+	readmeTmpl, err := templates.GetTemplate("README.md.tmpl")
+	if err != nil {
+		fmt.Printf("[WARNING] Failed to load README template: %v\n", err)
+	} else if readmeContent, err := generator.GenerateREADME(definition, readmeTmpl); err != nil {
+		fmt.Printf("[WARNING] Failed to generate README.md: %v\n", err)
+	} else if err := os.WriteFile(filepath.Join(outDir, "README.md"), []byte(readmeContent), 0644); err != nil {
+		fmt.Printf("[WARNING] Failed to write README.md: %v\n", err)
 	}
 
 	if generateGithubAction {
-		if actionTmpl, err := templates.GetTemplate("plugin-github-action.yml.tmpl"); err == nil {
-			if actionContent, err := generator.GenerateGithubAction(definition, actionTmpl); err == nil {
-				githubDir := filepath.Join(outDir, ".github", "workflows")
-				os.MkdirAll(githubDir, 0755)
-				os.WriteFile(filepath.Join(githubDir, "nextflow-export.yml"), []byte(actionContent), 0644)
+		actionTmpl, err := templates.GetTemplate("plugin-github-action.yml.tmpl")
+		if err != nil {
+			fmt.Printf("[WARNING] Failed to load GitHub Action template: %v\n", err)
+		} else if actionContent, err := generator.GenerateGithubAction(definition, actionTmpl); err != nil {
+			fmt.Printf("[WARNING] Failed to generate GitHub Action: %v\n", err)
+		} else {
+			githubDir := filepath.Join(outDir, ".github", "workflows")
+			if err := os.MkdirAll(githubDir, 0755); err != nil {
+				fmt.Printf("[WARNING] Failed to create .github/workflows directory: %v\n", err)
+			} else if err := os.WriteFile(filepath.Join(githubDir, "nextflow-export.yml"), []byte(actionContent), 0644); err != nil {
+				fmt.Printf("[WARNING] Failed to write GitHub Action: %v\n", err)
+			} else {
 				fmt.Printf("Successfully generated GitHub Action: %s\n", filepath.Join(githubDir, "nextflow-export.yml"))
 			}
 		}

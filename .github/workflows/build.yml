@@ -6,7 +6,7 @@ on:
       - master
       - main
       - develop
-      - cli-tooling
+      - nextflow-generator-fixes
   pull_request:
     branches:
       - master

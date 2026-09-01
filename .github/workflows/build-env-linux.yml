@@ -1,8 +1,6 @@
 name: Build R and Python Environment for Linux x64
 
 on:
-  release:
-    types: [created]
   workflow_dispatch:
 
 jobs:
@@ -42,23 +40,17 @@ jobs:
             libreadline-dev \
             bzip2
 
-      - name: Compile R
+      - name: Install portable R via cooker (downloads the tested, genuinely relocatable r-portable build instead of compiling a broken from-source one)
         env:
-          CPPFLAGS: -I/usr/include -I/usr/include/xorg
-          LDFLAGS: -L/usr/lib -L/usr/lib/xorg
-          CFLAGS: -I/usr/include
-          TCL_LIBRARY: /usr/lib/tcltk
-          TK_LIBRARY: /usr/lib/tcltk
-          PKG_CONFIG_PATH: /usr/lib/pkgconfig
-          C_INCLUDE_PATH: /usr/include
-          LIBRARY_PATH: /usr/lib
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          curl -O https://cran.r-project.org/src/base/R-4/R-4.5.2.tar.gz
-          tar -xzvf R-4.5.2.tar.gz
-          cd R-4.5.2
-          ./configure --prefix=${{ github.workspace }}/bin/linux/R-Portable/ --enable-R-shlib --with-blas --with-lapack --with-tcltk --with-mpi
-          make -j$(nproc)
-          make install
+          ASSET_URL=$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" https://api.github.com/repos/noatgnu/cookeR/releases/latest | jq -r '.assets[] | select(.name | endswith("linux-x86_64")) | .browser_download_url')
+          curl -fsSL -o cooker "$ASSET_URL"
+          chmod +x cooker
+          R_VERSION=$(./cooker r list --available --json | jq -r '.[0].version')
+          mkdir -p "${{ github.workspace }}/bin/linux"
+          COOKER_INSTALL_DIR="${{ github.workspace }}/bin/linux" ./cooker r install "$R_VERSION"
+          mv "${{ github.workspace }}/bin/linux/$R_VERSION" "${{ github.workspace }}/bin/linux/R-Portable"
       - name: Strip R binaries
         run: |
           find ${{ github.workspace }}/bin/linux/R-Portable -type f \( -name "*.so" -o -perm /111 \) -exec strip {} \;

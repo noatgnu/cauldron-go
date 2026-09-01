@@ -27,12 +27,20 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Setup R Environment
+      - name: Setup R Environment via cooker (downloads the tested, genuinely relocatable r-portable build instead of the CRAN installer)
         shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          New-Item -ItemType Directory -Force -Path "bin/win/R-Portable"
-          Invoke-WebRequest -Uri https://cran.r-project.org/bin/windows/base/old/4.5.2/R-4.5.2-win.exe -OutFile R-Installer.exe
-          Start-Process -FilePath R-Installer.exe -ArgumentList "/VERYSILENT", "/DIR=${{ github.workspace }}/bin/win/R-Portable" -Wait
+          $release = Invoke-RestMethod -Uri "https://api.github.com/repos/noatgnu/cookeR/releases/latest" -Headers @{ Authorization = "Bearer $env:GH_TOKEN" }
+          $assetUrl = ($release.assets | Where-Object { $_.name -like "*windows-x86_64.exe" }).browser_download_url
+          Invoke-WebRequest -Uri $assetUrl -OutFile cooker.exe
+          $available = & .\cooker.exe r list --available --json | ConvertFrom-Json
+          $rVersion = $available[0].version
+          New-Item -ItemType Directory -Force -Path bin/win | Out-Null
+          $env:COOKER_INSTALL_DIR = "${{ github.workspace }}/bin/win"
+          & .\cooker.exe r install $rVersion
+          Move-Item -Path "bin/win/$rVersion" -Destination "bin/win/R-Portable"
           echo "${{ github.workspace }}/bin/win/R-Portable/bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
           echo "R_HOME=${{ github.workspace }}/bin/win/R-Portable" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
@@ -218,22 +226,16 @@ jobs:
             bzip2 \
             python3-venv
 
-      - name: Compile R
+      - name: Install portable R via cooker (downloads the tested, genuinely relocatable r-portable build instead of compiling a broken from-source one)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          curl -O https://cran.r-project.org/src/base/R-4/R-4.5.2.tar.gz
-          tar -xzvf R-4.5.2.tar.gz
-          cd R-4.5.2
-          CPPFLAGS="-I/usr/include -I/usr/include/xorg" \
-          LDFLAGS="-L/usr/lib -L/usr/lib/xorg" \
-          CFLAGS="-I/usr/include" \
-          TCL_LIBRARY="/usr/lib/tcltk" \
-          TK_LIBRARY="/usr/lib/tcltk" \
-          PKG_CONFIG_PATH="/usr/lib/pkgconfig" \
-          C_INCLUDE_PATH="/usr/include" \
-          LIBRARY_PATH="/usr/lib" \
-          ./configure --prefix=${{ github.workspace }}/R --enable-R-shlib --with-blas --with-lapack --with-tcltk --with-mpi
-          make -j$(nproc)
-          make install
+          ASSET_URL=$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" https://api.github.com/repos/noatgnu/cookeR/releases/latest | jq -r '.assets[] | select(.name | endswith("linux-x86_64")) | .browser_download_url')
+          curl -fsSL -o cooker "$ASSET_URL"
+          chmod +x cooker
+          R_VERSION=$(./cooker r list --available --json | jq -r '.[0].version')
+          COOKER_INSTALL_DIR="${{ github.workspace }}" ./cooker r install "$R_VERSION"
+          mv "${{ github.workspace }}/$R_VERSION" "${{ github.workspace }}/R"
 
       - name: Set R environment variables
         run: |
@@ -326,7 +328,7 @@ jobs:
 
       - name: Clean up test environments
         run: |
-          rm -rf R python R-4.5.2 R-4.5.2.tar.gz cpython*.tar.gz
+          rm -rf R python cpython*.tar.gz cooker
 
       - name: Copy Resources
         run: |
@@ -397,27 +399,16 @@ jobs:
           echo "$(brew --prefix c-blosc)/bin" >> $GITHUB_PATH
           echo "$(brew --prefix bzip2)/bin" >> $GITHUB_PATH
 
-      - name: Compile R
+      - name: Install portable R via cooker (downloads the tested, genuinely relocatable r-portable build instead of compiling a broken from-source one)
         env:
-          CPPFLAGS: -I/opt/homebrew/include -I/opt/X11/include -I/opt/homebrew/opt/jpeg/include -I/opt/homebrew/include
-          LDFLAGS: -L/opt/X11/lib -L/opt/homebrew/opt/jpeg/lib -L/opt/homebrew/opt/lzo/lib -L/opt/homebrew/lib
-          LZO_DIR: $(brew --prefix lzo)
-          BZIP2_DIR: $(brew --prefix bzip2)
-          BLOSC_DIR: $(brew --prefix c-blosc)
-          HDF5_DIR: $(brew --prefix hdf5)
-          CFLAGS: -I/opt/homebrew/opt/lzo/include
-          TCL_LIBRARY: /opt/homebrew/opt/tcl-tk/lib
-          TK_LIBRARY: /opt/homebrew/opt/tcl-tk/lib
-          PKG_CONFIG_PATH: /opt/homebrew/opt/jpeg/lib/pkgconfig
-          C_INCLUDE_PATH: /opt/homebrew/Cellar/lzo/2.10/include/lzo:/opt/homebrew/Cellar/lzo/2.10/include/
-          LIBRARY_PATH: /opt/homebrew/lib
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          curl -O https://cran.r-project.org/src/base/R-4/R-4.5.2.tar.gz
-          tar -xzvf R-4.5.2.tar.gz
-          cd R-4.5.2
-          ./configure --prefix=${{ github.workspace }}/R --enable-R-shlib --with-blas --with-lapack --with-tcltk --with-mpi
-          make -j$(nproc)
-          make install
+          ASSET_URL=$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" https://api.github.com/repos/noatgnu/cookeR/releases/latest | jq -r '.assets[] | select(.name | endswith("macos-arm64")) | .browser_download_url')
+          curl -fsSL -o cooker "$ASSET_URL"
+          chmod +x cooker
+          R_VERSION=$(./cooker r list --available --json | jq -r '.[0].version')
+          COOKER_INSTALL_DIR="${{ github.workspace }}" ./cooker r install "$R_VERSION"
+          mv "${{ github.workspace }}/$R_VERSION" "${{ github.workspace }}/R"
 
       - name: Set R environment variables
         run: |
@@ -502,7 +493,7 @@ jobs:
 
       - name: Clean up test environments
         run: |
-          rm -rf R python R-4.5.2 R-4.5.2.tar.gz cpython*.tar.gz
+          rm -rf R python cpython*.tar.gz cooker
 
       - name: Copy Resources
         run: |
