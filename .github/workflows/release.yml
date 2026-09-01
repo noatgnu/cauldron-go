@@ -114,7 +114,7 @@ jobs:
           node scripts/generate-go-licenses.js
           cd frontend
           rm -f package-lock.json
-          npm install --silent
+          npm install
           cd ..
           node scripts/generate-npm-licenses.js
         shell: bash

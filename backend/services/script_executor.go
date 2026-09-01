@@ -194,11 +194,7 @@ func (s *ScriptExecutor) ExecutePythonScript(ctx context.Context, jobID string, 
 	return s.executeCommand(ctx, jobID, cmd, config.OutputDir, envInfo)
 }
 
-// resolveRExecutable picks which Rscript binary and (if bound) renv project a plugin run should use:
-// a plugin bound to a renv project runs with the R interpreter that renv was created against
-// (renvEnv.BaseRPath), the same self-contained-per-binding model ExecutePythonScript already uses
-// for venvs, falling back to the global configured R only when no binding exists or its recorded
-// interpreter is no longer present on disk.
+// resolveRExecutable prefers a bound renv's own R interpreter (renvEnv.BaseRPath), mirroring how ExecutePythonScript resolves venvs, falling back to the global R.
 func (s *ScriptExecutor) resolveRExecutable(pluginType string) (rPath string, renvProjectPath string, envInfo string, err error) {
 	cfg := s.settingsService.GetConfig()
 
