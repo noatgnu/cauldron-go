@@ -25,7 +25,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22.23.1'
 
       - name: Setup R Environment via cooker (downloads the tested, genuinely relocatable r-portable build instead of the CRAN installer)
         shell: pwsh
@@ -66,7 +66,7 @@ jobs:
           & "${{ github.workspace }}/bin/win/python/python.exe" -m pip install -r scripts/requirements.txt
 
       - name: Install Wails
-        run: go install github.com/wailsapp/wails/v3/cmd/wails3@latest
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.15
         shell: bash
 
       - name: Build Developer Tools
@@ -194,7 +194,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22.23.1'
 
       - name: Install system dependencies
         run: |
@@ -262,7 +262,7 @@ jobs:
 
 
       - name: Install Wails
-        run: go install github.com/wailsapp/wails/v3/cmd/wails3@latest
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.15
 
       - name: Build Developer Tools
         run: ./build.sh tools
@@ -376,7 +376,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22.23.1'
 
       - name: Set up dependencies
         env:
@@ -428,7 +428,7 @@ jobs:
           echo "${{ github.workspace }}/python/bin" >> $GITHUB_PATH
 
       - name: Install Wails
-        run: go install github.com/wailsapp/wails/v3/cmd/wails3@latest
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.15
 
       - name: Build Developer Tools
         run: ./build.sh tools
