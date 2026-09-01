@@ -14,6 +14,14 @@ jobs:
       windows_asset_url: ${{ steps.resolve.outputs.windows_asset_url }}
       linux_asset_url: ${{ steps.resolve.outputs.linux_asset_url }}
       darwin_asset_url: ${{ steps.resolve.outputs.darwin_asset_url }}
+      darwin_r_version: ${{ steps.resolve.outputs.darwin_r_version }}
+      darwin_r_asset_url: ${{ steps.resolve.outputs.darwin_r_asset_url }}
+      darwin_r_checksum_url: ${{ steps.resolve.outputs.darwin_r_checksum_url }}
+      darwin_r_asset_filename: ${{ steps.resolve.outputs.darwin_r_asset_filename }}
+      windows_r_version: ${{ steps.resolve.outputs.windows_r_version }}
+      windows_r_asset_url: ${{ steps.resolve.outputs.windows_r_asset_url }}
+      windows_r_checksum_url: ${{ steps.resolve.outputs.windows_r_checksum_url }}
+      windows_r_asset_filename: ${{ steps.resolve.outputs.windows_r_asset_filename }}
     steps:
       - name: Resolve all 3 platforms' cooker asset URLs from one API call, shared by every build job
         id: resolve
@@ -24,6 +32,38 @@ jobs:
           echo "windows_asset_url=$(echo "$COOKER_JSON" | jq -r '.assets[] | select(.name | endswith("windows-x86_64.exe")) | .browser_download_url')" >> "$GITHUB_OUTPUT"
           echo "linux_asset_url=$(echo "$COOKER_JSON" | jq -r '.assets[] | select(.name | endswith("linux-x86_64")) | .browser_download_url')" >> "$GITHUB_OUTPUT"
           echo "darwin_asset_url=$(echo "$COOKER_JSON" | jq -r '.assets[] | select(.name | endswith("macos-arm64")) | .browser_download_url')" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve macOS/Windows R-portable asset info from one API call; Linux keeps its own per-job call since it needs real distro detection
+        id: resolve_r
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          R_JSON=$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" https://api.github.com/repos/noatgnu/r-portable/releases)
+
+          resolve() {
+            local re="$1"
+            echo "$R_JSON" | jq -r --arg re "$re" '
+              [.[] | . as $rel | ($rel.assets[] | select(.name | test($re))) as $asset |
+                [ ($asset.name | capture($re).ver),
+                  $asset.browser_download_url,
+                  ($rel.assets[] | select(.name == ($asset.name + ".sha256")) | .browser_download_url),
+                  $asset.name
+                ]
+              ] | .[0] | @tsv
+            '
+          }
+
+          IFS=$'\t' read -r DARWIN_VERSION DARWIN_ASSET_URL DARWIN_CHECKSUM_URL DARWIN_ASSET_FILENAME <<< "$(resolve '^r-portable-(?<ver>[0-9]+(?:\.[0-9]+)+)-macos-arm64\.tar\.xz$')"
+          IFS=$'\t' read -r WINDOWS_VERSION WINDOWS_ASSET_URL WINDOWS_CHECKSUM_URL WINDOWS_ASSET_FILENAME <<< "$(resolve '^r-portable-(?<ver>[0-9]+(?:\.[0-9]+)+)-windows-x86_64\.zip$')"
+
+          echo "darwin_r_version=$DARWIN_VERSION" >> "$GITHUB_OUTPUT"
+          echo "darwin_r_asset_url=$DARWIN_ASSET_URL" >> "$GITHUB_OUTPUT"
+          echo "darwin_r_checksum_url=$DARWIN_CHECKSUM_URL" >> "$GITHUB_OUTPUT"
+          echo "darwin_r_asset_filename=$DARWIN_ASSET_FILENAME" >> "$GITHUB_OUTPUT"
+          echo "windows_r_version=$WINDOWS_VERSION" >> "$GITHUB_OUTPUT"
+          echo "windows_r_asset_url=$WINDOWS_ASSET_URL" >> "$GITHUB_OUTPUT"
+          echo "windows_r_checksum_url=$WINDOWS_CHECKSUM_URL" >> "$GITHUB_OUTPUT"
+          echo "windows_r_asset_filename=$WINDOWS_ASSET_FILENAME" >> "$GITHUB_OUTPUT"
 
   build-windows:
     needs: [resolve-cooker-assets]
@@ -46,15 +86,14 @@ jobs:
         with:
           node-version: '22.23.1'
 
-      - name: Setup R Environment via cooker (downloads the tested, genuinely relocatable r-portable build instead of the CRAN installer)
+      - name: Setup R Environment via cooker (asset info pre-resolved once by resolve-cooker-assets; no r-portable API call in this job)
         shell: pwsh
         run: |
           Invoke-WebRequest -Uri "${{ needs.resolve-cooker-assets.outputs.windows_asset_url }}" -OutFile cooker.exe
-          $available = & .\cooker.exe r list --available --json | ConvertFrom-Json
-          $rVersion = $available[0].version
+          $rVersion = "${{ needs.resolve-cooker-assets.outputs.windows_r_version }}"
           New-Item -ItemType Directory -Force -Path bin/win | Out-Null
           $env:COOKER_INSTALL_DIR = "${{ github.workspace }}/bin/win"
-          & .\cooker.exe r install $rVersion
+          & .\cooker.exe r install --asset-url="${{ needs.resolve-cooker-assets.outputs.windows_r_asset_url }}" --checksum-url="${{ needs.resolve-cooker-assets.outputs.windows_r_checksum_url }}" --asset-filename="${{ needs.resolve-cooker-assets.outputs.windows_r_asset_filename }}" $rVersion
           Move-Item -Path "bin/win/$rVersion" -Destination "bin/win/R-Portable"
           echo "${{ github.workspace }}/bin/win/R-Portable/bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
           echo "R_HOME=${{ github.workspace }}/bin/win/R-Portable" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
@@ -403,12 +442,16 @@ jobs:
           echo "$(brew --prefix c-blosc)/bin" >> $GITHUB_PATH
           echo "$(brew --prefix bzip2)/bin" >> $GITHUB_PATH
 
-      - name: Install portable R via cooker (downloads the tested, genuinely relocatable r-portable build instead of compiling a broken from-source one)
+      - name: Install portable R via cooker (asset info pre-resolved once by resolve-cooker-assets; no r-portable API call in this job)
         run: |
           curl -fsSL -o cooker "${{ needs.resolve-cooker-assets.outputs.darwin_asset_url }}"
           chmod +x cooker
-          R_VERSION=$(./cooker r list --available --json | jq -r '.[0].version')
-          COOKER_INSTALL_DIR="${{ github.workspace }}" ./cooker r install "$R_VERSION"
+          R_VERSION="${{ needs.resolve-cooker-assets.outputs.darwin_r_version }}"
+          COOKER_INSTALL_DIR="${{ github.workspace }}" ./cooker r install \
+            --asset-url="${{ needs.resolve-cooker-assets.outputs.darwin_r_asset_url }}" \
+            --checksum-url="${{ needs.resolve-cooker-assets.outputs.darwin_r_checksum_url }}" \
+            --asset-filename="${{ needs.resolve-cooker-assets.outputs.darwin_r_asset_filename }}" \
+            "$R_VERSION"
           mv "${{ github.workspace }}/$R_VERSION" "${{ github.workspace }}/R"
 
       - name: Set R environment variables
