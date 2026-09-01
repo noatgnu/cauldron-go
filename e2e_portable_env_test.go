@@ -8,7 +8,7 @@ import (
 
 func TestE2EPortableEnvDownload(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping portable env download test in short mode (requires real network + ~230MB download)")
+		t.Skip("skipping portable env download test in short mode (requires real network + ~230MB Python / ~2GB R download)")
 	}
 
 	app := NewApp()
@@ -78,6 +78,51 @@ func TestE2EPortableEnvDownload(t *testing.T) {
 
 			case <-timeout:
 				t.Fatal("Timed out waiting for portable Python installation after 25 minutes")
+			}
+		}
+	})
+
+	t.Run("downloads and installs portable R", func(t *testing.T) {
+		downloadURL, err := app.GetPortableEnvironmentURL("linux", "x86_64", "latest", "r-portable")
+		if err != nil {
+			t.Fatalf("Failed to get download URL: %v", err)
+		}
+		if downloadURL == "" {
+			t.Fatal("No download URL returned")
+		}
+		t.Logf("Starting download from: %s", downloadURL)
+
+		downloadDone := make(chan error, 1)
+		go func() {
+			downloadDone <- app.DownloadPortableEnvironment(downloadURL, "r-portable")
+		}()
+
+		timeout := time.After(40 * time.Minute)
+		ticker := time.NewTicker(10 * time.Second)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case err := <-downloadDone:
+				if err != nil {
+					t.Fatalf("Download failed: %v", err)
+				}
+				path, err := app.GetPortableEnvironmentPath("r-portable")
+				if err != nil || path == "" {
+					t.Fatalf("Download reported success but path is unavailable: %v", err)
+				}
+				t.Logf("Portable R installed at: %s", path)
+				if _, err := os.Stat(path); os.IsNotExist(err) {
+					t.Errorf("Installed path does not exist on disk: %s", path)
+				}
+				return
+
+			case <-ticker.C:
+				path, err := app.GetPortableEnvironmentPath("r-portable")
+				t.Logf("Installation status: installed=%v path=%s", err == nil, path)
+
+			case <-timeout:
+				t.Fatal("Timed out waiting for portable R installation after 40 minutes")
 			}
 		}
 	})
