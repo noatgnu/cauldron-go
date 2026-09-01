@@ -38,7 +38,7 @@
     "@angular/router": "^22.1.4",
     "@cauldron/forms": "file:../shared-lib/dist/cauldron-forms",
     "@wailsio/runtime": "^3.0.0-alpha.74",
-    "angular-plotly.js": "^20.0.0",
+    "angular-plotly.js": "^22.0.1",
     "data-forge": "^1.10.4",
     "material-icons": "^1.13.14",
     "plotly.js-dist-min": "^3.3.0",
