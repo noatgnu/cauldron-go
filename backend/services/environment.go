@@ -257,6 +257,48 @@ func (e *EnvironmentService) detectPortableR() (REnvironment, error) {
 		nil
 }
 
+func (e *EnvironmentService) detectCookerRVersions() ([]REnvironment, error) {
+	appFolder, err := getAppDataFolder()
+	if err != nil {
+		return nil, err
+	}
+
+	baseDir := filepath.Join(appFolder, "bin", "r-portable")
+	entries, err := os.ReadDir(baseDir)
+	if err != nil {
+		return nil, err
+	}
+
+	binName := "Rscript"
+	if runtime.GOOS == "windows" {
+		binName = "Rscript.exe"
+	}
+
+	var envs []REnvironment
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+
+		version := entry.Name()
+		rPath := filepath.Join(baseDir, version, "bin", binName)
+		if _, err := os.Stat(rPath); err != nil {
+			continue
+		}
+
+		envs = append(envs, REnvironment{
+			Name:      fmt.Sprintf("R %s (portable)", version),
+			Path:      rPath,
+			Type:      "portable",
+			Version:   version,
+			LibPath:   e.getRLibPath(rPath),
+			IsDefault: false,
+		})
+	}
+
+	return envs, nil
+}
+
 func (e *EnvironmentService) detectCondaEnvironments() ([]PythonEnvironment, error) {
 	var environments []PythonEnvironment
 
@@ -468,6 +510,18 @@ func (e *EnvironmentService) DetectREnvironments() ([]REnvironment, error) {
 		}
 	} else {
 		log.Printf("[DetectREnvironments] No portable R found: %v\n", err)
+	}
+
+	cookerEnvs, err := e.detectCookerRVersions()
+	if err == nil {
+		for _, env := range cookerEnvs {
+			log.Printf("[DetectREnvironments] Found cookeR-managed R: %s\n", env.Path)
+			if err := e.db.SaveREnvironment(env); err != nil {
+				log.Printf("[DetectREnvironments] Failed to save cookeR-managed R %s: %v\n", env.Version, err)
+			}
+		}
+	} else {
+		log.Printf("[DetectREnvironments] No cookeR-managed R found: %v\n", err)
 	}
 
 	defaultR, err := e.detectDefaultR()

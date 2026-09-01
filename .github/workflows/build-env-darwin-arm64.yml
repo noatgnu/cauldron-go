@@ -1,8 +1,6 @@
 name: Build R and Python Environment for macOS arm64
 
 on:
-  release:
-    types: [created]
   workflow_dispatch:
 
 jobs:
@@ -34,27 +32,17 @@ jobs:
           echo "$(brew --prefix c-blosc)/bin" >> $GITHUB_PATH
           echo "$(brew --prefix bzip2)/bin" >> $GITHUB_PATH
 
-      - name: Compile R
+      - name: Install portable R via cooker (downloads the tested, genuinely relocatable r-portable build instead of compiling a broken from-source one)
         env:
-          CPPFLAGS: -I/opt/homebrew/include -I/opt/X11/include -I/opt/homebrew/opt/jpeg/include -I/opt/homebrew/include
-          LDFLAGS: -L/opt/X11/lib -L/opt/homebrew/opt/jpeg/lib -L/opt/homebrew/opt/lzo/lib -L/opt/homebrew/lib
-          LZO_DIR: $(brew --prefix lzo)
-          BZIP2_DIR: $(brew --prefix bzip2)
-          BLOSC_DIR: $(brew --prefix c-blosc)
-          HDF5_DIR: $(brew --prefix hdf5)
-          CFLAGS: -I/opt/homebrew/opt/lzo/include
-          TCL_LIBRARY: /opt/homebrew/opt/tcl-tk/lib
-          TK_LIBRARY: /opt/homebrew/opt/tcl-tk/lib
-          PKG_CONFIG_PATH: /opt/homebrew/opt/jpeg/lib/pkgconfig
-          C_INCLUDE_PATH: /opt/homebrew/Cellar/lzo/2.10/include/lzo:/opt/homebrew/Cellar/lzo/2.10/include/
-          LIBRARY_PATH: /opt/homebrew/lib
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          curl -O https://cran.r-project.org/src/base/R-4/R-4.5.2.tar.gz
-          tar -xzvf R-4.5.2.tar.gz
-          cd R-4.5.2
-          ./configure --prefix=${{ github.workspace }}/bin/darwin/R-Portable/ --enable-R-shlib --with-blas --with-lapack --with-tcltk --with-mpi
-          make -j$(nproc)
-          make install
+          ASSET_URL=$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" https://api.github.com/repos/noatgnu/cookeR/releases/latest | jq -r '.assets[] | select(.name | endswith("macos-arm64")) | .browser_download_url')
+          curl -fsSL -o cooker "$ASSET_URL"
+          chmod +x cooker
+          R_VERSION=$(./cooker r list --available --json | jq -r '.[0].version')
+          mkdir -p "${{ github.workspace }}/bin/darwin"
+          COOKER_INSTALL_DIR="${{ github.workspace }}/bin/darwin" ./cooker r install "$R_VERSION"
+          mv "${{ github.workspace }}/bin/darwin/$R_VERSION" "${{ github.workspace }}/bin/darwin/R-Portable"
       - name: Strip R binaries
         run: |
           find ${{ github.workspace }}/bin/darwin/R-Portable -type f \( -name "*.so" -o -name "*.dylib" -o -perm +111 \) -exec strip {} \;

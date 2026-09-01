@@ -81,6 +81,8 @@ github.com/mattn/go-sqlite3 v1.14.22 h1:2gZY6PC6kBnID23Tichd1K+Z0oS6nE/XwU+Vz/5o
 github.com/mattn/go-sqlite3 v1.14.22/go.mod h1:Uh1q+B4BYcTPb+yiD3kU8Ct7aC0hY9fxUwlHK0RXw+Y=
 github.com/ncruces/go-strftime v1.0.0 h1:HMFp8mLCTPp341M/ZnA4qaf7ZlsbTc+miZjCLOFAw7w=
 github.com/ncruces/go-strftime v1.0.0/go.mod h1:Fwc5htZGVVkseilnfgOVb9mKy6w1naJmn9CehxcKcls=
+github.com/noatgnu/cookeR v0.1.1-0.20260831190529-fc2b0735ff79 h1:3VVzMUzaegn8+MM7cUwedAuiu5cckhxU23U7q6i1rJE=
+github.com/noatgnu/cookeR v0.1.1-0.20260831190529-fc2b0735ff79/go.mod h1:w0oJ54vG0Oqr26N0VxgiWgV9vQ8AxODLDL6L8moYU7w=
 github.com/noatgnu/uniprotparser-go v0.0.0-20251201170658-be6b6f22f793 h1:OHgPPJyM3RSoBK85OAWesaGXISRxND+C+X8Mtsc0/Mc=
 github.com/noatgnu/uniprotparser-go v0.0.0-20251201170658-be6b6f22f793/go.mod h1:UwcvX1kdoumjhiBXjlpd8wT3nh6QfAir0cPXu2jtCWo=
 github.com/onsi/gomega v1.34.1 h1:EUMJIKUjM8sKjYbtxQI9A4z2o+rruxnzNvpknOXie6k=

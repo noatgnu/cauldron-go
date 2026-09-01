@@ -18,6 +18,7 @@ import (
 
 	"github.com/noatgnu/cauldron-go/backend/models"
 	"github.com/noatgnu/cauldron-go/backend/services"
+	"github.com/noatgnu/cookeR/rversion"
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"gopkg.in/yaml.v3"
 )
@@ -39,6 +40,7 @@ type App struct {
 	scriptExecutor        *services.ScriptExecutor
 	portableEnvService    *services.PortableEnvService
 	uvService             *services.UvService
+	rPortableService      *services.RPortableService
 	pluginService         *services.PluginService
 	pluginLoaderV2        *services.PluginLoaderV2
 	pluginExecutor        *services.PluginExecutor
@@ -110,6 +112,11 @@ func (a *App) Initialize() {
 	a.envService = services.NewEnvironmentServiceV3(db, a.settings, services.NewProgressNotifierV3(a.wailsApp))
 	a.portableEnvService = services.NewPortableEnvServiceV3(a.fileService, a.wailsApp)
 	a.uvService = services.NewUvServiceV3(a.fileService, db, a.settings, a.wailsApp)
+	a.rPortableService, err = services.NewRPortableServiceV3(a.wailsApp)
+	if err != nil {
+		log.Printf("[App.Initialize] ERROR: Failed to initialize R portable service: %v\n", err)
+		return
+	}
 
 	log.Println("[App.Initialize] Initializing job queue...")
 	a.jobQueue = services.NewJobQueueServiceV3(db, a.wailsApp)
@@ -895,6 +902,26 @@ func (a *App) InstallUvRequirements(venvPythonPath string, requirementsPath stri
 
 func (a *App) ListUvPackages(venvPythonPath string) ([]string, error) {
 	return a.uvService.ListUvPackages(venvPythonPath)
+}
+
+func (a *App) ListAvailableRVersions() ([]rversion.Release, error) {
+	return a.rPortableService.ListAvailableRVersions()
+}
+
+func (a *App) ListInstalledRVersions() ([]string, error) {
+	return a.rPortableService.ListInstalledRVersions()
+}
+
+func (a *App) InstallRVersion(version string) error {
+	return a.rPortableService.InstallRVersion(version)
+}
+
+func (a *App) UninstallRVersion(version string) error {
+	return a.rPortableService.UninstallRVersion(version)
+}
+
+func (a *App) GetRPortablePath(version string) (string, error) {
+	return a.rPortableService.GetRPath(version)
 }
 
 func (a *App) GetPlugins() []*models.Plugin {

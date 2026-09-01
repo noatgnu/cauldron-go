@@ -44,7 +44,7 @@ func NewPortableEnvService(ctx context.Context, fileService *FileService) *Porta
 func (p *PortableEnvService) GetPortableEnvironmentURL(platform, arch, version, environment string) (string, error) {
 	url := p.releasesURL
 	if url == "" {
-		url = "https://api.github.com/repos/noatgnu/cauldron-go/releases"
+		url = "https://api.github.com/repos/noatgnu/cauldron-portable-env/releases"
 	}
 
 	log.Printf("[GetPortableEnvironmentURL] Requesting %s (platform=%s arch=%s version=%s env=%s)", url, platform, arch, version, environment)

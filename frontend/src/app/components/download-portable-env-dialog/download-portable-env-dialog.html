@@ -1,88 +1,102 @@
-<h2 mat-dialog-title>Download {{ environment === 'python' ? 'Python' : 'R' }} Portable Environment</h2>
+<h2 mat-dialog-title>{{ environment === 'python' ? 'Python' : 'R' }} Portable Environment</h2>
 
 <mat-dialog-content>
-  <form [formGroup]="form" class="download-form" style="margin-top: 4px;">
-    <mat-form-field appearance="outline" class="full-width">
-      <mat-label>Operating Platform</mat-label>
-      <mat-select formControlName="platform">
-        <mat-option value="win">Windows</mat-option>
-        <mat-option value="linux">Linux</mat-option>
-        <mat-option value="darwin">macOS (M1)</mat-option>
-      </mat-select>
-    </mat-form-field>
+  @if (environment === 'python') {
+    <form [formGroup]="form" class="download-form">
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Operating Platform</mat-label>
+        <mat-select formControlName="platform">
+          <mat-option value="win">Windows</mat-option>
+          <mat-option value="linux">Linux</mat-option>
+          <mat-option value="darwin">macOS (M1)</mat-option>
+        </mat-select>
+      </mat-form-field>
 
-    <mat-form-field appearance="outline" class="full-width">
-      <mat-label>Architecture</mat-label>
-      <mat-select formControlName="arch">
-        @if (form.get('platform')?.value === 'darwin') {
-          <mat-option value="arm64">ARM64</mat-option>
-        }
-        @if (form.get('platform')?.value === 'linux') {
-          <mat-option value="x86_64">x86_64</mat-option>
-          <mat-option value="arm64">ARM64</mat-option>
-        }
-        @if (form.get('platform')?.value === 'win') {
-          <mat-option value="x86_64">x86_64</mat-option>
-        }
-      </mat-select>
-    </mat-form-field>
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Architecture</mat-label>
+        <mat-select formControlName="arch">
+          @if (form.get('platform')?.value === 'darwin') {
+            <mat-option value="arm64">ARM64</mat-option>
+          }
+          @if (form.get('platform')?.value === 'linux') {
+            <mat-option value="x86_64">x86_64</mat-option>
+            <mat-option value="arm64">ARM64</mat-option>
+          }
+          @if (form.get('platform')?.value === 'win') {
+            <mat-option value="x86_64">x86_64</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+    </form>
 
-    <mat-form-field appearance="outline" class="full-width">
-      <mat-label>Download URL</mat-label>
-      <input matInput formControlName="url" readonly>
-    </mat-form-field>
-  </form>
-
-  <div class="download-actions">
-    <button mat-raised-button color="primary" (click)="download()" [disabled]="downloading">
-      {{ downloading ? 'Downloading...' : 'Download' }}
-    </button>
-  </div>
-
-  @if (downloading || currentPhase) {
-    <div class="overall-progress">
-      <div class="phase-info">
-        <strong>{{ currentPhase }}</strong>
-        <span class="overall-percentage">{{ overallProgress }}%</span>
-      </div>
-      <mat-progress-bar
-        mode="determinate"
-        [value]="overallProgress"
-        class="overall-progress-bar">
-      </mat-progress-bar>
+    <div class="dialog-actions-row">
+      <button mat-raised-button color="primary" (click)="download()" [disabled]="installing">
+        {{ installing ? 'Installing...' : 'Install' }}
+      </button>
     </div>
+  } @else {
+    <div class="r-version-picker">
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>R Version</mat-label>
+        <mat-select [(ngModel)]="selectedRVersion" [disabled]="loadingRVersions || installing">
+          @for (release of availableRVersions; track release.version) {
+            <mat-option [value]="release.version">
+              {{ release.version }}{{ isInstalled(release.version) ? ' (installed)' : '' }}
+            </mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+      @if (loadingRVersions) {
+        <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+      } @else if (availableRVersions.length === 0) {
+        <p class="hint">No R builds are available for this platform yet.</p>
+      }
+    </div>
+
+    <div class="dialog-actions-row">
+      <button mat-raised-button color="primary" (click)="installR()" [disabled]="installing || !selectedRVersion">
+        {{ installing ? 'Installing...' : (isInstalled(selectedRVersion) ? 'Reinstall' : 'Install') }}
+      </button>
+      @if (isInstalled(selectedRVersion) && !installing) {
+        <button mat-button color="warn" (click)="uninstallR(selectedRVersion)">Uninstall</button>
+      }
+    </div>
+
+    @if (installedRVersions.length > 0) {
+      <p class="hint">Installed: {{ installedRVersions.join(', ') }}</p>
+    }
   }
 
-  @if (getProgressMessages().length > 0) {
-    <div class="terminal">
-      @for (message of getProgressMessages(); track message) {
-        <div class="terminal-line">
-          <pre>{{ message }}</pre>
-          @if (message.startsWith('Downloading')) {
-            <mat-progress-bar
-              mode="determinate"
-              [value]="progressItems[message].percentage">
-            </mat-progress-bar>
-            <small>{{ progressItems[message].percentage.toFixed(1) }}%</small>
-            @if (progressItems[message].downloaded && progressItems[message].downloaded! > 0) {
-              <small> - {{ formatBytes(progressItems[message].downloaded!) }}@if (progressItems[message].total && progressItems[message].total! > 0) { / {{ formatBytes(progressItems[message].total!) }}}</small>
+  @if (steps.length > 0) {
+    <div class="steps">
+      @for (step of steps; track step.key) {
+        <div class="step" [class.step-active]="step.status === 'active'" [class.step-done]="step.status === 'done'" [class.step-error]="step.status === 'error'">
+          <mat-icon class="step-icon">
+            {{ step.status === 'done' ? 'check_circle' : step.status === 'error' ? 'error' : step.status === 'active' ? 'sync' : 'radio_button_unchecked' }}
+          </mat-icon>
+          <div class="step-body">
+            <span class="step-label">{{ step.label }}</span>
+            @if (step.status === 'active') {
+              <span class="step-detail">{{ step.detail }}</span>
+              <mat-progress-bar
+                [mode]="step.percentage ? 'determinate' : 'indeterminate'"
+                [value]="step.percentage || 0">
+              </mat-progress-bar>
+              @if (step.downloaded) {
+                <span class="step-detail">{{ formatBytes(step.downloaded) }}@if (step.total) { / {{ formatBytes(step.total) }}}</span>
+              }
             }
-          }
-          @if (message.startsWith('Extracting') || message.startsWith('Moving') || message.startsWith('Removing')) {
-            <mat-progress-bar
-              [mode]="progressItems[message].percentage === 0 ? 'indeterminate' : 'determinate'"
-              [value]="progressItems[message].percentage">
-            </mat-progress-bar>
-            @if (progressItems[message].percentage > 0) {
-              <small>{{ progressItems[message].percentage.toFixed(1) }}%</small>
+            @if (step.status === 'error') {
+              <span class="step-detail step-error-text">{{ errorMessage }}</span>
             }
-            @if (progressItems[message].files) {
-              <small> - {{ progressItems[message].files }} files moved</small>
-            }
-          }
+          </div>
         </div>
       }
     </div>
+  }
+
+  @if (finished) {
+    <p class="success-message">Installation complete.</p>
   }
 </mat-dialog-content>
 

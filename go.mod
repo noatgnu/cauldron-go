@@ -5,6 +5,7 @@ go 1.25.0
 require (
 	github.com/go-git/go-git/v5 v5.19.2
 	github.com/google/uuid v1.6.0
+	github.com/noatgnu/cookeR v0.1.1-0.20260831190529-fc2b0735ff79
 	github.com/noatgnu/uniprotparser-go v0.0.0-20251201170658-be6b6f22f793
 	github.com/ulikunitz/xz v0.5.15
 	github.com/wailsapp/wails/v3 v3.0.0-beta.15
