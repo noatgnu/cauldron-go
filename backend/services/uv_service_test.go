@@ -2,6 +2,7 @@ package services
 
 import (
 	"archive/tar"
+	"archive/zip"
 	"bytes"
 	"compress/gzip"
 	"crypto/sha256"
@@ -12,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -93,6 +95,39 @@ func makeUvTarGz(t *testing.T, nestedDir string, files map[string]string) []byte
 	return buf.Bytes()
 }
 
+func makeUvZip(t *testing.T, nestedDir string, files map[string]string) []byte {
+	t.Helper()
+
+	var buf bytes.Buffer
+	zipWriter := zip.NewWriter(&buf)
+
+	for name, content := range files {
+		fullName := nestedDir + "/" + name
+		w, err := zipWriter.Create(fullName)
+		if err != nil {
+			t.Fatalf("failed to create zip entry: %v", err)
+		}
+		if _, err := w.Write([]byte(content)); err != nil {
+			t.Fatalf("failed to write zip content: %v", err)
+		}
+	}
+
+	if err := zipWriter.Close(); err != nil {
+		t.Fatalf("failed to close zip writer: %v", err)
+	}
+
+	return buf.Bytes()
+}
+
+// makeUvArchive builds a fake release archive in whichever format assetName actually uses (.zip on Windows, .tar.gz elsewhere), matching DownloadUv's own format detection.
+func makeUvArchive(t *testing.T, assetName, nestedDir string, files map[string]string) []byte {
+	t.Helper()
+	if strings.HasSuffix(assetName, ".zip") {
+		return makeUvZip(t, nestedDir, files)
+	}
+	return makeUvTarGz(t, nestedDir, files)
+}
+
 func TestDownloadUv(t *testing.T) {
 	assetName, err := GetUvReleaseAsset(runtime.GOOS, runtime.GOARCH)
 	if err != nil {
@@ -104,7 +139,7 @@ func TestDownloadUv(t *testing.T) {
 		uvBinaryName = "uv.exe"
 	}
 
-	archiveData := makeUvTarGz(t, "uv-test-platform", map[string]string{
+	archiveData := makeUvArchive(t, assetName, "uv-test-platform", map[string]string{
 		uvBinaryName: "#!/bin/sh\necho uv",
 	})
 
