@@ -21,6 +21,20 @@
   </div>
 
   <div class="form-section">
+    <h3>Diagnostics</h3>
+    <p class="section-description">Internal diagnostic information for troubleshooting</p>
+    <mat-slide-toggle [ngModel]="debugMode()" (ngModelChange)="setDebugMode($event)">
+      Debug Mode
+    </mat-slide-toggle>
+    @if (debugMode()) {
+      <div class="info-box">
+        <mat-icon>info</mat-icon>
+        <div>Shows internal diagnostic information (runtime status, initialization logs, raw error details) on the Home page</div>
+      </div>
+    }
+  </div>
+
+  <div class="form-section">
     <h3>Advanced Plugin Management</h3>
     <p class="section-description">Advanced operations for managing external plugins</p>
 

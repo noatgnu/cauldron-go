@@ -15,4 +15,5 @@ type Config struct {
 	AccessibilityHighContrast      bool   `json:"accessibilityHighContrast"`
 	AccessibilityReducedMotion     bool   `json:"accessibilityReducedMotion"`
 	AccessibilityColorblindPalette string `json:"accessibilityColorblindPalette"`
+	DebugMode                      bool   `json:"debugMode"`
 }

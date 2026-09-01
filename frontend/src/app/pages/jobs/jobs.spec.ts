@@ -55,4 +55,34 @@ describe('Jobs', () => {
   it('should create', () => {
     expect(component).toBeTruthy();
   });
+
+  describe('keyboard access to job rows', () => {
+    const job = { id: 'job-1', name: 'Test Job', type: 'pca-analysis', status: 'completed', createdAt: Date.now() };
+
+    beforeEach(async () => {
+      wailsMock.getAllJobs.mockResolvedValue([job]);
+      await component.loadJobs();
+      fixture.detectChanges();
+    });
+
+    function nameCell(): HTMLElement {
+      return fixture.nativeElement.querySelector('td.clickable');
+    }
+
+    it('marks the job name cell as keyboard-focusable with a descriptive label', () => {
+      const cell = nameCell();
+      expect(cell.getAttribute('tabindex')).toBe('0');
+      expect(cell.getAttribute('aria-label')).toBe('Open job Test Job');
+    });
+
+    it('opens the job on Enter', () => {
+      nameCell().dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+      expect(routerMock.navigate).toHaveBeenCalledWith(['/jobs', job.id]);
+    });
+
+    it('opens the job on Space', () => {
+      nameCell().dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
+      expect(routerMock.navigate).toHaveBeenCalledWith(['/jobs', job.id]);
+    });
+  });
 });

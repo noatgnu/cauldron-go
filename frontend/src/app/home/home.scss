@@ -137,6 +137,11 @@
 
   .clickable {
     cursor: pointer;
+
+    &:focus-visible {
+      outline: 2px solid var(--primary, #1976d2);
+      outline-offset: -2px;
+    }
   }
 
   .action-buttons {

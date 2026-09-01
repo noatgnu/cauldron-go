@@ -68,6 +68,31 @@ func TestSettingsUseRenvCache(t *testing.T) {
 	}
 }
 
+func TestSettingsDebugMode(t *testing.T) {
+	_, _, settings := createTestEnvironmentService(t)
+
+	if settings.GetConfig().DebugMode != false {
+		t.Errorf("Expected default DebugMode to be false, got: %v", settings.GetConfig().DebugMode)
+	}
+
+	if err := settings.Set("debugMode", true); err != nil {
+		t.Fatalf("Failed to set debugMode: %v", err)
+	}
+
+	if settings.GetConfig().DebugMode != true {
+		t.Errorf("Expected DebugMode to be true after setting")
+	}
+
+	if got := settings.Get("debugMode"); got != true {
+		t.Errorf("Expected Get(\"debugMode\") to return true, got: %v", got)
+	}
+
+	newSettings := NewSettingsService(context.Background(), settings.db)
+	if newSettings.GetConfig().DebugMode != true {
+		t.Error("DebugMode setting did not persist to database")
+	}
+}
+
 func TestRenvEnvironmentModel(t *testing.T) {
 	_, db, _ := createTestEnvironmentService(t)
 

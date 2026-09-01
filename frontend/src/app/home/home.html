@@ -1,23 +1,25 @@
 <div class="home-container">
   <div class="jobs-content">
-    <mat-card class="debug-card">
-      <mat-card-content class="debug-content">
-        <div class="debug-text">
-          <strong>Debug Status:</strong><br>
-          window.go: <span [style.color]="debugInfo().windowGoExists ? 'green' : 'red'">{{ debugInfo().windowGoExists ? 'EXISTS' : 'MISSING' }}</span> |
-          Wails: <span [style.color]="wails.isWails ? 'green' : 'red'">{{ wails.isWails ? 'READY' : 'NOT READY' }}</span> |
-          Jobs: {{ debugInfo().jobsLoaded }} |
-          Loading: {{ loading() ? 'YES' : 'NO' }}
-          @if (debugInfo().lastError) {
-            <br><strong class="error-text">Error:</strong> {{ debugInfo().lastError }}
-          }
-          <br><strong>Last 3 logs:</strong>
-          @for (log of debugInfo().logs.slice(-3); track $index) {
-            <br>{{ log }}
-          }
-        </div>
-      </mat-card-content>
-    </mat-card>
+    @if (debugModeEnabled()) {
+      <mat-card class="debug-card">
+        <mat-card-content class="debug-content">
+          <div class="debug-text">
+            <strong>Debug Status:</strong><br>
+            window.go: <span [style.color]="debugInfo().windowGoExists ? 'green' : 'red'">{{ debugInfo().windowGoExists ? 'EXISTS' : 'MISSING' }}</span> |
+            Wails: <span [style.color]="wails.isWails ? 'green' : 'red'">{{ wails.isWails ? 'READY' : 'NOT READY' }}</span> |
+            Jobs: {{ debugInfo().jobsLoaded }} |
+            Loading: {{ loading() ? 'YES' : 'NO' }}
+            @if (debugInfo().lastError) {
+              <br><strong class="error-text">Error:</strong> {{ debugInfo().lastError }}
+            }
+            <br><strong>Last 3 logs:</strong>
+            @for (log of debugInfo().logs.slice(-3); track $index) {
+              <br>{{ log }}
+            }
+          </div>
+        </mat-card-content>
+      </mat-card>
+    }
 
     <div class="jobs-section">
       <div class="jobs-header">
@@ -31,18 +33,22 @@
         <div class="loading-container">
           <mat-spinner></mat-spinner>
           <p>Loading jobs...</p>
-          <small class="hint-text">If this takes more than 5 seconds, check debug info above</small>
+          @if (debugModeEnabled()) {
+            <small class="hint-text">If this takes more than 5 seconds, check debug info above</small>
+          }
         </div>
       } @else if (debugInfo().lastError && !wails.isWails) {
         <div class="error-state">
           <mat-icon color="warn">error</mat-icon>
           <h3>Cannot connect to backend</h3>
           <p class="error-subtitle">Wails runtime is not available</p>
-          <p class="error-detail">
-            window.go exists: {{ debugInfo().windowGoExists ? 'Yes' : 'No' }}<br>
-            window.runtime exists: {{ debugInfo().windowRuntimeExists ? 'Yes' : 'No' }}<br>
-            Error: {{ debugInfo().lastError }}
-          </p>
+          @if (debugModeEnabled()) {
+            <p class="error-detail">
+              window.go exists: {{ debugInfo().windowGoExists ? 'Yes' : 'No' }}<br>
+              window.runtime exists: {{ debugInfo().windowRuntimeExists ? 'Yes' : 'No' }}<br>
+              Error: {{ debugInfo().lastError }}
+            </p>
+          }
         </div>
       } @else if (jobs().length === 0) {
         <div class="empty-state">
@@ -61,7 +67,13 @@
 
           <ng-container matColumnDef="name">
             <th mat-header-cell *matHeaderCellDef>Name</th>
-            <td mat-cell *matCellDef="let job" (click)="viewJobDetail(job.id)" class="clickable">
+            <td mat-cell *matCellDef="let job"
+                (click)="viewJobDetail(job.id)"
+                (keydown.enter)="viewJobDetail(job.id)"
+                (keydown.space)="viewJobDetail(job.id); $event.preventDefault()"
+                tabindex="0"
+                [attr.aria-label]="'Open job ' + job.name"
+                class="clickable">
               <div class="job-name-cell">
                 <span class="job-name">{{ job.name }}</span>
                 @if (job.error) {
@@ -117,7 +129,9 @@
           <div class="error-message">
             <mat-icon color="warn" class="error-icon">error</mat-icon>
             Failed to load versions<br>
-            <small>{{ debugInfo().versionsLoaded }}</small>
+            @if (debugModeEnabled()) {
+              <small>{{ debugInfo().versionsLoaded }}</small>
+            }
           </div>
         } @else {
           <div class="status-grid">
@@ -183,7 +197,9 @@
           <div class="error-message">
             <mat-icon color="warn" class="error-icon">error</mat-icon>
             Failed to load files<br>
-            <small>{{ debugInfo().filesLoaded }}</small>
+            @if (debugModeEnabled()) {
+              <small>{{ debugInfo().filesLoaded }}</small>
+            }
           </div>
         } @else if (importedFiles().length === 0) {
           <div class="empty-files">

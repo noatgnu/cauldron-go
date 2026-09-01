@@ -1,4 +1,4 @@
-import { Component, OnInit, signal, ChangeDetectionStrategy, HostListener, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, signal, ChangeDetectionStrategy, HostListener, ChangeDetectorRef, ViewChild, ElementRef } from '@angular/core';
 import { RouterOutlet, Router, NavigationEnd } from '@angular/router';
 import { filter, firstValueFrom } from 'rxjs';
 import { MatSidenavModule } from '@angular/material/sidenav';
@@ -24,6 +24,8 @@ import { ConfirmPluginInstallation, SaveGitAuthConfig, ConfirmPluginInstallation
 export class App implements OnInit {
   protected readonly title = signal('cauldron-ui');
 
+  @ViewChild('mainContent', { read: ElementRef }) private mainContentRef?: ElementRef<HTMLElement>;
+
   constructor(
     private router: Router,
     private cdr: ChangeDetectorRef,
@@ -34,7 +36,10 @@ export class App implements OnInit {
     private themeService: ThemeService
   ) {
     this.router.events.pipe(filter(e => e instanceof NavigationEnd)).subscribe(() => {
-      setTimeout(() => this.cdr.detectChanges());
+      setTimeout(() => {
+        this.cdr.detectChanges();
+        this.mainContentRef?.nativeElement.focus({ preventScroll: true });
+      });
     });
   }
 

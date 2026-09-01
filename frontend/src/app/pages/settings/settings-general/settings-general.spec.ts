@@ -15,7 +15,8 @@ describe('SettingsGeneral', () => {
     wailsMock = {
       getSettings: vi.fn().mockResolvedValue({}),
       getRemotePlugins: vi.fn().mockResolvedValue([]),
-      logToFile: vi.fn().mockResolvedValue(undefined)
+      logToFile: vi.fn().mockResolvedValue(undefined),
+      setSetting: vi.fn().mockResolvedValue(undefined)
     };
     notificationMock = {
       showError: vi.fn(),
@@ -39,5 +40,22 @@ describe('SettingsGeneral', () => {
 
   it('should create', () => {
     expect(component).toBeTruthy();
+  });
+
+  it('defaults debug mode to off when not set', async () => {
+    await component.loadSettings();
+    expect(component['debugMode']()).toBe(false);
+  });
+
+  it('loads debug mode from settings', async () => {
+    wailsMock.getSettings.mockResolvedValue({ debugMode: true });
+    await component.loadSettings();
+    expect(component['debugMode']()).toBe(true);
+  });
+
+  it('persists debug mode changes', async () => {
+    await component.setDebugMode(true);
+    expect(component['debugMode']()).toBe(true);
+    expect(wailsMock.setSetting).toHaveBeenCalledWith('debugMode', true);
   });
 });

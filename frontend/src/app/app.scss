@@ -42,4 +42,8 @@
   display: flex;
   flex-direction: column;
   background-color: var(--background);
+
+  &:focus {
+    outline: none;
+  }
 }

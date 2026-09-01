@@ -84,6 +84,9 @@ func (s *SettingsService) Load() error {
 	if val, ok := settings["accessibility.colorblindPalette"]; ok {
 		s.config.AccessibilityColorblindPalette = val
 	}
+	if val, ok := settings["debugMode"]; ok {
+		s.config.DebugMode = val == "true"
+	}
 
 	return nil
 }
@@ -102,6 +105,7 @@ func (s *SettingsService) Save() error {
 	s.db.SaveSetting("accessibility.highContrast", fmt.Sprintf("%v", s.config.AccessibilityHighContrast))
 	s.db.SaveSetting("accessibility.reducedMotion", fmt.Sprintf("%v", s.config.AccessibilityReducedMotion))
 	s.db.SaveSetting("accessibility.colorblindPalette", s.config.AccessibilityColorblindPalette)
+	s.db.SaveSetting("debugMode", fmt.Sprintf("%v", s.config.DebugMode))
 	return nil
 }
 
@@ -133,6 +137,8 @@ func (s *SettingsService) Get(key string) interface{} {
 		return s.config.AccessibilityReducedMotion
 	case "accessibility.colorblindPalette":
 		return s.config.AccessibilityColorblindPalette
+	case "debugMode":
+		return s.config.DebugMode
 	}
 	return nil
 }
@@ -172,6 +178,8 @@ func (s *SettingsService) Set(key string, value interface{}) error {
 		s.config.AccessibilityReducedMotion = value.(bool)
 	case "accessibility.colorblindPalette":
 		s.config.AccessibilityColorblindPalette = value.(string)
+	case "debugMode":
+		s.config.DebugMode = value.(bool)
 	}
 	return s.Save()
 }

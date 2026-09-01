@@ -6,6 +6,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatSelectModule } from '@angular/material/select';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { FormsModule } from '@angular/forms';
 import { Wails, Config } from '../../../core/services/wails';
 import { NotificationService } from '../../../core/services/notification.service';
@@ -21,6 +22,7 @@ import * as models from '../../../../../bindings/github.com/noatgnu/cauldron-go/
     MatIconModule,
     MatTooltipModule,
     MatSelectModule,
+    MatSlideToggleModule,
     FormsModule
   ],
   templateUrl: './settings-general.html',
@@ -29,6 +31,7 @@ import * as models from '../../../../../bindings/github.com/noatgnu/cauldron-go/
 })
 export class SettingsGeneral implements OnInit {
   protected config = signal<Partial<Config>>({});
+  protected debugMode = signal(false);
   protected forceUpdating = signal(false);
   protected forceUpdatingSingle = signal(false);
   protected remotePlugins = signal<models.PluginRegistry[]>([]);
@@ -48,9 +51,15 @@ export class SettingsGeneral implements OnInit {
     try {
       const config = await this.wails.getSettings();
       this.config.set(config);
+      this.debugMode.set(!!config.debugMode);
     } catch (error) {
       await this.wails.logToFile(`[SettingsGeneral] Failed to load settings: ${error}`);
     }
+  }
+
+  async setDebugMode(value: boolean): Promise<void> {
+    this.debugMode.set(value);
+    await this.saveSetting('debugMode', value);
   }
 
   async loadRemotePlugins(): Promise<void> {

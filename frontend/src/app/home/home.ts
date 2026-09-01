@@ -56,6 +56,7 @@ export class Home implements OnInit {
     lastError: '',
     logs: [] as string[]
   });
+  protected debugModeEnabled = signal(false);
 
   constructor(
     protected wails: Wails,
@@ -80,6 +81,10 @@ export class Home implements OnInit {
   }
 
   async ngOnInit() {
+    this.wails.getSettings()
+      .then(config => this.debugModeEnabled.set(!!config.debugMode))
+      .catch(() => {});
+
     const addLog = (msg: string) => {
       const logs = this.debugInfo().logs;
       this.debugInfo.set({ ...this.debugInfo(), logs: [...logs, `[${new Date().toLocaleTimeString()}] ${msg}`] });

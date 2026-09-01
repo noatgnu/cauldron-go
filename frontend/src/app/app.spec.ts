@@ -63,7 +63,8 @@ describe('App', () => {
       progress: signal(null)
     };
     pluginV2ServiceMock = {
-      getAllPlugins: vi.fn().mockResolvedValue([])
+      getAllPlugins: vi.fn().mockResolvedValue([]),
+      pluginListVersion: signal(0)
     };
 
     await TestBed.configureTestingModule({
@@ -86,5 +87,17 @@ describe('App', () => {
     const fixture = TestBed.createComponent(App);
     const app = fixture.componentInstance;
     expect(app).toBeTruthy();
+  });
+
+  it('moves focus to the main content region after navigation', async () => {
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    const mainContent: HTMLElement = fixture.nativeElement.querySelector('#main-content');
+    expect(mainContent).not.toBeNull();
+    expect(mainContent.getAttribute('tabindex')).toBe('-1');
+    expect(document.activeElement).toBe(mainContent);
   });
 });
