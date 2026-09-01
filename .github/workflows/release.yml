@@ -44,13 +44,6 @@ jobs:
           echo "${{ github.workspace }}/bin/win/R-Portable/bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
           echo "R_HOME=${{ github.workspace }}/bin/win/R-Portable" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
-      - name: Install R packages
-        shell: pwsh
-        env:
-          R_LIBS_USER: ${{ github.workspace }}/bin/win/R-Portable/library
-        run: |
-          & "${{ github.workspace }}/bin/win/R-Portable/bin/Rscript.exe" backend/scripts/r/install_packages.R
-
       - name: Setup Python Environment
         shell: pwsh
         run: |
@@ -58,12 +51,6 @@ jobs:
           New-Item -ItemType Directory -Force -Path "bin/win/python"
           tar -xzf python-standalone.tar.gz -C "bin/win"
           echo "${{ github.workspace }}/bin/win/python" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-          
-      - name: Install Python packages
-        shell: pwsh
-        run: |
-          & "${{ github.workspace }}/bin/win/python/python.exe" -m pip install --upgrade pip
-          & "${{ github.workspace }}/bin/win/python/python.exe" -m pip install -r scripts/requirements.txt
 
       - name: Install Wails
         run: go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.15
