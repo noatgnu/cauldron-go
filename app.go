@@ -30,29 +30,30 @@ var goLicensesJSON []byte
 var npmLicensesJSON []byte
 
 type App struct {
-	wailsApp              *application.App
-	mainWindow            *application.WebviewWindow
-	db                    *services.DatabaseService
-	settings              *services.SettingsService
-	fileService           *services.FileService
-	jobQueue              *services.JobQueueService
-	envService            *services.EnvironmentService
-	scriptExecutor        *services.ScriptExecutor
-	portableEnvService    *services.PortableEnvService
-	uvService             *services.UvService
-	rPortableService      *services.RPortableService
-	pluginService         *services.PluginService
-	pluginLoaderV2        *services.PluginLoaderV2
-	pluginExecutor        *services.PluginExecutor
-	pluginInstaller       *services.PluginInstaller
-	protocolHandler       *services.ProtocolHandler
-	httpInstallServer     *services.HTTPInstallServer
-	pluginRegistryService *services.PluginRegistryService
-	gitAuthService        *services.GitAuthService
-	backupService         *services.BackupService
-	ready                 chan bool
-	logFilePath           string
-	initialized           chan struct{}
+	wailsApp               *application.App
+	mainWindow             *application.WebviewWindow
+	db                     *services.DatabaseService
+	settings               *services.SettingsService
+	fileService            *services.FileService
+	jobQueue               *services.JobQueueService
+	envService             *services.EnvironmentService
+	scriptExecutor         *services.ScriptExecutor
+	portableEnvService     *services.PortableEnvService
+	uvService              *services.UvService
+	rPortableService       *services.RPortableService
+	pluginService          *services.PluginService
+	pluginLoaderV2         *services.PluginLoaderV2
+	pluginExecutor         *services.PluginExecutor
+	pluginInstaller        *services.PluginInstaller
+	protocolHandler        *services.ProtocolHandler
+	httpInstallServer      *services.HTTPInstallServer
+	pluginRegistryService  *services.PluginRegistryService
+	gitAuthService         *services.GitAuthService
+	backupService          *services.BackupService
+	pluginMigrationService *services.PluginMigrationService
+	ready                  chan bool
+	logFilePath            string
+	initialized            chan struct{}
 }
 
 func NewApp() *App {
@@ -112,6 +113,7 @@ func (a *App) Initialize() {
 	a.envService = services.NewEnvironmentServiceV3(db, a.settings, services.NewProgressNotifierV3(a.wailsApp))
 	a.portableEnvService = services.NewPortableEnvServiceV3(a.fileService, a.wailsApp)
 	a.uvService = services.NewUvServiceV3(a.fileService, db, a.settings, a.wailsApp)
+	a.pluginMigrationService = services.NewPluginMigrationService(db)
 	a.rPortableService, err = services.NewRPortableServiceV3(a.wailsApp)
 	if err != nil {
 		log.Printf("[App.Initialize] ERROR: Failed to initialize R portable service: %v\n", err)
@@ -703,6 +705,40 @@ func (a *App) DeleteCustomEnvVar(id uint) error {
 
 func (a *App) DeleteCustomEnvVarByKey(pluginID uint, key string) error {
 	return a.db.DeleteCustomEnvVarByKey(pluginID, key)
+}
+
+// resolvePluginMigrationTargets loads the registry row and the loaded plugin's current schemaVersion for pluginID.
+func (a *App) resolvePluginMigrationTargets(pluginID uint) (*models.PluginRegistry, int, error) {
+	registry, err := a.db.GetPluginRegistryByID(pluginID)
+	if err != nil {
+		return nil, 0, err
+	}
+	if registry == nil {
+		return nil, 0, fmt.Errorf("plugin not found with ID: %d", pluginID)
+	}
+	plugin, err := a.pluginLoaderV2.GetPlugin(pluginID)
+	if err != nil {
+		return nil, 0, err
+	}
+	return registry, plugin.Definition.Plugin.SchemaVersion, nil
+}
+
+// GetPendingEnvVarMigration is a read-only check for which saved custom env var keys a plugin update renamed or removed.
+func (a *App) GetPendingEnvVarMigration(pluginID uint) ([]services.EnvVarKeyChange, error) {
+	registry, currentSchemaVersion, err := a.resolvePluginMigrationTargets(pluginID)
+	if err != nil {
+		return nil, err
+	}
+	return a.pluginMigrationService.DetectPendingEnvVarMigration(registry, currentSchemaVersion)
+}
+
+// ApplyPendingEnvVarMigration reconciles saved custom env var keys, only in response to an explicit user action.
+func (a *App) ApplyPendingEnvVarMigration(pluginID uint) error {
+	registry, currentSchemaVersion, err := a.resolvePluginMigrationTargets(pluginID)
+	if err != nil {
+		return err
+	}
+	return a.pluginMigrationService.ApplyPendingEnvVarMigration(registry, currentSchemaVersion)
 }
 
 type GitAuthConfigResponse struct {

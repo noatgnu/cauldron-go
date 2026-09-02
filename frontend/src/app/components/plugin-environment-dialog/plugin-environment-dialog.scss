@@ -63,6 +63,52 @@ mat-dialog-content {
   }
 }
 
+.env-var-migration-banner {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 12px 16px;
+  margin: 0 0 20px 0;
+  border-radius: 8px;
+  background: var(--warning-container, var(--surface-variant));
+  border: 1px solid var(--warning, var(--outline));
+
+  mat-icon {
+    color: var(--warning);
+    flex-shrink: 0;
+  }
+
+  .env-var-migration-body {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .env-var-migration-title {
+    font-size: 13px;
+    font-weight: 500;
+  }
+
+  .env-var-migration-list {
+    margin: 8px 0;
+    padding-left: 20px;
+    font-size: 12px;
+
+    code {
+      font-size: 11px;
+      padding: 1px 4px;
+      border-radius: 3px;
+      background: var(--surface-variant);
+    }
+  }
+
+  .env-var-migration-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 8px;
+  }
+}
+
 mat-dialog-actions {
   padding: 16px 24px;
   margin: 0;

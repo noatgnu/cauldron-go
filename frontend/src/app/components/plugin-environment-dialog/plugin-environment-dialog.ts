@@ -15,7 +15,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatTabsModule } from '@angular/material/tabs';
 import { FormsModule } from '@angular/forms';
-import { Wails, PythonEnvironment, REnvironment, PluginEnvironmentBinding, VirtualEnvironment, RenvEnvironment, CustomEnvVar, UvPythonVersion } from '../../core/services/wails';
+import { Wails, PythonEnvironment, REnvironment, PluginEnvironmentBinding, VirtualEnvironment, RenvEnvironment, CustomEnvVar, UvPythonVersion, EnvVarKeyChange } from '../../core/services/wails';
 import { DynamicFormComponent } from '../dynamic-form/dynamic-form';
 import * as models from '../../../../bindings/github.com/noatgnu/cauldron-go/backend/models/models';
 
@@ -76,6 +76,9 @@ export class PluginEnvironmentDialog implements OnInit {
   rEnvironments = signal<REnvironment[]>([]);
   uvAvailable = signal(false);
   uvManagedPythons = signal<UvPythonVersion[]>([]);
+  pendingEnvVarChanges = signal<EnvVarKeyChange[]>([]);
+  envVarMigrationDismissed = signal(false);
+  applyingEnvVarMigration = signal(false);
   activePythonEnv = signal<PythonEnvironment | null>(null);
   activeREnv = signal<REnvironment | null>(null);
   customEnvVars = signal<Record<string, string>>({});
@@ -109,6 +112,7 @@ export class PluginEnvironmentDialog implements OnInit {
   async ngOnInit() {
     await this.loadData();
     await this.loadCustomEnvVars();
+    await this.loadPendingEnvVarMigration();
   }
 
   async loadCustomEnvVars() {
@@ -120,6 +124,35 @@ export class PluginEnvironmentDialog implements OnInit {
       this.customEnvVars.set(varMap);
     } catch (error) {
       console.error('Failed to load custom env vars:', error);
+    }
+  }
+
+  async loadPendingEnvVarMigration() {
+    if (!this.data.plugin) return;
+    try {
+      const changes = await this.wails.getPendingEnvVarMigration(this.data.plugin.id);
+      this.pendingEnvVarChanges.set(changes || []);
+    } catch (error) {
+      console.error('Failed to check for pending env var migration:', error);
+    }
+  }
+
+  dismissEnvVarMigration() {
+    this.envVarMigrationDismissed.set(true);
+  }
+
+  async applyEnvVarMigration() {
+    if (!this.data.plugin) return;
+    this.applyingEnvVarMigration.set(true);
+    try {
+      await this.wails.applyPendingEnvVarMigration(this.data.plugin.id);
+      await this.loadCustomEnvVars();
+      await this.loadPendingEnvVarMigration();
+      this.notification.showSuccess('Saved environment variables updated to match the plugin update');
+    } catch (error) {
+      this.notification.showError(`Failed to apply environment variable migration: ${error}`);
+    } finally {
+      this.applyingEnvVarMigration.set(false);
     }
   }
 

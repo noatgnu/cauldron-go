@@ -244,6 +244,18 @@ func (d *DatabaseService) GetPluginRegistryByPluginID(pluginID string) (*models.
 	return &entry, nil
 }
 
+func (d *DatabaseService) GetPluginRegistryByID(id uint) (*models.PluginRegistry, error) {
+	var entry models.PluginRegistry
+	err := d.db.First(&entry, id).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &entry, nil
+}
+
 func (d *DatabaseService) GetAllSettings() (map[string]string, error) {
 	var settings []Setting
 	if err := d.db.Find(&settings).Error; err != nil {
@@ -521,6 +533,19 @@ func (d *DatabaseService) DeleteCustomEnvVar(id uint) error {
 
 func (d *DatabaseService) DeleteCustomEnvVarByKey(pluginID uint, key string) error {
 	return d.db.Where("plugin_id = ? AND key = ?", pluginID, key).Delete(&CustomEnvVar{}).Error
+}
+
+// RenameCustomEnvVarKey renames an existing saved value in place, keeping its ID and Value.
+// If a row already exists at the destination key, the source row is dropped in its favor.
+func (d *DatabaseService) RenameCustomEnvVarKey(pluginID uint, from, to string) error {
+	var destExists int64
+	if err := d.db.Model(&CustomEnvVar{}).Where("plugin_id = ? AND key = ?", pluginID, to).Count(&destExists).Error; err != nil {
+		return err
+	}
+	if destExists > 0 {
+		return d.DeleteCustomEnvVarByKey(pluginID, from)
+	}
+	return d.db.Model(&CustomEnvVar{}).Where("plugin_id = ? AND key = ?", pluginID, from).Update("key", to).Error
 }
 
 func (d *DatabaseService) SavePluginDockerImage(image *PluginDockerImage) error {

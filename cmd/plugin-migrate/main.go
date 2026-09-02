@@ -5,67 +5,13 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"sort"
 	"strconv"
 	"strings"
 
 	"github.com/noatgnu/cauldron-go/backend/models"
+	"github.com/noatgnu/cauldron-go/internal/pluginmigrations"
 	"gopkg.in/yaml.v3"
 )
-
-// RenameOp renames a named element (input, env var, or output) in place.
-type RenameOp struct {
-	From string `yaml:"from"`
-	To   string `yaml:"to"`
-}
-
-// NameOp identifies a named element to remove.
-type NameOp struct {
-	Name string `yaml:"name"`
-}
-
-// AddInputOp adds a new input or env var definition, optionally positioned after an existing one.
-type AddInputOp struct {
-	models.PluginInputV2 `yaml:",inline"`
-	InsertAfter          string `yaml:"insertAfter,omitempty"`
-}
-
-// PackageOp adds or removes a single package requirement.
-type PackageOp struct {
-	Name string `yaml:"name"`
-}
-
-// RequirementOp sets the Python and/or R version constraint.
-type RequirementOp struct {
-	Python string `yaml:"python,omitempty"`
-	R      string `yaml:"r,omitempty"`
-}
-
-// Operation is a single declarative change; exactly one field should be set.
-type Operation struct {
-	RenameInput    *RenameOp      `yaml:"renameInput,omitempty"`
-	RemoveInput    *NameOp        `yaml:"removeInput,omitempty"`
-	AddInput       *AddInputOp    `yaml:"addInput,omitempty"`
-	RenameEnvVar   *RenameOp      `yaml:"renameEnvVar,omitempty"`
-	RemoveEnvVar   *NameOp        `yaml:"removeEnvVar,omitempty"`
-	AddEnvVar      *AddInputOp    `yaml:"addEnvVar,omitempty"`
-	RenameOutput   *RenameOp      `yaml:"renameOutput,omitempty"`
-	RemoveOutput   *NameOp        `yaml:"removeOutput,omitempty"`
-	SetRequirement *RequirementOp `yaml:"setRequirement,omitempty"`
-	AddPackage     *PackageOp     `yaml:"addPackage,omitempty"`
-	RemovePackage  *PackageOp     `yaml:"removePackage,omitempty"`
-}
-
-// MigrationFile describes one schema version step for a plugin.
-type MigrationFile struct {
-	SchemaVersion int         `yaml:"schemaVersion"`
-	Description   string      `yaml:"description,omitempty"`
-	Operations    []Operation `yaml:"operations"`
-
-	path string
-}
-
-var migrationFileNamePattern = regexp.MustCompile(`^(\d{4})_[a-z0-9_]+\.yaml$`)
 
 func loadPluginDefinition(path string) (*models.PluginDefinition, error) {
 	data, err := os.ReadFile(path)
@@ -92,52 +38,7 @@ func savePluginDefinition(path string, def *models.PluginDefinition) error {
 	return os.WriteFile(path, []byte(buf.String()), 0644)
 }
 
-// loadMigrations reads every migrations/NNNN_*.yaml file, sorted by filename, validating that
-// schemaVersion strictly increases by 1 per file so the chain has no gaps or reordering.
-func loadMigrations(migrationsDir string) ([]MigrationFile, error) {
-	entries, err := os.ReadDir(migrationsDir)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, nil
-		}
-		return nil, fmt.Errorf("failed to read %s: %w", migrationsDir, err)
-	}
-
-	var names []string
-	for _, e := range entries {
-		if e.IsDir() {
-			continue
-		}
-		if !migrationFileNamePattern.MatchString(e.Name()) {
-			continue
-		}
-		names = append(names, e.Name())
-	}
-	sort.Strings(names)
-
-	var migrations []MigrationFile
-	expected := 1
-	for _, name := range names {
-		path := filepath.Join(migrationsDir, name)
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read %s: %w", path, err)
-		}
-		var m MigrationFile
-		if err := yaml.Unmarshal(data, &m); err != nil {
-			return nil, fmt.Errorf("failed to parse %s: %w", path, err)
-		}
-		m.path = path
-		if m.SchemaVersion != expected {
-			return nil, fmt.Errorf("%s: expected schemaVersion %d (migrations must increase by 1 with no gaps), got %d", name, expected, m.SchemaVersion)
-		}
-		migrations = append(migrations, m)
-		expected++
-	}
-	return migrations, nil
-}
-
-func applyOperation(def *models.PluginDefinition, op Operation) error {
+func applyOperation(def *models.PluginDefinition, op pluginmigrations.Operation) error {
 	switch {
 	case op.RenameInput != nil:
 		return renameInput(def, op.RenameInput.From, op.RenameInput.To)
@@ -219,7 +120,7 @@ func removeInput(def *models.PluginDefinition, name string) error {
 	return nil
 }
 
-func addInput(def *models.PluginDefinition, op *AddInputOp) error {
+func addInput(def *models.PluginDefinition, op *pluginmigrations.AddInputOp) error {
 	for i := range def.Inputs {
 		if def.Inputs[i].Name == op.Name {
 			return fmt.Errorf("addInput: input named %q already exists", op.Name)
@@ -288,8 +189,7 @@ func packageBaseName(pkg string) string {
 	return pkg
 }
 
-// addPackage upserts by base name: an existing entry has its version specifier replaced,
-// so "addPackage: numpy>=1.26.0" also serves as the way to bump an already-required package.
+// addPackage upserts by base name, so it also serves as how you bump an already-required package's version.
 func addPackage(def *models.PluginDefinition, pkg string) {
 	base := packageBaseName(pkg)
 	for i, existing := range def.Execution.Requirements.Packages {
@@ -322,7 +222,7 @@ func nextMigrationNumber(migrationsDir string) (int, error) {
 	}
 	max := 0
 	for _, e := range entries {
-		if e.IsDir() || !migrationFileNamePattern.MatchString(e.Name()) {
+		if e.IsDir() || !pluginmigrations.FileNamePattern.MatchString(e.Name()) {
 			continue
 		}
 		n, _ := strconv.Atoi(e.Name()[:4])
@@ -385,7 +285,7 @@ func cmdApply(args []string, dryRun bool) error {
 		return err
 	}
 
-	migrations, err := loadMigrations(migrationsDir)
+	migrations, err := pluginmigrations.LoadMigrations(migrationsDir)
 	if err != nil {
 		return err
 	}
@@ -403,7 +303,7 @@ func cmdApply(args []string, dryRun bool) error {
 	for _, m := range pending {
 		for i, op := range m.Operations {
 			if err := applyOperation(def, op); err != nil {
-				return fmt.Errorf("%s operation %d: %w", filepath.Base(m.path), i+1, err)
+				return fmt.Errorf("%s operation %d: %w", filepath.Base(m.Path), i+1, err)
 			}
 		}
 		def.Plugin.SchemaVersion = m.SchemaVersion
@@ -415,7 +315,7 @@ func cmdApply(args []string, dryRun bool) error {
 		if desc != "" {
 			desc = ": " + desc
 		}
-		fmt.Printf("%s %s (schemaVersion %d)%s\n", verb, filepath.Base(m.path), m.SchemaVersion, desc)
+		fmt.Printf("%s %s (schemaVersion %d)%s\n", verb, filepath.Base(m.Path), m.SchemaVersion, desc)
 	}
 
 	if dryRun {

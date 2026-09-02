@@ -230,7 +230,33 @@
                   Custom Environment Variables
                 </h3>
                 <p class="section-description">Set plugin-specific paths or configuration variables required by the script.</p>
-                
+
+                @if (pendingEnvVarChanges().length > 0 && !envVarMigrationDismissed()) {
+                  <div class="env-var-migration-banner">
+                    <mat-icon>sync_alt</mat-icon>
+                    <div class="env-var-migration-body">
+                      <span class="env-var-migration-title">This plugin's update renamed or removed some environment variables</span>
+                      <ul class="env-var-migration-list">
+                        @for (change of pendingEnvVarChanges(); track change.from) {
+                          <li>
+                            @if (change.removed) {
+                              <span><code>{{ change.from }}</code> was removed</span>
+                            } @else {
+                              <span><code>{{ change.from }}</code> &rarr; <code>{{ change.to }}</code></span>
+                            }
+                          </li>
+                        }
+                      </ul>
+                      <div class="env-var-migration-actions">
+                        <button mat-button (click)="dismissEnvVarMigration()" [disabled]="applyingEnvVarMigration()">Not now</button>
+                        <button mat-raised-button color="primary" (click)="applyEnvVarMigration()" [disabled]="applyingEnvVarMigration()">
+                          {{ applyingEnvVarMigration() ? 'Applying...' : 'Update saved values' }}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                }
+
                 <app-dynamic-form
                   [plugin]="envVariablePlugin()!"
                   (formSubmit)="onEnvVarsSubmit($event)">

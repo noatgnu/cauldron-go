@@ -37,7 +37,9 @@ describe('PluginEnvironmentDialog', () => {
       getVirtualEnvironments: vi.fn().mockResolvedValue([]),
       bindPluginToEnvironment: vi.fn().mockResolvedValue(undefined),
       createPythonVirtualEnv: vi.fn().mockResolvedValue(undefined),
-      createUvVirtualEnv: vi.fn().mockResolvedValue(undefined)
+      createUvVirtualEnv: vi.fn().mockResolvedValue(undefined),
+      getPendingEnvVarMigration: vi.fn().mockResolvedValue([]),
+      applyPendingEnvVarMigration: vi.fn().mockResolvedValue(undefined)
     };
     notificationMock = {
       showError: vi.fn(),
@@ -114,5 +116,78 @@ describe('PluginEnvironmentDialog', () => {
 
     expect(wailsMock.createPythonVirtualEnv).toHaveBeenCalledWith('/usr/bin/python3', '/tmp/venv-test', 'test');
     expect(wailsMock.createUvVirtualEnv).not.toHaveBeenCalled();
+  });
+
+  const fakePlugin = {
+    id: 42,
+    definition: { execution: { envVariables: [{ name: 'API_KEY', type: 'text' }] } }
+  };
+
+  function useDialogDataWithPlugin() {
+    TestBed.overrideProvider(MAT_DIALOG_DATA, {
+      useValue: { pluginId: 'test', pluginName: 'Test', runtimeEnvironments: [], plugin: fakePlugin }
+    });
+  }
+
+  it('does not show a migration banner when nothing is pending', async () => {
+    useDialogDataWithPlugin();
+    createComponent();
+    await fixture.whenStable();
+
+    expect(component.pendingEnvVarChanges()).toEqual([]);
+  });
+
+  it('loads pending env var changes for the bound plugin on init', async () => {
+    wailsMock.getPendingEnvVarMigration.mockResolvedValue([
+      { from: 'API_KEY', to: 'UNIPROT_API_KEY', removed: false }
+    ]);
+    useDialogDataWithPlugin();
+    createComponent();
+    await fixture.whenStable();
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    expect(wailsMock.getPendingEnvVarMigration).toHaveBeenCalledWith(42);
+    expect(component.pendingEnvVarChanges()).toEqual([
+      { from: 'API_KEY', to: 'UNIPROT_API_KEY', removed: false }
+    ]);
+  });
+
+  it('dismissing the banner hides it without calling apply', async () => {
+    wailsMock.getPendingEnvVarMigration.mockResolvedValue([{ from: 'A', to: 'B', removed: false }]);
+    useDialogDataWithPlugin();
+    createComponent();
+    await fixture.whenStable();
+
+    component.dismissEnvVarMigration();
+
+    expect(component.envVarMigrationDismissed()).toBe(true);
+    expect(wailsMock.applyPendingEnvVarMigration).not.toHaveBeenCalled();
+  });
+
+  it('applying the migration calls the backend and refreshes pending changes', async () => {
+    wailsMock.getPendingEnvVarMigration
+      .mockResolvedValueOnce([{ from: 'A', to: 'B', removed: false }])
+      .mockResolvedValueOnce([]);
+    useDialogDataWithPlugin();
+    createComponent();
+    await fixture.whenStable();
+
+    await component.applyEnvVarMigration();
+
+    expect(wailsMock.applyPendingEnvVarMigration).toHaveBeenCalledWith(42);
+    expect(component.pendingEnvVarChanges()).toEqual([]);
+  });
+
+  it('surfaces an error notification when applying the migration fails', async () => {
+    wailsMock.getPendingEnvVarMigration.mockResolvedValue([{ from: 'A', to: 'B', removed: false }]);
+    wailsMock.applyPendingEnvVarMigration.mockRejectedValue(new Error('boom'));
+    useDialogDataWithPlugin();
+    createComponent();
+    await fixture.whenStable();
+
+    await component.applyEnvVarMigration();
+
+    expect(notificationMock.showError).toHaveBeenCalled();
+    expect(component.applyingEnvVarMigration()).toBe(false);
   });
 });

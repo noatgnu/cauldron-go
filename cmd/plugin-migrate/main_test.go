@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/noatgnu/cauldron-go/backend/models"
+	"github.com/noatgnu/cauldron-go/internal/pluginmigrations"
 )
 
 func samplePluginDefinition() *models.PluginDefinition {
@@ -134,7 +135,7 @@ func TestRemoveInput_RemovesFromArgsMappingAndExample(t *testing.T) {
 
 func TestAddInput_InsertAfter(t *testing.T) {
 	def := samplePluginDefinition()
-	op := &AddInputOp{
+	op := &pluginmigrations.AddInputOp{
 		PluginInputV2: models.PluginInputV2{Name: "min_replicates", Label: "Min Replicates", Type: "number"},
 		InsertAfter:   "input_file",
 	}
@@ -152,7 +153,7 @@ func TestAddInput_InsertAfter(t *testing.T) {
 
 func TestAddInput_AppendsWhenNoInsertAfter(t *testing.T) {
 	def := samplePluginDefinition()
-	op := &AddInputOp{PluginInputV2: models.PluginInputV2{Name: "extra", Type: "text"}}
+	op := &pluginmigrations.AddInputOp{PluginInputV2: models.PluginInputV2{Name: "extra", Type: "text"}}
 	if err := addInput(def, op); err != nil {
 		t.Fatalf("addInput failed: %v", err)
 	}
@@ -163,7 +164,7 @@ func TestAddInput_AppendsWhenNoInsertAfter(t *testing.T) {
 
 func TestAddInput_DuplicateNameFails(t *testing.T) {
 	def := samplePluginDefinition()
-	op := &AddInputOp{PluginInputV2: models.PluginInputV2{Name: "threshold", Type: "number"}}
+	op := &pluginmigrations.AddInputOp{PluginInputV2: models.PluginInputV2{Name: "threshold", Type: "number"}}
 	if err := addInput(def, op); err == nil {
 		t.Error("expected error adding a duplicate input name, got nil")
 	}
@@ -171,7 +172,7 @@ func TestAddInput_DuplicateNameFails(t *testing.T) {
 
 func TestAddInput_InsertAfterUnknownTargetFails(t *testing.T) {
 	def := samplePluginDefinition()
-	op := &AddInputOp{PluginInputV2: models.PluginInputV2{Name: "x", Type: "text"}, InsertAfter: "does_not_exist"}
+	op := &pluginmigrations.AddInputOp{PluginInputV2: models.PluginInputV2{Name: "x", Type: "text"}, InsertAfter: "does_not_exist"}
 	if err := addInput(def, op); err == nil {
 		t.Error("expected error for unknown insertAfter target, got nil")
 	}
@@ -264,7 +265,7 @@ func TestLoadMigrations_ValidSequence(t *testing.T) {
 	writeMigration(t, dir, "0001_first.yaml", "schemaVersion: 1\noperations: []\n")
 	writeMigration(t, dir, "0002_second.yaml", "schemaVersion: 2\noperations: []\n")
 
-	migrations, err := loadMigrations(filepath.Join(dir, "migrations"))
+	migrations, err := pluginmigrations.LoadMigrations(filepath.Join(dir, "migrations"))
 	if err != nil {
 		t.Fatalf("loadMigrations failed: %v", err)
 	}
@@ -280,14 +281,14 @@ func TestLoadMigrations_GapFails(t *testing.T) {
 	dir := t.TempDir()
 	writeMigration(t, dir, "0002_skipped_one.yaml", "schemaVersion: 2\noperations: []\n")
 
-	if _, err := loadMigrations(filepath.Join(dir, "migrations")); err == nil {
+	if _, err := pluginmigrations.LoadMigrations(filepath.Join(dir, "migrations")); err == nil {
 		t.Error("expected error for a gapped schemaVersion sequence, got nil")
 	}
 }
 
 func TestLoadMigrations_NoDirReturnsEmpty(t *testing.T) {
 	dir := t.TempDir()
-	migrations, err := loadMigrations(filepath.Join(dir, "migrations"))
+	migrations, err := pluginmigrations.LoadMigrations(filepath.Join(dir, "migrations"))
 	if err != nil {
 		t.Fatalf("expected no error for missing migrations dir, got %v", err)
 	}
