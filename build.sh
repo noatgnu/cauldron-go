@@ -315,6 +315,7 @@ build_dev_tools() {
         "plugin-doc-generator"
         "plugin-doc-generator-all"
         "plugin-scaffolder"
+        "plugin-migrate"
         "plugin-to-nextflow"
         "plugin-to-slivka"
         "plugin-to-spa"

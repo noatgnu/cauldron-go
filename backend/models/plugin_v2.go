@@ -222,15 +222,16 @@ func (r *PluginRuntimeV2) GetDockerImageName(pluginID string) string {
 }
 
 type PluginMetadata struct {
-	ID          string         `yaml:"id" json:"id"`
-	Name        string         `yaml:"name" json:"name"`
-	Description string         `yaml:"description" json:"description"`
-	Version     string         `yaml:"version" json:"version"`
-	Author      string         `yaml:"author,omitempty" json:"author,omitempty"`
-	Category    PluginCategory `yaml:"category" json:"category"`
-	Subcategory string         `yaml:"subcategory,omitempty" json:"subcategory,omitempty"`
-	Icon        string         `yaml:"icon,omitempty" json:"icon,omitempty"`
-	Repository  string         `yaml:"repository,omitempty" json:"repository,omitempty"`
+	ID            string         `yaml:"id" json:"id"`
+	Name          string         `yaml:"name" json:"name"`
+	Description   string         `yaml:"description" json:"description"`
+	Version       string         `yaml:"version" json:"version"`
+	SchemaVersion int            `yaml:"schemaVersion,omitempty" json:"schemaVersion,omitempty"`
+	Author        string         `yaml:"author,omitempty" json:"author,omitempty"`
+	Category      PluginCategory `yaml:"category" json:"category"`
+	Subcategory   string         `yaml:"subcategory,omitempty" json:"subcategory,omitempty"`
+	Icon          string         `yaml:"icon,omitempty" json:"icon,omitempty"`
+	Repository    string         `yaml:"repository,omitempty" json:"repository,omitempty"`
 }
 
 type ExampleData struct {
