@@ -87,8 +87,8 @@ func (u *UvService) GetUvPath() (string, error) {
 	return uvPath, nil
 }
 
-// resolveUvPath returns the app-managed uv path, falling back to system PATH; every uv-invoking method must use this (not GetUvPath) to match IsUvAvailable.
-func (u *UvService) resolveUvPath() (string, error) {
+// ResolveUvPath returns the app-managed uv path, falling back to system PATH; every uv-invoking method must use this (not GetUvPath) to match IsUvAvailable.
+func (u *UvService) ResolveUvPath() (string, error) {
 	if path, err := u.GetUvPath(); err == nil {
 		return path, nil
 	}
@@ -100,7 +100,7 @@ func (u *UvService) resolveUvPath() (string, error) {
 
 // IsUvAvailable reports whether a managed uv install exists, falling back to checking PATH.
 func (u *UvService) IsUvAvailable() bool {
-	_, err := u.resolveUvPath()
+	_, err := u.ResolveUvPath()
 	return err == nil
 }
 
@@ -246,7 +246,7 @@ func (u *UvService) DownloadUv() error {
 
 // ListUvManagedPythons returns the Python versions uv has already installed.
 func (u *UvService) ListUvManagedPythons() ([]UvPythonVersion, error) {
-	uvPath, err := u.resolveUvPath()
+	uvPath, err := u.ResolveUvPath()
 	if err != nil {
 		return nil, err
 	}
@@ -282,7 +282,7 @@ func (u *UvService) ListUvManagedPythons() ([]UvPythonVersion, error) {
 
 // InstallUvPythonVersion downloads and installs a Python version via uv.
 func (u *UvService) InstallUvPythonVersion(version string) error {
-	uvPath, err := u.resolveUvPath()
+	uvPath, err := u.ResolveUvPath()
 	if err != nil {
 		return err
 	}
@@ -304,7 +304,7 @@ func (u *UvService) InstallUvPythonVersion(version string) error {
 
 // CreateUvVirtualEnv creates a virtual environment with uv, optionally installing plugin requirements.
 func (u *UvService) CreateUvVirtualEnv(pythonVersion, venvPath, pluginID, pluginFolderPath string) error {
-	uvPath, err := u.resolveUvPath()
+	uvPath, err := u.ResolveUvPath()
 	if err != nil {
 		return err
 	}
@@ -382,7 +382,7 @@ func (u *UvService) InstallUvPackages(venvPythonPath string, packages []string) 
 		return nil
 	}
 
-	uvPath, err := u.resolveUvPath()
+	uvPath, err := u.ResolveUvPath()
 	if err != nil {
 		return err
 	}
@@ -405,7 +405,7 @@ func (u *UvService) InstallUvPackages(venvPythonPath string, packages []string) 
 
 // InstallUvRequirements installs a requirements file into a uv-managed Python environment.
 func (u *UvService) InstallUvRequirements(venvPythonPath, requirementsPath string) error {
-	uvPath, err := u.resolveUvPath()
+	uvPath, err := u.ResolveUvPath()
 	if err != nil {
 		return err
 	}
@@ -427,7 +427,7 @@ func (u *UvService) InstallUvRequirements(venvPythonPath, requirementsPath strin
 
 // ListUvPackages lists installed packages in a uv-managed Python environment.
 func (u *UvService) ListUvPackages(venvPythonPath string) ([]string, error) {
-	uvPath, err := u.resolveUvPath()
+	uvPath, err := u.ResolveUvPath()
 	if err != nil {
 		return nil, err
 	}

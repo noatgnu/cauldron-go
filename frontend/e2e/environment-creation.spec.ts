@@ -350,7 +350,7 @@ test.describe('uv Integration Tests via MCP', () => {
     let createdVenvId: number | null = null;
 
     try {
-      const createResult = await tryCallBoundMethod('main.App.CreateUvVirtualEnv', installedVersion.version, venvPath, '', '');
+      const createResult = await tryCallBoundMethod('main.App.CreateUvVirtualEnv', installedVersion.version, venvPath, '');
       if (!createResult.success) {
         test.skip(true, `uv venv creation failed: ${createResult.error || 'unknown error'}`);
         return;
@@ -375,6 +375,70 @@ test.describe('uv Integration Tests via MCP', () => {
   test('should show the uv section on the Python settings page via MCP', async () => {
     await mcp.navigate('#/settings/python');
     expect(await mcp.waitForElement('.uv-section')).toBe(true);
+  });
+
+  test('should create a uv-managed venv and bind it to a plugin', async () => {
+    test.setTimeout(300000);
+
+    const available = await ensureUvAvailable();
+    if (!available) {
+      test.skip(true, 'uv could not be installed (no network access?)');
+      return;
+    }
+
+    const plugins = await mcp.callBoundMethod('main.App.GetPluginsV2');
+    if (!plugins || plugins.length === 0) {
+      test.skip(true, 'No plugins available');
+      return;
+    }
+
+    const targetVersion = '3.12';
+    const installResult = await tryCallBoundMethod('main.App.InstallUvPythonVersion', targetVersion);
+    if (!installResult.success) {
+      test.skip(true, `Failed to install uv-managed Python ${targetVersion}: ${installResult.error}`);
+      return;
+    }
+
+    const managedPythons = await mcp.callBoundMethod('main.App.ListUvManagedPythons');
+    const installedVersion = (managedPythons || []).find((p: any) => p.version?.startsWith(targetVersion));
+    if (!installedVersion) {
+      test.skip(true, 'Installed uv Python version not found in managed list');
+      return;
+    }
+
+    const plugin = plugins[0];
+    const pluginID = plugin.definition?.plugin?.id || plugin.id?.toString();
+    const venvPath = `/tmp/e2e-uv-plugin-venv-${Date.now()}`;
+    let createdVenvId: number | null = null;
+
+    try {
+      const createResult = await tryCallBoundMethod('main.App.CreateUvVirtualEnv', installedVersion.version, venvPath, pluginID);
+      if (!createResult.success) {
+        test.skip(true, `uv venv creation failed: ${createResult.error || 'unknown error'}`);
+        return;
+      }
+
+      const environments = await mcp.callBoundMethod('main.App.GetVirtualEnvironments');
+      const newVenv = environments?.find((v: any) => v.Path?.includes(venvPath));
+      expect(newVenv).toBeDefined();
+      if (!newVenv) return;
+
+      createdVenvId = newVenv.ID;
+      expect(newVenv.Source).toBe('uv');
+
+      const bindResult = await tryCallBoundMethod(
+        'main.App.BindPluginToEnvironment', pluginID, 'python', newVenv.ID, newVenv.Path
+      );
+      expect(bindResult.success).toBe(true);
+
+      const binding = await mcp.callBoundMethod('main.App.GetPluginEnvironmentBinding', pluginID, 'python');
+      expect(binding).toBeDefined();
+      expect(binding.EnvironmentID).toBe(newVenv.ID);
+    } finally {
+      if (createdVenvId) {
+        await mcp.callBoundMethod('main.App.DeleteVirtualEnvironment', createdVenvId);
+      }
+    }
   });
 });
 

@@ -651,10 +651,10 @@ export class Wails {
     this.notifyBindingsUpdated();
   }
 
-  async createUvVirtualEnv(pythonVersion: string, venvPath: string, pluginID: string = '', pluginFolderPath: string = ''): Promise<void> {
+  async createUvVirtualEnv(pythonVersion: string, venvPath: string, pluginID: string = ''): Promise<void> {
     if (!this.isWails) throw new Error('Wails not available');
     await this.waitForBackend();
-    await WailsApp.CreateUvVirtualEnv(pythonVersion, venvPath, pluginID, pluginFolderPath);
+    await WailsApp.CreateUvVirtualEnv(pythonVersion, venvPath, pluginID);
     this.notifyBindingsUpdated();
   }
 

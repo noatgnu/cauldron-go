@@ -115,6 +115,11 @@
                               }
                             </mat-option>
                           }
+                          @for (uvPython of uvManagedPythons(); track uvPython.version) {
+                            <mat-option [value]="uvPythonPrefix + uvPython.version">
+                              {{ uvPython.version }} ({{ uvPython.implementation }}) - uv-managed
+                            </mat-option>
+                          }
                         </mat-select>
                         <mat-hint>Select the Python environment to use as base</mat-hint>
                       </mat-form-field>

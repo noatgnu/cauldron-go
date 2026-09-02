@@ -1,6 +1,7 @@
 #!/bin/bash
 
 set -e
+set -o pipefail
 
 PROJECT_ROOT=$(cd "$(dirname "$0")" && pwd)
 FRONTEND_DIR="$PROJECT_ROOT/frontend"
@@ -57,6 +58,16 @@ print_info() {
 check_cross_compiler() {
     local compiler="$1"
     if command -v "$compiler" &> /dev/null; then
+        return 0
+    fi
+    return 1
+}
+
+needs_gtk3_tag() {
+    if command -v pkg-config &> /dev/null && pkg-config --exists gtk4 2>/dev/null; then
+        if pkg-config --atleast-version=4.10 gtk4; then
+            return 1
+        fi
         return 0
     fi
     return 1
@@ -423,7 +434,12 @@ build_wails() {
 
     if [ "$os_part" = "$current_os" ] && [ "$arch_part" = "$current_arch" ]; then
         echo "Native build detected"
-        if go build -o "$platform_dir/$output_name" . 2>&1 | tee /tmp/wails-build.log; then
+        local extra_tags=""
+        if [ "$os_part" = "linux" ] && needs_gtk3_tag; then
+            print_info "Legacy GTK4 detected (< 4.10, missing GtkFileDialog) -- building with -tags gtk3"
+            extra_tags="-tags gtk3"
+        fi
+        if go build $extra_tags -o "$platform_dir/$output_name" . 2>&1 | tee /tmp/wails-build.log; then
             if grep -q "undefined:" /tmp/wails-build.log; then
                 print_error "Wails v3 build failed with errors"
                 echo "Check /tmp/wails-build.log for details"
@@ -634,7 +650,12 @@ build_wails_platform() {
 
     if [ "$os_part" = "$current_os" ] && [ "$arch_part" = "$current_arch" ]; then
         echo "Native build"
-        if go build -ldflags="-s -w" -o "$output_dir/$output_name" . 2>&1 | tee /tmp/wails-build-${os_part}-${arch_part}.log; then
+        local extra_tags=""
+        if [ "$os_part" = "linux" ] && needs_gtk3_tag; then
+            print_info "Legacy GTK4 detected (< 4.10, missing GtkFileDialog) -- building with -tags gtk3"
+            extra_tags="-tags gtk3"
+        fi
+        if go build $extra_tags -ldflags="-s -w" -o "$output_dir/$output_name" . 2>&1 | tee /tmp/wails-build-${os_part}-${arch_part}.log; then
             if grep -q "undefined:" /tmp/wails-build-${os_part}-${arch_part}.log; then
                 print_error "Build failed for $PLATFORM"
                 return 1
@@ -679,7 +700,12 @@ build_wails_platform() {
         fi
     elif [ "$os_part" = "linux" ] && [ "$current_os" = "linux" ]; then
         echo "Native Linux build"
-        if CGO_ENABLED=1 go build -ldflags="-s -w" -o "$output_dir/$output_name" . 2>&1 | tee /tmp/wails-build-${os_part}-${arch_part}.log; then
+        local extra_tags=""
+        if needs_gtk3_tag; then
+            print_info "Legacy GTK4 detected (< 4.10, missing GtkFileDialog) -- building with -tags gtk3"
+            extra_tags="-tags gtk3"
+        fi
+        if CGO_ENABLED=1 go build $extra_tags -ldflags="-s -w" -o "$output_dir/$output_name" . 2>&1 | tee /tmp/wails-build-${os_part}-${arch_part}.log; then
             if grep -q "undefined:" /tmp/wails-build-${os_part}-${arch_part}.log; then
                 print_error "Build failed for $PLATFORM"
                 return 1

@@ -113,6 +113,40 @@ func TestE2EEnvironmentDetection(t *testing.T) {
 		}
 		t.Logf("Found %d R environments", len(renvs))
 	})
+
+	t.Run("IsUvAvailable reports a consistent result", func(t *testing.T) {
+		available := app.IsUvAvailable()
+		t.Logf("uv available: %v", available)
+
+		path, err := app.GetUvPath()
+		if available {
+			if err != nil {
+				t.Errorf("IsUvAvailable reported true but GetUvPath failed: %v", err)
+			}
+			if path == "" {
+				t.Error("IsUvAvailable reported true but GetUvPath returned an empty path")
+			}
+		} else if err == nil {
+			t.Errorf("IsUvAvailable reported false but GetUvPath unexpectedly succeeded with path: %s", path)
+		}
+	})
+
+	t.Run("ListUvManagedPythons returns without error regardless of uv availability", func(t *testing.T) {
+		pythons, err := app.ListUvManagedPythons()
+		if !app.IsUvAvailable() {
+			if err == nil {
+				t.Logf("uv not available, ListUvManagedPythons returned %d entries with no error", len(pythons))
+			}
+			return
+		}
+		if err != nil {
+			t.Fatalf("ListUvManagedPythons failed: %v", err)
+		}
+		t.Logf("Found %d uv-managed Python versions", len(pythons))
+		for _, p := range pythons {
+			t.Logf("  - %s (%s) at %s", p.Version, p.Implementation, p.Path)
+		}
+	})
 }
 
 func TestE2EFileOperations(t *testing.T) {

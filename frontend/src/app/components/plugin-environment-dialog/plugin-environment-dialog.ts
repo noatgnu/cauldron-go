@@ -15,7 +15,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatTabsModule } from '@angular/material/tabs';
 import { FormsModule } from '@angular/forms';
-import { Wails, PythonEnvironment, REnvironment, PluginEnvironmentBinding, VirtualEnvironment, RenvEnvironment, CustomEnvVar } from '../../core/services/wails';
+import { Wails, PythonEnvironment, REnvironment, PluginEnvironmentBinding, VirtualEnvironment, RenvEnvironment, CustomEnvVar, UvPythonVersion } from '../../core/services/wails';
 import { DynamicFormComponent } from '../dynamic-form/dynamic-form';
 import * as models from '../../../../bindings/github.com/noatgnu/cauldron-go/backend/models/models';
 
@@ -25,6 +25,8 @@ export interface PluginEnvironmentDialogData {
   runtimeEnvironments: string[];
   plugin?: models.PluginV2;
 }
+
+const UV_PYTHON_PREFIX = 'uv:';
 
 @Component({
   selector: 'app-plugin-environment-dialog',
@@ -53,6 +55,7 @@ export interface PluginEnvironmentDialogData {
 export class PluginEnvironmentDialog implements OnInit {
   protected readonly data = inject<PluginEnvironmentDialogData>(MAT_DIALOG_DATA);
   protected readonly dialogRef = inject(MatDialogRef<PluginEnvironmentDialog>);
+  protected readonly uvPythonPrefix = UV_PYTHON_PREFIX;
   private readonly wails = inject(Wails);
   private readonly notification = inject(NotificationService);
 
@@ -71,6 +74,8 @@ export class PluginEnvironmentDialog implements OnInit {
   pythonEnvironments = signal<PythonEnvironment[]>([]);
   basePythonEnvironments = computed(() => this.pythonEnvironments().filter(env => !env.isVirtual));
   rEnvironments = signal<REnvironment[]>([]);
+  uvAvailable = signal(false);
+  uvManagedPythons = signal<UvPythonVersion[]>([]);
   activePythonEnv = signal<PythonEnvironment | null>(null);
   activeREnv = signal<REnvironment | null>(null);
   customEnvVars = signal<Record<string, string>>({});
@@ -154,13 +159,26 @@ export class PluginEnvironmentDialog implements OnInit {
         }
       };
 
-      const [pythonBinding, rBinding, pythonEnvs, rEnvs, activePython, activeR] = await Promise.all([
+      const getUvManagedPythons = async () => {
+        try {
+          const available = await this.wails.isUvAvailable();
+          this.uvAvailable.set(available);
+          if (!available) return [];
+          return await this.wails.listUvManagedPythons();
+        } catch {
+          this.uvAvailable.set(false);
+          return [];
+        }
+      };
+
+      const [pythonBinding, rBinding, pythonEnvs, rEnvs, activePython, activeR, uvPythons] = await Promise.all([
         getPythonBinding(),
         getRBinding(),
         this.wails.detectPythonEnvironments(),
         this.wails.detectREnvironments(),
         this.wails.getActivePythonEnvironment(),
-        this.wails.getActiveREnvironment()
+        this.wails.getActiveREnvironment(),
+        getUvManagedPythons()
       ]);
 
       this.pythonBinding.set(pythonBinding);
@@ -169,6 +187,7 @@ export class PluginEnvironmentDialog implements OnInit {
       this.rEnvironments.set(rEnvs || []);
       this.activePythonEnv.set(activePython);
       this.activeREnv.set(activeR);
+      this.uvManagedPythons.set(uvPythons || []);
     } catch (error) {
       console.error('Failed to load environment data:', error);
       this.notification.showError('Failed to load environment data');
@@ -242,7 +261,7 @@ export class PluginEnvironmentDialog implements OnInit {
 
   startVenvCreation() {
     const baseEnvs = this.basePythonEnvironments();
-    if (baseEnvs.length === 0) {
+    if (baseEnvs.length === 0 && this.uvManagedPythons().length === 0) {
       this.notification.showError('No base Python environments detected. Please configure Python in Settings first.');
       return;
     }
@@ -250,10 +269,14 @@ export class PluginEnvironmentDialog implements OnInit {
     const activePython = this.activePythonEnv();
     const defaultEnv = activePython && !activePython.isVirtual
       ? activePython.path
-      : baseEnvs[0].path;
+      : (baseEnvs[0]?.path ?? UV_PYTHON_PREFIX + this.uvManagedPythons()[0].version);
 
     this.selectedBasePython.set(defaultEnv);
     this.showVenvCreation.set(true);
+  }
+
+  isUvBaseSelection(value: string): boolean {
+    return value.startsWith(UV_PYTHON_PREFIX);
   }
 
   cancelVenvCreation() {
@@ -273,7 +296,12 @@ export class PluginEnvironmentDialog implements OnInit {
 
     try {
       const venvPath = await this.wails.getDefaultVenvPath(this.data.pluginId);
-      await this.wails.createPythonVirtualEnv(basePython, venvPath, this.data.pluginId);
+      if (this.isUvBaseSelection(basePython)) {
+        const uvPythonVersion = basePython.slice(UV_PYTHON_PREFIX.length);
+        await this.wails.createUvVirtualEnv(uvPythonVersion, venvPath, this.data.pluginId);
+      } else {
+        await this.wails.createPythonVirtualEnv(basePython, venvPath, this.data.pluginId);
+      }
 
       const venvs = await this.wails.getVirtualEnvironments();
       const newVenv = venvs.find(v => v.Path.includes(venvPath) || venvPath.includes(v.Name));

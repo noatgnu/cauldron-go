@@ -597,23 +597,30 @@ func (a *App) ListRPackages(rPath string) ([]string, error) {
 	return a.envService.ListRPackages(rPath)
 }
 
-func (a *App) CreatePythonVirtualEnv(basePythonPath string, venvPath string, pluginID string) error {
-	var pluginFolderPath string
-	if pluginID != "" {
-		plugin, err := a.pluginLoaderV2.GetPluginByStringID(pluginID)
-		if err != nil {
-			if id, convErr := strconv.ParseUint(pluginID, 10, 64); convErr == nil {
-				plugin, err = a.pluginLoaderV2.GetPlugin(uint(id))
-			}
-		}
+// resolvePluginFolderPath looks up a plugin's folder path by its string or numeric ID, logging (not failing) on a miss.
+func (a *App) resolvePluginFolderPath(pluginID, logPrefix string) string {
+	if pluginID == "" {
+		return ""
+	}
 
-		if err == nil {
-			pluginFolderPath = plugin.FolderPath
-			log.Printf("[App] CreatePythonVirtualEnv: Found plugin folder path: %s", pluginFolderPath)
-		} else {
-			log.Printf("[App] CreatePythonVirtualEnv: Failed to get plugin folder path: %v", err)
+	plugin, err := a.pluginLoaderV2.GetPluginByStringID(pluginID)
+	if err != nil {
+		if id, convErr := strconv.ParseUint(pluginID, 10, 64); convErr == nil {
+			plugin, err = a.pluginLoaderV2.GetPlugin(uint(id))
 		}
 	}
+
+	if err != nil {
+		log.Printf("[App] %s: Failed to get plugin folder path: %v", logPrefix, err)
+		return ""
+	}
+
+	log.Printf("[App] %s: Found plugin folder path: %s", logPrefix, plugin.FolderPath)
+	return plugin.FolderPath
+}
+
+func (a *App) CreatePythonVirtualEnv(basePythonPath string, venvPath string, pluginID string) error {
+	pluginFolderPath := a.resolvePluginFolderPath(pluginID, "CreatePythonVirtualEnv")
 	return a.envService.CreatePythonVirtualEnv(basePythonPath, venvPath, pluginID, pluginFolderPath)
 }
 
@@ -869,7 +876,7 @@ func (a *App) GetPortableEnvironmentPath(environment string) (string, error) {
 }
 
 func (a *App) GetUvPath() (string, error) {
-	return a.uvService.GetUvPath()
+	return a.uvService.ResolveUvPath()
 }
 
 func (a *App) DownloadUv() error {
@@ -888,7 +895,8 @@ func (a *App) InstallUvPythonVersion(version string) error {
 	return a.uvService.InstallUvPythonVersion(version)
 }
 
-func (a *App) CreateUvVirtualEnv(pythonVersion string, venvPath string, pluginID string, pluginFolderPath string) error {
+func (a *App) CreateUvVirtualEnv(pythonVersion string, venvPath string, pluginID string) error {
+	pluginFolderPath := a.resolvePluginFolderPath(pluginID, "CreateUvVirtualEnv")
 	return a.uvService.CreateUvVirtualEnv(pythonVersion, venvPath, pluginID, pluginFolderPath)
 }
 
