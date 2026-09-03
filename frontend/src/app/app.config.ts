@@ -1,6 +1,6 @@
 import { ApplicationConfig, importProvidersFrom, provideBrowserGlobalErrorListeners, provideZonelessChangeDetection } from '@angular/core';
 import { provideRouter, withHashLocation } from '@angular/router';
-import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { MATERIAL_ANIMATIONS } from '@angular/material/core';
 import * as PlotlyJS from 'plotly.js-dist-min';
 import { PlotlyModule } from 'angular-plotly.js';
 import {
@@ -19,7 +19,7 @@ import { routes } from './app.routes';
 export const appConfig: ApplicationConfig = {
   providers: [
     provideZonelessChangeDetection(),
-    provideNoopAnimations(),
+    { provide: MATERIAL_ANIMATIONS, useValue: { animationsDisabled: false } },
     provideBrowserGlobalErrorListeners(),
     provideRouter(routes, withHashLocation()),
     importProvidersFrom(PlotlyModule.forRoot(PlotlyJS)),
