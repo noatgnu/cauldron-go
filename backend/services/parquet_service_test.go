@@ -60,6 +60,7 @@ func makeTestRows(n int) []parquetTestRow {
 func TestOpenParquetFile_ReportsSchemaAndRowCount(t *testing.T) {
 	path := writeTestParquetFile(t, makeTestRows(10), 5)
 	svc := NewParquetService(NewProgressNotifier(nil))
+	t.Cleanup(func() { _ = svc.CloseParquetFile(path) })
 
 	info, err := svc.OpenParquetFile(path)
 	if err != nil {
@@ -89,6 +90,7 @@ func TestOpenParquetFile_ReportsSchemaAndRowCount(t *testing.T) {
 func TestOpenParquetFile_CachesHandleAcrossCalls(t *testing.T) {
 	path := writeTestParquetFile(t, makeTestRows(5), 5)
 	svc := NewParquetService(NewProgressNotifier(nil))
+	t.Cleanup(func() { _ = svc.CloseParquetFile(path) })
 
 	if _, err := svc.OpenParquetFile(path); err != nil {
 		t.Fatalf("first OpenParquetFile failed: %v", err)
@@ -105,6 +107,7 @@ func TestOpenParquetFile_CachesHandleAcrossCalls(t *testing.T) {
 func TestReadParquetPage_ReturnsCorrectSlice(t *testing.T) {
 	path := writeTestParquetFile(t, makeTestRows(10), 5)
 	svc := NewParquetService(NewProgressNotifier(nil))
+	t.Cleanup(func() { _ = svc.CloseParquetFile(path) })
 
 	page, err := svc.ReadParquetPage(path, 3, 4)
 	if err != nil {
@@ -124,6 +127,7 @@ func TestReadParquetPage_ReturnsCorrectSlice(t *testing.T) {
 func TestReadParquetPage_PartialLastPage(t *testing.T) {
 	path := writeTestParquetFile(t, makeTestRows(10), 5)
 	svc := NewParquetService(NewProgressNotifier(nil))
+	t.Cleanup(func() { _ = svc.CloseParquetFile(path) })
 
 	page, err := svc.ReadParquetPage(path, 8, 5)
 	if err != nil {
@@ -143,6 +147,7 @@ func TestReadParquetPage_PartialLastPage(t *testing.T) {
 func TestReadParquetPage_SpansTwoRowGroups(t *testing.T) {
 	path := writeTestParquetFile(t, makeTestRows(10), 4) // row groups: [0-3],[4-7],[8-9]
 	svc := NewParquetService(NewProgressNotifier(nil))
+	t.Cleanup(func() { _ = svc.CloseParquetFile(path) })
 
 	page, err := svc.ReadParquetPage(path, 2, 6) // spans row group 0 and row group 1
 	if err != nil {
@@ -227,6 +232,7 @@ func TestExportParquetToCSV_TabDelimiter(t *testing.T) {
 func TestCloseParquetFile_RemovesHandleAndAllowsReopen(t *testing.T) {
 	path := writeTestParquetFile(t, makeTestRows(5), 5)
 	svc := NewParquetService(NewProgressNotifier(nil))
+	t.Cleanup(func() { _ = svc.CloseParquetFile(path) })
 
 	if _, err := svc.OpenParquetFile(path); err != nil {
 		t.Fatalf("OpenParquetFile failed: %v", err)
