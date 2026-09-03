@@ -26,6 +26,7 @@ interface UpdateCheckResult {
   latestCommit?: string;
   recommendedCommit?: string;
   changelogUrl?: string;
+  schemaMigrationAvailable?: boolean;
   error?: string;
 }
 
@@ -86,7 +87,8 @@ export class PluginUpdateCheckDialog implements OnInit {
         currentCommit: result.current_commit || this.data.plugin.commitHash || '',
         latestCommit: result.latest_commit,
         recommendedCommit: result.recommended_commit,
-        changelogUrl: result.changelog_url
+        changelogUrl: result.changelog_url,
+        schemaMigrationAvailable: result.schema_migration_available || false
       });
 
       await this.wails.logToFile(`[PluginUpdateCheckDialog] Checked update for ${this.data.plugin.definition.plugin.name}: hasUpdate=${result.has_update}`);

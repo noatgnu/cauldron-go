@@ -724,7 +724,7 @@ func (a *App) resolvePluginMigrationTargets(pluginID uint) (*models.PluginRegist
 }
 
 // GetPendingEnvVarMigration is a read-only check for which saved custom env var keys a plugin update renamed or removed.
-func (a *App) GetPendingEnvVarMigration(pluginID uint) ([]services.EnvVarKeyChange, error) {
+func (a *App) GetPendingEnvVarMigration(pluginID uint) (*services.PendingEnvVarMigration, error) {
 	registry, currentSchemaVersion, err := a.resolvePluginMigrationTargets(pluginID)
 	if err != nil {
 		return nil, err
@@ -732,13 +732,13 @@ func (a *App) GetPendingEnvVarMigration(pluginID uint) ([]services.EnvVarKeyChan
 	return a.pluginMigrationService.DetectPendingEnvVarMigration(registry, currentSchemaVersion)
 }
 
-// ApplyPendingEnvVarMigration reconciles saved custom env var keys, only in response to an explicit user action.
-func (a *App) ApplyPendingEnvVarMigration(pluginID uint) error {
+// ApplyPendingEnvVarMigration reconciles saved custom env var keys, only in response to an explicit user action; confirmedLarge must be true to apply an unusually large pending migration.
+func (a *App) ApplyPendingEnvVarMigration(pluginID uint, confirmedLarge bool) error {
 	registry, currentSchemaVersion, err := a.resolvePluginMigrationTargets(pluginID)
 	if err != nil {
 		return err
 	}
-	return a.pluginMigrationService.ApplyPendingEnvVarMigration(registry, currentSchemaVersion)
+	return a.pluginMigrationService.ApplyPendingEnvVarMigration(registry, currentSchemaVersion, confirmedLarge)
 }
 
 type GitAuthConfigResponse struct {

@@ -1,8 +1,11 @@
 package services
 
 import (
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/noatgnu/cauldron-go/backend/models"
@@ -39,12 +42,12 @@ func TestPendingEnvVarChanges_NoMigrationsDir(t *testing.T) {
 	db := createTestDB(t)
 	svc, registry := setupMigrationTestPlugin(t, db)
 
-	changes, err := svc.DetectPendingEnvVarMigration(registry, 1)
+	pending, err := svc.DetectPendingEnvVarMigration(registry, 1)
 	if err != nil {
 		t.Fatalf("DetectPendingEnvVarMigration failed: %v", err)
 	}
-	if len(changes) != 0 {
-		t.Errorf("expected no changes with no migrations dir, got %+v", changes)
+	if len(pending.Changes) != 0 {
+		t.Errorf("expected no changes with no migrations dir, got %+v", pending.Changes)
 	}
 }
 
@@ -53,12 +56,12 @@ func TestPendingEnvVarChanges_AlreadyAppliedIsNoOp(t *testing.T) {
 	svc, registry := setupMigrationTestPlugin(t, db)
 	registry.LastAppliedSchemaVersion = 2
 
-	changes, err := svc.DetectPendingEnvVarMigration(registry, 2)
+	pending, err := svc.DetectPendingEnvVarMigration(registry, 2)
 	if err != nil {
 		t.Fatalf("DetectPendingEnvVarMigration failed: %v", err)
 	}
-	if len(changes) != 0 {
-		t.Errorf("expected no changes when already at current schemaVersion, got %+v", changes)
+	if len(pending.Changes) != 0 {
+		t.Errorf("expected no changes when already at current schemaVersion, got %+v", pending.Changes)
 	}
 }
 
@@ -73,12 +76,15 @@ func TestPendingEnvVarChanges_SimpleRename(t *testing.T) {
 		t.Fatalf("failed to seed CustomEnvVar: %v", err)
 	}
 
-	changes, err := svc.DetectPendingEnvVarMigration(registry, 1)
+	pending, err := svc.DetectPendingEnvVarMigration(registry, 1)
 	if err != nil {
 		t.Fatalf("DetectPendingEnvVarMigration failed: %v", err)
 	}
-	if len(changes) != 1 || changes[0].From != "API_KEY" || changes[0].To != "UNIPROT_API_KEY" || changes[0].Removed {
-		t.Fatalf("unexpected changes: %+v", changes)
+	if len(pending.Changes) != 1 || pending.Changes[0].From != "API_KEY" || pending.Changes[0].To != "UNIPROT_API_KEY" || pending.Changes[0].Removed {
+		t.Fatalf("unexpected changes: %+v", pending.Changes)
+	}
+	if pending.TotalOperations != 1 || pending.Large {
+		t.Errorf("expected TotalOperations=1, Large=false, got %+v", pending)
 	}
 }
 
@@ -95,12 +101,12 @@ func TestPendingEnvVarChanges_ChainedRenameAcrossMigrations(t *testing.T) {
 		t.Fatalf("failed to seed CustomEnvVar: %v", err)
 	}
 
-	changes, err := svc.DetectPendingEnvVarMigration(registry, 2)
+	pending, err := svc.DetectPendingEnvVarMigration(registry, 2)
 	if err != nil {
 		t.Fatalf("DetectPendingEnvVarMigration failed: %v", err)
 	}
-	if len(changes) != 1 || changes[0].From != "A" || changes[0].To != "C" {
-		t.Fatalf("expected chained rename A -> C, got %+v", changes)
+	if len(pending.Changes) != 1 || pending.Changes[0].From != "A" || pending.Changes[0].To != "C" {
+		t.Fatalf("expected chained rename A -> C, got %+v", pending.Changes)
 	}
 }
 
@@ -115,12 +121,12 @@ func TestPendingEnvVarChanges_Removal(t *testing.T) {
 		t.Fatalf("failed to seed CustomEnvVar: %v", err)
 	}
 
-	changes, err := svc.DetectPendingEnvVarMigration(registry, 1)
+	pending, err := svc.DetectPendingEnvVarMigration(registry, 1)
 	if err != nil {
 		t.Fatalf("DetectPendingEnvVarMigration failed: %v", err)
 	}
-	if len(changes) != 1 || !changes[0].Removed || changes[0].From != "LEGACY_KEY" {
-		t.Fatalf("expected a removal change, got %+v", changes)
+	if len(pending.Changes) != 1 || !pending.Changes[0].Removed || pending.Changes[0].From != "LEGACY_KEY" {
+		t.Fatalf("expected a removal change, got %+v", pending.Changes)
 	}
 }
 
@@ -135,12 +141,54 @@ func TestPendingEnvVarChanges_IgnoresUnaffectedKeys(t *testing.T) {
 		t.Fatalf("failed to seed CustomEnvVar: %v", err)
 	}
 
-	changes, err := svc.DetectPendingEnvVarMigration(registry, 1)
+	pending, err := svc.DetectPendingEnvVarMigration(registry, 1)
 	if err != nil {
 		t.Fatalf("DetectPendingEnvVarMigration failed: %v", err)
 	}
-	if len(changes) != 0 {
-		t.Errorf("expected no changes for an unaffected key, got %+v", changes)
+	if len(pending.Changes) != 0 {
+		t.Errorf("expected no changes for an unaffected key, got %+v", pending.Changes)
+	}
+}
+
+// writeLargeMigration writes a single migration file with opCount unrelated renameEnvVar operations, none of which touch any saved key -- large purely by operation count.
+func writeLargeMigration(t *testing.T, pluginFolder string, opCount int) {
+	t.Helper()
+	var b strings.Builder
+	b.WriteString("schemaVersion: 1\noperations:\n")
+	for i := 0; i < opCount; i++ {
+		fmt.Fprintf(&b, "  - renameEnvVar: { from: UNUSED_%d, to: ALSO_UNUSED_%d }\n", i, i)
+	}
+	writeTestMigration(t, pluginFolder, "0001_large.yaml", b.String())
+}
+
+func TestPendingEnvVarChanges_LargeSetIsFlagged(t *testing.T) {
+	db := createTestDB(t)
+	svc, registry := setupMigrationTestPlugin(t, db)
+	writeLargeMigration(t, registry.FolderPath, LargeMigrationOperationThreshold+1)
+
+	pending, err := svc.DetectPendingEnvVarMigration(registry, 1)
+	if err != nil {
+		t.Fatalf("DetectPendingEnvVarMigration failed: %v", err)
+	}
+	if !pending.Large {
+		t.Errorf("expected Large=true for %d operations, got %+v", LargeMigrationOperationThreshold+1, pending)
+	}
+	if pending.TotalOperations != LargeMigrationOperationThreshold+1 {
+		t.Errorf("expected TotalOperations=%d, got %d", LargeMigrationOperationThreshold+1, pending.TotalOperations)
+	}
+}
+
+func TestPendingEnvVarChanges_AtThresholdIsNotLarge(t *testing.T) {
+	db := createTestDB(t)
+	svc, registry := setupMigrationTestPlugin(t, db)
+	writeLargeMigration(t, registry.FolderPath, LargeMigrationOperationThreshold)
+
+	pending, err := svc.DetectPendingEnvVarMigration(registry, 1)
+	if err != nil {
+		t.Fatalf("DetectPendingEnvVarMigration failed: %v", err)
+	}
+	if pending.Large {
+		t.Errorf("expected exactly-at-threshold (%d) to not be flagged large", LargeMigrationOperationThreshold)
 	}
 }
 
@@ -155,7 +203,7 @@ func TestApplyPendingEnvVarMigration_RenamesAndUpdatesLedger(t *testing.T) {
 		t.Fatalf("failed to seed CustomEnvVar: %v", err)
 	}
 
-	if err := svc.ApplyPendingEnvVarMigration(registry, 1); err != nil {
+	if err := svc.ApplyPendingEnvVarMigration(registry, 1, false); err != nil {
 		t.Fatalf("ApplyPendingEnvVarMigration failed: %v", err)
 	}
 
@@ -190,7 +238,7 @@ func TestApplyPendingEnvVarMigration_Removal(t *testing.T) {
 		t.Fatalf("failed to seed CustomEnvVar: %v", err)
 	}
 
-	if err := svc.ApplyPendingEnvVarMigration(registry, 1); err != nil {
+	if err := svc.ApplyPendingEnvVarMigration(registry, 1, false); err != nil {
 		t.Fatalf("ApplyPendingEnvVarMigration failed: %v", err)
 	}
 
@@ -217,7 +265,7 @@ func TestApplyPendingEnvVarMigration_RenameConflictDropsSource(t *testing.T) {
 		t.Fatalf("failed to seed NEW_KEY: %v", err)
 	}
 
-	if err := svc.ApplyPendingEnvVarMigration(registry, 1); err != nil {
+	if err := svc.ApplyPendingEnvVarMigration(registry, 1, false); err != nil {
 		t.Fatalf("ApplyPendingEnvVarMigration failed: %v", err)
 	}
 
@@ -237,11 +285,38 @@ func TestApplyPendingEnvVarMigration_NoMatchingKeysStillBumpsLedger(t *testing.T
 	writeTestMigration(t, registry.FolderPath, "0001_rename.yaml",
 		"schemaVersion: 1\noperations:\n  - renameEnvVar: { from: NEVER_SET, to: ALSO_NEVER_SET }\n")
 
-	if err := svc.ApplyPendingEnvVarMigration(registry, 1); err != nil {
+	if err := svc.ApplyPendingEnvVarMigration(registry, 1, false); err != nil {
 		t.Fatalf("ApplyPendingEnvVarMigration failed: %v", err)
 	}
 
 	if registry.LastAppliedSchemaVersion != 1 {
 		t.Errorf("expected ledger bumped to 1 even with no matching saved keys, got %d", registry.LastAppliedSchemaVersion)
+	}
+}
+
+func TestApplyPendingEnvVarMigration_LargeSetRequiresConfirmation(t *testing.T) {
+	db := createTestDB(t)
+	svc, registry := setupMigrationTestPlugin(t, db)
+	writeLargeMigration(t, registry.FolderPath, LargeMigrationOperationThreshold+1)
+
+	err := svc.ApplyPendingEnvVarMigration(registry, 1, false)
+	if !errors.Is(err, ErrLargeMigrationRequiresConfirmation) {
+		t.Fatalf("expected ErrLargeMigrationRequiresConfirmation, got %v", err)
+	}
+	if registry.LastAppliedSchemaVersion != 0 {
+		t.Errorf("expected ledger left untouched when confirmation is required, got %d", registry.LastAppliedSchemaVersion)
+	}
+}
+
+func TestApplyPendingEnvVarMigration_LargeSetSucceedsWhenConfirmed(t *testing.T) {
+	db := createTestDB(t)
+	svc, registry := setupMigrationTestPlugin(t, db)
+	writeLargeMigration(t, registry.FolderPath, LargeMigrationOperationThreshold+1)
+
+	if err := svc.ApplyPendingEnvVarMigration(registry, 1, true); err != nil {
+		t.Fatalf("ApplyPendingEnvVarMigration with confirmedLarge=true failed: %v", err)
+	}
+	if registry.LastAppliedSchemaVersion != 1 {
+		t.Errorf("expected ledger updated once confirmed, got %d", registry.LastAppliedSchemaVersion)
 	}
 }

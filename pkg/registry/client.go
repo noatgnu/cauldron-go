@@ -84,6 +84,7 @@ type Plugin struct {
 	Name                   string        `json:"name"`
 	Description            string        `json:"description"`
 	Version                string        `json:"version"`
+	SchemaVersion          int           `json:"schema_version"`
 	Author                 *Author       `json:"author"`
 	Category               *Category     `json:"category"`
 	Icon                   string        `json:"icon,omitempty"`
@@ -103,13 +104,16 @@ type Plugin struct {
 }
 
 type UpdateInfo struct {
-	PluginID          string  `json:"plugin_id"`
-	CurrentCommit     string  `json:"current_commit"`
-	LatestCommit      string  `json:"latest_commit"`
-	RecommendedCommit string  `json:"recommended_commit"`
-	LatestStableTag   *string `json:"latest_stable_tag"`
-	HasUpdate         bool    `json:"has_update"`
-	ChangelogURL      *string `json:"changelog_url"`
+	PluginID                 string  `json:"plugin_id"`
+	CurrentCommit            string  `json:"current_commit"`
+	LatestCommit             string  `json:"latest_commit"`
+	RecommendedCommit        string  `json:"recommended_commit"`
+	LatestStableTag          *string `json:"latest_stable_tag"`
+	HasUpdate                bool    `json:"has_update"`
+	ChangelogURL             *string `json:"changelog_url"`
+	CurrentSchemaVersion     int     `json:"current_schema_version"`
+	LatestSchemaVersion      int     `json:"latest_schema_version"`
+	SchemaMigrationAvailable bool    `json:"schema_migration_available"`
 }
 
 type PluginListResponse struct {

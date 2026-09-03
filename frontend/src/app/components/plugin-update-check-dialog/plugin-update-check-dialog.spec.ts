@@ -94,6 +94,37 @@ describe('PluginUpdateCheckDialog', () => {
     expect(component.updateResult()?.hasUpdate).toBe(true);
   });
 
+  it('should surface a schema migration notice when the registry reports one', async () => {
+    const mockUpdateResult = {
+      has_update: true,
+      current_commit: 'abc1234',
+      latest_commit: 'def5678',
+      recommended_commit: 'def5678',
+      schema_migration_available: true
+    };
+
+    mockWails.checkPluginUpdate.mockResolvedValue(mockUpdateResult);
+
+    await component.ngOnInit();
+
+    expect(component.updateResult()?.schemaMigrationAvailable).toBe(true);
+  });
+
+  it('should default schemaMigrationAvailable to false when the registry omits it', async () => {
+    const mockUpdateResult = {
+      has_update: true,
+      current_commit: 'abc1234',
+      latest_commit: 'def5678',
+      recommended_commit: 'def5678'
+    };
+
+    mockWails.checkPluginUpdate.mockResolvedValue(mockUpdateResult);
+
+    await component.ngOnInit();
+
+    expect(component.updateResult()?.schemaMigrationAvailable).toBe(false);
+  });
+
   it('should handle update check error', async () => {
     mockWails.checkPluginUpdate.mockRejectedValue('Network error');
 

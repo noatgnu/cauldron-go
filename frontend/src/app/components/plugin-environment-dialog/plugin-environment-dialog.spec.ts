@@ -1,11 +1,20 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
-import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
+import { MAT_DIALOG_DATA, MatDialog, MatDialogRef } from '@angular/material/dialog';
+import { of } from 'rxjs';
 import { PluginEnvironmentDialog } from './plugin-environment-dialog';
 import { Wails } from '../../core/services/wails';
 import { NotificationService } from '../../core/services/notification.service';
 import { vi } from 'vitest';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
+
+function pendingMigration(changes: any[], opts: { totalOperations?: number; large?: boolean } = {}) {
+  return {
+    changes,
+    totalOperations: opts.totalOperations ?? changes.length,
+    large: opts.large ?? false
+  };
+}
 
 describe('PluginEnvironmentDialog', () => {
   let component: PluginEnvironmentDialog;
@@ -13,6 +22,7 @@ describe('PluginEnvironmentDialog', () => {
   let dialogRefSpy: any;
   let wailsMock: any;
   let notificationMock: any;
+  let dialogMock: any;
 
   function createComponent() {
     fixture = TestBed.createComponent(PluginEnvironmentDialog);
@@ -38,12 +48,18 @@ describe('PluginEnvironmentDialog', () => {
       bindPluginToEnvironment: vi.fn().mockResolvedValue(undefined),
       createPythonVirtualEnv: vi.fn().mockResolvedValue(undefined),
       createUvVirtualEnv: vi.fn().mockResolvedValue(undefined),
-      getPendingEnvVarMigration: vi.fn().mockResolvedValue([]),
+      getPendingEnvVarMigration: vi.fn().mockResolvedValue(null),
       applyPendingEnvVarMigration: vi.fn().mockResolvedValue(undefined)
     };
     notificationMock = {
       showError: vi.fn(),
       showSuccess: vi.fn()
+    };
+    dialogMock = {
+      open: vi.fn().mockReturnValue({
+        componentInstance: {},
+        afterClosed: () => of(true)
+      })
     };
 
     await TestBed.configureTestingModule({
@@ -63,6 +79,9 @@ describe('PluginEnvironmentDialog', () => {
       ]
     })
     .compileComponents();
+
+    // PluginEnvironmentDialog's own MatDialogModule import would otherwise shadow a plain providers: override.
+    TestBed.overrideProvider(MatDialog, { useValue: dialogMock });
   });
 
   it('should create', async () => {
@@ -138,9 +157,9 @@ describe('PluginEnvironmentDialog', () => {
   });
 
   it('loads pending env var changes for the bound plugin on init', async () => {
-    wailsMock.getPendingEnvVarMigration.mockResolvedValue([
-      { from: 'API_KEY', to: 'UNIPROT_API_KEY', removed: false }
-    ]);
+    wailsMock.getPendingEnvVarMigration.mockResolvedValue(
+      pendingMigration([{ from: 'API_KEY', to: 'UNIPROT_API_KEY', removed: false }])
+    );
     useDialogDataWithPlugin();
     createComponent();
     await fixture.whenStable();
@@ -150,10 +169,11 @@ describe('PluginEnvironmentDialog', () => {
     expect(component.pendingEnvVarChanges()).toEqual([
       { from: 'API_KEY', to: 'UNIPROT_API_KEY', removed: false }
     ]);
+    expect(component.pendingEnvVarMigration()?.large).toBe(false);
   });
 
   it('dismissing the banner hides it without calling apply', async () => {
-    wailsMock.getPendingEnvVarMigration.mockResolvedValue([{ from: 'A', to: 'B', removed: false }]);
+    wailsMock.getPendingEnvVarMigration.mockResolvedValue(pendingMigration([{ from: 'A', to: 'B', removed: false }]));
     useDialogDataWithPlugin();
     createComponent();
     await fixture.whenStable();
@@ -164,22 +184,54 @@ describe('PluginEnvironmentDialog', () => {
     expect(wailsMock.applyPendingEnvVarMigration).not.toHaveBeenCalled();
   });
 
-  it('applying the migration calls the backend and refreshes pending changes', async () => {
+  it('applying a normal-sized migration calls the backend with confirmedLarge=false and skips the confirm dialog', async () => {
     wailsMock.getPendingEnvVarMigration
-      .mockResolvedValueOnce([{ from: 'A', to: 'B', removed: false }])
-      .mockResolvedValueOnce([]);
+      .mockResolvedValueOnce(pendingMigration([{ from: 'A', to: 'B', removed: false }]))
+      .mockResolvedValueOnce(pendingMigration([]));
     useDialogDataWithPlugin();
     createComponent();
     await fixture.whenStable();
 
     await component.applyEnvVarMigration();
 
-    expect(wailsMock.applyPendingEnvVarMigration).toHaveBeenCalledWith(42);
+    expect(dialogMock.open).not.toHaveBeenCalled();
+    expect(wailsMock.applyPendingEnvVarMigration).toHaveBeenCalledWith(42, false);
     expect(component.pendingEnvVarChanges()).toEqual([]);
   });
 
+  it('applying a large migration shows a confirm dialog and proceeds with confirmedLarge=true when confirmed', async () => {
+    wailsMock.getPendingEnvVarMigration
+      .mockResolvedValueOnce(pendingMigration([{ from: 'A', to: 'B', removed: false }], { totalOperations: 80, large: true }))
+      .mockResolvedValueOnce(pendingMigration([]));
+    useDialogDataWithPlugin();
+    createComponent();
+    await fixture.whenStable();
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    await component.applyEnvVarMigration();
+
+    expect(dialogMock.open).toHaveBeenCalled();
+    expect(wailsMock.applyPendingEnvVarMigration).toHaveBeenCalledWith(42, true);
+  });
+
+  it('applying a large migration does nothing if the confirm dialog is cancelled', async () => {
+    dialogMock.open.mockReturnValue({ componentInstance: {}, afterClosed: () => of(false) });
+    wailsMock.getPendingEnvVarMigration.mockResolvedValue(
+      pendingMigration([{ from: 'A', to: 'B', removed: false }], { totalOperations: 80, large: true })
+    );
+    useDialogDataWithPlugin();
+    createComponent();
+    await fixture.whenStable();
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    await component.applyEnvVarMigration();
+
+    expect(dialogMock.open).toHaveBeenCalled();
+    expect(wailsMock.applyPendingEnvVarMigration).not.toHaveBeenCalled();
+  });
+
   it('surfaces an error notification when applying the migration fails', async () => {
-    wailsMock.getPendingEnvVarMigration.mockResolvedValue([{ from: 'A', to: 'B', removed: false }]);
+    wailsMock.getPendingEnvVarMigration.mockResolvedValue(pendingMigration([{ from: 'A', to: 'B', removed: false }]));
     wailsMock.applyPendingEnvVarMigration.mockRejectedValue(new Error('boom'));
     useDialogDataWithPlugin();
     createComponent();

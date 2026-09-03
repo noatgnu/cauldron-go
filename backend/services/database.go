@@ -535,17 +535,19 @@ func (d *DatabaseService) DeleteCustomEnvVarByKey(pluginID uint, key string) err
 	return d.db.Where("plugin_id = ? AND key = ?", pluginID, key).Delete(&CustomEnvVar{}).Error
 }
 
-// RenameCustomEnvVarKey renames an existing saved value in place, keeping its ID and Value.
-// If a row already exists at the destination key, the source row is dropped in its favor.
-func (d *DatabaseService) RenameCustomEnvVarKey(pluginID uint, from, to string) error {
+// RenameCustomEnvVarKey renames an existing saved value in place; renamed is false when a row already existed at the destination key, in which case the source row is dropped in its favor instead.
+func (d *DatabaseService) RenameCustomEnvVarKey(pluginID uint, from, to string) (renamed bool, err error) {
 	var destExists int64
 	if err := d.db.Model(&CustomEnvVar{}).Where("plugin_id = ? AND key = ?", pluginID, to).Count(&destExists).Error; err != nil {
-		return err
+		return false, err
 	}
 	if destExists > 0 {
-		return d.DeleteCustomEnvVarByKey(pluginID, from)
+		return false, d.DeleteCustomEnvVarByKey(pluginID, from)
 	}
-	return d.db.Model(&CustomEnvVar{}).Where("plugin_id = ? AND key = ?", pluginID, from).Update("key", to).Error
+	if err := d.db.Model(&CustomEnvVar{}).Where("plugin_id = ? AND key = ?", pluginID, from).Update("key", to).Error; err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 func (d *DatabaseService) SavePluginDockerImage(image *PluginDockerImage) error {

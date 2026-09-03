@@ -161,6 +161,26 @@ mat-dialog-content {
   margin-bottom: 16px;
 }
 
+.schema-migration-notice {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  margin-bottom: 16px;
+  border-radius: 6px;
+  background: var(--warning-container, var(--surface-variant));
+  border: 1px solid var(--warning, var(--outline));
+  font-size: 12px;
+
+  mat-icon {
+    color: var(--warning);
+    flex-shrink: 0;
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+  }
+}
+
 .updating-section {
   margin-top: 20px;
   padding-top: 20px;

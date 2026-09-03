@@ -75,6 +75,13 @@
             </button>
           }
 
+          @if (updateResult()!.schemaMigrationAvailable) {
+            <div class="schema-migration-notice">
+              <mat-icon>sync_alt</mat-icon>
+              <span>This update includes schema changes. If any of your saved environment variable values are affected, you'll be prompted to update them from the plugin's Environment settings after installing.</span>
+            </div>
+          }
+
           @if (updating()) {
             <div class="updating-section">
               <mat-progress-bar mode="indeterminate"></mat-progress-bar>

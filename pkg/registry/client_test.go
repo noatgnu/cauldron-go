@@ -123,12 +123,13 @@ func TestListPlugins_InvalidJSON(t *testing.T) {
 
 func TestGetPlugin_Success(t *testing.T) {
 	mockPlugin := Plugin{
-		ID:          "test-plugin",
-		Name:        "Test Plugin",
-		Description: "Test Description",
-		Version:     "1.0.0",
-		Repository:  "https://github.com/test/plugin",
-		CommitHash:  "abc123",
+		ID:            "test-plugin",
+		Name:          "Test Plugin",
+		Description:   "Test Description",
+		Version:       "1.0.0",
+		SchemaVersion: 3,
+		Repository:    "https://github.com/test/plugin",
+		CommitHash:    "abc123",
 	}
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -163,6 +164,10 @@ func TestGetPlugin_Success(t *testing.T) {
 
 	if result.Version != "1.0.0" {
 		t.Errorf("expected version '1.0.0', got '%s'", result.Version)
+	}
+
+	if result.SchemaVersion != 3 {
+		t.Errorf("expected schema version 3, got %d", result.SchemaVersion)
 	}
 }
 
@@ -389,13 +394,16 @@ func TestCheckUpdate_Success(t *testing.T) {
 	changelogURL := "https://github.com/test/plugin/changelog"
 
 	mockUpdateInfo := UpdateInfo{
-		PluginID:          "test-plugin",
-		CurrentCommit:     "abc123",
-		LatestCommit:      "def456",
-		RecommendedCommit: "def456",
-		LatestStableTag:   &latestTag,
-		HasUpdate:         true,
-		ChangelogURL:      &changelogURL,
+		PluginID:                 "test-plugin",
+		CurrentCommit:            "abc123",
+		LatestCommit:             "def456",
+		RecommendedCommit:        "def456",
+		LatestStableTag:          &latestTag,
+		HasUpdate:                true,
+		ChangelogURL:             &changelogURL,
+		CurrentSchemaVersion:     1,
+		LatestSchemaVersion:      2,
+		SchemaMigrationAvailable: true,
 	}
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -438,6 +446,18 @@ func TestCheckUpdate_Success(t *testing.T) {
 
 	if result.LatestStableTag == nil || *result.LatestStableTag != "v2.0.0" {
 		t.Error("expected latest stable tag 'v2.0.0'")
+	}
+
+	if result.CurrentSchemaVersion != 1 {
+		t.Errorf("expected current schema version 1, got %d", result.CurrentSchemaVersion)
+	}
+
+	if result.LatestSchemaVersion != 2 {
+		t.Errorf("expected latest schema version 2, got %d", result.LatestSchemaVersion)
+	}
+
+	if !result.SchemaMigrationAvailable {
+		t.Error("expected SchemaMigrationAvailable to be true")
 	}
 }
 

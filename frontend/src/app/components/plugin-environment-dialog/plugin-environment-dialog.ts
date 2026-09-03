@@ -1,6 +1,7 @@
 import { Component, OnInit, signal, inject, computed, ChangeDetectionStrategy, effect } from '@angular/core';
+import { firstValueFrom } from 'rxjs';
 import { CommonModule } from '@angular/common';
-import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
+import { MAT_DIALOG_DATA, MatDialog, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
@@ -15,8 +16,9 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatTabsModule } from '@angular/material/tabs';
 import { FormsModule } from '@angular/forms';
-import { Wails, PythonEnvironment, REnvironment, PluginEnvironmentBinding, VirtualEnvironment, RenvEnvironment, CustomEnvVar, UvPythonVersion, EnvVarKeyChange } from '../../core/services/wails';
+import { Wails, PythonEnvironment, REnvironment, PluginEnvironmentBinding, VirtualEnvironment, RenvEnvironment, CustomEnvVar, UvPythonVersion, PendingEnvVarMigration } from '../../core/services/wails';
 import { DynamicFormComponent } from '../dynamic-form/dynamic-form';
+import { ConfirmDialogComponent } from '../confirm-dialog/confirm-dialog';
 import * as models from '../../../../bindings/github.com/noatgnu/cauldron-go/backend/models/models';
 
 export interface PluginEnvironmentDialogData {
@@ -58,6 +60,7 @@ export class PluginEnvironmentDialog implements OnInit {
   protected readonly uvPythonPrefix = UV_PYTHON_PREFIX;
   private readonly wails = inject(Wails);
   private readonly notification = inject(NotificationService);
+  private readonly dialog = inject(MatDialog);
 
   constructor() {
     effect(() => {
@@ -76,7 +79,8 @@ export class PluginEnvironmentDialog implements OnInit {
   rEnvironments = signal<REnvironment[]>([]);
   uvAvailable = signal(false);
   uvManagedPythons = signal<UvPythonVersion[]>([]);
-  pendingEnvVarChanges = signal<EnvVarKeyChange[]>([]);
+  pendingEnvVarMigration = signal<PendingEnvVarMigration | null>(null);
+  pendingEnvVarChanges = computed(() => this.pendingEnvVarMigration()?.changes ?? []);
   envVarMigrationDismissed = signal(false);
   applyingEnvVarMigration = signal(false);
   activePythonEnv = signal<PythonEnvironment | null>(null);
@@ -130,8 +134,8 @@ export class PluginEnvironmentDialog implements OnInit {
   async loadPendingEnvVarMigration() {
     if (!this.data.plugin) return;
     try {
-      const changes = await this.wails.getPendingEnvVarMigration(this.data.plugin.id);
-      this.pendingEnvVarChanges.set(changes || []);
+      const pending = await this.wails.getPendingEnvVarMigration(this.data.plugin.id);
+      this.pendingEnvVarMigration.set(pending);
     } catch (error) {
       console.error('Failed to check for pending env var migration:', error);
     }
@@ -143,9 +147,27 @@ export class PluginEnvironmentDialog implements OnInit {
 
   async applyEnvVarMigration() {
     if (!this.data.plugin) return;
+
+    const pending = this.pendingEnvVarMigration();
+    let confirmedLarge = false;
+    if (pending?.large) {
+      const dialogRef = this.dialog.open(ConfirmDialogComponent, {
+        width: '450px',
+        data: {
+          title: 'Unusually Large Update',
+          message: `This plugin update touches ${pending.totalOperations} environment variable operations affecting ${pending.changes.length} of your saved value(s). This is much larger than a typical update. Continue anyway?`,
+          confirmText: 'Continue',
+          cancelText: 'Cancel'
+        }
+      });
+      const confirmed = await firstValueFrom(dialogRef.afterClosed());
+      if (!confirmed) return;
+      confirmedLarge = true;
+    }
+
     this.applyingEnvVarMigration.set(true);
     try {
-      await this.wails.applyPendingEnvVarMigration(this.data.plugin.id);
+      await this.wails.applyPendingEnvVarMigration(this.data.plugin.id, confirmedLarge);
       await this.loadCustomEnvVars();
       await this.loadPendingEnvVarMigration();
       this.notification.showSuccess('Saved environment variables updated to match the plugin update');

@@ -27,6 +27,7 @@ export type UvPythonVersion = services.UvPythonVersion;
 export type BackupSummary = services.BackupSummary;
 export type RestoreResult = services.RestoreResult;
 export type EnvVarKeyChange = services.EnvVarKeyChange;
+export type PendingEnvVarMigration = services.PendingEnvVarMigration;
 
 export interface GitAuthConfig {
   id: number;
@@ -727,16 +728,16 @@ export class Wails {
     return WailsApp.DeleteCustomEnvVarByKey(pluginId, key);
   }
 
-  async getPendingEnvVarMigration(pluginId: number): Promise<EnvVarKeyChange[]> {
+  async getPendingEnvVarMigration(pluginId: number): Promise<PendingEnvVarMigration | null> {
     if (!this.isWails) throw new Error('Wails not available');
     await this.waitForBackend();
     return WailsApp.GetPendingEnvVarMigration(pluginId);
   }
 
-  async applyPendingEnvVarMigration(pluginId: number): Promise<void> {
+  async applyPendingEnvVarMigration(pluginId: number, confirmedLarge: boolean = false): Promise<void> {
     if (!this.isWails) throw new Error('Wails not available');
     await this.waitForBackend();
-    return WailsApp.ApplyPendingEnvVarMigration(pluginId);
+    return WailsApp.ApplyPendingEnvVarMigration(pluginId, confirmedLarge);
   }
 
   async saveGitAuthConfig(repoURL: string, sshKeyPath: string, passphrase: string): Promise<void> {
