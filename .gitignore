@@ -151,7 +151,8 @@ plugins/phate-analysis/
 plugins/phate-analysis-*/
 
 bin
-examples
+examples/*
+!examples/parquet_browser/
 
 # Plugin-to-SPA CLI (binary only, not source)
 /plugin-to-spa

@@ -28,6 +28,8 @@ export type BackupSummary = services.BackupSummary;
 export type RestoreResult = services.RestoreResult;
 export type EnvVarKeyChange = services.EnvVarKeyChange;
 export type PendingEnvVarMigration = services.PendingEnvVarMigration;
+export type ParquetColumn = services.ParquetColumn;
+export type ParquetFileInfo = services.ParquetFileInfo;
 
 export interface GitAuthConfig {
   id: number;
@@ -738,6 +740,42 @@ export class Wails {
     if (!this.isWails) throw new Error('Wails not available');
     await this.waitForBackend();
     return WailsApp.ApplyPendingEnvVarMigration(pluginId, confirmedLarge);
+  }
+
+  async openParquetFileDialog(): Promise<string> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.OpenParquetFileDialog();
+  }
+
+  async getParquetFileInfo(path: string): Promise<ParquetFileInfo | null> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.GetParquetFileInfo(path);
+  }
+
+  async getParquetPage(path: string, offset: number, limit: number): Promise<Record<string, any>[]> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.GetParquetPage(path, offset, limit);
+  }
+
+  async saveParquetExportDialog(defaultName: string): Promise<string> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.SaveParquetExportDialog(defaultName);
+  }
+
+  async exportParquetToCSV(path: string, outputPath: string, columns: string[], delimiter: string): Promise<void> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.ExportParquetToCSV(path, outputPath, columns, delimiter);
+  }
+
+  async closeParquetFile(path: string): Promise<void> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.CloseParquetFile(path);
   }
 
   async saveGitAuthConfig(repoURL: string, sshKeyPath: string, passphrase: string): Promise<void> {

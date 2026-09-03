@@ -1,0 +1,105 @@
+<div class="parquet-browser-container">
+  <mat-toolbar class="parquet-toolbar">
+    <button mat-raised-button color="primary" (click)="openFile()" [disabled]="loadingFile()">
+      <mat-icon>folder_open</mat-icon>
+      Open Parquet File
+    </button>
+
+    @if (filePath()) {
+      <span class="file-name" [matTooltip]="filePath()!">{{ fileName() }}</span>
+    }
+
+    <span class="spacer"></span>
+
+    @if (fileInfo()) {
+      <mat-form-field appearance="outline" class="delimiter-field">
+        <mat-label>Delimiter</mat-label>
+        <mat-select [(ngModel)]="delimiter">
+          <mat-option value=",">Comma (CSV)</mat-option>
+          <mat-option value="&#9;">Tab (TSV)</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <button mat-raised-button color="accent" (click)="exportData()" [disabled]="exporting()">
+        <mat-icon>download</mat-icon>
+        Export
+      </button>
+    }
+  </mat-toolbar>
+
+  @if (exporting()) {
+    <div class="export-progress">
+      <mat-progress-bar mode="determinate" [value]="exportPercentage()"></mat-progress-bar>
+      <span class="export-message">{{ exportMessage() }}</span>
+    </div>
+  }
+
+  @if (loadingFile()) {
+    <div class="loading-state">
+      <mat-spinner diameter="32"></mat-spinner>
+      <span>Reading parquet file...</span>
+    </div>
+  } @else if (!fileInfo()) {
+    <div class="empty-state">
+      <mat-icon>table_chart</mat-icon>
+      <p>Open a .parquet file to preview its schema and browse rows.</p>
+    </div>
+  } @else {
+    <div class="browser-content">
+      <mat-card class="columns-panel">
+        <mat-card-content>
+          <h3>
+            <mat-icon>view_column</mat-icon>
+            Columns
+          </h3>
+          <p class="hint-text">Select which columns to include when exporting.</p>
+          <div class="column-list">
+            @for (column of fileInfo()!.columns; track column.name) {
+              <mat-checkbox
+                [checked]="isColumnSelected(column.name)"
+                (change)="toggleColumn(column.name)">
+                {{ column.name }}
+                <span class="column-type">{{ column.type }}</span>
+              </mat-checkbox>
+            }
+          </div>
+          <div class="file-stats">
+            <p><strong>Rows:</strong> {{ fileInfo()!.numRows }}</p>
+            <p><strong>Row groups:</strong> {{ fileInfo()!.numRowGroups }}</p>
+            <p><strong>Size:</strong> {{ formatBytes(fileInfo()!.fileSize) }}</p>
+          </div>
+        </mat-card-content>
+      </mat-card>
+
+      <div class="table-panel">
+        <div class="table-container">
+          @if (loadingPage()) {
+            <div class="page-loading-overlay">
+              <mat-spinner diameter="28"></mat-spinner>
+            </div>
+          }
+          <table mat-table [dataSource]="rows()" class="full-width-table">
+            @for (column of displayedColumns(); track column) {
+              <ng-container [matColumnDef]="column">
+                <th mat-header-cell *matHeaderCellDef>{{ column }}</th>
+                <td mat-cell *matCellDef="let row">{{ row[column] }}</td>
+              </ng-container>
+            }
+
+            <tr mat-header-row *matHeaderRowDef="displayedColumns()"></tr>
+            <tr mat-row *matRowDef="let row; columns: displayedColumns();"></tr>
+          </table>
+        </div>
+
+        <mat-paginator
+          [length]="fileInfo()!.numRows"
+          [pageSize]="pageSize()"
+          [pageSizeOptions]="[10, 25, 50, 100]"
+          [pageIndex]="pageIndex()"
+          (page)="onPageChange($event)"
+          showFirstLastButtons>
+        </mat-paginator>
+      </div>
+    </div>
+  }
+</div>
