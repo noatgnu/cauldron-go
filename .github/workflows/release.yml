@@ -166,10 +166,7 @@ jobs:
       - name: Generate Licenses
         run: |
           node scripts/generate-go-licenses.js
-          cd frontend
-          rm -f package-lock.json
-          npm install
-          cd ..
+          cd frontend && npm ci && cd ..
           node scripts/generate-npm-licenses.js
         shell: bash
 
