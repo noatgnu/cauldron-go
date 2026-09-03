@@ -51,6 +51,7 @@ type App struct {
 	gitAuthService         *services.GitAuthService
 	backupService          *services.BackupService
 	pluginMigrationService *services.PluginMigrationService
+	parquetService         *services.ParquetService
 	ready                  chan bool
 	logFilePath            string
 	initialized            chan struct{}
@@ -114,6 +115,7 @@ func (a *App) Initialize() {
 	a.portableEnvService = services.NewPortableEnvServiceV3(a.fileService, a.wailsApp)
 	a.uvService = services.NewUvServiceV3(a.fileService, db, a.settings, a.wailsApp)
 	a.pluginMigrationService = services.NewPluginMigrationService(db)
+	a.parquetService = services.NewParquetService(services.NewProgressNotifierV3(a.wailsApp))
 	a.rPortableService, err = services.NewRPortableServiceV3(a.wailsApp)
 	if err != nil {
 		log.Printf("[App.Initialize] ERROR: Failed to initialize R portable service: %v\n", err)
@@ -739,6 +741,38 @@ func (a *App) ApplyPendingEnvVarMigration(pluginID uint, confirmedLarge bool) er
 		return err
 	}
 	return a.pluginMigrationService.ApplyPendingEnvVarMigration(registry, currentSchemaVersion, confirmedLarge)
+}
+
+// OpenParquetFileDialog shows a native file picker restricted to .parquet files.
+func (a *App) OpenParquetFileDialog() (string, error) {
+	return a.fileService.OpenFileDialog("Select Parquet File", []application.FileFilter{
+		{DisplayName: "Parquet Files (*.parquet)", Pattern: "*.parquet"},
+	})
+}
+
+func (a *App) GetParquetFileInfo(path string) (*services.ParquetFileInfo, error) {
+	return a.parquetService.OpenParquetFile(path)
+}
+
+func (a *App) GetParquetPage(path string, offset int, limit int) ([]map[string]interface{}, error) {
+	return a.parquetService.ReadParquetPage(path, offset, limit)
+}
+
+// SaveParquetExportDialog shows a native save-file picker for the CSV/TSV export destination.
+func (a *App) SaveParquetExportDialog(defaultName string) (string, error) {
+	return a.fileService.SaveFileDialog("Export Parquet Data", defaultName)
+}
+
+func (a *App) ExportParquetToCSV(path string, outputPath string, columns []string, delimiter string) error {
+	d := ','
+	if delimiter != "" {
+		d = rune(delimiter[0])
+	}
+	return a.parquetService.ExportParquetToCSV(path, outputPath, columns, d)
+}
+
+func (a *App) CloseParquetFile(path string) error {
+	return a.parquetService.CloseParquetFile(path)
 }
 
 type GitAuthConfigResponse struct {

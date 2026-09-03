@@ -32,7 +32,8 @@ export class Breadcrumbs implements OnInit {
     'job': { label: 'Jobs', listRoute: '/jobs' },
     'plugin': { label: 'Plugins', listRoute: '/plugin-list' },
     'plugin-list': { label: 'Plugin List' },
-    'plugins': { label: 'Plugin Management' }
+    'plugins': { label: 'Plugin Management' },
+    'parquet-browser': { label: 'Parquet Browser' }
   };
 
   constructor(

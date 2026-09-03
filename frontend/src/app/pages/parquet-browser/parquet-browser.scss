@@ -1,0 +1,162 @@
+.parquet-browser-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.parquet-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 8px 16px;
+  background-color: var(--surface-variant);
+  color: var(--on-surface);
+
+  .file-name {
+    font-size: 13px;
+    color: var(--on-surface-variant);
+    max-width: 300px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .spacer {
+    flex: 1;
+  }
+
+  .delimiter-field {
+    width: 140px;
+
+    ::ng-deep .mat-mdc-text-field-wrapper {
+      height: 40px;
+    }
+  }
+}
+
+.export-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 16px;
+
+  .export-message {
+    font-size: 11px;
+    color: var(--on-surface-variant);
+  }
+}
+
+.loading-state,
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex: 1;
+  color: var(--on-surface-variant);
+
+  mat-icon {
+    font-size: 40px;
+    width: 40px;
+    height: 40px;
+    opacity: 0.5;
+  }
+}
+
+.browser-content {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  gap: 8px;
+  padding: 8px;
+}
+
+.columns-panel {
+  width: 220px;
+  flex-shrink: 0;
+  overflow-y: auto;
+
+  h3 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    margin: 0 0 4px 0;
+
+    mat-icon {
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+    }
+  }
+
+  .hint-text {
+    font-size: 11px;
+    color: var(--on-surface-variant);
+    margin: 0 0 8px 0;
+  }
+
+  .column-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 12px;
+
+    mat-checkbox {
+      font-size: 12px;
+    }
+
+    .column-type {
+      margin-left: 6px;
+      font-size: 10px;
+      color: var(--on-surface-variant);
+    }
+  }
+
+  .file-stats {
+    border-top: 1px solid var(--border);
+    padding-top: 8px;
+
+    p {
+      margin: 2px 0;
+      font-size: 11px;
+    }
+  }
+}
+
+.table-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.table-container {
+  flex: 1;
+  overflow: auto;
+  position: relative;
+  border: 1px solid var(--border);
+}
+
+.full-width-table {
+  width: 100%;
+
+  td, th {
+    white-space: nowrap;
+    padding: 0 12px;
+  }
+}
+
+.page-loading-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
+  z-index: 1;
+}
