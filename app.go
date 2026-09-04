@@ -164,7 +164,7 @@ func (a *App) Initialize() {
 			job.CompletedAt = &now
 		}
 
-		if err := a.db.GetDB().Save(job).Error; err != nil {
+		if err := a.db.GetDB().Model(job).Select("*").Updates(job).Error; err != nil {
 			log.Printf("[App] Failed to save job %s: %v", jobID, err)
 		}
 
@@ -183,7 +183,7 @@ func (a *App) Initialize() {
 			job.TerminalOutput = job.TerminalOutput[len(job.TerminalOutput)-maxLines:]
 		}
 
-		if err := a.db.GetDB().Save(job).Error; err != nil {
+		if err := a.db.GetDB().Model(job).Select("*").Updates(job).Error; err != nil {
 			log.Printf("[App] Failed to save job output %s: %v", jobID, err)
 		}
 

@@ -118,7 +118,7 @@ func (j *JobQueueService) worker() {
 				// Put it back as pending for ResumeQueue to pick up
 				log.Printf("[worker] Queue paused after receiving job, marking as pending: %s", job.ID)
 				job.Status = models.JobStatusPending
-				if err := j.db.GetDB().Save(job).Error; err != nil {
+				if err := j.db.GetDB().Model(job).Select("*").Updates(job).Error; err != nil {
 					log.Printf("[worker] Failed to save job status: %v", err)
 				}
 				continue
@@ -332,7 +332,7 @@ func (j *JobQueueService) processJob(job *models.Job) {
 	job.StartedAt = &now
 	job.Status = models.JobStatusInProgress
 
-	j.db.GetDB().Save(job)
+	j.db.GetDB().Model(job).Select("*").Updates(job)
 	j.emitJobUpdate(job)
 
 	j.mu.RLock()
@@ -345,7 +345,7 @@ func (j *JobQueueService) processJob(job *models.Job) {
 		job.CompletedAt = &completedTime
 		job.Status = models.JobStatusFailed
 		job.Error = "Job stopped by user request"
-		j.db.GetDB().Save(job)
+		j.db.GetDB().Model(job).Select("*").Updates(job)
 		j.emitJobUpdate(job)
 		return
 	}
@@ -355,7 +355,7 @@ func (j *JobQueueService) processJob(job *models.Job) {
 		job.CompletedAt = &completedTime
 		job.Status = models.JobStatusFailed
 		job.Error = err.Error()
-		j.db.GetDB().Save(job)
+		j.db.GetDB().Model(job).Select("*").Updates(job)
 		j.emitJobUpdate(job)
 		return
 	}
@@ -365,7 +365,7 @@ func (j *JobQueueService) processJob(job *models.Job) {
 		job.CompletedAt = &completedTime
 		job.Status = models.JobStatusCompleted
 		job.Progress = 100
-		j.db.GetDB().Save(job)
+		j.db.GetDB().Model(job).Select("*").Updates(job)
 		j.emitJobUpdate(job)
 		return
 	}
@@ -391,7 +391,7 @@ func (j *JobQueueService) processJob(job *models.Job) {
 			job.CompletedAt = &completedTime
 			job.Status = models.JobStatusFailed
 			job.Error = fmt.Sprintf("Failed to load plugin: %v", err)
-			j.db.GetDB().Save(job)
+			j.db.GetDB().Model(job).Select("*").Updates(job)
 			j.emitJobUpdate(job)
 			return
 		}
@@ -427,7 +427,7 @@ func (j *JobQueueService) processJob(job *models.Job) {
 			job.CompletedAt = &completedTime
 			job.Status = models.JobStatusFailed
 			job.Error = "No runtime environments specified"
-			j.db.GetDB().Save(job)
+			j.db.GetDB().Model(job).Select("*").Updates(job)
 			j.emitJobUpdate(job)
 			return
 		}
@@ -475,7 +475,7 @@ func (j *JobQueueService) processJob(job *models.Job) {
 		return
 	}
 
-	j.db.GetDB().Save(job)
+	j.db.GetDB().Model(job).Select("*").Updates(job)
 	j.emitJobUpdate(job)
 }
 
@@ -711,7 +711,7 @@ func (j *JobQueueService) UpdateJobProgress(id string, progress float64, output 
 		job.TerminalOutput = append(job.TerminalOutput, output)
 	}
 
-	j.db.GetDB().Save(job)
+	j.db.GetDB().Model(job).Select("*").Updates(job)
 	j.emitJobUpdate(job)
 
 	return nil
@@ -731,7 +731,7 @@ func (j *JobQueueService) FailJob(id string, errorMsg string) error {
 	job.Status = models.JobStatusFailed
 	job.Error = errorMsg
 
-	j.db.GetDB().Save(job)
+	j.db.GetDB().Model(job).Select("*").Updates(job)
 	j.emitJobUpdate(job)
 
 	return nil
@@ -752,7 +752,7 @@ func (j *JobQueueService) CompleteJob(id string, outputPath string) error {
 	job.Progress = 100
 	job.OutputPath = outputPath
 
-	j.db.GetDB().Save(job)
+	j.db.GetDB().Model(job).Select("*").Updates(job)
 	j.emitJobUpdate(job)
 
 	return nil
@@ -833,7 +833,7 @@ func (j *JobQueueService) StopQueueImmediate() error {
 		job.StartedAt = nil
 		job.CompletedAt = nil
 		job.Error = ""
-		j.db.GetDB().Save(job)
+		j.db.GetDB().Model(job).Select("*").Updates(job)
 
 		if cancelFunc, exists := j.cancelFuncs[job.ID]; exists {
 			log.Printf("[StopQueueImmediate] Calling cancel function for job %s", job.ID)

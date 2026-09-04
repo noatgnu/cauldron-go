@@ -195,7 +195,7 @@ func newCLIContextWithPluginsDir(pluginsDir string) (*cliContext, error) {
 			now := time.Now()
 			job.CompletedAt = &now
 		}
-		db.GetDB().Save(job)
+		db.GetDB().Model(job).Select("*").Updates(job)
 	})
 	scriptExecutor.SetOutputCallback(func(jobID string, line string) {
 		job, err := jobQueue.GetJob(jobID)
@@ -207,7 +207,7 @@ func newCLIContextWithPluginsDir(pluginsDir string) (*cliContext, error) {
 		if len(job.TerminalOutput) > maxLines {
 			job.TerminalOutput = job.TerminalOutput[len(job.TerminalOutput)-maxLines:]
 		}
-		db.GetDB().Save(job)
+		db.GetDB().Model(job).Select("*").Updates(job)
 	})
 	scriptExecutor.SetPluginLoader(pluginLoaderV2)
 	jobQueue.SetScriptExecutor(scriptExecutor)
