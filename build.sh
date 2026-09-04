@@ -12,6 +12,9 @@ PLATFORM=""
 
 WAILS_CMD="${WAILS_CMD:-wails3}"
 
+VERSION="${VERSION:-$(git -C "$PROJECT_ROOT" describe --tags --always --dirty 2>/dev/null || echo dev)}"
+LDFLAGS="-s -w -X main.appVersion=$VERSION"
+
 MINGW_CC_AMD64="${MINGW_CC_AMD64:-x86_64-w64-mingw32-gcc}"
 MINGW_CC_386="${MINGW_CC_386:-i686-w64-mingw32-gcc}"
 OSX_CC_AMD64="${OSX_CC_AMD64:-o64-clang}"
@@ -440,7 +443,7 @@ build_wails() {
             print_info "Legacy GTK4 detected (< 4.10, missing GtkFileDialog) -- building with -tags gtk3"
             extra_tags="-tags gtk3"
         fi
-        if go build $extra_tags -o "$platform_dir/$output_name" . 2>&1 | tee /tmp/wails-build.log; then
+        if go build $extra_tags -ldflags="$LDFLAGS" -o "$platform_dir/$output_name" . 2>&1 | tee /tmp/wails-build.log; then
             if grep -q "undefined:" /tmp/wails-build.log; then
                 print_error "Wails v3 build failed with errors"
                 echo "Check /tmp/wails-build.log for details"
@@ -460,7 +463,7 @@ build_wails() {
         local windows_cc
         if windows_cc=$(get_windows_cc "$arch_part"); then
             echo "Cross-compiling to Windows with CGO (CC=$windows_cc)..."
-            if CGO_ENABLED=1 CC="$windows_cc" GOOS="$os_part" GOARCH="$arch_part" go build -o "$platform_dir/$output_name" . 2>&1 | tee /tmp/wails-build.log; then
+            if CGO_ENABLED=1 CC="$windows_cc" GOOS="$os_part" GOARCH="$arch_part" go build -ldflags="$LDFLAGS" -o "$platform_dir/$output_name" . 2>&1 | tee /tmp/wails-build.log; then
                 if grep -q "undefined:" /tmp/wails-build.log; then
                     print_error "Wails v3 build failed with errors"
                     echo "Check /tmp/wails-build.log for details"
@@ -478,7 +481,7 @@ build_wails() {
             fi
         else
             print_info "mingw-w64 not found, building without CGO..."
-            if CGO_ENABLED=0 GOOS="$os_part" GOARCH="$arch_part" go build -o "$platform_dir/$output_name" . 2>&1 | tee /tmp/wails-build.log; then
+            if CGO_ENABLED=0 GOOS="$os_part" GOARCH="$arch_part" go build -ldflags="$LDFLAGS" -o "$platform_dir/$output_name" . 2>&1 | tee /tmp/wails-build.log; then
                 if grep -q "undefined:" /tmp/wails-build.log; then
                     print_error "Wails v3 build failed with errors"
                     echo "Check /tmp/wails-build.log for details"
@@ -499,7 +502,7 @@ build_wails() {
         local darwin_cc
         if darwin_cc=$(get_darwin_cc "$arch_part"); then
             echo "Cross-compiling to macOS with CGO (CC=$darwin_cc)..."
-            if CGO_ENABLED=1 CC="$darwin_cc" GOOS="$os_part" GOARCH="$arch_part" go build -o "$platform_dir/$output_name" . 2>&1 | tee /tmp/wails-build.log; then
+            if CGO_ENABLED=1 CC="$darwin_cc" GOOS="$os_part" GOARCH="$arch_part" go build -ldflags="$LDFLAGS" -o "$platform_dir/$output_name" . 2>&1 | tee /tmp/wails-build.log; then
                 if grep -q "undefined:" /tmp/wails-build.log; then
                     print_error "Wails v3 build failed with errors"
                     echo "Check /tmp/wails-build.log for details"
@@ -656,7 +659,7 @@ build_wails_platform() {
             print_info "Legacy GTK4 detected (< 4.10, missing GtkFileDialog) -- building with -tags gtk3"
             extra_tags="-tags gtk3"
         fi
-        if go build $extra_tags -ldflags="-s -w" -o "$output_dir/$output_name" . 2>&1 | tee /tmp/wails-build-${os_part}-${arch_part}.log; then
+        if go build $extra_tags -ldflags="$LDFLAGS" -o "$output_dir/$output_name" . 2>&1 | tee /tmp/wails-build-${os_part}-${arch_part}.log; then
             if grep -q "undefined:" /tmp/wails-build-${os_part}-${arch_part}.log; then
                 print_error "Build failed for $PLATFORM"
                 return 1
@@ -672,7 +675,7 @@ build_wails_platform() {
         local windows_cc
         if windows_cc=$(get_windows_cc "$arch_part"); then
             echo "Cross-compiling to Windows with CGO (CC=$windows_cc)"
-            if CGO_ENABLED=1 CC="$windows_cc" GOOS="$os_part" GOARCH="$arch_part" go build -ldflags="-s -w" -o "$output_dir/$output_name" . 2>&1 | tee /tmp/wails-build-${os_part}-${arch_part}.log; then
+            if CGO_ENABLED=1 CC="$windows_cc" GOOS="$os_part" GOARCH="$arch_part" go build -ldflags="$LDFLAGS" -o "$output_dir/$output_name" . 2>&1 | tee /tmp/wails-build-${os_part}-${arch_part}.log; then
                 if grep -q "undefined:" /tmp/wails-build-${os_part}-${arch_part}.log; then
                     print_error "Build failed for $PLATFORM"
                     return 1
@@ -686,7 +689,7 @@ build_wails_platform() {
             fi
         else
             print_info "mingw-w64 not found, building without CGO"
-            if CGO_ENABLED=0 GOOS="$os_part" GOARCH="$arch_part" go build -ldflags="-s -w" -o "$output_dir/$output_name" . 2>&1 | tee /tmp/wails-build-${os_part}-${arch_part}.log; then
+            if CGO_ENABLED=0 GOOS="$os_part" GOARCH="$arch_part" go build -ldflags="$LDFLAGS" -o "$output_dir/$output_name" . 2>&1 | tee /tmp/wails-build-${os_part}-${arch_part}.log; then
                 if grep -q "undefined:" /tmp/wails-build-${os_part}-${arch_part}.log; then
                     print_error "Build failed for $PLATFORM"
                     return 1
@@ -706,7 +709,7 @@ build_wails_platform() {
             print_info "Legacy GTK4 detected (< 4.10, missing GtkFileDialog) -- building with -tags gtk3"
             extra_tags="-tags gtk3"
         fi
-        if CGO_ENABLED=1 go build $extra_tags -ldflags="-s -w" -o "$output_dir/$output_name" . 2>&1 | tee /tmp/wails-build-${os_part}-${arch_part}.log; then
+        if CGO_ENABLED=1 go build $extra_tags -ldflags="$LDFLAGS" -o "$output_dir/$output_name" . 2>&1 | tee /tmp/wails-build-${os_part}-${arch_part}.log; then
             if grep -q "undefined:" /tmp/wails-build-${os_part}-${arch_part}.log; then
                 print_error "Build failed for $PLATFORM"
                 return 1
@@ -722,7 +725,7 @@ build_wails_platform() {
         local darwin_cc
         if darwin_cc=$(get_darwin_cc "$arch_part"); then
             echo "Cross-compiling to macOS with CGO (CC=$darwin_cc)"
-            if CGO_ENABLED=1 CC="$darwin_cc" GOOS="$os_part" GOARCH="$arch_part" go build -ldflags="-s -w" -o "$output_dir/$output_name" . 2>&1 | tee /tmp/wails-build-${os_part}-${arch_part}.log; then
+            if CGO_ENABLED=1 CC="$darwin_cc" GOOS="$os_part" GOARCH="$arch_part" go build -ldflags="$LDFLAGS" -o "$output_dir/$output_name" . 2>&1 | tee /tmp/wails-build-${os_part}-${arch_part}.log; then
                 if grep -q "undefined:" /tmp/wails-build-${os_part}-${arch_part}.log; then
                     print_error "Build failed for $PLATFORM"
                     return 1

@@ -60,7 +60,10 @@ describe('App', () => {
     wailsMock = {
       isWails: false,
       bindingsUpdated: signal(0),
-      progress: signal(null)
+      progress: signal(null),
+      getSettings: vi.fn().mockResolvedValue({ autoCheckForUpdates: true }),
+      checkForUpdate: vi.fn().mockResolvedValue({ available: false }),
+      logToFile: vi.fn().mockResolvedValue(undefined)
     };
     pluginV2ServiceMock = {
       getAllPlugins: vi.fn().mockResolvedValue([]),
@@ -99,5 +102,55 @@ describe('App', () => {
     expect(mainContent).not.toBeNull();
     expect(mainContent.getAttribute('tabindex')).toBe('-1');
     expect(document.activeElement).toBe(mainContent);
+  });
+
+  it('opens the update dialog on startup when auto-check is enabled and an update is available', async () => {
+    wailsMock.getSettings.mockResolvedValue({ autoCheckForUpdates: true });
+    wailsMock.checkForUpdate.mockResolvedValue({ available: true, latestVersion: 'v0.1.0' });
+
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    expect(dialogMock.open).toHaveBeenCalled();
+  });
+
+  it('does not check for updates on startup when auto-check is disabled', async () => {
+    wailsMock.getSettings.mockResolvedValue({ autoCheckForUpdates: false });
+
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    expect(wailsMock.checkForUpdate).not.toHaveBeenCalled();
+    expect(dialogMock.open).not.toHaveBeenCalled();
+  });
+
+  it('does not open the dialog on startup when already up to date', async () => {
+    wailsMock.getSettings.mockResolvedValue({ autoCheckForUpdates: true });
+    wailsMock.checkForUpdate.mockResolvedValue({ available: false });
+
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    expect(dialogMock.open).not.toHaveBeenCalled();
+  });
+
+  it('silently swallows startup update-check failures without showing the user an error', async () => {
+    wailsMock.getSettings.mockResolvedValue({ autoCheckForUpdates: true });
+    wailsMock.checkForUpdate.mockRejectedValue(new Error('network down'));
+
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    expect(dialogMock.open).not.toHaveBeenCalled();
+    expect(notificationMock.showError).not.toHaveBeenCalled();
+    expect(wailsMock.logToFile).toHaveBeenCalled();
   });
 });

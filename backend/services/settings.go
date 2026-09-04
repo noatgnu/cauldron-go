@@ -87,6 +87,9 @@ func (s *SettingsService) Load() error {
 	if val, ok := settings["debugMode"]; ok {
 		s.config.DebugMode = val == "true"
 	}
+	if val, ok := settings["autoCheckForUpdates"]; ok {
+		s.config.AutoCheckForUpdates = val == "true"
+	}
 
 	return nil
 }
@@ -106,6 +109,7 @@ func (s *SettingsService) Save() error {
 	s.db.SaveSetting("accessibility.reducedMotion", fmt.Sprintf("%v", s.config.AccessibilityReducedMotion))
 	s.db.SaveSetting("accessibility.colorblindPalette", s.config.AccessibilityColorblindPalette)
 	s.db.SaveSetting("debugMode", fmt.Sprintf("%v", s.config.DebugMode))
+	s.db.SaveSetting("autoCheckForUpdates", fmt.Sprintf("%v", s.config.AutoCheckForUpdates))
 	return nil
 }
 
@@ -139,6 +143,8 @@ func (s *SettingsService) Get(key string) interface{} {
 		return s.config.AccessibilityColorblindPalette
 	case "debugMode":
 		return s.config.DebugMode
+	case "autoCheckForUpdates":
+		return s.config.AutoCheckForUpdates
 	}
 	return nil
 }
@@ -180,6 +186,8 @@ func (s *SettingsService) Set(key string, value interface{}) error {
 		s.config.AccessibilityColorblindPalette = value.(string)
 	case "debugMode":
 		s.config.DebugMode = value.(bool)
+	case "autoCheckForUpdates":
+		s.config.AutoCheckForUpdates = value.(bool)
 	}
 	return s.Save()
 }
@@ -218,6 +226,11 @@ func (s *SettingsService) initializeDefaults() {
 	}
 	if s.config.AccessibilityColorblindPalette == "" {
 		s.config.AccessibilityColorblindPalette = "default"
+	}
+
+	// Check the DB directly (not the in-memory config) so an explicit "false" isn't mistaken for "never set".
+	if val, _ := s.db.GetSetting("autoCheckForUpdates"); val == "" {
+		s.config.AutoCheckForUpdates = true
 	}
 }
 

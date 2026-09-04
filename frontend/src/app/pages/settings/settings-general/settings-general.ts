@@ -7,10 +7,12 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
+import { MatDialog } from '@angular/material/dialog';
 import { FormsModule } from '@angular/forms';
 import { Wails, Config } from '../../../core/services/wails';
 import { NotificationService } from '../../../core/services/notification.service';
 import * as models from '../../../../../bindings/github.com/noatgnu/cauldron-go/backend/models/models';
+import { UpdateAvailableDialog } from '../../../components/update-available-dialog/update-available-dialog';
 
 @Component({
   selector: 'app-settings-general',
@@ -32,6 +34,8 @@ import * as models from '../../../../../bindings/github.com/noatgnu/cauldron-go/
 export class SettingsGeneral implements OnInit {
   protected config = signal<Partial<Config>>({});
   protected debugMode = signal(false);
+  protected autoCheckForUpdates = signal(true);
+  protected checkingForUpdate = signal(false);
   protected forceUpdating = signal(false);
   protected forceUpdatingSingle = signal(false);
   protected remotePlugins = signal<models.PluginRegistry[]>([]);
@@ -39,7 +43,8 @@ export class SettingsGeneral implements OnInit {
 
   constructor(
     private wails: Wails,
-    private notification: NotificationService
+    private notification: NotificationService,
+    private dialog: MatDialog
   ) {}
 
   async ngOnInit(): Promise<void> {
@@ -52,6 +57,7 @@ export class SettingsGeneral implements OnInit {
       const config = await this.wails.getSettings();
       this.config.set(config);
       this.debugMode.set(!!config.debugMode);
+      this.autoCheckForUpdates.set(config.autoCheckForUpdates !== false);
     } catch (error) {
       await this.wails.logToFile(`[SettingsGeneral] Failed to load settings: ${error}`);
     }
@@ -60,6 +66,28 @@ export class SettingsGeneral implements OnInit {
   async setDebugMode(value: boolean): Promise<void> {
     this.debugMode.set(value);
     await this.saveSetting('debugMode', value);
+  }
+
+  async setAutoCheckForUpdates(value: boolean): Promise<void> {
+    this.autoCheckForUpdates.set(value);
+    await this.saveSetting('autoCheckForUpdates', value);
+  }
+
+  async checkForUpdateNow(): Promise<void> {
+    this.checkingForUpdate.set(true);
+    try {
+      const info = await this.wails.checkForUpdate();
+      if (info?.available) {
+        this.dialog.open(UpdateAvailableDialog, { data: info, width: '480px' });
+      } else {
+        this.notification.showInfo("You're up to date.");
+      }
+    } catch (error) {
+      this.notification.showError(`Failed to check for updates: ${error}`);
+      await this.wails.logToFile(`[SettingsGeneral] Failed to check for updates: ${error}`);
+    } finally {
+      this.checkingForUpdate.set(false);
+    }
   }
 
   async loadRemotePlugins(): Promise<void> {

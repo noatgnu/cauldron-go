@@ -15,6 +15,9 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
+// appVersion is set at build time via -ldflags "-X main.appVersion=...".
+var appVersion = "dev"
+
 //go:embed all:frontend/dist/browser
 var assets embed.FS
 
@@ -167,6 +170,7 @@ func main() {
 	fmt.Println("Cauldron starting - logs at:", logDir)
 
 	app := NewApp()
+	app.SetVersion(appVersion)
 	if logFilePath != "" {
 		app.SetLogFilePath(logFilePath)
 		log.Printf("Log file path set to: %s\n", logFilePath)

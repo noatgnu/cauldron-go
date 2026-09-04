@@ -21,6 +21,24 @@
   </div>
 
   <div class="form-section">
+    <h3>Updates</h3>
+    <p class="section-description">Control whether Cauldron checks GitHub for a newer release on startup</p>
+    <mat-slide-toggle [ngModel]="autoCheckForUpdates()" (ngModelChange)="setAutoCheckForUpdates($event)">
+      Automatically check for updates on startup
+    </mat-slide-toggle>
+    <div>
+      <button mat-stroked-button (click)="checkForUpdateNow()" [disabled]="checkingForUpdate()" style="margin-top: 12px;">
+        <mat-icon>refresh</mat-icon>
+        @if (checkingForUpdate()) {
+          Checking...
+        } @else {
+          Check Now
+        }
+      </button>
+    </div>
+  </div>
+
+  <div class="form-section">
     <h3>Diagnostics</h3>
     <p class="section-description">Internal diagnostic information for troubleshooting</p>
     <mat-slide-toggle [ngModel]="debugMode()" (ngModelChange)="setDebugMode($event)">

@@ -12,6 +12,8 @@ import { LoadingService } from './services/loading';
 import { ThemeService } from './core/services/theme.service';
 import { NotificationService } from './core/services/notification.service';
 import { ConfirmPluginInstallDialog, PluginInstallConfirmData, PluginInstallConfirmResult } from './components/confirm-plugin-install-dialog/confirm-plugin-install-dialog';
+import { UpdateAvailableDialog } from './components/update-available-dialog/update-available-dialog';
+import { Wails } from './core/services/wails';
 import { ConfirmPluginInstallation, SaveGitAuthConfig, ConfirmPluginInstallationWithRegistry } from '../../bindings/github.com/noatgnu/cauldron-go/app';
 
 @Component({
@@ -33,7 +35,8 @@ export class App implements OnInit {
     private loadingService: LoadingService,
     private dialog: MatDialog,
     private notification: NotificationService,
-    private themeService: ThemeService
+    private themeService: ThemeService,
+    private wails: Wails
   ) {
     this.router.events.pipe(filter(e => e instanceof NavigationEnd)).subscribe(() => {
       setTimeout(() => {
@@ -53,6 +56,21 @@ export class App implements OnInit {
   ngOnInit(): void {
     this.setupMenuEventListeners();
     this.setupPluginInstallationListeners();
+    this.checkForUpdatesIfEnabled();
+  }
+
+  private async checkForUpdatesIfEnabled(): Promise<void> {
+    try {
+      const config = await this.wails.getSettings();
+      if (config.autoCheckForUpdates === false) return;
+
+      const info = await this.wails.checkForUpdate();
+      if (info?.available) {
+        this.dialog.open(UpdateAvailableDialog, { data: info, width: '480px' });
+      }
+    } catch (error) {
+      await this.wails.logToFile(`[App] Startup update check failed: ${error}`);
+    }
   }
 
   private setupMenuEventListeners(): void {

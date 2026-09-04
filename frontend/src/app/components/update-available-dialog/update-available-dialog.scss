@@ -1,0 +1,27 @@
+h2[mat-dialog-title] {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.version-line {
+  margin: 0 0 12px 0;
+}
+
+.release-notes {
+  h3 {
+    font-size: 13px;
+    margin: 0 0 4px 0;
+    color: var(--on-surface-variant);
+  }
+
+  pre {
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-family: inherit;
+    font-size: 13px;
+    margin: 0;
+    max-height: 240px;
+    overflow-y: auto;
+  }
+}

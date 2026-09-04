@@ -1,0 +1,25 @@
+<h2 mat-dialog-title>
+  <mat-icon>new_releases</mat-icon>
+  Update Available
+</h2>
+
+<mat-dialog-content>
+  <p class="version-line">
+    <strong>{{ data.latestVersion }}</strong> is available (you're on {{ data.currentVersion }}).
+  </p>
+
+  @if (data.releaseNotes) {
+    <div class="release-notes">
+      <h3>What's new</h3>
+      <pre>{{ data.releaseNotes }}</pre>
+    </div>
+  }
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button (click)="close()">Later</button>
+  <button mat-raised-button color="primary" (click)="viewRelease()">
+    <mat-icon>open_in_new</mat-icon>
+    View Release
+  </button>
+</mat-dialog-actions>
