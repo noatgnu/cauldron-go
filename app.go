@@ -54,8 +54,10 @@ type App struct {
 	parquetService         *services.ParquetService
 	delimitedFileService   *services.DelimitedFileService
 	tableFileService       *services.TableFileService
+	updateCheckService     *services.UpdateCheckService
 	ready                  chan bool
 	logFilePath            string
+	appVersion             string
 	initialized            chan struct{}
 }
 
@@ -72,6 +74,10 @@ func (a *App) SetApplication(wailsApp *application.App) {
 
 func (a *App) SetMainWindow(window *application.WebviewWindow) {
 	a.mainWindow = window
+}
+
+func (a *App) SetVersion(version string) {
+	a.appVersion = version
 }
 
 func (a *App) emitEvent(name string, data interface{}) {
@@ -121,6 +127,7 @@ func (a *App) Initialize() {
 	a.parquetService = services.NewParquetService(tableProgressNotifier)
 	a.delimitedFileService = services.NewDelimitedFileService(tableProgressNotifier)
 	a.tableFileService = services.NewTableFileService(a.parquetService, a.delimitedFileService)
+	a.updateCheckService = services.NewUpdateCheckService(a.appVersion)
 	a.rPortableService, err = services.NewRPortableServiceV3(a.wailsApp)
 	if err != nil {
 		log.Printf("[App.Initialize] ERROR: Failed to initialize R portable service: %v\n", err)
@@ -781,6 +788,16 @@ func (a *App) ExportTableFile(path string, outputPath string, columns []string, 
 
 func (a *App) CloseTableFile(path string) error {
 	return a.tableFileService.CloseFile(path)
+}
+
+// GetAppVersion returns the running app's version, embedded at build time.
+func (a *App) GetAppVersion() string {
+	return a.appVersion
+}
+
+// CheckForUpdate checks GitHub for a newer release than the running app version.
+func (a *App) CheckForUpdate() (*services.UpdateInfo, error) {
+	return a.updateCheckService.CheckForUpdate()
 }
 
 type GitAuthConfigResponse struct {

@@ -30,6 +30,7 @@ export type EnvVarKeyChange = services.EnvVarKeyChange;
 export type PendingEnvVarMigration = services.PendingEnvVarMigration;
 export type DataColumn = services.DataColumn;
 export type DataFileInfo = services.DataFileInfo;
+export type UpdateInfo = services.UpdateInfo;
 
 export interface GitAuthConfig {
   id: number;
@@ -177,6 +178,18 @@ export class Wails {
     if (!this.isWails) throw new Error('Wails not available');
     await this.waitForBackend();
     return WailsApp.SetSetting(key, value);
+  }
+
+  async getAppVersion(): Promise<string> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.GetAppVersion();
+  }
+
+  async checkForUpdate(): Promise<UpdateInfo | null> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.CheckForUpdate();
   }
 
   async detectPythonPath(): Promise<string> {

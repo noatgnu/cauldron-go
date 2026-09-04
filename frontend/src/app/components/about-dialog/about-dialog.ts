@@ -32,7 +32,7 @@ interface LicenseData {
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class AboutDialog implements OnInit {
-  protected readonly version = '1.0.0';
+  protected version = signal('dev');
   protected readonly copyright = 'Copyright 2025';
   protected readonly author = 'Toan K. Phung';
   protected readonly email = 'tphung001@dundee.ac.uk';
@@ -50,6 +50,13 @@ export class AboutDialog implements OnInit {
       await this.wails.logToFile(`Failed to load license info: ${error}`);
     } finally {
       this.loading.set(false);
+    }
+
+    try {
+      const version = await this.wails.getAppVersion();
+      if (version) this.version.set(version);
+    } catch (error) {
+      await this.wails.logToFile(`Failed to load app version: ${error}`);
     }
   }
 }

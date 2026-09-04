@@ -183,7 +183,7 @@ jobs:
           npm run build
           cd ..
           mkdir -p build/bin/windows-amd64
-          CGO_ENABLED=0 go build -ldflags="-s -w -H windowsgui" -o build/bin/windows-amd64/cauldron.exe .
+          CGO_ENABLED=0 go build -ldflags="-s -w -H windowsgui -X main.appVersion=${{ github.ref_name }}" -o build/bin/windows-amd64/cauldron.exe .
         shell: bash
 
       - name: Copy Resources
@@ -363,7 +363,7 @@ jobs:
           npm run build
           cd ..
           mkdir -p build/bin/linux-amd64
-          CGO_ENABLED=1 go build -tags gtk4 -ldflags="-s -w" -o build/bin/linux-amd64/cauldron .
+          CGO_ENABLED=1 go build -tags gtk4 -ldflags="-s -w -X main.appVersion=${{ github.ref_name }}" -o build/bin/linux-amd64/cauldron .
 
       - name: Clean up test environments
         run: |
@@ -527,7 +527,7 @@ jobs:
           npm run build
           cd ..
           mkdir -p build/bin/darwin-arm64
-          CGO_ENABLED=1 go build -ldflags="-s -w" -o build/bin/darwin-arm64/cauldron .
+          CGO_ENABLED=1 go build -ldflags="-s -w -X main.appVersion=${{ github.ref_name }}" -o build/bin/darwin-arm64/cauldron .
 
       - name: Verify Build
         run: ls -l build/bin/darwin-arm64/
