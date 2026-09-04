@@ -13,13 +13,13 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatCardModule } from '@angular/material/card';
-import { Wails, ParquetFileInfo } from '../../core/services/wails';
+import { Wails, DataFileInfo } from '../../core/services/wails';
 import { NotificationService } from '../../core/services/notification.service';
 
 type Delimiter = ',' | '\t';
 
 @Component({
-  selector: 'app-parquet-browser',
+  selector: 'app-table-browser',
   imports: [
     CommonModule,
     FormsModule,
@@ -36,15 +36,15 @@ type Delimiter = ',' | '\t';
     MatTooltipModule,
     MatCardModule
   ],
-  templateUrl: './parquet-browser.html',
-  styleUrl: './parquet-browser.scss'
+  templateUrl: './table-browser.html',
+  styleUrl: './table-browser.scss'
 })
-export class ParquetBrowser implements OnDestroy {
+export class TableBrowser implements OnDestroy {
   private readonly wails = inject(Wails);
   private readonly notification = inject(NotificationService);
 
   protected filePath = signal<string | null>(null);
-  protected fileInfo = signal<ParquetFileInfo | null>(null);
+  protected fileInfo = signal<DataFileInfo | null>(null);
   protected rows = signal<Record<string, any>[]>([]);
   protected pageIndex = signal(0);
   protected pageSize = signal(25);
@@ -66,7 +66,7 @@ export class ParquetBrowser implements OnDestroy {
   constructor() {
     effect(() => {
       const progress = this.wails.progress();
-      if (progress && progress.id === 'parquet-export') {
+      if (progress && progress.id === 'table-export') {
         this.exportMessage.set(progress.message);
         this.exportPercentage.set(progress.percentage);
         if (progress.status === 'completed' || progress.status === 'error') {
@@ -79,13 +79,13 @@ export class ParquetBrowser implements OnDestroy {
   async ngOnDestroy() {
     const path = this.filePath();
     if (path) {
-      await this.wails.closeParquetFile(path).catch(() => {});
+      await this.wails.closeTableFile(path).catch(() => {});
     }
   }
 
   async openFile() {
     try {
-      const path = await this.wails.openParquetFileDialog();
+      const path = await this.wails.openTableFileDialog();
       if (!path) return;
       await this.loadFile(path);
     } catch (error) {
@@ -101,19 +101,19 @@ export class ParquetBrowser implements OnDestroy {
   private async loadFile(path: string) {
     const previous = this.filePath();
     if (previous && previous !== path) {
-      await this.wails.closeParquetFile(previous).catch(() => {});
+      await this.wails.closeTableFile(previous).catch(() => {});
     }
 
     this.loadingFile.set(true);
     try {
-      const info = await this.wails.getParquetFileInfo(path);
+      const info = await this.wails.getTableFileInfo(path);
       this.filePath.set(path);
       this.fileInfo.set(info);
       this.selectedColumns.set(new Set(info?.columns.map(c => c.name) ?? []));
       this.pageIndex.set(0);
       await this.loadPage();
     } catch (error) {
-      this.notification.showError(`Failed to open parquet file: ${error}`);
+      this.notification.showError(`Failed to open file: ${error}`);
     } finally {
       this.loadingFile.set(false);
     }
@@ -126,7 +126,7 @@ export class ParquetBrowser implements OnDestroy {
     this.loadingPage.set(true);
     try {
       const offset = this.pageIndex() * this.pageSize();
-      const page = await this.wails.getParquetPage(path, offset, this.pageSize());
+      const page = await this.wails.getTableFilePage(path, offset, this.pageSize());
       this.rows.set(page || []);
     } catch (error) {
       this.notification.showError(`Failed to read page: ${error}`);
@@ -167,11 +167,11 @@ export class ParquetBrowser implements OnDestroy {
     }
 
     const ext = this.delimiter() === '\t' ? 'tsv' : 'csv';
-    const defaultName = this.fileName().replace(/\.parquet$/i, `.${ext}`);
+    const defaultName = this.fileName().replace(/\.(parquet|csv|tsv)$/i, `.${ext}`);
 
     let outputPath: string;
     try {
-      outputPath = await this.wails.saveParquetExportDialog(defaultName);
+      outputPath = await this.wails.saveTableExportDialog(defaultName);
     } catch (error) {
       if (!this.isDialogCancelled(error)) {
         this.notification.showError(`Failed to open save dialog: ${error}`);
@@ -185,7 +185,7 @@ export class ParquetBrowser implements OnDestroy {
       this.exportMessage.set('Starting export...');
       this.exportPercentage.set(0);
 
-      await this.wails.exportParquetToCSV(path, outputPath, columns, this.delimiter());
+      await this.wails.exportTableFile(path, outputPath, columns, this.delimiter());
       this.notification.showSuccess(`Exported to ${outputPath}`);
     } catch (error) {
       this.notification.showError(`Export failed: ${error}`);

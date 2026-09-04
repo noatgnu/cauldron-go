@@ -52,6 +52,8 @@ type App struct {
 	backupService          *services.BackupService
 	pluginMigrationService *services.PluginMigrationService
 	parquetService         *services.ParquetService
+	delimitedFileService   *services.DelimitedFileService
+	tableFileService       *services.TableFileService
 	ready                  chan bool
 	logFilePath            string
 	initialized            chan struct{}
@@ -115,7 +117,10 @@ func (a *App) Initialize() {
 	a.portableEnvService = services.NewPortableEnvServiceV3(a.fileService, a.wailsApp)
 	a.uvService = services.NewUvServiceV3(a.fileService, db, a.settings, a.wailsApp)
 	a.pluginMigrationService = services.NewPluginMigrationService(db)
-	a.parquetService = services.NewParquetService(services.NewProgressNotifierV3(a.wailsApp))
+	tableProgressNotifier := services.NewProgressNotifierV3(a.wailsApp)
+	a.parquetService = services.NewParquetService(tableProgressNotifier)
+	a.delimitedFileService = services.NewDelimitedFileService(tableProgressNotifier)
+	a.tableFileService = services.NewTableFileService(a.parquetService, a.delimitedFileService)
 	a.rPortableService, err = services.NewRPortableServiceV3(a.wailsApp)
 	if err != nil {
 		log.Printf("[App.Initialize] ERROR: Failed to initialize R portable service: %v\n", err)
@@ -743,36 +748,39 @@ func (a *App) ApplyPendingEnvVarMigration(pluginID uint, confirmedLarge bool) er
 	return a.pluginMigrationService.ApplyPendingEnvVarMigration(registry, currentSchemaVersion, confirmedLarge)
 }
 
-// OpenParquetFileDialog shows a native file picker restricted to .parquet files.
-func (a *App) OpenParquetFileDialog() (string, error) {
-	return a.fileService.OpenFileDialog("Select Parquet File", []application.FileFilter{
+// OpenTableFileDialog shows a native file picker restricted to .parquet/.csv/.tsv files.
+func (a *App) OpenTableFileDialog() (string, error) {
+	return a.fileService.OpenFileDialog("Select File", []application.FileFilter{
+		{DisplayName: "Table Files (*.parquet, *.csv, *.tsv)", Pattern: "*.parquet;*.csv;*.tsv"},
 		{DisplayName: "Parquet Files (*.parquet)", Pattern: "*.parquet"},
+		{DisplayName: "CSV Files (*.csv)", Pattern: "*.csv"},
+		{DisplayName: "TSV Files (*.tsv)", Pattern: "*.tsv"},
 	})
 }
 
-func (a *App) GetParquetFileInfo(path string) (*services.ParquetFileInfo, error) {
-	return a.parquetService.OpenParquetFile(path)
+func (a *App) GetTableFileInfo(path string) (*services.DataFileInfo, error) {
+	return a.tableFileService.OpenFile(path)
 }
 
-func (a *App) GetParquetPage(path string, offset int, limit int) ([]map[string]interface{}, error) {
-	return a.parquetService.ReadParquetPage(path, offset, limit)
+func (a *App) GetTableFilePage(path string, offset int, limit int) ([]map[string]interface{}, error) {
+	return a.tableFileService.ReadPage(path, offset, limit)
 }
 
-// SaveParquetExportDialog shows a native save-file picker for the CSV/TSV export destination.
-func (a *App) SaveParquetExportDialog(defaultName string) (string, error) {
-	return a.fileService.SaveFileDialog("Export Parquet Data", defaultName)
+// SaveTableExportDialog shows a native save-file picker for the CSV/TSV export destination.
+func (a *App) SaveTableExportDialog(defaultName string) (string, error) {
+	return a.fileService.SaveFileDialog("Export Table Data", defaultName)
 }
 
-func (a *App) ExportParquetToCSV(path string, outputPath string, columns []string, delimiter string) error {
+func (a *App) ExportTableFile(path string, outputPath string, columns []string, delimiter string) error {
 	d := ','
 	if delimiter != "" {
 		d = rune(delimiter[0])
 	}
-	return a.parquetService.ExportParquetToCSV(path, outputPath, columns, d)
+	return a.tableFileService.ExportFile(path, outputPath, columns, d)
 }
 
-func (a *App) CloseParquetFile(path string) error {
-	return a.parquetService.CloseParquetFile(path)
+func (a *App) CloseTableFile(path string) error {
+	return a.tableFileService.CloseFile(path)
 }
 
 type GitAuthConfigResponse struct {

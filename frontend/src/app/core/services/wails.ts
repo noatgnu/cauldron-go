@@ -28,8 +28,8 @@ export type BackupSummary = services.BackupSummary;
 export type RestoreResult = services.RestoreResult;
 export type EnvVarKeyChange = services.EnvVarKeyChange;
 export type PendingEnvVarMigration = services.PendingEnvVarMigration;
-export type ParquetColumn = services.ParquetColumn;
-export type ParquetFileInfo = services.ParquetFileInfo;
+export type DataColumn = services.DataColumn;
+export type DataFileInfo = services.DataFileInfo;
 
 export interface GitAuthConfig {
   id: number;
@@ -742,40 +742,40 @@ export class Wails {
     return WailsApp.ApplyPendingEnvVarMigration(pluginId, confirmedLarge);
   }
 
-  async openParquetFileDialog(): Promise<string> {
+  async openTableFileDialog(): Promise<string> {
     if (!this.isWails) throw new Error('Wails not available');
     await this.waitForBackend();
-    return WailsApp.OpenParquetFileDialog();
+    return WailsApp.OpenTableFileDialog();
   }
 
-  async getParquetFileInfo(path: string): Promise<ParquetFileInfo | null> {
+  async getTableFileInfo(path: string): Promise<DataFileInfo | null> {
     if (!this.isWails) throw new Error('Wails not available');
     await this.waitForBackend();
-    return WailsApp.GetParquetFileInfo(path);
+    return WailsApp.GetTableFileInfo(path);
   }
 
-  async getParquetPage(path: string, offset: number, limit: number): Promise<Record<string, any>[]> {
+  async getTableFilePage(path: string, offset: number, limit: number): Promise<Record<string, any>[]> {
     if (!this.isWails) throw new Error('Wails not available');
     await this.waitForBackend();
-    return WailsApp.GetParquetPage(path, offset, limit);
+    return WailsApp.GetTableFilePage(path, offset, limit);
   }
 
-  async saveParquetExportDialog(defaultName: string): Promise<string> {
+  async saveTableExportDialog(defaultName: string): Promise<string> {
     if (!this.isWails) throw new Error('Wails not available');
     await this.waitForBackend();
-    return WailsApp.SaveParquetExportDialog(defaultName);
+    return WailsApp.SaveTableExportDialog(defaultName);
   }
 
-  async exportParquetToCSV(path: string, outputPath: string, columns: string[], delimiter: string): Promise<void> {
+  async exportTableFile(path: string, outputPath: string, columns: string[], delimiter: string): Promise<void> {
     if (!this.isWails) throw new Error('Wails not available');
     await this.waitForBackend();
-    return WailsApp.ExportParquetToCSV(path, outputPath, columns, delimiter);
+    return WailsApp.ExportTableFile(path, outputPath, columns, delimiter);
   }
 
-  async closeParquetFile(path: string): Promise<void> {
+  async closeTableFile(path: string): Promise<void> {
     if (!this.isWails) throw new Error('Wails not available');
     await this.waitForBackend();
-    return WailsApp.CloseParquetFile(path);
+    return WailsApp.CloseTableFile(path);
   }
 
   async saveGitAuthConfig(repoURL: string, sshKeyPath: string, passphrase: string): Promise<void> {

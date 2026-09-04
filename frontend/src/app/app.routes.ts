@@ -10,7 +10,7 @@ import { PluginEditor } from './pages/plugin-editor/plugin-editor';
 import { PluginRegistry } from './pages/plugin-registry/plugin-registry';
 import { PluginRegistryDetail } from './pages/plugin-registry-detail/plugin-registry-detail';
 import { About } from './pages/about/about';
-import { ParquetBrowser } from './pages/parquet-browser/parquet-browser';
+import { TableBrowser } from './pages/table-browser/table-browser';
 
 export const routes: Routes = [
   { path: '', redirectTo: 'home', pathMatch: 'full' },
@@ -29,6 +29,6 @@ export const routes: Routes = [
   { path: 'plugin-editor', component: PluginEditor },
   { path: 'plugin-editor/new', component: PluginEditor },
   { path: 'plugin-editor/:id', component: PluginEditor },
-  { path: 'parquet-browser', component: ParquetBrowser },
+  { path: 'table-browser', component: TableBrowser },
   { path: '**', redirectTo: '' }
 ];
