@@ -198,25 +198,29 @@ func rowSliceToMap(record []string, header []string) map[string]interface{} {
 	return m
 }
 
-// ExportToCSV streams the file sequentially from the start through a CSV writer, using its own reader independent of any cached browsing handle for path.
-func (s *DelimitedFileService) ExportToCSV(path, outputPath string, columns []string, delimiter rune) error {
+// ExportToCSV streams rows [offset, offset+limit) through a CSV writer, using its own reader independent of any cached browsing handle for path. offset<=0 starts from the first row; limit<=0 means no upper bound (export to end of file) — this is NOT the same "return nothing" convention ReadPage's limit<=0 uses.
+func (s *DelimitedFileService) ExportToCSV(path, outputPath string, columns []string, delimiter rune, offset, limit int) error {
+	if offset < 0 {
+		offset = 0
+	}
+
+	h, err := s.getOrOpen(path)
+	if err != nil {
+		return err
+	}
+
+	// Copy out from under a brief lock so the (potentially long) export below never blocks concurrent ReadPage calls; not covering a real race since CloseFile never mutates a live handle's slices in place.
+	s.mu.Lock()
+	header := append([]string(nil), h.header...)
+	index := append([]int64(nil), h.index...)
+	sourceDelimiter := h.delimiter
+	s.mu.Unlock()
+
 	f, err := os.Open(path)
 	if err != nil {
 		return fmt.Errorf("failed to open %s (check the network drive is still connected): %w", path, err)
 	}
 	defer f.Close()
-
-	if _, err := skipBOM(f); err != nil {
-		return fmt.Errorf("failed to read %s (check the network drive is still connected): %w", path, err)
-	}
-
-	sourceDelimiter := delimiterFor(path)
-	reader := newDelimitedReader(f, sourceDelimiter)
-
-	header, err := reader.Read()
-	if err != nil && err != io.EOF {
-		return fmt.Errorf("failed to read header from %s: %w", path, err)
-	}
 
 	selected := columns
 	if len(selected) == 0 {
@@ -239,12 +243,23 @@ func (s *DelimitedFileService) ExportToCSV(path, outputPath string, columns []st
 		return fmt.Errorf("failed to write CSV header: %w", err)
 	}
 
-	total, err := s.rowCount(path)
-	if err != nil {
-		total = 0
+	s.progress.EmitStart(ProgressTypeGeneric, "table-export", fmt.Sprintf("Exporting %s...", filepath.Base(path)))
+
+	if offset >= len(index) {
+		w.Flush()
+		s.progress.EmitComplete(ProgressTypeGeneric, "table-export", fmt.Sprintf("Exported 0 rows to %s", filepath.Base(outputPath)))
+		return nil
 	}
 
-	s.progress.EmitStart(ProgressTypeGeneric, "table-export", fmt.Sprintf("Exporting %s...", filepath.Base(path)))
+	if _, err := f.Seek(index[offset], io.SeekStart); err != nil {
+		return fmt.Errorf("failed to seek to row %d in %s (check the network drive is still connected): %w", offset, path, err)
+	}
+	reader := newDelimitedReader(f, sourceDelimiter)
+
+	total := int64(len(index) - offset)
+	if limit > 0 && int64(limit) < total {
+		total = int64(limit)
+	}
 
 	var written int64
 	const batchSize = 1000
@@ -279,6 +294,9 @@ func (s *DelimitedFileService) ExportToCSV(path, outputPath string, columns []st
 			}
 			s.progress.EmitProgress(ProgressTypeGeneric, "table-export", fmt.Sprintf("Exported %d/%d rows", written, total), pct)
 		}
+		if limit > 0 && written >= int64(limit) {
+			break
+		}
 	}
 
 	w.Flush()
@@ -289,17 +307,6 @@ func (s *DelimitedFileService) ExportToCSV(path, outputPath string, columns []st
 
 	s.progress.EmitComplete(ProgressTypeGeneric, "table-export", fmt.Sprintf("Exported %d rows to %s", written, filepath.Base(outputPath)))
 	return nil
-}
-
-// rowCount returns the cached row count for path, opening it if needed.
-func (s *DelimitedFileService) rowCount(path string) (int64, error) {
-	h, err := s.getOrOpen(path)
-	if err != nil {
-		return 0, err
-	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return int64(len(h.index)), nil
 }
 
 // CloseFile releases the cached handle for path, if one is open.

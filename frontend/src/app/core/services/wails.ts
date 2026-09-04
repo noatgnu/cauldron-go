@@ -779,10 +779,10 @@ export class Wails {
     return WailsApp.SaveTableExportDialog(defaultName);
   }
 
-  async exportTableFile(path: string, outputPath: string, columns: string[], delimiter: string): Promise<void> {
+  async exportTableFile(path: string, outputPath: string, columns: string[], delimiter: string, offset: number, limit: number): Promise<void> {
     if (!this.isWails) throw new Error('Wails not available');
     await this.waitForBackend();
-    return WailsApp.ExportTableFile(path, outputPath, columns, delimiter);
+    return WailsApp.ExportTableFile(path, outputPath, columns, delimiter, offset, limit);
   }
 
   async closeTableFile(path: string): Promise<void> {

@@ -159,9 +159,128 @@ describe('TableBrowser', () => {
       '/data/sample.parquet',
       '/data/sample.csv',
       ['id'],
-      '\t'
+      '\t',
+      0,
+      0
     );
     expect(notificationMock.showSuccess).toHaveBeenCalled();
+  });
+
+  it('exports the full file (offset 0, limit 0) when no row range is set', async () => {
+    createComponent();
+    await fixture.whenStable();
+    await component.openFile();
+
+    await component.exportData();
+
+    expect(wailsMock.exportTableFile).toHaveBeenCalledWith(
+      '/data/sample.parquet',
+      '/data/sample.csv',
+      ['id', 'name'],
+      ',',
+      0,
+      0
+    );
+  });
+
+  it('derives offset/limit from a from/to row range', async () => {
+    createComponent();
+    await fixture.whenStable();
+    await component.openFile();
+
+    state().fromRow.set(11);
+    state().toRow.set(20);
+
+    await component.exportData();
+
+    expect(wailsMock.exportTableFile).toHaveBeenCalledWith(
+      '/data/sample.parquet',
+      '/data/sample.csv',
+      ['id', 'name'],
+      ',',
+      10,
+      10
+    );
+  });
+
+  it('treats a from-row-only range as "to end of file"', async () => {
+    createComponent();
+    await fixture.whenStable();
+    await component.openFile();
+
+    state().fromRow.set(51);
+
+    await component.exportData();
+
+    expect(wailsMock.exportTableFile).toHaveBeenCalledWith(
+      '/data/sample.parquet',
+      '/data/sample.csv',
+      ['id', 'name'],
+      ',',
+      50,
+      0
+    );
+  });
+
+  it('treats a to-row-only range as starting from row 1', async () => {
+    createComponent();
+    await fixture.whenStable();
+    await component.openFile();
+
+    state().toRow.set(5);
+
+    await component.exportData();
+
+    expect(wailsMock.exportTableFile).toHaveBeenCalledWith(
+      '/data/sample.parquet',
+      '/data/sample.csv',
+      ['id', 'name'],
+      ',',
+      0,
+      5
+    );
+  });
+
+  it('rejects a row range where To row is before From row', async () => {
+    createComponent();
+    await fixture.whenStable();
+    await component.openFile();
+
+    state().fromRow.set(20);
+    state().toRow.set(10);
+
+    await component.exportData();
+
+    expect(notificationMock.showError).toHaveBeenCalled();
+    expect(wailsMock.exportTableFile).not.toHaveBeenCalled();
+  });
+
+  it('rejects a row range beyond the file\'s row count', async () => {
+    createComponent();
+    await fixture.whenStable();
+    await component.openFile();
+
+    state().fromRow.set(1);
+    state().toRow.set(1000);
+
+    await component.exportData();
+
+    expect(notificationMock.showError).toHaveBeenCalled();
+    expect(wailsMock.exportTableFile).not.toHaveBeenCalled();
+  });
+
+  it('resets the row range when a new file is opened', async () => {
+    createComponent();
+    await fixture.whenStable();
+    await component.openFile();
+
+    state().fromRow.set(10);
+    state().toRow.set(20);
+
+    await component.openFile();
+
+    expect(state().fromRow()).toBeNull();
+    expect(state().toRow()).toBeNull();
   });
 
   it('derives the default export name from a .csv source file', async () => {

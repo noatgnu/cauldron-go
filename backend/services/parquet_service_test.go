@@ -169,7 +169,7 @@ func TestExportParquetToCSV_RoundTrips(t *testing.T) {
 	svc := NewParquetService(NewProgressNotifier(nil))
 
 	outPath := filepath.Join(t.TempDir(), "out.csv")
-	if err := svc.ExportParquetToCSV(path, outPath, nil, ','); err != nil {
+	if err := svc.ExportParquetToCSV(path, outPath, nil, ',', 0, 0); err != nil {
 		t.Fatalf("ExportParquetToCSV failed: %v", err)
 	}
 
@@ -190,7 +190,7 @@ func TestExportParquetToCSV_ColumnSubset(t *testing.T) {
 	svc := NewParquetService(NewProgressNotifier(nil))
 
 	outPath := filepath.Join(t.TempDir(), "out.csv")
-	if err := svc.ExportParquetToCSV(path, outPath, []string{"name", "id"}, ','); err != nil {
+	if err := svc.ExportParquetToCSV(path, outPath, []string{"name", "id"}, ',', 0, 0); err != nil {
 		t.Fatalf("ExportParquetToCSV failed: %v", err)
 	}
 
@@ -211,7 +211,7 @@ func TestExportParquetToCSV_TabDelimiter(t *testing.T) {
 	svc := NewParquetService(NewProgressNotifier(nil))
 
 	outPath := filepath.Join(t.TempDir(), "out.tsv")
-	if err := svc.ExportParquetToCSV(path, outPath, nil, '\t'); err != nil {
+	if err := svc.ExportParquetToCSV(path, outPath, nil, '\t', 0, 0); err != nil {
 		t.Fatalf("ExportParquetToCSV failed: %v", err)
 	}
 
@@ -226,6 +226,47 @@ func TestExportParquetToCSV_TabDelimiter(t *testing.T) {
 	wantHeader := "id\tname\tscore"
 	if lines[0] != wantHeader {
 		t.Errorf("expected tab-delimited header %q, got %q", wantHeader, lines[0])
+	}
+}
+
+func TestExportParquetToCSV_RowRange(t *testing.T) {
+	path := writeTestParquetFile(t, makeTestRows(10), 4) // row groups: [0-3],[4-7],[8-9]
+	svc := NewParquetService(NewProgressNotifier(nil))
+
+	outPath := filepath.Join(t.TempDir(), "out.csv")
+	if err := svc.ExportParquetToCSV(path, outPath, nil, ',', 3, 4); err != nil {
+		t.Fatalf("ExportParquetToCSV failed: %v", err)
+	}
+
+	records := readCSV(t, outPath)
+	if len(records) != 5 { // header + 4 rows
+		t.Fatalf("expected 5 CSV records (header + 4 rows), got %d", len(records))
+	}
+	for i, wantID := range []string{"3", "4", "5", "6"} {
+		if records[i+1][0] != wantID {
+			t.Errorf("row %d: expected id %q, got %v", i, wantID, records[i+1])
+		}
+	}
+}
+
+func TestExportParquetToCSV_RowRangeWithColumnSubset(t *testing.T) {
+	path := writeTestParquetFile(t, makeTestRows(10), 10)
+	svc := NewParquetService(NewProgressNotifier(nil))
+
+	outPath := filepath.Join(t.TempDir(), "out.csv")
+	if err := svc.ExportParquetToCSV(path, outPath, []string{"name", "id"}, ',', 8, 0); err != nil {
+		t.Fatalf("ExportParquetToCSV failed: %v", err)
+	}
+
+	records := readCSV(t, outPath)
+	if len(records) != 3 { // header + rows 8,9 (limit<=0 means to end of file)
+		t.Fatalf("expected 3 CSV records (header + 2 rows), got %d", len(records))
+	}
+	if records[0][0] != "name" || records[0][1] != "id" {
+		t.Fatalf("expected header [name id], got %v", records[0])
+	}
+	if records[1][1] != "8" || records[2][1] != "9" {
+		t.Fatalf("expected ids 8 and 9, got %v, %v", records[1], records[2])
 	}
 }
 

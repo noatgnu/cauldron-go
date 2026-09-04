@@ -778,12 +778,12 @@ func (a *App) SaveTableExportDialog(defaultName string) (string, error) {
 	return a.fileService.SaveFileDialog("Export Table Data", defaultName)
 }
 
-func (a *App) ExportTableFile(path string, outputPath string, columns []string, delimiter string) error {
+func (a *App) ExportTableFile(path string, outputPath string, columns []string, delimiter string, offset int, limit int) error {
 	d := ','
 	if delimiter != "" {
 		d = rune(delimiter[0])
 	}
-	return a.tableFileService.ExportFile(path, outputPath, columns, d)
+	return a.tableFileService.ExportFile(path, outputPath, columns, d, offset, limit)
 }
 
 func (a *App) CloseTableFile(path string) error {
