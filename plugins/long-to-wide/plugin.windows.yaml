@@ -1,0 +1,135 @@
+plugin:
+  id: "long-to-wide"
+  name: "Long to Wide (Pivot)"
+  description: "Spread a variable/value pair back into separate columns (pandas pivot / tidyr pivot_wider)"
+  version: "1.0.0"
+  author: "CauldronGO Team"
+  category: "preprocessing"
+  icon: "view_column"
+
+runtime:
+  environments:
+    - direct
+  entrypoint: "long-to-wide.exe"
+
+inputs:
+  - name: "input_file"
+    label: "Input File"
+    type: "file"
+    required: true
+    accept: ".csv,.tsv,.txt"
+    description: "Table to reshape from long to wide format"
+
+  - name: "id_vars"
+    label: "ID Columns"
+    type: "column-selector"
+    required: true
+    multiple: true
+    sourceFile: "input_file"
+    description: "Columns that uniquely identify an output row"
+
+  - name: "names_from"
+    label: "Names From Column"
+    type: "column-selector"
+    required: true
+    multiple: false
+    sourceFile: "input_file"
+    description: "Column whose distinct values become the new column headers"
+
+  - name: "values_from"
+    label: "Values From Column"
+    type: "column-selector"
+    required: true
+    multiple: false
+    sourceFile: "input_file"
+    description: "Column supplying the cell values"
+
+  - name: "names_prefix"
+    label: "Column Name Prefix"
+    type: "text"
+    required: false
+    default: ""
+    description: "Prefix prepended to generated column names"
+
+  - name: "fill_value"
+    label: "Fill Value"
+    type: "text"
+    required: false
+    default: ""
+    description: "Value used for id/name combinations absent from the input"
+
+  - name: "on_duplicate"
+    label: "On Duplicate Key"
+    type: "select"
+    required: false
+    default: "error"
+    options:
+      - "error"
+      - "first"
+      - "last"
+      - "concat"
+    description: "How to resolve multiple input rows mapping to the same id + names-from combination"
+
+  - name: "concat_separator"
+    label: "Concat Separator"
+    type: "text"
+    required: false
+    default: ";"
+    description: "Separator used to join duplicate values when On Duplicate Key is 'concat'"
+    visibleWhen:
+      field: "on_duplicate"
+      equals: "concat"
+
+  - name: "delimiter"
+    label: "File Delimiter"
+    type: "select"
+    required: false
+    default: "tab"
+    options:
+      - "tab"
+      - "comma"
+      - "semicolon"
+    description: "Delimiter used for both the input file and the output file"
+
+outputs:
+  - name: "wide_data"
+    path: "pivoted.data.tsv"
+    type: "data"
+    description: "Pivoted (wide-format) table"
+    format: "tsv"
+
+execution:
+  argsMapping:
+    input_file: "--input"
+    id_vars:
+      flag: "--id-vars"
+      transform: "comma-join"
+    names_from: "--names-from"
+    values_from: "--values-from"
+    names_prefix: "--names-prefix"
+    fill_value: "--fill-value"
+    on_duplicate: "--on-duplicate"
+    concat_separator: "--concat-separator"
+    delimiter:
+      flag: "--delimiter"
+      transform: "map"
+      values:
+        tab: "\t"
+        comma: ","
+        semicolon: ";"
+
+  outputDir: "--output"
+
+example:
+  enabled: false
+  values:
+    input_file: "diann/imputed.data.txt"
+    id_vars:
+      - "Protein.Group"
+    names_from: "Genes"
+    values_from: "First.Protein.Description"
+    names_prefix: ""
+    fill_value: ""
+    on_duplicate: "first"
+    concat_separator: ";"
+    delimiter: "tab"

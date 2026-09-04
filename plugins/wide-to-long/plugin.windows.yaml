@@ -1,0 +1,102 @@
+plugin:
+  id: "wide-to-long"
+  name: "Wide to Long (Melt)"
+  description: "Collapse multiple value columns into id/variable/value triples (pandas melt / tidyr pivot_longer)"
+  version: "1.0.0"
+  author: "CauldronGO Team"
+  category: "preprocessing"
+  icon: "unfold_more"
+
+runtime:
+  environments:
+    - direct
+  entrypoint: "wide-to-long.exe"
+
+inputs:
+  - name: "input_file"
+    label: "Input File"
+    type: "file"
+    required: true
+    accept: ".csv,.tsv,.txt"
+    description: "Table to reshape from wide to long format"
+
+  - name: "id_vars"
+    label: "ID Columns"
+    type: "column-selector"
+    required: true
+    multiple: true
+    sourceFile: "input_file"
+    description: "Columns to keep as-is (identifiers)"
+
+  - name: "value_vars"
+    label: "Value Columns to Melt"
+    type: "column-selector"
+    required: false
+    multiple: true
+    sourceFile: "input_file"
+    description: "Columns to collapse into variable/value pairs. Leave empty to melt all columns not selected as ID columns."
+
+  - name: "var_name"
+    label: "Variable Column Name"
+    type: "text"
+    required: false
+    default: "variable"
+    description: "Name of the new column holding the melted columns' original names"
+
+  - name: "value_name"
+    label: "Value Column Name"
+    type: "text"
+    required: false
+    default: "value"
+    description: "Name of the new column holding the melted cell values"
+
+  - name: "delimiter"
+    label: "File Delimiter"
+    type: "select"
+    required: false
+    default: "tab"
+    options:
+      - "tab"
+      - "comma"
+      - "semicolon"
+    description: "Delimiter used for both the input file and the output file"
+
+outputs:
+  - name: "long_data"
+    path: "melted.data.tsv"
+    type: "data"
+    description: "Melted (long-format) table"
+    format: "tsv"
+
+execution:
+  argsMapping:
+    input_file: "--input"
+    id_vars:
+      flag: "--id-vars"
+      transform: "comma-join"
+    value_vars:
+      flag: "--value-vars"
+      transform: "comma-join"
+    var_name: "--var-name"
+    value_name: "--value-name"
+    delimiter:
+      flag: "--delimiter"
+      transform: "map"
+      values:
+        tab: "\t"
+        comma: ","
+        semicolon: ";"
+
+  outputDir: "--output"
+
+example:
+  enabled: false
+  values:
+    input_file: "diann/imputed.data.txt"
+    id_vars:
+      - "Protein.Group"
+      - "Genes"
+    value_vars: []
+    var_name: "Sample"
+    value_name: "Intensity"
+    delimiter: "tab"
