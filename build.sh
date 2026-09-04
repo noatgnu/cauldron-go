@@ -238,28 +238,35 @@ copy_resources() {
         fi
     fi
 
-    local fetcher_name="uniprot-fetcher"
-    if [ "$os_part" = "windows" ]; then
-        fetcher_name="uniprot-fetcher.exe"
-    fi
+    local external_tools=(
+        "uniprot-fetcher"
+        "wide-to-long"
+        "long-to-wide"
+    )
+    for tool in "${external_tools[@]}"; do
+        local exe_name="$tool"
+        if [ "$os_part" = "windows" ]; then
+            exe_name="$tool.exe"
+        fi
 
-    if [ -f "$PROJECT_ROOT/bin/external/$os_part-$arch_part/$fetcher_name" ]; then
-        mkdir -p "$target_dir/plugins/uniprot-fetcher"
-        if cp "$PROJECT_ROOT/bin/external/$os_part-$arch_part/$fetcher_name" "$target_dir/plugins/uniprot-fetcher/"; then
-            print_success "Uniprot-fetcher executable copied to plugin directory"
-        else
-            print_error "Failed to copy uniprot-fetcher executable"
-            has_error=1
+        if [ -f "$PROJECT_ROOT/bin/external/$os_part-$arch_part/$exe_name" ]; then
+            mkdir -p "$target_dir/plugins/$tool"
+            if cp "$PROJECT_ROOT/bin/external/$os_part-$arch_part/$exe_name" "$target_dir/plugins/$tool/"; then
+                print_success "$tool executable copied to plugin directory"
+            else
+                print_error "Failed to copy $tool executable"
+                has_error=1
+            fi
+        elif [ -f "$PROJECT_ROOT/bin/external/$exe_name" ]; then
+            mkdir -p "$target_dir/plugins/$tool"
+            if cp "$PROJECT_ROOT/bin/external/$exe_name" "$target_dir/plugins/$tool/"; then
+                print_success "$tool executable copied to plugin directory (from legacy path)"
+            else
+                print_error "Failed to copy $tool executable"
+                has_error=1
+            fi
         fi
-    elif [ -f "$PROJECT_ROOT/bin/external/$fetcher_name" ]; then
-        mkdir -p "$target_dir/plugins/uniprot-fetcher"
-        if cp "$PROJECT_ROOT/bin/external/$fetcher_name" "$target_dir/plugins/uniprot-fetcher/"; then
-            print_success "Uniprot-fetcher executable copied to plugin directory (from legacy path)"
-        else
-            print_error "Failed to copy uniprot-fetcher executable"
-            has_error=1
-        fi
-    fi
+    done
 
     if [ -d "$PROJECT_ROOT/bin/$os_part-$arch_part" ]; then
         mkdir -p "$target_dir/tools"
@@ -351,17 +358,27 @@ build_external_tools() {
     local output_base="$PROJECT_ROOT/bin/external/$os_part-$arch_part"
     mkdir -p "$output_base"
 
-    local output_name="uniprot-fetcher"
+    local exe_ext=""
     if [ "$os_part" = "windows" ]; then
-        output_name="uniprot-fetcher.exe"
+        exe_ext=".exe"
     fi
 
-    if GOOS="$os_part" GOARCH="$arch_part" go build -o "$output_base/$output_name" ./cmd/uniprot-fetcher; then
-        print_success "Built uniprot-fetcher for $platform"
-    else
-        print_error "Failed to build uniprot-fetcher for $platform"
-        return 1
-    fi
+    local tools=(
+        "uniprot-fetcher"
+        "wide-to-long"
+        "long-to-wide"
+    )
+
+    for tool in "${tools[@]}"; do
+        if [ -d "./cmd/$tool" ]; then
+            if GOOS="$os_part" GOARCH="$arch_part" go build -o "$output_base/$tool$exe_ext" "./cmd/$tool"; then
+                print_success "Built $tool for $platform"
+            else
+                print_error "Failed to build $tool for $platform"
+                return 1
+            fi
+        fi
+    done
 
     print_success "All external utility programs built successfully for $platform"
 }
