@@ -99,7 +99,7 @@ func TestTableFileService_ExportFile_DispatchesByExtension(t *testing.T) {
 	t.Cleanup(func() { _ = svc.CloseFile(path) })
 
 	outPath := filepath.Join(t.TempDir(), "out.csv")
-	if err := svc.ExportFile(path, outPath, nil, ','); err != nil {
+	if err := svc.ExportFile(path, outPath, nil, ',', 0, 0); err != nil {
 		t.Fatalf("ExportFile failed: %v", err)
 	}
 	if _, err := os.Stat(outPath); err != nil {

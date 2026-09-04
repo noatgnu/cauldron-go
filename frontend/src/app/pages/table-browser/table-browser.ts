@@ -9,6 +9,7 @@ import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatSelectModule } from '@angular/material/select';
 import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
@@ -31,6 +32,7 @@ type Delimiter = ',' | '\t';
     MatCheckboxModule,
     MatSelectModule,
     MatFormFieldModule,
+    MatInputModule,
     MatProgressBarModule,
     MatProgressSpinnerModule,
     MatTooltipModule,
@@ -51,6 +53,8 @@ export class TableBrowser implements OnDestroy {
   protected loadingFile = signal(false);
   protected loadingPage = signal(false);
   protected selectedColumns = signal<Set<string>>(new Set());
+  protected fromRow = signal<number | null>(null);
+  protected toRow = signal<number | null>(null);
   protected delimiter = signal<Delimiter>(',');
   protected exporting = signal(false);
   protected exportMessage = signal('');
@@ -110,6 +114,8 @@ export class TableBrowser implements OnDestroy {
       this.filePath.set(path);
       this.fileInfo.set(info);
       this.selectedColumns.set(new Set(info?.columns.map(c => c.name) ?? []));
+      this.fromRow.set(null);
+      this.toRow.set(null);
       this.pageIndex.set(0);
       await this.loadPage();
     } catch (error) {
@@ -155,6 +161,28 @@ export class TableBrowser implements OnDestroy {
     return this.selectedColumns().has(name);
   }
 
+  /** Derives backend offset/limit (0-indexed, limit<=0 means to end of file) from the 1-indexed fromRow/toRow fields, or null if the range is invalid. */
+  private computeRowRange(numRows: number): { offset: number; limit: number } | null {
+    const from = this.fromRow();
+    const to = this.toRow();
+
+    if (from === null && to === null) return { offset: 0, limit: 0 };
+
+    const effectiveFrom = from ?? 1;
+    if (effectiveFrom < 1 || effectiveFrom > numRows) {
+      this.notification.showError(`"From row" must be between 1 and ${numRows}`);
+      return null;
+    }
+    if (to !== null) {
+      if (to < effectiveFrom || to > numRows) {
+        this.notification.showError(`"To row" must be between ${effectiveFrom} and ${numRows}`);
+        return null;
+      }
+      return { offset: effectiveFrom - 1, limit: to - effectiveFrom + 1 };
+    }
+    return { offset: effectiveFrom - 1, limit: 0 };
+  }
+
   async exportData() {
     const path = this.filePath();
     const info = this.fileInfo();
@@ -165,6 +193,9 @@ export class TableBrowser implements OnDestroy {
       this.notification.showError('Select at least one column to export');
       return;
     }
+
+    const range = this.computeRowRange(info.numRows);
+    if (!range) return;
 
     const ext = this.delimiter() === '\t' ? 'tsv' : 'csv';
     const defaultName = this.fileName().replace(/\.(parquet|csv|tsv)$/i, `.${ext}`);
@@ -185,7 +216,7 @@ export class TableBrowser implements OnDestroy {
       this.exportMessage.set('Starting export...');
       this.exportPercentage.set(0);
 
-      await this.wails.exportTableFile(path, outputPath, columns, this.delimiter());
+      await this.wails.exportTableFile(path, outputPath, columns, this.delimiter(), range.offset, range.limit);
       this.notification.showSuccess(`Exported to ${outputPath}`);
     } catch (error) {
       this.notification.showError(`Export failed: ${error}`);

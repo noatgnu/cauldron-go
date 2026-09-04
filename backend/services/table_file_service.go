@@ -35,12 +35,12 @@ func (s *TableFileService) ReadPage(path string, offset, limit int) ([]map[strin
 	return s.delimited.ReadPage(path, offset, limit)
 }
 
-// ExportFile exports the selected columns of path to outputPath, delimited by delimiter.
-func (s *TableFileService) ExportFile(path, outputPath string, columns []string, delimiter rune) error {
+// ExportFile exports rows [offset, offset+limit) and the selected columns of path to outputPath, delimited by delimiter. offset<=0 starts from the first row; limit<=0 means no upper bound.
+func (s *TableFileService) ExportFile(path, outputPath string, columns []string, delimiter rune, offset, limit int) error {
 	if isParquet(path) {
-		return s.parquet.ExportParquetToCSV(path, outputPath, columns, delimiter)
+		return s.parquet.ExportParquetToCSV(path, outputPath, columns, delimiter, offset, limit)
 	}
-	return s.delimited.ExportToCSV(path, outputPath, columns, delimiter)
+	return s.delimited.ExportToCSV(path, outputPath, columns, delimiter, offset, limit)
 }
 
 // CloseFile releases the cached handle for path, if one is open.

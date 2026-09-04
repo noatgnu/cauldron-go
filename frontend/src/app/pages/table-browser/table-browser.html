@@ -63,6 +63,22 @@
               </mat-checkbox>
             }
           </div>
+          <h3>
+            <mat-icon>filter_alt</mat-icon>
+            Row Range
+          </h3>
+          <p class="hint-text">Select which rows to include when exporting. Leave blank to export all rows.</p>
+          <div class="row-range">
+            <mat-form-field appearance="outline" class="row-range-field">
+              <mat-label>From row</mat-label>
+              <input matInput type="number" min="1" [max]="fileInfo()!.numRows" [(ngModel)]="fromRow">
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="row-range-field">
+              <mat-label>To row</mat-label>
+              <input matInput type="number" min="1" [max]="fileInfo()!.numRows" [(ngModel)]="toRow">
+            </mat-form-field>
+          </div>
+
           <div class="file-stats">
             <p><strong>Rows:</strong> {{ fileInfo()!.numRows }}</p>
             @if (fileInfo()!.numRowGroups > 0) {

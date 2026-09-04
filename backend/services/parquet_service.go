@@ -191,8 +191,12 @@ func (s *ParquetService) ReadParquetPage(path string, offset, limit int) ([]map[
 	return result, nil
 }
 
-// ExportParquetToCSV streams the file sequentially through a CSV writer, using its own reader independent of any cached browsing handle for path.
-func (s *ParquetService) ExportParquetToCSV(path, outputPath string, columns []string, delimiter rune) error {
+// ExportParquetToCSV streams rows [offset, offset+limit) through a CSV writer, using its own reader independent of any cached browsing handle for path. offset<=0 starts from the first row; limit<=0 means no upper bound (export to end of file) — this is NOT the same "return nothing" convention ReadParquetPage's limit<=0 uses.
+func (s *ParquetService) ExportParquetToCSV(path, outputPath string, columns []string, delimiter rune, offset, limit int) error {
+	if offset < 0 {
+		offset = 0
+	}
+
 	f, err := os.Open(path)
 	if err != nil {
 		return fmt.Errorf("failed to open %s (check the network drive is still connected): %w", path, err)
@@ -211,6 +215,12 @@ func (s *ParquetService) ExportParquetToCSV(path, outputPath string, columns []s
 
 	reader := parquet.NewGenericReader[any](pf)
 	defer reader.Close()
+
+	if offset > 0 {
+		if err := reader.SeekToRow(int64(offset)); err != nil {
+			return fmt.Errorf("failed to seek to row %d in %s (check the network drive is still connected): %w", offset, path, err)
+		}
+	}
 
 	allNames := columnNamesOf(reader.Schema())
 	selected := columns
@@ -232,7 +242,10 @@ func (s *ParquetService) ExportParquetToCSV(path, outputPath string, columns []s
 
 	s.progress.EmitStart(ProgressTypeGeneric, "table-export", fmt.Sprintf("Exporting %s...", filepath.Base(path)))
 
-	total := reader.NumRows()
+	total := reader.NumRows() - int64(offset)
+	if limit > 0 && int64(limit) < total {
+		total = int64(limit)
+	}
 	var written int64
 	const batchSize = 1000
 	buf := make([]parquet.Row, batchSize)
@@ -240,6 +253,9 @@ func (s *ParquetService) ExportParquetToCSV(path, outputPath string, columns []s
 
 	for {
 		n, readErr := reader.ReadRows(buf)
+		if limit > 0 && written+int64(n) > int64(limit) {
+			n = int(int64(limit) - written)
+		}
 		for i := 0; i < n; i++ {
 			m := rowToMap(buf[i], allNames)
 			for j, name := range selected {
@@ -257,6 +273,9 @@ func (s *ParquetService) ExportParquetToCSV(path, outputPath string, columns []s
 		if total > 0 && n > 0 {
 			pct := float64(written) / float64(total) * 100
 			s.progress.EmitProgress(ProgressTypeGeneric, "table-export", fmt.Sprintf("Exported %d/%d rows", written, total), pct)
+		}
+		if limit > 0 && written >= int64(limit) {
+			break
 		}
 		if readErr != nil {
 			if readErr == io.EOF {

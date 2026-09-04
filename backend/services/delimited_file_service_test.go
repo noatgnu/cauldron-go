@@ -247,7 +247,7 @@ func TestExportToCSV_RoundTrips(t *testing.T) {
 	t.Cleanup(func() { _ = svc.CloseFile(path) })
 
 	outPath := filepath.Join(t.TempDir(), "out.csv")
-	if err := svc.ExportToCSV(path, outPath, nil, ','); err != nil {
+	if err := svc.ExportToCSV(path, outPath, nil, ',', 0, 0); err != nil {
 		t.Fatalf("ExportToCSV failed: %v", err)
 	}
 
@@ -269,7 +269,7 @@ func TestExportToCSV_ColumnSubsetAndDelimiterConversion(t *testing.T) {
 	t.Cleanup(func() { _ = svc.CloseFile(path) })
 
 	outPath := filepath.Join(t.TempDir(), "out.tsv")
-	if err := svc.ExportToCSV(path, outPath, []string{"name", "id"}, '\t'); err != nil {
+	if err := svc.ExportToCSV(path, outPath, []string{"name", "id"}, '\t', 0, 0); err != nil {
 		t.Fatalf("ExportToCSV failed: %v", err)
 	}
 
@@ -283,6 +283,77 @@ func TestExportToCSV_ColumnSubsetAndDelimiterConversion(t *testing.T) {
 	}
 	if lines[0] != "name\tid" {
 		t.Errorf("expected tab-delimited header 'name\\tid', got %q", lines[0])
+	}
+}
+
+func TestExportToCSV_RowRange(t *testing.T) {
+	path := writeTestDelimitedFile(t, "test.csv", makeCSVContent(10))
+	svc := NewDelimitedFileService(NewProgressNotifier(nil))
+	t.Cleanup(func() { _ = svc.CloseFile(path) })
+
+	outPath := filepath.Join(t.TempDir(), "out.csv")
+	if err := svc.ExportToCSV(path, outPath, nil, ',', 3, 4); err != nil {
+		t.Fatalf("ExportToCSV failed: %v", err)
+	}
+
+	records := readCSV(t, outPath)
+	if len(records) != 5 { // header + 4 rows
+		t.Fatalf("expected 5 CSV records (header + 4 rows), got %d", len(records))
+	}
+	for i, wantID := range []string{"3", "4", "5", "6"} {
+		if records[i+1][0] != wantID {
+			t.Errorf("row %d: expected id %q, got %v", i, wantID, records[i+1])
+		}
+	}
+}
+
+func TestExportToCSV_RowRangeWithColumnSubset(t *testing.T) {
+	path := writeTestDelimitedFile(t, "test.csv", makeCSVContent(10))
+	svc := NewDelimitedFileService(NewProgressNotifier(nil))
+	t.Cleanup(func() { _ = svc.CloseFile(path) })
+
+	outPath := filepath.Join(t.TempDir(), "out.csv")
+	if err := svc.ExportToCSV(path, outPath, []string{"name", "id"}, ',', 8, 0); err != nil {
+		t.Fatalf("ExportToCSV failed: %v", err)
+	}
+
+	records := readCSV(t, outPath)
+	if len(records) != 3 { // header + rows 8,9 (limit<=0 means to end of file)
+		t.Fatalf("expected 3 CSV records (header + 2 rows), got %d", len(records))
+	}
+	if records[0][0] != "name" || records[0][1] != "id" {
+		t.Fatalf("expected header [name id], got %v", records[0])
+	}
+	if records[1][1] != "8" || records[2][1] != "9" {
+		t.Fatalf("expected ids 8 and 9, got %v, %v", records[1], records[2])
+	}
+}
+
+func TestExportToCSV_RowRangeStartsAfterEmbeddedNewlineRow(t *testing.T) {
+	content := "id,name,note\n" +
+		"0,alice,\"hello, world\"\n" +
+		"1,\"bob\nnewline\",x\n" +
+		"2,carol,y\n"
+	path := writeTestDelimitedFile(t, "test.csv", []byte(content))
+	svc := NewDelimitedFileService(NewProgressNotifier(nil))
+	t.Cleanup(func() { _ = svc.CloseFile(path) })
+
+	// Seed the cached index by browsing first, then export starting right after the tricky row 1.
+	if _, err := svc.OpenFile(path); err != nil {
+		t.Fatalf("OpenFile failed: %v", err)
+	}
+
+	outPath := filepath.Join(t.TempDir(), "out.csv")
+	if err := svc.ExportToCSV(path, outPath, nil, ',', 2, 0); err != nil {
+		t.Fatalf("ExportToCSV failed: %v", err)
+	}
+
+	records := readCSV(t, outPath)
+	if len(records) != 2 { // header + row 2 only
+		t.Fatalf("expected 2 CSV records (header + 1 row), got %d", len(records))
+	}
+	if records[1][1] != "carol" {
+		t.Fatalf("expected the row after the embedded-newline row to be carol, got %v", records[1])
 	}
 }
 
