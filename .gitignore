@@ -152,7 +152,7 @@ plugins/phate-analysis-*/
 
 bin
 examples/*
-!examples/parquet_browser/
+!examples/table_browser/
 
 # Plugin-to-SPA CLI (binary only, not source)
 /plugin-to-spa

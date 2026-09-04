@@ -12,19 +12,19 @@ import (
 	"github.com/parquet-go/parquet-go"
 )
 
-// ParquetColumn describes one leaf column of a Parquet file's schema.
-type ParquetColumn struct {
+// DataColumn describes one column of a tabular file's schema (Parquet, CSV, or TSV).
+type DataColumn struct {
 	Name string `json:"name"`
 	Type string `json:"type"`
 }
 
-// ParquetFileInfo summarizes a Parquet file's schema and size, read from the file footer only.
-type ParquetFileInfo struct {
-	Path         string          `json:"path"`
-	Columns      []ParquetColumn `json:"columns"`
-	NumRows      int64           `json:"numRows"`
-	NumRowGroups int             `json:"numRowGroups"`
-	FileSize     int64           `json:"fileSize"`
+// DataFileInfo summarizes a tabular file's schema and size.
+type DataFileInfo struct {
+	Path         string       `json:"path"`
+	Columns      []DataColumn `json:"columns"`
+	NumRows      int64        `json:"numRows"`
+	NumRowGroups int          `json:"numRowGroups"`
+	FileSize     int64        `json:"fileSize"`
 }
 
 type openParquetHandle struct {
@@ -92,15 +92,15 @@ func columnNamesOf(schema *parquet.Schema) []string {
 	return names
 }
 
-func columnsOf(schema *parquet.Schema) []ParquetColumn {
+func columnsOf(schema *parquet.Schema) []DataColumn {
 	paths := schema.Columns()
-	cols := make([]ParquetColumn, len(paths))
+	cols := make([]DataColumn, len(paths))
 	for i, path := range paths {
 		typeName := "unknown"
 		if leaf, ok := schema.Lookup(path...); ok {
 			typeName = leaf.Node.Type().String()
 		}
-		cols[i] = ParquetColumn{Name: strings.Join(path, "."), Type: typeName}
+		cols[i] = DataColumn{Name: strings.Join(path, "."), Type: typeName}
 	}
 	return cols
 }
@@ -141,7 +141,7 @@ func rowToMap(row parquet.Row, names []string) map[string]interface{} {
 }
 
 // OpenParquetFile opens (or reuses an already-open handle for) path and returns its schema and size.
-func (s *ParquetService) OpenParquetFile(path string) (*ParquetFileInfo, error) {
+func (s *ParquetService) OpenParquetFile(path string) (*DataFileInfo, error) {
 	h, err := s.getOrOpen(path)
 	if err != nil {
 		return nil, err
@@ -153,7 +153,7 @@ func (s *ParquetService) OpenParquetFile(path string) (*ParquetFileInfo, error) 
 	}
 
 	schema := h.reader.Schema()
-	return &ParquetFileInfo{
+	return &DataFileInfo{
 		Path:         path,
 		Columns:      columnsOf(schema),
 		NumRows:      h.reader.NumRows(),
@@ -230,7 +230,7 @@ func (s *ParquetService) ExportParquetToCSV(path, outputPath string, columns []s
 		return fmt.Errorf("failed to write CSV header: %w", err)
 	}
 
-	s.progress.EmitStart(ProgressTypeGeneric, "parquet-export", fmt.Sprintf("Exporting %s...", filepath.Base(path)))
+	s.progress.EmitStart(ProgressTypeGeneric, "table-export", fmt.Sprintf("Exporting %s...", filepath.Base(path)))
 
 	total := reader.NumRows()
 	var written int64
@@ -249,31 +249,31 @@ func (s *ParquetService) ExportParquetToCSV(path, outputPath string, columns []s
 				}
 			}
 			if err := w.Write(record); err != nil {
-				s.progress.EmitError(ProgressTypeGeneric, "parquet-export", "Export failed", err.Error())
+				s.progress.EmitError(ProgressTypeGeneric, "table-export", "Export failed", err.Error())
 				return fmt.Errorf("failed to write row: %w", err)
 			}
 		}
 		written += int64(n)
 		if total > 0 && n > 0 {
 			pct := float64(written) / float64(total) * 100
-			s.progress.EmitProgress(ProgressTypeGeneric, "parquet-export", fmt.Sprintf("Exported %d/%d rows", written, total), pct)
+			s.progress.EmitProgress(ProgressTypeGeneric, "table-export", fmt.Sprintf("Exported %d/%d rows", written, total), pct)
 		}
 		if readErr != nil {
 			if readErr == io.EOF {
 				break
 			}
-			s.progress.EmitError(ProgressTypeGeneric, "parquet-export", "Export failed", readErr.Error())
+			s.progress.EmitError(ProgressTypeGeneric, "table-export", "Export failed", readErr.Error())
 			return fmt.Errorf("failed to read rows from %s (check the network drive is still connected): %w", path, readErr)
 		}
 	}
 
 	w.Flush()
 	if err := w.Error(); err != nil {
-		s.progress.EmitError(ProgressTypeGeneric, "parquet-export", "Export failed", err.Error())
+		s.progress.EmitError(ProgressTypeGeneric, "table-export", "Export failed", err.Error())
 		return fmt.Errorf("failed to flush CSV writer: %w", err)
 	}
 
-	s.progress.EmitComplete(ProgressTypeGeneric, "parquet-export", fmt.Sprintf("Exported %d rows to %s", written, filepath.Base(outputPath)))
+	s.progress.EmitComplete(ProgressTypeGeneric, "table-export", fmt.Sprintf("Exported %d rows to %s", written, filepath.Base(outputPath)))
 	return nil
 }
 

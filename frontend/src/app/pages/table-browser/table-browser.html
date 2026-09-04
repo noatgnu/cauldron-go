@@ -1,8 +1,8 @@
-<div class="parquet-browser-container">
-  <mat-toolbar class="parquet-toolbar">
+<div class="table-browser-container">
+  <mat-toolbar class="table-toolbar">
     <button mat-raised-button color="primary" (click)="openFile()" [disabled]="loadingFile()">
       <mat-icon>folder_open</mat-icon>
-      Open Parquet File
+      Open File
     </button>
 
     @if (filePath()) {
@@ -37,12 +37,12 @@
   @if (loadingFile()) {
     <div class="loading-state">
       <mat-spinner diameter="32"></mat-spinner>
-      <span>Reading parquet file...</span>
+      <span>Reading file...</span>
     </div>
   } @else if (!fileInfo()) {
     <div class="empty-state">
       <mat-icon>table_chart</mat-icon>
-      <p>Open a .parquet file to preview its schema and browse rows.</p>
+      <p>Open a .parquet, .csv, or .tsv file to preview its schema and browse rows.</p>
     </div>
   } @else {
     <div class="browser-content">
@@ -59,13 +59,15 @@
                 [checked]="isColumnSelected(column.name)"
                 (change)="toggleColumn(column.name)">
                 {{ column.name }}
-                <span class="column-type">{{ column.type }}</span>
+                <span class="column-type">{{ column.type || 'text' }}</span>
               </mat-checkbox>
             }
           </div>
           <div class="file-stats">
             <p><strong>Rows:</strong> {{ fileInfo()!.numRows }}</p>
-            <p><strong>Row groups:</strong> {{ fileInfo()!.numRowGroups }}</p>
+            @if (fileInfo()!.numRowGroups > 0) {
+              <p><strong>Row groups:</strong> {{ fileInfo()!.numRowGroups }}</p>
+            }
             <p><strong>Size:</strong> {{ formatBytes(fileInfo()!.fileSize) }}</p>
           </div>
         </mat-card-content>

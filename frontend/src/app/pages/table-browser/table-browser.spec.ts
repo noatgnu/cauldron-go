@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { vi } from 'vitest';
-import { ParquetBrowser } from './parquet-browser';
+import { TableBrowser } from './table-browser';
 import { Wails } from '../../core/services/wails';
 import { NotificationService } from '../../core/services/notification.service';
 
@@ -16,14 +16,25 @@ const sampleInfo = {
   fileSize: 4096
 };
 
-describe('ParquetBrowser', () => {
-  let component: ParquetBrowser;
-  let fixture: ComponentFixture<ParquetBrowser>;
+const sampleCSVInfo = {
+  path: '/data/sample.csv',
+  columns: [
+    { name: 'id', type: '' },
+    { name: 'name', type: '' }
+  ],
+  numRows: 100,
+  numRowGroups: 0,
+  fileSize: 4096
+};
+
+describe('TableBrowser', () => {
+  let component: TableBrowser;
+  let fixture: ComponentFixture<TableBrowser>;
   let wailsMock: any;
   let notificationMock: any;
 
   function createComponent() {
-    fixture = TestBed.createComponent(ParquetBrowser);
+    fixture = TestBed.createComponent(TableBrowser);
     component = fixture.componentInstance;
   }
 
@@ -34,12 +45,12 @@ describe('ParquetBrowser', () => {
   beforeEach(async () => {
     wailsMock = {
       progress: signal(null),
-      openParquetFileDialog: vi.fn().mockResolvedValue('/data/sample.parquet'),
-      getParquetFileInfo: vi.fn().mockResolvedValue(sampleInfo),
-      getParquetPage: vi.fn().mockResolvedValue([{ id: 1, name: 'a' }, { id: 2, name: 'b' }]),
-      saveParquetExportDialog: vi.fn().mockResolvedValue('/data/sample.csv'),
-      exportParquetToCSV: vi.fn().mockResolvedValue(undefined),
-      closeParquetFile: vi.fn().mockResolvedValue(undefined)
+      openTableFileDialog: vi.fn().mockResolvedValue('/data/sample.parquet'),
+      getTableFileInfo: vi.fn().mockResolvedValue(sampleInfo),
+      getTableFilePage: vi.fn().mockResolvedValue([{ id: 1, name: 'a' }, { id: 2, name: 'b' }]),
+      saveTableExportDialog: vi.fn().mockResolvedValue('/data/sample.csv'),
+      exportTableFile: vi.fn().mockResolvedValue(undefined),
+      closeTableFile: vi.fn().mockResolvedValue(undefined)
     };
     notificationMock = {
       showError: vi.fn(),
@@ -49,7 +60,7 @@ describe('ParquetBrowser', () => {
     };
 
     await TestBed.configureTestingModule({
-      imports: [ParquetBrowser],
+      imports: [TableBrowser],
       providers: [
         { provide: Wails, useValue: wailsMock },
         { provide: NotificationService, useValue: notificationMock }
@@ -70,20 +81,20 @@ describe('ParquetBrowser', () => {
 
     await component.openFile();
 
-    expect(wailsMock.getParquetFileInfo).toHaveBeenCalledWith('/data/sample.parquet');
-    expect(wailsMock.getParquetPage).toHaveBeenCalledWith('/data/sample.parquet', 0, 25);
+    expect(wailsMock.getTableFileInfo).toHaveBeenCalledWith('/data/sample.parquet');
+    expect(wailsMock.getTableFilePage).toHaveBeenCalledWith('/data/sample.parquet', 0, 25);
     expect(state().fileInfo()).toEqual(sampleInfo);
     expect(state().rows().length).toBe(2);
   });
 
   it('does nothing when the file dialog is cancelled', async () => {
-    wailsMock.openParquetFileDialog.mockResolvedValue('');
+    wailsMock.openTableFileDialog.mockResolvedValue('');
     createComponent();
     await fixture.whenStable();
 
     await component.openFile();
 
-    expect(wailsMock.getParquetFileInfo).not.toHaveBeenCalled();
+    expect(wailsMock.getTableFileInfo).not.toHaveBeenCalled();
     expect(state().fileInfo()).toBeNull();
   });
 
@@ -104,7 +115,7 @@ describe('ParquetBrowser', () => {
 
     await component.onPageChange({ pageIndex: 2, pageSize: 25 } as any);
 
-    expect(wailsMock.getParquetPage).toHaveBeenCalledWith('/data/sample.parquet', 50, 25);
+    expect(wailsMock.getTableFilePage).toHaveBeenCalledWith('/data/sample.parquet', 50, 25);
   });
 
   it('toggles column selection', async () => {
@@ -130,7 +141,7 @@ describe('ParquetBrowser', () => {
     await component.exportData();
 
     expect(notificationMock.showError).toHaveBeenCalled();
-    expect(wailsMock.saveParquetExportDialog).not.toHaveBeenCalled();
+    expect(wailsMock.saveTableExportDialog).not.toHaveBeenCalled();
   });
 
   it('exports the selected columns with the chosen delimiter', async () => {
@@ -143,8 +154,8 @@ describe('ParquetBrowser', () => {
 
     await component.exportData();
 
-    expect(wailsMock.saveParquetExportDialog).toHaveBeenCalledWith('sample.tsv');
-    expect(wailsMock.exportParquetToCSV).toHaveBeenCalledWith(
+    expect(wailsMock.saveTableExportDialog).toHaveBeenCalledWith('sample.tsv');
+    expect(wailsMock.exportTableFile).toHaveBeenCalledWith(
       '/data/sample.parquet',
       '/data/sample.csv',
       ['id'],
@@ -153,19 +164,31 @@ describe('ParquetBrowser', () => {
     expect(notificationMock.showSuccess).toHaveBeenCalled();
   });
 
-  it('does nothing when the export destination dialog is cancelled', async () => {
-    wailsMock.saveParquetExportDialog.mockResolvedValue('');
+  it('derives the default export name from a .csv source file', async () => {
+    wailsMock.openTableFileDialog.mockResolvedValue('/data/sample.csv');
+    wailsMock.getTableFileInfo.mockResolvedValue(sampleCSVInfo);
     createComponent();
     await fixture.whenStable();
     await component.openFile();
 
     await component.exportData();
 
-    expect(wailsMock.exportParquetToCSV).not.toHaveBeenCalled();
+    expect(wailsMock.saveTableExportDialog).toHaveBeenCalledWith('sample.csv');
+  });
+
+  it('does nothing when the export destination dialog is cancelled', async () => {
+    wailsMock.saveTableExportDialog.mockResolvedValue('');
+    createComponent();
+    await fixture.whenStable();
+    await component.openFile();
+
+    await component.exportData();
+
+    expect(wailsMock.exportTableFile).not.toHaveBeenCalled();
   });
 
   it('does not show an error when the file dialog is cancelled with a runtime error', async () => {
-    wailsMock.openParquetFileDialog.mockRejectedValue(
+    wailsMock.openTableFileDialog.mockRejectedValue(
       new Error('{"message":"cancelled by user","cause":{},"kind":"RuntimeError"}')
     );
     createComponent();
@@ -177,7 +200,7 @@ describe('ParquetBrowser', () => {
   });
 
   it('does not show an error when the export dialog is cancelled with a runtime error', async () => {
-    wailsMock.saveParquetExportDialog.mockRejectedValue(
+    wailsMock.saveTableExportDialog.mockRejectedValue(
       new Error('{"message":"cancelled by user","cause":{},"kind":"RuntimeError"}')
     );
     createComponent();
@@ -187,7 +210,7 @@ describe('ParquetBrowser', () => {
     await component.exportData();
 
     expect(notificationMock.showError).not.toHaveBeenCalled();
-    expect(wailsMock.exportParquetToCSV).not.toHaveBeenCalled();
+    expect(wailsMock.exportTableFile).not.toHaveBeenCalled();
   });
 
   it('closes the open file on destroy', async () => {
@@ -197,7 +220,7 @@ describe('ParquetBrowser', () => {
 
     await component.ngOnDestroy();
 
-    expect(wailsMock.closeParquetFile).toHaveBeenCalledWith('/data/sample.parquet');
+    expect(wailsMock.closeTableFile).toHaveBeenCalledWith('/data/sample.parquet');
   });
 
   it('updates export progress from the wails progress signal', async () => {
@@ -206,7 +229,7 @@ describe('ParquetBrowser', () => {
 
     (wailsMock.progress as any).set({
       type: 'generic',
-      id: 'parquet-export',
+      id: 'table-export',
       message: 'Exported 50/100 rows',
       percentage: 50,
       status: 'in_progress'
@@ -215,5 +238,17 @@ describe('ParquetBrowser', () => {
 
     expect(state().exportMessage()).toBe('Exported 50/100 rows');
     expect(state().exportPercentage()).toBe(50);
+  });
+
+  it('hides the row-groups stat for a non-parquet source file', async () => {
+    wailsMock.openTableFileDialog.mockResolvedValue('/data/sample.csv');
+    wailsMock.getTableFileInfo.mockResolvedValue(sampleCSVInfo);
+    createComponent();
+    await fixture.whenStable();
+    await component.openFile();
+    fixture.detectChanges();
+
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).not.toContain('Row groups');
   });
 });
