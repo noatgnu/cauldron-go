@@ -1,0 +1,14 @@
+.w-full {
+  width: 100%;
+}
+
+.dialog-message {
+  margin-bottom: 16px;
+  color: var(--mat-dialog-content-text-color, rgba(0, 0, 0, 0.87));
+}
+
+.error-message {
+  color: var(--mat-sys-error, #b3261e);
+  font-size: 12px;
+  margin: 4px 0 0;
+}

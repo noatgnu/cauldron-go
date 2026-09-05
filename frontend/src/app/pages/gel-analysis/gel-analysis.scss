@@ -1,0 +1,157 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.gel-analysis-container {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.gel-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px 16px;
+  background-color: var(--surface-variant);
+  color: var(--on-surface);
+
+  .spacer {
+    flex: 1;
+  }
+}
+
+.auto-detect-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 16px;
+
+  span {
+    font-size: 11px;
+    color: var(--on-surface-variant);
+  }
+}
+
+.loading-state,
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex: 1;
+  min-height: 0;
+  color: var(--on-surface-variant);
+  padding: 32px;
+
+  mat-icon {
+    font-size: 40px;
+    width: 40px;
+    height: 40px;
+    opacity: 0.5;
+  }
+}
+
+.analysis-content {
+  display: flex;
+  gap: 8px;
+  padding: 8px;
+  flex-wrap: wrap;
+}
+
+.canvas-panel {
+  flex: 1;
+  min-width: 300px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+
+  .hint-text {
+    font-size: 11px;
+    color: var(--on-surface-variant);
+    margin: 0;
+  }
+}
+
+.canvas-stack {
+  position: relative;
+  border: 1px solid var(--border);
+  max-width: 100%;
+  overflow: auto;
+
+  canvas {
+    display: block;
+    max-width: 100%;
+  }
+
+  .overlay-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    cursor: crosshair;
+  }
+}
+
+.side-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 320px;
+  flex-shrink: 0;
+
+  mat-card-content h3 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    margin: 0 0 8px 0;
+
+    mat-icon {
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+    }
+  }
+}
+
+.param-field {
+  width: 100%;
+
+  ::ng-deep .mat-mdc-form-field-subscript-wrapper {
+    display: none;
+  }
+}
+
+mat-list-item.selected {
+  background-color: var(--surface-variant);
+}
+
+.results-card {
+  margin: 8px;
+
+  .results-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    h3 {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      margin: 0;
+    }
+  }
+
+  .full-width-table {
+    width: 100%;
+    margin-top: 8px;
+  }
+}

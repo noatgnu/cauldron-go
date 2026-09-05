@@ -31,6 +31,16 @@ export type PendingEnvVarMigration = services.PendingEnvVarMigration;
 export type DataColumn = services.DataColumn;
 export type DataFileInfo = services.DataFileInfo;
 export type UpdateInfo = services.UpdateInfo;
+export type GelLaneROI = models.GelLaneROI;
+export type GelPeakParams = models.GelPeakParams;
+export type GelBand = models.GelBand;
+export type GelLaneProfile = models.GelLaneProfile;
+export type GelCalibrationPoint = models.GelCalibrationPoint;
+export type GelCalibrationCurve = models.GelCalibrationCurve;
+export type GelImageMeta = models.GelImageMeta;
+export type GelAnalysisSession = models.GelAnalysisSession;
+export type GelAutoDetectResult = services.GelAutoDetectResult;
+export type GelAnalysisProvenance = models.GelAnalysisProvenance;
 
 export interface GitAuthConfig {
   id: number;
@@ -1120,5 +1130,126 @@ export class Wails {
     if (!this.isWails) throw new Error('Wails not available');
     await this.waitForBackend();
     return WailsApp.FetchPluginDependencies(repoURL);
+  }
+
+  async openGelImageDialog(): Promise<string> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.OpenGelImageDialog();
+  }
+
+  async loadGelImage(path: string): Promise<GelImageMeta | null> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.LoadGelImage(path);
+  }
+
+  /** Returns a base64-encoded PNG string, usable directly as a `data:image/png;base64,...` URL. */
+  async getGelImagePreview(sessionID: string): Promise<string> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.GetGelImagePreview(sessionID);
+  }
+
+  async setGelLane(sessionID: string, lane: GelLaneROI): Promise<void> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.SetGelLane(sessionID, lane);
+  }
+
+  async removeGelLane(sessionID: string, laneID: string): Promise<void> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.RemoveGelLane(sessionID, laneID);
+  }
+
+  async getGelLanes(sessionID: string): Promise<GelLaneROI[]> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.GetGelLanes(sessionID);
+  }
+
+  async computeGelLaneProfile(sessionID: string, laneID: string, params: GelPeakParams): Promise<GelLaneProfile | null> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.ComputeGelLaneProfile(sessionID, laneID, params);
+  }
+
+  async computeAllGelProfiles(sessionID: string, params: GelPeakParams): Promise<Partial<Record<string, GelLaneProfile>>> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.ComputeAllGelProfiles(sessionID, params);
+  }
+
+  async fitGelCalibrationCurve(sessionID: string, markerLaneID: string): Promise<GelCalibrationCurve | null> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.FitGelCalibrationCurve(sessionID, markerLaneID);
+  }
+
+  async applyGelCalibration(sessionID: string): Promise<Partial<Record<string, GelLaneProfile>>> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.ApplyGelCalibration(sessionID);
+  }
+
+  async getGelProvenance(sessionID: string): Promise<GelAnalysisProvenance | null> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.GetGelProvenance(sessionID);
+  }
+
+  async exportGelResultsDialog(defaultName: string): Promise<string> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.ExportGelResultsDialog(defaultName);
+  }
+
+  async exportGelResultsCSV(sessionID: string, outputPath: string): Promise<void> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.ExportGelResultsCSV(sessionID, outputPath);
+  }
+
+  async saveGelSession(sessionID: string, name: string): Promise<number> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.SaveGelSession(sessionID, name);
+  }
+
+  async getGelSessions(): Promise<GelAnalysisSession[]> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.GetGelSessions();
+  }
+
+  async loadGelSession(id: number): Promise<GelImageMeta | null> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.LoadGelSession(id);
+  }
+
+  async deleteGelSession(id: number): Promise<void> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.DeleteGelSession(id);
+  }
+
+  async closeGelSession(sessionID: string): Promise<void> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.CloseGelSession(sessionID);
+  }
+
+  async runGelAutoDetect(sessionID: string): Promise<GelAutoDetectResult | null> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.RunGelAutoDetect(sessionID);
+  }
+
+  async cancelGelAutoDetect(sessionID: string): Promise<void> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.CancelGelAutoDetect(sessionID);
   }
 }

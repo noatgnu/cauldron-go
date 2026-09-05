@@ -30,5 +30,6 @@ export const routes: Routes = [
   { path: 'plugin-editor/new', component: PluginEditor },
   { path: 'plugin-editor/:id', component: PluginEditor },
   { path: 'table-browser', component: TableBrowser },
+  { path: 'gel-analysis', loadComponent: () => import('./pages/gel-analysis/gel-analysis').then(m => m.GelAnalysis) },
   { path: '**', redirectTo: '' }
 ];
