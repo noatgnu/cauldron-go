@@ -1,0 +1,46 @@
+.dialog-message {
+  margin-bottom: 12px;
+  color: var(--mat-dialog-content-text-color, rgba(0, 0, 0, 0.87));
+  font-size: 13px;
+}
+
+.provenance-list {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  column-gap: 12px;
+  row-gap: 6px;
+  margin: 0;
+  font-size: 12px;
+}
+
+.provenance-list dt {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.provenance-list dd {
+  margin: 0;
+  word-break: break-all;
+}
+
+.mono {
+  font-family: monospace;
+}
+
+.warn-chip {
+  margin-left: 8px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--mat-sys-error, #b3261e);
+  color: var(--mat-sys-on-error, #fff);
+  font-family: sans-serif;
+  font-size: 10px;
+}
+
+.package-list {
+  max-height: 160px;
+  overflow-y: auto;
+  border: 1px solid var(--border, rgba(0, 0, 0, 0.12));
+  border-radius: 4px;
+  padding: 4px 8px;
+}

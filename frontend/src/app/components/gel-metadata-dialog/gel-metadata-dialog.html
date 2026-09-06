@@ -1,0 +1,21 @@
+<h2 mat-dialog-title>Raw Image Metadata</h2>
+<mat-dialog-content>
+  <p class="dialog-message">
+    Tags read directly from the image file, unparsed, including scanner/vendor-specific fields.
+    Nothing here affects analysis; it's shown as the file encodes it.
+  </p>
+
+  @if (entries().length === 0) {
+    <p class="empty-state">No embedded metadata tags were found in this image file.</p>
+  } @else {
+    <dl class="metadata-list">
+      @for (entry of entries(); track entry[0]) {
+        <dt>{{ entry[0] }}</dt>
+        <dd class="mono">{{ entry[1] }}</dd>
+      }
+    </dl>
+  }
+</mat-dialog-content>
+<mat-dialog-actions align="end">
+  <button mat-raised-button color="primary" (click)="onClose()">Close</button>
+</mat-dialog-actions>

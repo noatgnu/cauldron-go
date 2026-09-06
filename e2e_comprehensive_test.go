@@ -975,3 +975,163 @@ func TestE2EExampleFiles(t *testing.T) {
 		}
 	})
 }
+
+// TestE2EGelAnalysis exercises the Gel Analysis feature through App's public methods rather than
+// GelAnalysisService directly. This is exactly the layer where a signature mismatch between App
+// and the service (e.g. RunGelAutoDetect's expectedLaneCount parameter) would surface, and where
+// backend/services' unit tests can't catch it since they call the service directly.
+//
+// RunAutoDetect is deliberately not covered here: it resolves its Python script folder via
+// os.Executable(), which under `go test` points at a temp test binary, not this repo's
+// scripts/gel-analysis directory. Same reason TestE2EJobOutputOperations needs a real,
+// already-built BUILD_DIR/plugins to exercise plugin execution. The auto-detect algorithm itself
+// is validated separately via manual CLI runs against real and synthetic gel images.
+func TestE2EGelAnalysis(t *testing.T) {
+	imagePath := "examples/gel-analysis/sample_gel.png"
+	if _, err := os.Stat(imagePath); os.IsNotExist(err) {
+		t.Skipf("Example gel image not found: %s", imagePath)
+	}
+
+	app := NewApp()
+	app.Initialize()
+	defer app.Shutdown()
+
+	time.Sleep(500 * time.Millisecond)
+
+	var sessionID string
+	var imageHeight int
+
+	t.Run("LoadGelImage decodes the sample image", func(t *testing.T) {
+		meta, err := app.LoadGelImage(imagePath)
+		if err != nil {
+			t.Fatalf("LoadGelImage failed: %v", err)
+		}
+		if meta == nil || meta.SessionID == "" {
+			t.Fatal("LoadGelImage returned no session")
+		}
+		sessionID = meta.SessionID
+		imageHeight = meta.Height
+		t.Logf("loaded %dx%d image, session=%s", meta.Width, meta.Height, sessionID)
+	})
+
+	t.Run("GetGelImagePreview returns PNG bytes", func(t *testing.T) {
+		preview, err := app.GetGelImagePreview(sessionID)
+		if err != nil {
+			t.Fatalf("GetGelImagePreview failed: %v", err)
+		}
+		if len(preview) == 0 {
+			t.Error("GetGelImagePreview returned empty bytes")
+		}
+	})
+
+	t.Run("SetGelLane and GetGelLanes round-trip", func(t *testing.T) {
+		lane := models.GelLaneROI{ID: "lane1", Label: "Lane 1", X: 18, Y: 0, Width: 63, Height: float64(imageHeight)}
+		if err := app.SetGelLane(sessionID, lane); err != nil {
+			t.Fatalf("SetGelLane failed: %v", err)
+		}
+		lanes, err := app.GetGelLanes(sessionID)
+		if err != nil || len(lanes) != 1 {
+			t.Fatalf("GetGelLanes = %v, %v; want 1 lane", lanes, err)
+		}
+	})
+
+	var bandCount int
+	t.Run("ComputeGelLaneProfile finds bands", func(t *testing.T) {
+		params := models.GelPeakParams{SmoothingWindow: 7, MinProminence: 0.05, MinDistance: 5, BaselineMethod: "rolling-min", Polarity: "dark-bands"}
+		profile, err := app.ComputeGelLaneProfile(sessionID, "lane1", params)
+		if err != nil {
+			t.Fatalf("ComputeGelLaneProfile failed: %v", err)
+		}
+		bandCount = len(profile.Bands)
+		t.Logf("found %d band(s)", bandCount)
+	})
+
+	t.Run("FitGelCalibrationCurve and ApplyGelCalibration", func(t *testing.T) {
+		if bandCount == 0 {
+			t.Skip("no bands detected on lane1, nothing to calibrate against")
+		}
+		markerMWs := make([]float64, bandCount)
+		for i := range markerMWs {
+			markerMWs[i] = float64(100 - i*10)
+		}
+		if err := app.SetGelLane(sessionID, models.GelLaneROI{ID: "lane1", Label: "Lane 1", X: 18, Y: 0, Width: 63, Height: float64(imageHeight), IsMarker: true, MarkerMWs: markerMWs}); err != nil {
+			t.Fatalf("SetGelLane (marker) failed: %v", err)
+		}
+		curve, err := app.FitGelCalibrationCurve(sessionID, "lane1")
+		if err != nil {
+			t.Fatalf("FitGelCalibrationCurve failed: %v", err)
+		}
+		if curve == nil {
+			t.Fatal("FitGelCalibrationCurve returned nil curve")
+		}
+		if _, err := app.ApplyGelCalibration(sessionID); err != nil {
+			t.Fatalf("ApplyGelCalibration failed: %v", err)
+		}
+	})
+
+	t.Run("DetectGelBoundary and boundary round-trip", func(t *testing.T) {
+		boundary, err := app.DetectGelBoundary(sessionID, 5)
+		if err != nil {
+			t.Fatalf("DetectGelBoundary failed: %v", err)
+		}
+		if boundary == nil {
+			t.Fatal("DetectGelBoundary returned nil")
+		}
+		got, err := app.GetGelBoundary(sessionID)
+		if err != nil || got == nil {
+			t.Fatalf("GetGelBoundary = %v, %v", got, err)
+		}
+		if err := app.ClearGelBoundary(sessionID); err != nil {
+			t.Fatalf("ClearGelBoundary failed: %v", err)
+		}
+	})
+
+	t.Run("GetGelProvenance and GetGelRawMetadata do not error", func(t *testing.T) {
+		if _, err := app.GetGelProvenance(sessionID); err != nil {
+			t.Fatalf("GetGelProvenance failed: %v", err)
+		}
+		if _, err := app.GetGelRawMetadata(sessionID); err != nil {
+			t.Fatalf("GetGelRawMetadata failed: %v", err)
+		}
+	})
+
+	t.Run("ExportGelResultsCSV writes a non-empty file", func(t *testing.T) {
+		outputPath := filepath.Join(t.TempDir(), "e2e-gel-results.csv")
+		if err := app.ExportGelResultsCSV(sessionID, outputPath); err != nil {
+			t.Fatalf("ExportGelResultsCSV failed: %v", err)
+		}
+		info, err := os.Stat(outputPath)
+		if err != nil || info.Size() == 0 {
+			t.Fatalf("expected a non-empty CSV at %s, err=%v", outputPath, err)
+		}
+	})
+
+	t.Run("SaveGelSession, LoadGelSession, DeleteGelSession round-trip", func(t *testing.T) {
+		id, err := app.SaveGelSession(sessionID, "e2e-test-session")
+		if err != nil {
+			t.Fatalf("SaveGelSession failed: %v", err)
+		}
+		defer func() {
+			if err := app.DeleteGelSession(id); err != nil {
+				t.Errorf("DeleteGelSession failed: %v", err)
+			}
+		}()
+
+		reopenedMeta, err := app.LoadGelSession(id)
+		if err != nil {
+			t.Fatalf("LoadGelSession failed: %v", err)
+		}
+		defer app.CloseGelSession(reopenedMeta.SessionID)
+
+		reopenedLanes, err := app.GetGelLanes(reopenedMeta.SessionID)
+		if err != nil || len(reopenedLanes) != 1 {
+			t.Fatalf("GetGelLanes on reopened session = %v, %v; want 1 lane", reopenedLanes, err)
+		}
+	})
+
+	t.Run("CloseGelSession", func(t *testing.T) {
+		if err := app.CloseGelSession(sessionID); err != nil {
+			t.Fatalf("CloseGelSession failed: %v", err)
+		}
+	})
+}

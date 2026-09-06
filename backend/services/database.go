@@ -188,6 +188,7 @@ func (d *DatabaseService) autoMigrate() error {
 		&PluginDockerImage{},
 		&models.Job{},
 		&models.PluginRegistry{},
+		&models.GelAnalysisSession{},
 	); err != nil {
 		return err
 	}

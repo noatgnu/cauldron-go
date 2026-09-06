@@ -1,0 +1,380 @@
+<div class="gel-analysis-container">
+  <mat-toolbar class="gel-toolbar">
+    <button mat-raised-button color="primary" (click)="openImage()" [disabled]="loadingImage()">
+      <mat-icon>folder_open</mat-icon>
+      Open Image
+    </button>
+
+    @if (imageMeta()) {
+      <span class="spacer"></span>
+
+      <button mat-stroked-button (click)="saveSession()">
+        <mat-icon>save</mat-icon>
+        Save Session
+      </button>
+      <button mat-stroked-button [matMenuTriggerFor]="sessionsMenu" (click)="refreshSessions()">
+        <mat-icon>folder_shared</mat-icon>
+        My Sessions
+      </button>
+      <mat-menu #sessionsMenu="matMenu">
+        @if (sessions().length === 0) {
+          <button mat-menu-item disabled>No saved sessions</button>
+        }
+        @for (session of sessions(); track session.id) {
+          <button mat-menu-item (click)="loadSession(session.id)">
+            <mat-icon>image</mat-icon>
+            <span>{{ session.name }}</span>
+          </button>
+        }
+        @if (sessions().length > 0) {
+          <mat-divider></mat-divider>
+          @for (session of sessions(); track session.id) {
+            <button mat-menu-item (click)="deleteSession(session.id); $event.stopPropagation()">
+              <mat-icon>delete</mat-icon>
+              <span>Delete "{{ session.name }}"</span>
+            </button>
+          }
+        }
+      </mat-menu>
+    }
+  </mat-toolbar>
+
+  @if (loadingImage()) {
+    <div class="loading-state">
+      <mat-spinner diameter="32"></mat-spinner>
+      <span>Loading image...</span>
+    </div>
+  } @else if (!imageMeta()) {
+    <div class="empty-state">
+      <mat-icon>biotech</mat-icon>
+      <p>Open a gel scan image (PNG, JPEG, or TIFF) to begin.</p>
+    </div>
+  } @else {
+    <div class="analysis-content">
+      <div class="canvas-panel">
+        <div class="canvas-stack" #canvasStack (scroll)="onCanvasScroll()">
+          <canvas #imageCanvas class="image-canvas"
+                  [style.width.px]="canvasDisplayWidth()"
+                  [style.max-width]="canvasDisplayWidth() ? 'none' : '100%'"></canvas>
+          <canvas #overlayCanvas class="overlay-canvas"
+                  [style.width.px]="canvasDisplayWidth()"
+                  [style.max-width]="canvasDisplayWidth() ? 'none' : '100%'"
+                  (mousedown)="onOverlayMouseDown($event)"
+                  (mousemove)="onOverlayMouseMove($event)"
+                  (mouseup)="onOverlayMouseUp()"
+                  (mouseleave)="onOverlayMouseUp()"></canvas>
+        </div>
+
+        @if (showMinimap() && imagePreviewUrl()) {
+          <div class="minimap" (mousedown)="onMinimapClick($event)">
+            <img [src]="imagePreviewUrl()" class="minimap-image" alt="" />
+            @if (viewportRect(); as rect) {
+              <div class="minimap-viewport"
+                   [style.left.%]="rect.left * 100"
+                   [style.top.%]="rect.top * 100"
+                   [style.width.%]="rect.width * 100"
+                   [style.height.%]="rect.height * 100"></div>
+            }
+          </div>
+        }
+        <p class="hint-text">
+          @if (drawMode() === 'lane') {
+            Drag on the image to draw a lane rectangle.
+          } @else {
+            Drag on the image to set the gel boundary rectangle.
+          }
+        </p>
+
+        <div class="canvas-controls">
+          <div class="display-levels">
+            <span class="display-levels-label">Display</span>
+            <mat-slider min="0" max="0.99" step="0.01" discrete class="levels-slider" matTooltip="Black point. Display only, never affects the underlying data or analysis">
+              <input matSliderThumb [(ngModel)]="blackPoint" (change)="applyDisplayLevels()">
+            </mat-slider>
+            <mat-slider min="0.01" max="1" step="0.01" discrete class="levels-slider" matTooltip="White point. Display only, never affects the underlying data or analysis">
+              <input matSliderThumb [(ngModel)]="whitePoint" (change)="applyDisplayLevels()">
+            </mat-slider>
+            <button mat-icon-button (click)="resetDisplayLevels()" matTooltip="Reset to auto contrast">
+              <mat-icon>restart_alt</mat-icon>
+            </button>
+          </div>
+
+          <div class="zoom-controls">
+            <span class="display-levels-label">Zoom</span>
+            <mat-slider min="25" max="400" step="25" discrete class="levels-slider" matTooltip="Zoom the image; scroll to pan">
+              <input matSliderThumb [ngModel]="zoomLevel() ? zoomLevel()! * 100 : 100" (ngModelChange)="setZoom($event)">
+            </mat-slider>
+            <button mat-icon-button (click)="resetZoom()" matTooltip="Fit to width">
+              <mat-icon>fit_screen</mat-icon>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="side-panel">
+        <mat-accordion multi>
+          <mat-expansion-panel [expanded]="lanesPanelExpanded()" (expandedChange)="lanesPanelExpanded.set($event)">
+            <mat-expansion-panel-header>
+              <mat-panel-title><mat-icon>view_column</mat-icon> Lanes</mat-panel-title>
+              <mat-panel-description>{{ lanes().length }} lane(s)</mat-panel-description>
+            </mat-expansion-panel-header>
+
+            <mat-form-field appearance="outline" class="param-field" matTooltip="Total lane slots for Auto-detect">
+              <mat-label>Expected lanes</mat-label>
+              <input matInput type="number" min="0" [(ngModel)]="expectedLaneCount">
+            </mat-form-field>
+            <button mat-stroked-button (click)="runAutoDetect()" [disabled]="autoDetecting()">
+              <mat-icon>auto_awesome</mat-icon>
+              Auto-detect
+            </button>
+            @if (autoDetecting()) {
+              <button mat-stroked-button color="warn" (click)="cancelAutoDetect()">
+                <mat-icon>cancel</mat-icon>
+                Cancel
+              </button>
+              <mat-progress-bar mode="determinate" [value]="autoDetectPercentage()"></mat-progress-bar>
+              <p class="hint-text">{{ autoDetectMessage() }}</p>
+            }
+
+            <button mat-stroked-button [color]="drawMode() === 'lane' ? 'primary' : undefined" (click)="setDrawMode('lane')">
+              <mat-icon>add_box</mat-icon>
+              Draw Lane
+            </button>
+
+            <app-gel-lane-map
+              [lanes]="lanes()"
+              [imageWidth]="imageMeta()?.width ?? 0"
+              [selectedLaneId]="selectedLaneId()"
+              (laneSelected)="selectLane($event)"></app-gel-lane-map>
+
+            @if (selectedLane(); as lane) {
+              <div class="selected-lane-header">
+                <h3><mat-icon>straighten</mat-icon> <span>{{ lane.label }}</span></h3>
+                <span class="spacer"></span>
+                <button mat-icon-button (click)="markAsLadder(lane)" matTooltip="Mark as ladder">
+                  <mat-icon>straighten</mat-icon>
+                </button>
+                <button mat-icon-button (click)="removeLane(lane.id)" matTooltip="Remove lane">
+                  <mat-icon>delete</mat-icon>
+                </button>
+              </div>
+              @if (lane.isMarker) {
+                <p class="hint-text">Ladder ({{ lane.markerMWs?.length ?? 0 }} MWs)</p>
+              }
+              <div class="lane-dimensions">
+                <mat-form-field appearance="outline" class="param-field dimension-field">
+                  <mat-label>X</mat-label>
+                  <input matInput type="number" [ngModel]="lane.x" (ngModelChange)="updateSelectedLane('x', $event)">
+                </mat-form-field>
+                <mat-form-field appearance="outline" class="param-field dimension-field">
+                  <mat-label>Y</mat-label>
+                  <input matInput type="number" [ngModel]="lane.y" (ngModelChange)="updateSelectedLane('y', $event)">
+                </mat-form-field>
+                <mat-form-field appearance="outline" class="param-field dimension-field">
+                  <mat-label>Width</mat-label>
+                  <input matInput type="number" min="1" [ngModel]="lane.width" (ngModelChange)="updateSelectedLane('width', $event)">
+                </mat-form-field>
+                <mat-form-field appearance="outline" class="param-field dimension-field">
+                  <mat-label>Height</mat-label>
+                  <input matInput type="number" min="1" [ngModel]="lane.height" (ngModelChange)="updateSelectedLane('height', $event)">
+                </mat-form-field>
+              </div>
+              <button mat-stroked-button (click)="centerSelectedLane()" matTooltip="Re-center on the actual lane signal">
+                <mat-icon>center_focus_strong</mat-icon>
+                Center Lane
+              </button>
+              <mat-form-field appearance="outline" class="param-field" matTooltip="Position in the full sequence, e.g. ladder = lane 3 of 12">
+                <mat-label>Lane index (1-based, optional)</mat-label>
+                <input matInput type="number" min="1"
+                       [ngModel]="lane.laneIndex !== undefined && lane.laneIndex !== null ? lane.laneIndex + 1 : null"
+                       (ngModelChange)="updateLaneIndex($event !== null && $event !== '' ? $event - 1 : null)">
+              </mat-form-field>
+              @if (otherLanes().length > 0) {
+                <mat-form-field appearance="outline" class="param-field">
+                  <mat-label>Match size of</mat-label>
+                  <mat-select (selectionChange)="matchLaneSize($event.value)">
+                    @for (other of otherLanes(); track other.id) {
+                      <mat-option [value]="other.id">{{ other.label }}</mat-option>
+                    }
+                  </mat-select>
+                </mat-form-field>
+                <p class="hint-text">Sets this lane's width and height to match the chosen one.</p>
+              }
+            } @else if (lanes().length > 0) {
+              <p class="hint-text">Select a lane above to view and edit it.</p>
+            }
+          </mat-expansion-panel>
+
+          <mat-expansion-panel [expanded]="boundaryPanelExpanded()" (expandedChange)="boundaryPanelExpanded.set($event)">
+            <mat-expansion-panel-header>
+              <mat-panel-title>
+                <mat-icon>crop_free</mat-icon> Gel Boundary
+                <mat-icon class="info-icon" matTooltip="Derived from current lanes' bounding box, not physical edge detection">info_outline</mat-icon>
+              </mat-panel-title>
+              <mat-panel-description>{{ boundary() ? 'Set' : 'Not set' }}</mat-panel-description>
+            </mat-expansion-panel-header>
+
+            <p class="hint-text">Drag on the image or edit below to adjust.</p>
+
+            <button mat-stroked-button [color]="drawMode() === 'boundary' ? 'primary' : undefined" (click)="setDrawMode('boundary')">
+              <mat-icon>add_box</mat-icon>
+              Draw Boundary
+            </button>
+
+            <mat-form-field appearance="outline" class="param-field">
+              <mat-label>Auto-detect padding (px)</mat-label>
+              <input matInput type="number" min="0" [(ngModel)]="boundaryPadding">
+            </mat-form-field>
+            <button mat-stroked-button (click)="detectBoundary()" [disabled]="lanes().length === 0" matTooltip="Fit to a padded bounding box of all current lanes">
+              <mat-icon>auto_awesome</mat-icon>
+              Auto-detect Boundary
+            </button>
+            @if (boundary(); as b) {
+              <div class="lane-dimensions">
+                <mat-form-field appearance="outline" class="param-field dimension-field">
+                  <mat-label>X</mat-label>
+                  <input matInput type="number" [ngModel]="b.x" (ngModelChange)="updateBoundary('x', $event)">
+                </mat-form-field>
+                <mat-form-field appearance="outline" class="param-field dimension-field">
+                  <mat-label>Y</mat-label>
+                  <input matInput type="number" [ngModel]="b.y" (ngModelChange)="updateBoundary('y', $event)">
+                </mat-form-field>
+                <mat-form-field appearance="outline" class="param-field dimension-field">
+                  <mat-label>Width</mat-label>
+                  <input matInput type="number" min="1" [ngModel]="b.width" (ngModelChange)="updateBoundary('width', $event)">
+                </mat-form-field>
+                <mat-form-field appearance="outline" class="param-field dimension-field">
+                  <mat-label>Height</mat-label>
+                  <input matInput type="number" min="1" [ngModel]="b.height" (ngModelChange)="updateBoundary('height', $event)">
+                </mat-form-field>
+              </div>
+              <button mat-stroked-button (click)="clearBoundary()">
+                <mat-icon>clear</mat-icon>
+                Clear Boundary
+              </button>
+            }
+          </mat-expansion-panel>
+
+          <mat-expansion-panel [expanded]="peakPanelExpanded()" (expandedChange)="peakPanelExpanded.set($event)">
+            <mat-expansion-panel-header>
+              <mat-panel-title><mat-icon>tune</mat-icon> Peak Detection</mat-panel-title>
+              <mat-panel-description>{{ polarity() === 'dark-bands' ? 'Dark' : 'Light' }} bands</mat-panel-description>
+            </mat-expansion-panel-header>
+
+            <mat-form-field appearance="outline" class="param-field">
+              <mat-label>Smoothing window</mat-label>
+              <input matInput type="number" min="0" [(ngModel)]="smoothingWindow">
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="param-field">
+              <mat-label>Min prominence (0-1)</mat-label>
+              <input matInput type="number" step="0.01" min="0" max="1" [(ngModel)]="minProminence">
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="param-field">
+              <mat-label>Min distance (px)</mat-label>
+              <input matInput type="number" min="0" [(ngModel)]="minDistance">
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="param-field">
+              <mat-label>Baseline</mat-label>
+              <mat-select [(ngModel)]="baselineMethod">
+                <mat-option value="rolling-min">Rolling min</mat-option>
+                <mat-option value="percentile">Percentile</mat-option>
+                <mat-option value="none">None</mat-option>
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="param-field">
+              <mat-label>Polarity</mat-label>
+              <mat-select [(ngModel)]="polarity">
+                <mat-option value="dark-bands">Dark bands</mat-option>
+                <mat-option value="light-bands">Light bands</mat-option>
+              </mat-select>
+            </mat-form-field>
+            <button mat-raised-button color="primary" (click)="recomputeAllProfiles()" [disabled]="computingProfiles() || lanes().length === 0">
+              @if (computingProfiles()) {
+                <mat-spinner diameter="18"></mat-spinner>
+              } @else {
+                Recompute All Profiles
+              }
+            </button>
+          </mat-expansion-panel>
+
+          <mat-expansion-panel [expanded]="calibrationPanelExpanded()" (expandedChange)="calibrationPanelExpanded.set($event)">
+            <mat-expansion-panel-header>
+              <mat-panel-title><mat-icon>show_chart</mat-icon> Calibration</mat-panel-title>
+              <mat-panel-description>{{ calibration() ? ('R² = ' + (calibration()!.rSquared | number:'1.2-2')) : 'Not fitted' }}</mat-panel-description>
+            </mat-expansion-panel-header>
+
+            <mat-form-field appearance="outline" class="param-field">
+              <mat-label>Ladder lane</mat-label>
+              <mat-select [(ngModel)]="calibrationLaneId">
+                @for (lane of markerLanes(); track lane.id) {
+                  <mat-option [value]="lane.id">{{ lane.label }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+            <button mat-raised-button color="primary" (click)="fitCalibration()" [disabled]="!calibrationLaneId()">
+              Fit Calibration Curve
+            </button>
+            <app-gel-calibration-plot [curve]="calibration()"></app-gel-calibration-plot>
+          </mat-expansion-panel>
+        </mat-accordion>
+      </div>
+    </div>
+
+    <mat-card class="results-card">
+      <mat-card-content>
+        <div class="results-header">
+          <h3><mat-icon>table_chart</mat-icon> Results</h3>
+          <button mat-stroked-button (click)="viewProvenance()" matTooltip="What produced this result: image hash, versions, Python environment">
+            <mat-icon>verified</mat-icon>
+            Provenance
+          </button>
+          <button mat-stroked-button (click)="viewRawMetadata()" matTooltip="Unparsed tags embedded in the source image file">
+            <mat-icon>description</mat-icon>
+            Raw Metadata
+          </button>
+          <button mat-stroked-button (click)="exportResults()" [disabled]="resultsRows().length === 0">
+            <mat-icon>download</mat-icon>
+            Export CSV
+          </button>
+        </div>
+        <table mat-table [dataSource]="resultsRows()" class="full-width-table">
+          <ng-container matColumnDef="lane">
+            <th mat-header-cell *matHeaderCellDef>Lane</th>
+            <td mat-cell *matCellDef="let row">{{ row.lane }}</td>
+          </ng-container>
+          <ng-container matColumnDef="bandNumber">
+            <th mat-header-cell *matHeaderCellDef>#</th>
+            <td mat-cell *matCellDef="let row">{{ row.bandNumber }}</td>
+          </ng-container>
+          <ng-container matColumnDef="position">
+            <th mat-header-cell *matHeaderCellDef>Position</th>
+            <td mat-cell *matCellDef="let row">{{ row.position | number:'1.0-1' }}</td>
+          </ng-container>
+          <ng-container matColumnDef="relativePosition">
+            <th mat-header-cell *matHeaderCellDef>Rel. Migration</th>
+            <td mat-cell *matCellDef="let row">{{ row.relativePosition | number:'1.2-2' }}</td>
+          </ng-container>
+          <ng-container matColumnDef="intensity">
+            <th mat-header-cell *matHeaderCellDef>Intensity</th>
+            <td mat-cell *matCellDef="let row">{{ row.intensity | number:'1.0-1' }}</td>
+          </ng-container>
+          <ng-container matColumnDef="area">
+            <th mat-header-cell *matHeaderCellDef>Area</th>
+            <td mat-cell *matCellDef="let row">{{ row.area | number:'1.0-1' }}</td>
+          </ng-container>
+          <ng-container matColumnDef="molecularWeight">
+            <th mat-header-cell *matHeaderCellDef>MW (kDa)</th>
+            <td mat-cell *matCellDef="let row">{{ row.molecularWeight !== null ? (row.molecularWeight | number:'1.1-1') : '—' }}</td>
+          </ng-container>
+          <ng-container matColumnDef="relativeQuantity">
+            <th mat-header-cell *matHeaderCellDef>% of Lane</th>
+            <td mat-cell *matCellDef="let row">{{ row.relativeQuantity | number:'1.1-1' }}%</td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="resultsColumns"></tr>
+          <tr mat-row *matRowDef="let row; columns: resultsColumns;"></tr>
+        </table>
+      </mat-card-content>
+    </mat-card>
+  }
+</div>

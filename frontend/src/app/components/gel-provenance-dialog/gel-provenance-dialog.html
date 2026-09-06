@@ -1,0 +1,73 @@
+<h2 mat-dialog-title>Analysis Provenance</h2>
+<mat-dialog-content>
+  <p class="dialog-message">
+    Record of exactly what produced this result — reload the same image, settings, and Python
+    environment to check whether it reproduces.
+  </p>
+
+  <dl class="provenance-list">
+    <dt>Image SHA-256</dt>
+    <dd class="mono">{{ data.provenance.imageSha256 }}</dd>
+
+    <dt>Image path</dt>
+    <dd class="mono">{{ data.provenance.imagePath }}</dd>
+
+    <dt>Analysis engine version</dt>
+    <dd>{{ data.provenance.analysisEngineVersion }}</dd>
+
+    <dt>App version</dt>
+    <dd>{{ data.provenance.appVersion }}</dd>
+
+    @if (data.provenance.vcsRevision) {
+      <dt>Build revision</dt>
+      <dd class="mono">
+        {{ data.provenance.vcsRevision }}
+        @if (data.provenance.vcsModified) {
+          <span class="warn-chip">modified working tree</span>
+        }
+      </dd>
+    }
+
+    <dt>Generated at</dt>
+    <dd>{{ data.provenance.generatedAt }}</dd>
+
+    @if (data.provenance.peakParams) {
+      <dt>Peak parameters</dt>
+      <dd class="mono">
+        smoothing={{ data.provenance.peakParams.smoothingWindow }},
+        minProminence={{ data.provenance.peakParams.minProminence }},
+        minDistance={{ data.provenance.peakParams.minDistance }},
+        baseline={{ data.provenance.peakParams.baselineMethod }},
+        polarity={{ data.provenance.peakParams.polarity }}
+      </dd>
+    }
+
+    <dt>Lanes</dt>
+    <dd>{{ data.provenance.lanes.length }} lane(s) defined</dd>
+
+    <dt>Auto-detect used</dt>
+    <dd>{{ data.provenance.autoDetectUsed ? 'Yes' : 'No' }}</dd>
+
+    @if (data.provenance.autoDetectUsed) {
+      <dt>Python version</dt>
+      <dd class="mono">{{ data.provenance.pythonVersion || 'unknown' }}</dd>
+
+      <dt>Auto-detect script SHA-256</dt>
+      <dd class="mono">{{ data.provenance.autoDetectScriptSha256 || 'unknown' }}</dd>
+
+      @if (data.provenance.pythonPackages && data.provenance.pythonPackages.length) {
+        <dt>Python packages</dt>
+        <dd>
+          <div class="package-list">
+            @for (pkg of data.provenance.pythonPackages; track pkg) {
+              <div class="mono">{{ pkg }}</div>
+            }
+          </div>
+        </dd>
+      }
+    }
+  </dl>
+</mat-dialog-content>
+<mat-dialog-actions align="end">
+  <button mat-raised-button color="primary" (click)="onClose()">Close</button>
+</mat-dialog-actions>

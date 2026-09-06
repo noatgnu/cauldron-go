@@ -1,0 +1,20 @@
+<div class="lane-map" [class.empty]="lanes.length === 0">
+  @if (lanes.length === 0) {
+    <span class="lane-map-empty">No lanes yet</span>
+  } @else {
+    @for (lane of lanes; track lane.id) {
+      <button type="button"
+              class="lane-segment"
+              [class.selected]="lane.id === selectedLaneId"
+              [class.marker]="lane.isMarker"
+              [style.left.%]="laneLeft(lane)"
+              [style.width.%]="laneWidthPercent(lane)"
+              [matTooltip]="lane.label"
+              (click)="select(lane.id)">
+        @if (lane.isMarker) {
+          <mat-icon>straighten</mat-icon>
+        }
+      </button>
+    }
+  }
+</div>

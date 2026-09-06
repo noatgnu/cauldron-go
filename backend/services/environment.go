@@ -913,6 +913,11 @@ func (e *EnvironmentService) ListRPackages(rPath string) ([]string, error) {
 	return packages, nil
 }
 
+func fileExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && !info.IsDir()
+}
+
 func loadPluginDefinition(pluginYamlPath string) (*models.PluginDefinition, error) {
 	data, err := os.ReadFile(pluginYamlPath)
 	if err != nil {
@@ -1025,6 +1030,12 @@ func (e *EnvironmentService) CreatePythonVirtualEnv(basePythonPath string, venvP
 				}
 			} else {
 				log.Printf("[CreatePythonVirtualEnv] Warning: Specified pythonRequirementsFile '%s' not found at %s\n", requirementsFile, requirementsPath)
+			}
+		} else if fallbackPath := filepath.Join(pluginFolderPath, "requirements.txt"); fileExists(fallbackPath) {
+			// No plugin.yaml requirements. Fall back to a plain requirements.txt for non-plugin features like gel-analysis.
+			log.Printf("[CreatePythonVirtualEnv] No plugin.yaml requirements found; installing plain requirements.txt at %s\n", fallbackPath)
+			if err := e.InstallPythonRequirements(pythonExe, fallbackPath); err != nil {
+				log.Printf("[CreatePythonVirtualEnv] Warning: Failed to install requirements.txt: %v\n", err)
 			}
 		} else {
 			log.Printf("[CreatePythonVirtualEnv] No package requirements specified for plugin %s\n", pluginID)
