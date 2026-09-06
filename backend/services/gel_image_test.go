@@ -141,6 +141,134 @@ func TestSumColumnRange_ClampsOutOfBounds(t *testing.T) {
 	}
 }
 
+func TestSumColumnProfile(t *testing.T) {
+	buf := &GelImageBuffer{
+		Width:  3,
+		Height: 2,
+		Gray16: []uint16{1, 2, 3, 4, 5, 6},
+	}
+
+	profile := buf.SumColumnProfile(0, 0, 3, 2)
+	want := []float64{5, 7, 9} // col0: 1+4, col1: 2+5, col2: 3+6
+	if len(profile) != len(want) {
+		t.Fatalf("expected %d columns, got %d", len(want), len(profile))
+	}
+	for i := range want {
+		if profile[i] != want[i] {
+			t.Errorf("column %d = %v, want %v", i, profile[i], want[i])
+		}
+	}
+}
+
+func buildOffsetLaneBuffer(width, height, bandStart, bandEnd int) *GelImageBuffer {
+	buf := &GelImageBuffer{Width: width, Height: height, Gray16: make([]uint16, width*height)}
+	for row := 0; row < height; row++ {
+		for col := 0; col < width; col++ {
+			v := uint16(60000)
+			if col >= bandStart && col < bandEnd {
+				v = 1000
+			}
+			buf.Gray16[row*width+col] = v
+		}
+	}
+	return buf
+}
+
+func TestFindLaneCenterX_MovesTowardOffsetSignal(t *testing.T) {
+	// True lane is a dark band at columns [25,35); the rough rectangle is offset left at [20,30),
+	// partially overlapping it. Distance-weighting deliberately damps full snap-to-band correction
+	// (needed to resist a stronger neighboring lane elsewhere), so this checks partial, bounded
+	// movement toward the true centroid (29.5) rather than an exact snap.
+	buf := buildOffsetLaneBuffer(60, 4, 25, 35)
+
+	centerX, err := buf.FindLaneCenterX(20, 0, 10, 4, 5, "dark-bands")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if centerX <= 25 || centerX >= 29.5 {
+		t.Errorf("centerX = %v, want strictly between original center 25 and true centroid 29.5", centerX)
+	}
+}
+
+func TestFindLaneCenterX_DoesNotGetPulledIntoStrongerNeighborLane(t *testing.T) {
+	// Regression test for a real reported bug: a strong lane [0,60) sits right next to a much
+	// fainter lane [80,140) across a small gap. A rough box drawn on the faint lane, reaching
+	// slightly into the strong lane's edge via the search margin, must stay centered within the
+	// faint lane's own true span rather than getting pulled toward the stronger neighbor.
+	const width, height = 200, 4
+	buf := &GelImageBuffer{Width: width, Height: height, Gray16: make([]uint16, width*height)}
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			v := uint16(60000)
+			if x < 60 {
+				v = 30000 // strong neighboring lane
+			} else if x >= 80 && x < 140 {
+				v = 58000 // faint target lane
+			}
+			buf.Gray16[y*width+x] = v
+		}
+	}
+
+	centerX, err := buf.FindLaneCenterX(70, 0, 60, height, 30, "dark-bands")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if centerX < 80 || centerX >= 140 {
+		t.Errorf("centerX = %v, want within the faint lane's true span [80,140), not pulled into the strong neighbor", centerX)
+	}
+}
+
+func TestFindLaneCenterX_NoSignalFallsBackToCurrentCenter(t *testing.T) {
+	buf := &GelImageBuffer{Width: 40, Height: 4, Gray16: make([]uint16, 40*4)}
+	for i := range buf.Gray16 {
+		buf.Gray16[i] = 50000 // uniform, no band anywhere
+	}
+
+	centerX, err := buf.FindLaneCenterX(10, 0, 10, 4, 5, "dark-bands")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if centerX != 15 { // 10 + 10/2, unchanged
+		t.Errorf("centerX = %v, want 15 (unchanged center)", centerX)
+	}
+}
+
+// TestFindLaneCenterX_RealScannedGel uses a real scanned fluorescent gel crop (light-bands, real
+// sensor noise, real background drift) instead of a synthetic buffer. Cropped from 14_NEB.tif in
+// the GelGenie quantitation_ladder_gels dataset (Kotidis et al., Nature Communications 2025,
+// CC-BY-4.0, https://doi.org/10.5281/zenodo.14641949). It contains a strong lane (~columns 15-80
+// in crop coordinates) and a much fainter lane (~columns 167-186) across a gap.
+func TestFindLaneCenterX_RealScannedGel(t *testing.T) {
+	buf, meta, err := LoadGelImageFile(filepath.Join("testdata", "gelgenie_14_neb_crop.tif"))
+	if err != nil {
+		t.Fatalf("failed to load real gel fixture: %v", err)
+	}
+	if meta.Width != 220 || meta.Height != 120 {
+		t.Fatalf("unexpected fixture dimensions %dx%d", meta.Width, meta.Height)
+	}
+
+	for _, tc := range []struct {
+		name   string
+		roughX float64
+	}{
+		{"box_close_to_faint_lane", 150},
+		{"box_slightly_left", 155},
+		{"box_slightly_right", 160},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			centerX, err := buf.FindLaneCenterX(tc.roughX, 10, 40, 100, 20, "light-bands")
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			// True faint-lane peak is ~173; must land within the faint lane's real span (~167-186)
+			// and, crucially, nowhere near the much stronger neighboring lane (~15-80).
+			if centerX < 160 || centerX > 190 {
+				t.Errorf("centerX = %v, want within the real faint lane's span [160,190]", centerX)
+			}
+		})
+	}
+}
+
 func TestEncodePreviewPNG_ProducesValidPNG(t *testing.T) {
 	buf := &GelImageBuffer{Width: 2, Height: 2, Gray16: []uint16{0, 30000, 60000, 65535}}
 	data, err := EncodePreviewPNG(buf)
@@ -153,6 +281,53 @@ func TestEncodePreviewPNG_ProducesValidPNG(t *testing.T) {
 	}
 	if img.Bounds().Dx() != 2 || img.Bounds().Dy() != 2 {
 		t.Errorf("decoded dims = %dx%d, want 2x2", img.Bounds().Dx(), img.Bounds().Dy())
+	}
+}
+
+func TestEncodePreviewPNGWithLevels_ClampsAndScales(t *testing.T) {
+	// Values chosen so black/white points at 0.25/0.75 of the 16-bit range map cleanly: anything
+	// at or below the black point clips to 0, at or above the white point clips to 255, and the
+	// midpoint between them maps to roughly the middle of the 8-bit range.
+	blackPoint, whitePoint := 0.25, 0.75
+	lo := uint16(blackPoint * 65535)
+	hi := uint16(whitePoint * 65535)
+	mid := uint16((float64(lo) + float64(hi)) / 2)
+
+	buf := &GelImageBuffer{Width: 4, Height: 1, Gray16: []uint16{0, lo, mid, 65535}}
+	data, err := EncodePreviewPNGWithLevels(buf, blackPoint, whitePoint)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	img, err := png.Decode(bytes.NewReader(data))
+	if err != nil {
+		t.Fatalf("output isn't a valid PNG: %v", err)
+	}
+	gray, ok := img.(*image.Gray)
+	if !ok {
+		t.Fatalf("expected *image.Gray, got %T", img)
+	}
+
+	if v := gray.GrayAt(0, 0).Y; v != 0 {
+		t.Errorf("below black point: got %d, want 0", v)
+	}
+	if v := gray.GrayAt(1, 0).Y; v != 0 {
+		t.Errorf("at black point: got %d, want 0", v)
+	}
+	if v := gray.GrayAt(3, 0).Y; v != 255 {
+		t.Errorf("above white point: got %d, want 255", v)
+	}
+	if v := gray.GrayAt(2, 0).Y; v < 100 || v > 155 {
+		t.Errorf("midpoint: got %d, want roughly 128", v)
+	}
+}
+
+func TestEncodePreviewPNGWithLevels_RejectsInvalidRange(t *testing.T) {
+	buf := &GelImageBuffer{Width: 1, Height: 1, Gray16: []uint16{100}}
+	if _, err := EncodePreviewPNGWithLevels(buf, 0.5, 0.5); err == nil {
+		t.Error("expected an error when whitePoint == blackPoint")
+	}
+	if _, err := EncodePreviewPNGWithLevels(buf, 0.7, 0.3); err == nil {
+		t.Error("expected an error when whitePoint < blackPoint")
 	}
 }
 

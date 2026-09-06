@@ -1,0 +1,35 @@
+.dialog-message {
+  margin-bottom: 12px;
+  color: var(--mat-dialog-content-text-color, rgba(0, 0, 0, 0.87));
+  font-size: 13px;
+}
+
+.empty-state {
+  color: var(--mat-dialog-content-text-color, rgba(0, 0, 0, 0.6));
+  font-size: 13px;
+}
+
+.metadata-list {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  column-gap: 12px;
+  row-gap: 6px;
+  margin: 0;
+  font-size: 12px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.metadata-list dt {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.metadata-list dd {
+  margin: 0;
+  word-break: break-word;
+}
+
+.mono {
+  font-family: monospace;
+}

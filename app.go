@@ -628,13 +628,22 @@ func (a *App) resolvePluginFolderPath(pluginID, logPrefix string) string {
 		}
 	}
 
-	if err != nil {
-		log.Printf("[App] %s: Failed to get plugin folder path: %v", logPrefix, err)
-		return ""
+	if err == nil {
+		log.Printf("[App] %s: Found plugin folder path: %s", logPrefix, plugin.FolderPath)
+		return plugin.FolderPath
 	}
 
-	log.Printf("[App] %s: Found plugin folder path: %s", logPrefix, plugin.FolderPath)
-	return plugin.FolderPath
+	// Not a registered plugin. Fall back to scripts/<pluginID>/, used by built-in features like gel-analysis.
+	if exePath, exeErr := os.Executable(); exeErr == nil {
+		scriptsDir := filepath.Join(filepath.Dir(exePath), "scripts", pluginID)
+		if info, statErr := os.Stat(scriptsDir); statErr == nil && info.IsDir() {
+			log.Printf("[App] %s: %q is not a registered plugin; using scripts folder: %s", logPrefix, pluginID, scriptsDir)
+			return scriptsDir
+		}
+	}
+
+	log.Printf("[App] %s: Failed to get plugin folder path: %v", logPrefix, err)
+	return ""
 }
 
 func (a *App) CreatePythonVirtualEnv(basePythonPath string, venvPath string, pluginID string) error {
@@ -807,6 +816,15 @@ func (a *App) GetGelImagePreview(sessionID string) ([]byte, error) {
 	return a.gelAnalysisService.GetImagePreview(sessionID)
 }
 
+func (a *App) GetGelImagePreviewWithLevels(sessionID string, blackPoint float64, whitePoint float64) ([]byte, error) {
+	return a.gelAnalysisService.GetImagePreviewWithLevels(sessionID, blackPoint, whitePoint)
+}
+
+// GetGelRawMetadata returns the unparsed TIFF/PNG tags read directly from the source image file.
+func (a *App) GetGelRawMetadata(sessionID string) (map[string]string, error) {
+	return a.gelAnalysisService.GetRawMetadata(sessionID)
+}
+
 func (a *App) SetGelLane(sessionID string, lane models.GelLaneROI) error {
 	return a.gelAnalysisService.SetLane(sessionID, lane)
 }
@@ -817,6 +835,26 @@ func (a *App) RemoveGelLane(sessionID string, laneID string) error {
 
 func (a *App) GetGelLanes(sessionID string) ([]models.GelLaneROI, error) {
 	return a.gelAnalysisService.GetLanes(sessionID)
+}
+
+func (a *App) CenterGelLane(sessionID string, laneID string) (*models.GelLaneROI, error) {
+	return a.gelAnalysisService.CenterLane(sessionID, laneID)
+}
+
+func (a *App) SetGelBoundary(sessionID string, boundary models.GelBoundary) error {
+	return a.gelAnalysisService.SetBoundary(sessionID, boundary)
+}
+
+func (a *App) GetGelBoundary(sessionID string) (*models.GelBoundary, error) {
+	return a.gelAnalysisService.GetBoundary(sessionID)
+}
+
+func (a *App) ClearGelBoundary(sessionID string) error {
+	return a.gelAnalysisService.ClearBoundary(sessionID)
+}
+
+func (a *App) DetectGelBoundary(sessionID string, paddingPx float64) (*models.GelBoundary, error) {
+	return a.gelAnalysisService.DetectBoundary(sessionID, paddingPx)
 }
 
 func (a *App) ComputeGelLaneProfile(sessionID string, laneID string, params models.GelPeakParams) (*models.GelLaneProfile, error) {
@@ -835,8 +873,8 @@ func (a *App) ApplyGelCalibration(sessionID string) (map[string]models.GelLanePr
 	return a.gelAnalysisService.ApplyCalibration(sessionID)
 }
 
-// GetGelProvenance returns the audit record (image hash, versions, Python environment) for a
-// session's current state — what a reviewer checks to verify or attempt to reproduce a result.
+// GetGelProvenance returns the audit record (image hash, versions, Python environment) a reviewer
+// checks to verify or attempt to reproduce a result.
 func (a *App) GetGelProvenance(sessionID string) (*models.GelAnalysisProvenance, error) {
 	return a.gelAnalysisService.GetProvenance(sessionID)
 }
@@ -872,9 +910,10 @@ func (a *App) CloseGelSession(sessionID string) error {
 
 // RunGelAutoDetect generates a synthetic bookkeeping ID (never registered with JobQueueService)
 // and runs the bundled Python auto-detect script synchronously, returning its result directly.
-func (a *App) RunGelAutoDetect(sessionID string) (*services.GelAutoDetectResult, error) {
+// expectedLaneCount enables anchor-guided detection (pass 0 for plain profile-based detection).
+func (a *App) RunGelAutoDetect(sessionID string, expectedLaneCount int) (*services.GelAutoDetectResult, error) {
 	jobID := fmt.Sprintf("gel-auto-detect-%s-%d", sessionID, time.Now().UnixNano())
-	return a.gelAnalysisService.RunAutoDetect(sessionID, jobID)
+	return a.gelAnalysisService.RunAutoDetect(sessionID, jobID, expectedLaneCount)
 }
 
 func (a *App) CancelGelAutoDetect(sessionID string) error {

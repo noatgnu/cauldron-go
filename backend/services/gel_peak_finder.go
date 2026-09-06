@@ -8,15 +8,10 @@ import (
 	"github.com/noatgnu/cauldron-go/backend/models"
 )
 
-// AnalysisEngineVersion identifies the behavior of this file's peak-finding/calibration math.
-// Bump it only when SmoothProfile, ComputeBaseline, FindPeaks, or FitCalibrationCurve's *behavior*
-// changes in a way that would alter results for the same inputs — not for unrelated app changes
-// (UI, bugfixes elsewhere). This is what a reviewer checks, alongside the image hash, to know
-// whether a result was produced by the same computational method as a prior run.
+// AnalysisEngineVersion identifies this file's math behavior. Bump only when a result-affecting change is made, not for unrelated app changes.
 const AnalysisEngineVersion = "1.0.0"
 
-// SmoothProfile applies a centered moving average of the given odd window size. A window of 0
-// or 1 disables smoothing (returns a copy of values unchanged).
+// SmoothProfile applies a centered moving average; a window of 0 or 1 disables smoothing.
 func SmoothProfile(values []float64, window int) []float64 {
 	out := make([]float64, len(values))
 	if window <= 1 || len(values) == 0 {
@@ -43,10 +38,7 @@ func SmoothProfile(values []float64, window int) []float64 {
 	return out
 }
 
-// ComputeBaseline estimates a local background for a profile, to be subtracted before peak
-// detection. "rolling-min" (default) uses a sliding-window minimum; "percentile" uses the 5th
-// percentile within the same window, which tolerates a little noise better than a hard minimum;
-// "none" returns an all-zero baseline (no correction).
+// ComputeBaseline estimates a local background to subtract before peak detection: "rolling-min" (default), "percentile" (5th, more noise-tolerant), or "none".
 func ComputeBaseline(values []float64, method string) []float64 {
 	baseline := make([]float64, len(values))
 	if len(values) == 0 {
@@ -88,9 +80,7 @@ func ComputeBaseline(values []float64, method string) []float64 {
 	return baseline
 }
 
-// FindPeaks detects bands in a baseline-corrected, optionally polarity-inverted intensity
-// profile. It's a small, dependency-free equivalent of scipy.signal.find_peaks(distance=...):
-// local maxima -> prominence filter -> greedy minimum-distance non-max suppression.
+// FindPeaks is a dependency-free equivalent of scipy.signal.find_peaks: local maxima -> prominence filter -> min-distance non-max suppression.
 func FindPeaks(values, baseline []float64, params models.GelPeakParams) []models.GelBand {
 	if len(values) == 0 {
 		return nil
@@ -278,8 +268,7 @@ func absInt(v int) int {
 	return v
 }
 
-// FitCalibrationCurve fits log10(MW) as a linear function of relative migration distance via
-// ordinary least squares — the standard SDS-PAGE calibration convention.
+// FitCalibrationCurve fits log10(MW) vs. relative migration distance via OLS, the standard SDS-PAGE calibration convention.
 func FitCalibrationCurve(points []models.GelCalibrationPoint) (models.GelCalibrationCurve, error) {
 	n := len(points)
 	if n < 2 {

@@ -28,8 +28,8 @@ func newTestGelAnalysisService(t *testing.T) (*GelAnalysisService, *DatabaseServ
 }
 
 // writeSingleColumnGray16 writes a width=1, height=len(values) Gray16 PNG, so that
-// SumColumnRange(0,0,1,len) returns exactly `values` back — the simplest way to drive a known
-// intensity profile through the service's public API for integration-style testing.
+// SumColumnRange(0,0,1,len) returns exactly `values` back. This is the simplest way to drive a
+// known intensity profile through the service's public API for integration-style testing.
 func writeSingleColumnGray16(t *testing.T, path string, values []uint16) {
 	t.Helper()
 	img := image.NewGray16(image.Rect(0, 0, 1, len(values)))
@@ -99,6 +99,170 @@ func TestGelAnalysisService_SetLaneAndComputeProfile(t *testing.T) {
 	lanes, _ = svc.GetLanes(meta.SessionID)
 	if len(lanes) != 0 {
 		t.Errorf("expected 0 lanes after removal, got %d", len(lanes))
+	}
+}
+
+// write2DGray16 writes a width x height Gray16 PNG from a row-major values slice, for tests that
+// need real horizontal structure (e.g. CenterLane), unlike writeSingleColumnGray16's width=1 shape.
+func write2DGray16(t *testing.T, path string, width, height int, values []uint16) {
+	t.Helper()
+	img := image.NewGray16(image.Rect(0, 0, width, height))
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			img.SetGray16(x, y, color.Gray16{Y: values[y*width+x]})
+		}
+	}
+	writeTestPNG(t, path, img)
+}
+
+func TestGelAnalysisService_CenterLane(t *testing.T) {
+	svc, _ := newTestGelAnalysisService(t)
+
+	const width, height = 60, 4
+	values := make([]uint16, width*height)
+	for i := range values {
+		values[i] = 60000
+	}
+	// True lane is a dark band at columns [25,35), centroid 29.5.
+	for y := 0; y < height; y++ {
+		for x := 25; x < 35; x++ {
+			values[y*width+x] = 1000
+		}
+	}
+
+	path := filepath.Join(t.TempDir(), "offset-lane.png")
+	write2DGray16(t, path, width, height, values)
+
+	meta, err := svc.LoadImage(path)
+	if err != nil {
+		t.Fatalf("LoadImage: %v", err)
+	}
+
+	// Rough rectangle drawn off to the left, only partially overlapping the true band.
+	lane := models.GelLaneROI{ID: "lane1", Label: "Lane 1", X: 20, Y: 0, Width: 10, Height: 4}
+	if err := svc.SetLane(meta.SessionID, lane); err != nil {
+		t.Fatalf("SetLane: %v", err)
+	}
+
+	updated, err := svc.CenterLane(meta.SessionID, "lane1")
+	if err != nil {
+		t.Fatalf("CenterLane: %v", err)
+	}
+
+	// Distance-weighting damps full snap-to-band correction, so expect partial bounded movement, not an exact snap.
+	trueX := 29.5 - lane.Width/2
+	if updated.X <= lane.X || updated.X >= trueX {
+		t.Errorf("centered X = %v, want strictly between original %v and true center %v", updated.X, lane.X, trueX)
+	}
+	if updated.Width != lane.Width || updated.Height != lane.Height {
+		t.Errorf("CenterLane should not change width/height, got %vx%v", updated.Width, updated.Height)
+	}
+}
+
+func TestGelAnalysisService_DetectBoundary(t *testing.T) {
+	svc, _ := newTestGelAnalysisService(t)
+
+	const width, height = 100, 50
+	values := make([]uint16, width*height)
+	path := filepath.Join(t.TempDir(), "boundary.png")
+	write2DGray16(t, path, width, height, values)
+
+	meta, err := svc.LoadImage(path)
+	if err != nil {
+		t.Fatalf("LoadImage: %v", err)
+	}
+
+	if err := svc.SetLane(meta.SessionID, models.GelLaneROI{ID: "l1", X: 10, Y: 5, Width: 8, Height: 30}); err != nil {
+		t.Fatalf("SetLane: %v", err)
+	}
+	if err := svc.SetLane(meta.SessionID, models.GelLaneROI{ID: "l2", X: 40, Y: 8, Width: 8, Height: 20}); err != nil {
+		t.Fatalf("SetLane: %v", err)
+	}
+
+	boundary, err := svc.DetectBoundary(meta.SessionID, 5)
+	if err != nil {
+		t.Fatalf("DetectBoundary: %v", err)
+	}
+
+	if boundary.X != 5 || boundary.Y != 0 || boundary.Width != 48 || boundary.Height != 40 {
+		t.Errorf("boundary = %+v, want {X:5 Y:0 Width:48 Height:40}", boundary)
+	}
+
+	got, err := svc.GetBoundary(meta.SessionID)
+	if err != nil || got == nil || *got != *boundary {
+		t.Errorf("GetBoundary = %+v, %v; want %+v, nil", got, err, boundary)
+	}
+
+	if err := svc.ClearBoundary(meta.SessionID); err != nil {
+		t.Fatalf("ClearBoundary: %v", err)
+	}
+	got, err = svc.GetBoundary(meta.SessionID)
+	if err != nil || got != nil {
+		t.Errorf("GetBoundary after clear = %+v, %v; want nil, nil", got, err)
+	}
+}
+
+func TestGelAnalysisService_DetectBoundary_ClampsToImage(t *testing.T) {
+	svc, _ := newTestGelAnalysisService(t)
+
+	const width, height = 100, 50
+	values := make([]uint16, width*height)
+	path := filepath.Join(t.TempDir(), "boundary-clamp.png")
+	write2DGray16(t, path, width, height, values)
+
+	meta, err := svc.LoadImage(path)
+	if err != nil {
+		t.Fatalf("LoadImage: %v", err)
+	}
+
+	if err := svc.SetLane(meta.SessionID, models.GelLaneROI{ID: "l1", X: 2, Y: 2, Width: 5, Height: 5}); err != nil {
+		t.Fatalf("SetLane: %v", err)
+	}
+
+	boundary, err := svc.DetectBoundary(meta.SessionID, 200)
+	if err != nil {
+		t.Fatalf("DetectBoundary: %v", err)
+	}
+	if boundary.X != 0 || boundary.Y != 0 || boundary.Width != float64(width) || boundary.Height != float64(height) {
+		t.Errorf("boundary = %+v, want clamped to full image {0,0,%d,%d}", boundary, width, height)
+	}
+}
+
+func TestGelAnalysisService_DetectBoundary_ErrorsWithNoLanes(t *testing.T) {
+	svc, _ := newTestGelAnalysisService(t)
+
+	path := filepath.Join(t.TempDir(), "no-lanes.png")
+	write2DGray16(t, path, 10, 10, make([]uint16, 100))
+
+	meta, err := svc.LoadImage(path)
+	if err != nil {
+		t.Fatalf("LoadImage: %v", err)
+	}
+
+	if _, err := svc.DetectBoundary(meta.SessionID, 5); err == nil {
+		t.Error("expected an error when detecting a boundary with no lanes set")
+	}
+}
+
+func TestGelAnalysisService_SetBoundary(t *testing.T) {
+	svc, _ := newTestGelAnalysisService(t)
+
+	path := filepath.Join(t.TempDir(), "manual-boundary.png")
+	write2DGray16(t, path, 20, 20, make([]uint16, 400))
+
+	meta, err := svc.LoadImage(path)
+	if err != nil {
+		t.Fatalf("LoadImage: %v", err)
+	}
+
+	manual := models.GelBoundary{X: 1, Y: 2, Width: 3, Height: 4}
+	if err := svc.SetBoundary(meta.SessionID, manual); err != nil {
+		t.Fatalf("SetBoundary: %v", err)
+	}
+
+	got, err := svc.GetBoundary(meta.SessionID)
+	if err != nil || got == nil || *got != manual {
+		t.Errorf("GetBoundary = %+v, %v; want %+v, nil", got, err, manual)
 	}
 }
 
@@ -187,6 +351,37 @@ func TestGelAnalysisService_FitCalibration_ErrorsOnBandCountMismatch(t *testing.
 	}
 }
 
+func intPtr(v int) *int { return &v }
+
+func TestFindAnchorLanes_SortsByIndexAndComputesCenter(t *testing.T) {
+	lanes := map[string]models.GelLaneROI{
+		"a": {ID: "a", X: 100, Width: 20, LaneIndex: intPtr(2)},
+		"b": {ID: "b", X: 10, Width: 10, LaneIndex: intPtr(0)},
+		"c": {ID: "c", X: 50, Width: 30}, // no LaneIndex: not an anchor
+	}
+
+	anchors := findAnchorLanes(lanes)
+
+	if len(anchors) != 2 {
+		t.Fatalf("expected 2 anchors, got %d: %+v", len(anchors), anchors)
+	}
+	if anchors[0].Index != 0 || anchors[0].Position != 15 || anchors[0].Width != 10 {
+		t.Errorf("anchors[0] = %+v, want {Index:0 Position:15 Width:10}", anchors[0])
+	}
+	if anchors[1].Index != 2 || anchors[1].Position != 110 || anchors[1].Width != 20 {
+		t.Errorf("anchors[1] = %+v, want {Index:2 Position:110 Width:20}", anchors[1])
+	}
+}
+
+func TestFindAnchorLanes_EmptyWhenNoneIndexed(t *testing.T) {
+	lanes := map[string]models.GelLaneROI{
+		"a": {ID: "a", X: 100, Width: 20},
+	}
+	if anchors := findAnchorLanes(lanes); len(anchors) != 0 {
+		t.Errorf("expected no anchors, got %+v", anchors)
+	}
+}
+
 func TestGelAnalysisService_SaveAndReloadSession(t *testing.T) {
 	svc, _ := newTestGelAnalysisService(t)
 
@@ -201,6 +396,10 @@ func TestGelAnalysisService_SaveAndReloadSession(t *testing.T) {
 	lane := models.GelLaneROI{ID: "lane1", Label: "Lane 1", X: 0, Y: 0, Width: 1, Height: 50}
 	if err := svc.SetLane(meta.SessionID, lane); err != nil {
 		t.Fatalf("SetLane: %v", err)
+	}
+	boundary := models.GelBoundary{X: 0, Y: 0, Width: 1, Height: 50}
+	if err := svc.SetBoundary(meta.SessionID, boundary); err != nil {
+		t.Fatalf("SetBoundary: %v", err)
 	}
 
 	id, err := svc.SaveSession(meta.SessionID, "My Session")
@@ -224,6 +423,11 @@ func TestGelAnalysisService_SaveAndReloadSession(t *testing.T) {
 	reopenedLanes, err := svc.GetLanes(reopenedMeta.SessionID)
 	if err != nil || len(reopenedLanes) != 1 || reopenedLanes[0].ID != "lane1" {
 		t.Fatalf("expected the saved lane to be restored, got %v, %+v", err, reopenedLanes)
+	}
+
+	reopenedBoundary, err := svc.GetBoundary(reopenedMeta.SessionID)
+	if err != nil || reopenedBoundary == nil || *reopenedBoundary != boundary {
+		t.Errorf("expected the saved boundary to be restored, got %+v, %v", reopenedBoundary, err)
 	}
 
 	if err := svc.DeleteSavedSession(id); err != nil {

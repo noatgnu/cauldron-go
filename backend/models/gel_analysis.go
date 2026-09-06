@@ -15,6 +15,19 @@ type GelLaneROI struct {
 	Height    float64   `json:"height"`
 	IsMarker  bool      `json:"isMarker"`
 	MarkerMWs []float64 `json:"markerMWs,omitempty"`
+	// LaneIndex is this lane's known 0-based position within the full expected sequence (e.g. the
+	// ladder is lane 3 of 12).
+	LaneIndex *int `json:"laneIndex,omitempty"`
+}
+
+// GelBoundary is the single working-region rectangle for a session, in source-image pixel
+// coordinates. Auto-detect derives it from currently known lanes; the user can also drag/resize
+// it manually like a lane ROI.
+type GelBoundary struct {
+	X      float64 `json:"x"`
+	Y      float64 `json:"y"`
+	Width  float64 `json:"width"`
+	Height float64 `json:"height"`
 }
 
 // GelPeakParams controls smoothing/baseline/peak-detection behavior for ComputeLaneProfile.
@@ -67,9 +80,7 @@ type GelImageMeta struct {
 	ImageSHA256 string `json:"imageSha256"`
 }
 
-// GelAnalysisProvenance captures everything needed to audit or attempt to reproduce a result:
-// exactly which image bytes were analyzed, with what parameters, by which build of Cauldron, and
-// — if Auto-detect was used — which Python interpreter/package versions and script produced it.
+// GelAnalysisProvenance is the audit record for a result: image hash, parameters, app/engine build, and (if used) the Auto-detect Python environment.
 type GelAnalysisProvenance struct {
 	GeneratedAt            string               `json:"generatedAt"` // RFC3339
 	AppVersion             string               `json:"appVersion"`
@@ -79,6 +90,7 @@ type GelAnalysisProvenance struct {
 	ImagePath              string               `json:"imagePath"`
 	ImageSHA256            string               `json:"imageSha256"`
 	Lanes                  []GelLaneROI         `json:"lanes"`
+	Boundary               *GelBoundary         `json:"boundary,omitempty"`
 	PeakParams             *GelPeakParams       `json:"peakParams,omitempty"`
 	Calibration            *GelCalibrationCurve `json:"calibration,omitempty"`
 	AutoDetectUsed         bool                 `json:"autoDetectUsed"`
@@ -112,18 +124,13 @@ func (l GelLaneROIList) Value() (driver.Value, error) {
 	return json.Marshal(l)
 }
 
-// GelAnalysisSession is a persisted "recipe" (image path + lane ROIs + peak params) so a gel
-// analysis session can be reopened later without storing decoded pixel data. It also carries a
-// provenance snapshot taken at save time (image hash, app/engine version, auto-detect Python
-// environment) so a reviewer reopening it later can check what produced it.
-//
-// Schema changes to this struct must stay additive (new optional fields only) — older saved
-// sessions must keep loading correctly in newer app versions; never rename/remove a column.
+// GelAnalysisSession is a reopenable "recipe" (image path, lanes, params, provenance snapshot).
 type GelAnalysisSession struct {
 	ID             uint           `gorm:"primaryKey" json:"id"`
 	Name           string         `gorm:"not null" json:"name"`
 	ImagePath      string         `gorm:"not null" json:"imagePath"`
 	Lanes          GelLaneROIList `gorm:"type:text" json:"lanes"`
+	Boundary       string         `gorm:"type:text" json:"boundary"`
 	PeakParams     string         `gorm:"type:text" json:"peakParams"`
 	Notes          string         `json:"notes"`
 	ImageSHA256    string         `json:"imageSha256"`

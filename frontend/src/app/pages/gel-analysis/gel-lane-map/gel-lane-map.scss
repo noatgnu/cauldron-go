@@ -1,0 +1,59 @@
+.lane-map {
+  position: relative;
+  height: 32px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background-color: var(--surface-variant);
+  margin-bottom: 12px;
+  overflow: hidden;
+
+  &.empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
+.lane-map-empty {
+  font-size: 11px;
+  color: var(--on-surface-variant);
+}
+
+.lane-segment {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  min-width: 3px;
+  border: none;
+  border-radius: 2px;
+  background-color: #4caf50;
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  mat-icon {
+    font-size: 12px;
+    width: 12px;
+    height: 12px;
+    color: rgba(0, 0, 0, 0.6);
+  }
+
+  &:hover {
+    filter: brightness(1.15);
+  }
+
+  &.marker {
+    background-color: #ffb300;
+  }
+
+  &.selected:not(.marker) {
+    background-color: #00e5ff;
+  }
+
+  &.selected {
+    outline: 2px solid #00e5ff;
+    outline-offset: 1px;
+  }
+}

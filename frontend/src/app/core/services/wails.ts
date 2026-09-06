@@ -32,6 +32,7 @@ export type DataColumn = services.DataColumn;
 export type DataFileInfo = services.DataFileInfo;
 export type UpdateInfo = services.UpdateInfo;
 export type GelLaneROI = models.GelLaneROI;
+export type GelBoundary = models.GelBoundary;
 export type GelPeakParams = models.GelPeakParams;
 export type GelBand = models.GelBand;
 export type GelLaneProfile = models.GelLaneProfile;
@@ -1151,6 +1152,19 @@ export class Wails {
     return WailsApp.GetGelImagePreview(sessionID);
   }
 
+  async getGelImagePreviewWithLevels(sessionID: string, blackPoint: number, whitePoint: number): Promise<string> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.GetGelImagePreviewWithLevels(sessionID, blackPoint, whitePoint);
+  }
+
+  /** Unparsed TIFF/PNG tags read directly from the source image file (vendor-specific fields included, as-is). */
+  async getGelRawMetadata(sessionID: string): Promise<Partial<Record<string, string>>> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.GetGelRawMetadata(sessionID);
+  }
+
   async setGelLane(sessionID: string, lane: GelLaneROI): Promise<void> {
     if (!this.isWails) throw new Error('Wails not available');
     await this.waitForBackend();
@@ -1163,10 +1177,41 @@ export class Wails {
     return WailsApp.RemoveGelLane(sessionID, laneID);
   }
 
+  async centerGelLane(sessionID: string, laneID: string): Promise<GelLaneROI | null> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.CenterGelLane(sessionID, laneID);
+  }
+
   async getGelLanes(sessionID: string): Promise<GelLaneROI[]> {
     if (!this.isWails) throw new Error('Wails not available');
     await this.waitForBackend();
     return WailsApp.GetGelLanes(sessionID);
+  }
+
+  async setGelBoundary(sessionID: string, boundary: GelBoundary): Promise<void> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.SetGelBoundary(sessionID, boundary);
+  }
+
+  async getGelBoundary(sessionID: string): Promise<GelBoundary | null> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.GetGelBoundary(sessionID);
+  }
+
+  async clearGelBoundary(sessionID: string): Promise<void> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.ClearGelBoundary(sessionID);
+  }
+
+  /** Derives the boundary as a padded bounding box of current lanes, not true physical-edge detection. */
+  async detectGelBoundary(sessionID: string, paddingPx: number): Promise<GelBoundary | null> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.DetectGelBoundary(sessionID, paddingPx);
   }
 
   async computeGelLaneProfile(sessionID: string, laneID: string, params: GelPeakParams): Promise<GelLaneProfile | null> {
@@ -1241,10 +1286,11 @@ export class Wails {
     return WailsApp.CloseGelSession(sessionID);
   }
 
-  async runGelAutoDetect(sessionID: string): Promise<GelAutoDetectResult | null> {
+  /** expectedLaneCount enables anchor-guided detection (pass 0 for plain profile-based detection). */
+  async runGelAutoDetect(sessionID: string, expectedLaneCount: number): Promise<GelAutoDetectResult | null> {
     if (!this.isWails) throw new Error('Wails not available');
     await this.waitForBackend();
-    return WailsApp.RunGelAutoDetect(sessionID);
+    return WailsApp.RunGelAutoDetect(sessionID, expectedLaneCount);
   }
 
   async cancelGelAutoDetect(sessionID: string): Promise<void> {
