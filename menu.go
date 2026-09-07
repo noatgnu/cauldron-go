@@ -74,6 +74,20 @@ func createApplicationMenu(app *App) *application.Menu {
 				app.wailsApp.Event.Emit("menu:view-plugin-list", nil)
 			}
 		})
+	viewMenu.Add("Table Browser").
+		SetAccelerator("CmdOrCtrl+4").
+		OnClick(func(ctx *application.Context) {
+			if app.wailsApp != nil {
+				app.wailsApp.Event.Emit("menu:view-table-browser", nil)
+			}
+		})
+	viewMenu.Add("Gel Analysis").
+		SetAccelerator("CmdOrCtrl+5").
+		OnClick(func(ctx *application.Context) {
+			if app.wailsApp != nil {
+				app.wailsApp.Event.Emit("menu:view-gel-analysis", nil)
+			}
+		})
 
 	windowMenu := menu.AddSubmenu("Window")
 	windowMenu.Add("Minimize").

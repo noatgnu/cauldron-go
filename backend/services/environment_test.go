@@ -1,7 +1,9 @@
 package services
 
 import (
+	"bytes"
 	"context"
+	"log"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -261,6 +263,41 @@ execution:
 	}
 	if _, err := os.Stat(pythonExe); os.IsNotExist(err) {
 		t.Errorf("Python executable not found in venv: %s", pythonExe)
+	}
+}
+
+func TestVenvCreationWithPlainRequirementsTxtFallback(t *testing.T) {
+	envService, _, settings := createTestEnvironmentService(t)
+	pythonPath, err := settings.DetectPythonPath()
+	if err != nil {
+		t.Skip("Python not found, skipping venv creation test")
+	}
+	tmpDir := t.TempDir()
+
+	// No plugin.yaml here on purpose. This mirrors a non-plugin, script-backed feature (e.g. gel-analysis).
+	folderPath := filepath.Join(tmpDir, "gel-analysis")
+	if err := os.MkdirAll(folderPath, 0755); err != nil {
+		t.Fatalf("Failed to create folder: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(folderPath, "requirements.txt"), []byte(""), 0644); err != nil {
+		t.Fatalf("Failed to write requirements.txt: %v", err)
+	}
+
+	var logBuf bytes.Buffer
+	log.SetOutput(&logBuf)
+	defer log.SetOutput(os.Stderr)
+
+	venvPath := filepath.Join(tmpDir, "test_venv")
+	err = envService.CreatePythonVirtualEnv(pythonPath, venvPath, "gel-analysis", folderPath)
+	if err != nil {
+		if strings.Contains(err.Error(), "failed to create virtual environment") {
+			t.Skip("Python venv module not available, skipping venv creation test")
+		}
+		t.Fatalf("CreatePythonVirtualEnv failed: %v", err)
+	}
+
+	if !strings.Contains(logBuf.String(), "installing plain requirements.txt") {
+		t.Errorf("Expected the plain-requirements.txt fallback to fire for a folder with no plugin.yaml; log was: %s", logBuf.String())
 	}
 }
 

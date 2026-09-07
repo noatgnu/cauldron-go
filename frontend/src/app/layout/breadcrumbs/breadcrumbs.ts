@@ -33,7 +33,8 @@ export class Breadcrumbs implements OnInit {
     'plugin': { label: 'Plugins', listRoute: '/plugin-list' },
     'plugin-list': { label: 'Plugin List' },
     'plugins': { label: 'Plugin Management' },
-    'table-browser': { label: 'Table Browser' }
+    'table-browser': { label: 'Table Browser' },
+    'gel-analysis': { label: 'Gel Analysis' }
   };
 
   constructor(

@@ -55,6 +55,7 @@ type App struct {
 	delimitedFileService   *services.DelimitedFileService
 	tableFileService       *services.TableFileService
 	updateCheckService     *services.UpdateCheckService
+	gelAnalysisService     *services.GelAnalysisService
 	ready                  chan bool
 	logFilePath            string
 	appVersion             string
@@ -140,6 +141,7 @@ func (a *App) Initialize() {
 
 	log.Println("[App.Initialize] Initializing script executor...")
 	a.scriptExecutor = services.NewScriptExecutor(a.settings, a.db)
+	a.gelAnalysisService = services.NewGelAnalysisService(a.db, a.scriptExecutor, services.NewProgressNotifierV3(a.wailsApp), a.envService, a.appVersion)
 	a.scriptExecutor.SetUpdateCallback(func(jobID string, update models.Job) {
 		job, err := a.jobQueue.GetJob(jobID)
 		if err != nil {
@@ -626,13 +628,22 @@ func (a *App) resolvePluginFolderPath(pluginID, logPrefix string) string {
 		}
 	}
 
-	if err != nil {
-		log.Printf("[App] %s: Failed to get plugin folder path: %v", logPrefix, err)
-		return ""
+	if err == nil {
+		log.Printf("[App] %s: Found plugin folder path: %s", logPrefix, plugin.FolderPath)
+		return plugin.FolderPath
 	}
 
-	log.Printf("[App] %s: Found plugin folder path: %s", logPrefix, plugin.FolderPath)
-	return plugin.FolderPath
+	// Not a registered plugin. Fall back to scripts/<pluginID>/, used by built-in features like gel-analysis.
+	if exePath, exeErr := os.Executable(); exeErr == nil {
+		scriptsDir := filepath.Join(filepath.Dir(exePath), "scripts", pluginID)
+		if info, statErr := os.Stat(scriptsDir); statErr == nil && info.IsDir() {
+			log.Printf("[App] %s: %q is not a registered plugin; using scripts folder: %s", logPrefix, pluginID, scriptsDir)
+			return scriptsDir
+		}
+	}
+
+	log.Printf("[App] %s: Failed to get plugin folder path: %v", logPrefix, err)
+	return ""
 }
 
 func (a *App) CreatePythonVirtualEnv(basePythonPath string, venvPath string, pluginID string) error {
@@ -788,6 +799,125 @@ func (a *App) ExportTableFile(path string, outputPath string, columns []string, 
 
 func (a *App) CloseTableFile(path string) error {
 	return a.tableFileService.CloseFile(path)
+}
+
+// OpenGelImageDialog shows a native file picker restricted to common gel-scan image formats.
+func (a *App) OpenGelImageDialog() (string, error) {
+	return a.fileService.OpenFileDialog("Select Gel Image", []application.FileFilter{
+		{DisplayName: "Gel Images (*.tif, *.tiff, *.png, *.jpg, *.jpeg)", Pattern: "*.tif;*.tiff;*.png;*.jpg;*.jpeg"},
+	})
+}
+
+func (a *App) LoadGelImage(path string) (*models.GelImageMeta, error) {
+	return a.gelAnalysisService.LoadImage(path)
+}
+
+func (a *App) GetGelImagePreview(sessionID string) ([]byte, error) {
+	return a.gelAnalysisService.GetImagePreview(sessionID)
+}
+
+func (a *App) GetGelImagePreviewWithLevels(sessionID string, blackPoint float64, whitePoint float64) ([]byte, error) {
+	return a.gelAnalysisService.GetImagePreviewWithLevels(sessionID, blackPoint, whitePoint)
+}
+
+// GetGelRawMetadata returns the unparsed TIFF/PNG tags read directly from the source image file.
+func (a *App) GetGelRawMetadata(sessionID string) (map[string]string, error) {
+	return a.gelAnalysisService.GetRawMetadata(sessionID)
+}
+
+func (a *App) SetGelLane(sessionID string, lane models.GelLaneROI) error {
+	return a.gelAnalysisService.SetLane(sessionID, lane)
+}
+
+func (a *App) RemoveGelLane(sessionID string, laneID string) error {
+	return a.gelAnalysisService.RemoveLane(sessionID, laneID)
+}
+
+func (a *App) GetGelLanes(sessionID string) ([]models.GelLaneROI, error) {
+	return a.gelAnalysisService.GetLanes(sessionID)
+}
+
+func (a *App) CenterGelLane(sessionID string, laneID string) (*models.GelLaneROI, error) {
+	return a.gelAnalysisService.CenterLane(sessionID, laneID)
+}
+
+func (a *App) SetGelBoundary(sessionID string, boundary models.GelBoundary) error {
+	return a.gelAnalysisService.SetBoundary(sessionID, boundary)
+}
+
+func (a *App) GetGelBoundary(sessionID string) (*models.GelBoundary, error) {
+	return a.gelAnalysisService.GetBoundary(sessionID)
+}
+
+func (a *App) ClearGelBoundary(sessionID string) error {
+	return a.gelAnalysisService.ClearBoundary(sessionID)
+}
+
+func (a *App) DetectGelBoundary(sessionID string, paddingPx float64) (*models.GelBoundary, error) {
+	return a.gelAnalysisService.DetectBoundary(sessionID, paddingPx)
+}
+
+func (a *App) ComputeGelLaneProfile(sessionID string, laneID string, params models.GelPeakParams) (*models.GelLaneProfile, error) {
+	return a.gelAnalysisService.ComputeLaneProfile(sessionID, laneID, params)
+}
+
+func (a *App) ComputeAllGelProfiles(sessionID string, params models.GelPeakParams) (map[string]models.GelLaneProfile, error) {
+	return a.gelAnalysisService.ComputeAllProfiles(sessionID, params)
+}
+
+func (a *App) FitGelCalibrationCurve(sessionID string, markerLaneID string) (*models.GelCalibrationCurve, error) {
+	return a.gelAnalysisService.FitCalibrationCurve(sessionID, markerLaneID)
+}
+
+func (a *App) ApplyGelCalibration(sessionID string) (map[string]models.GelLaneProfile, error) {
+	return a.gelAnalysisService.ApplyCalibration(sessionID)
+}
+
+// GetGelProvenance returns the audit record (image hash, versions, Python environment) a reviewer
+// checks to verify or attempt to reproduce a result.
+func (a *App) GetGelProvenance(sessionID string) (*models.GelAnalysisProvenance, error) {
+	return a.gelAnalysisService.GetProvenance(sessionID)
+}
+
+// ExportGelResultsDialog shows a native save-file picker for the results CSV destination.
+func (a *App) ExportGelResultsDialog(defaultName string) (string, error) {
+	return a.fileService.SaveFileDialog("Export Gel Analysis Results", defaultName)
+}
+
+func (a *App) ExportGelResultsCSV(sessionID string, outputPath string) error {
+	return a.gelAnalysisService.ExportResultsCSV(sessionID, outputPath)
+}
+
+func (a *App) SaveGelSession(sessionID string, name string) (uint, error) {
+	return a.gelAnalysisService.SaveSession(sessionID, name)
+}
+
+func (a *App) GetGelSessions() ([]models.GelAnalysisSession, error) {
+	return a.gelAnalysisService.ListSavedSessions()
+}
+
+func (a *App) LoadGelSession(id uint) (*models.GelImageMeta, error) {
+	return a.gelAnalysisService.LoadSavedSession(id)
+}
+
+func (a *App) DeleteGelSession(id uint) error {
+	return a.gelAnalysisService.DeleteSavedSession(id)
+}
+
+func (a *App) CloseGelSession(sessionID string) error {
+	return a.gelAnalysisService.CloseSession(sessionID)
+}
+
+// RunGelAutoDetect generates a synthetic bookkeeping ID (never registered with JobQueueService)
+// and runs the bundled Python auto-detect script synchronously, returning its result directly.
+// expectedLaneCount enables anchor-guided detection (pass 0 for plain profile-based detection).
+func (a *App) RunGelAutoDetect(sessionID string, expectedLaneCount int) (*services.GelAutoDetectResult, error) {
+	jobID := fmt.Sprintf("gel-auto-detect-%s-%d", sessionID, time.Now().UnixNano())
+	return a.gelAnalysisService.RunAutoDetect(sessionID, jobID, expectedLaneCount)
+}
+
+func (a *App) CancelGelAutoDetect(sessionID string) error {
+	return a.gelAnalysisService.CancelAutoDetect(sessionID)
 }
 
 // GetAppVersion returns the running app's version, embedded at build time.

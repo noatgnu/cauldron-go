@@ -334,20 +334,33 @@ func (u *UvService) CreateUvVirtualEnv(pythonVersion, venvPath, pluginID, plugin
 		u.progressNotifier.EmitProgress(ProgressTypeInstall, "uv-venv", "Installing plugin requirements...", 40)
 
 		pluginYamlPath := filepath.Join(pluginFolderPath, "plugin.yaml")
+		installed := false
 		if pluginDef, err := loadPluginDefinition(pluginYamlPath); err == nil {
 			inlinePackages := pluginDef.Execution.Requirements.Packages
 			requirementsFile := pluginDef.Execution.Requirements.PythonRequirementsFile
 
 			if len(inlinePackages) > 0 {
+				installed = true
 				if err := u.InstallUvPackages(pythonExe, inlinePackages); err != nil {
 					log.Printf("[CreateUvVirtualEnv] Warning: Failed to install inline packages: %v\n", err)
 				}
 			} else if requirementsFile != "" {
 				requirementsPath := filepath.Join(pluginFolderPath, requirementsFile)
 				if _, err := os.Stat(requirementsPath); err == nil {
+					installed = true
 					if err := u.InstallUvRequirements(pythonExe, requirementsPath); err != nil {
 						log.Printf("[CreateUvVirtualEnv] Warning: Failed to install plugin requirements: %v\n", err)
 					}
+				}
+			}
+		}
+
+		if !installed {
+			// No plugin.yaml requirements. Fall back to a plain requirements.txt, same as CreatePythonVirtualEnv.
+			if fallbackPath := filepath.Join(pluginFolderPath, "requirements.txt"); fileExists(fallbackPath) {
+				log.Printf("[CreateUvVirtualEnv] No plugin.yaml requirements found; installing plain requirements.txt at %s\n", fallbackPath)
+				if err := u.InstallUvRequirements(pythonExe, fallbackPath); err != nil {
+					log.Printf("[CreateUvVirtualEnv] Warning: Failed to install requirements.txt: %v\n", err)
 				}
 			}
 		}

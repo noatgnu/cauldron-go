@@ -1,0 +1,8 @@
+@if (curve()) {
+  <div class="calibration-plot">
+    <plotly-plot [data]="graphData()" [layout]="graphLayout" [useResizeHandler]="true" [style]="{width: '100%'}"></plotly-plot>
+    <span class="r-squared">{{ rSquaredLabel() }}</span>
+  </div>
+} @else {
+  <p class="empty-state">Fit a calibration curve to see the plot.</p>
+}

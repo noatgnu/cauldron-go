@@ -1,0 +1,23 @@
+<h2 mat-dialog-title>Mark "{{ data.laneLabel }}" as Ladder</h2>
+<mat-dialog-content>
+  <p class="dialog-message">
+    Enter the known molecular weights (kDa) for this ladder lane, top to bottom, separated by commas.
+  </p>
+  <mat-form-field appearance="outline" class="w-full" floatLabel="always">
+    <mat-label>Molecular weights (kDa)</mat-label>
+    <input
+      matInput
+      placeholder="250, 150, 100, 75, 50, 37, 25"
+      [ngModel]="inputValue()"
+      (ngModelChange)="onInputChange($event)"
+      (keyup.enter)="onConfirm()"
+      cdkFocusInitial>
+  </mat-form-field>
+  @if (error()) {
+    <p class="error-message">{{ error() }}</p>
+  }
+</mat-dialog-content>
+<mat-dialog-actions align="end">
+  <button mat-button (click)="onCancel()">Cancel</button>
+  <button mat-raised-button color="primary" (click)="onConfirm()">Save</button>
+</mat-dialog-actions>

@@ -86,6 +86,14 @@ export class App implements OnInit {
       this.router.navigate(['/plugin-list']);
     });
 
+    Events.On('menu:view-table-browser', () => {
+      this.router.navigate(['/table-browser']);
+    });
+
+    Events.On('menu:view-gel-analysis', () => {
+      this.router.navigate(['/gel-analysis']);
+    });
+
     Events.On('menu:settings', () => {
       this.router.navigate(['/settings']);
     });
