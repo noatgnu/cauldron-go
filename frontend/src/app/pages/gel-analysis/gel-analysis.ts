@@ -28,6 +28,7 @@ import { PromptDialogComponent, PromptDialogData } from '../../components/prompt
 import { GelLaneMap } from './gel-lane-map/gel-lane-map';
 
 interface ResultRow {
+  laneId: string;
   lane: string;
   bandNumber: number;
   position: number;
@@ -78,6 +79,7 @@ export class GelAnalysis implements OnDestroy {
   protected imagePreviewUrl = signal<string | null>(null);
   protected lanes = signal<GelLaneROI[]>([]);
   protected selectedLaneId = signal<string | null>(null);
+  protected selectedBand = signal<{ laneId: string; bandNumber: number } | null>(null);
   protected boundary = signal<GelBoundary | null>(null);
   protected boundaryPadding = signal(10);
   protected drawMode = signal<'lane' | 'boundary'>('lane');
@@ -136,6 +138,7 @@ export class GelAnalysis implements OnDestroy {
       if (!profile) continue;
       profile.bands.forEach((band, i) => {
         rows.push({
+          laneId,
           lane: lane?.label ?? laneId,
           bandNumber: i + 1,
           position: band.position,
@@ -301,6 +304,8 @@ export class GelAnalysis implements OnDestroy {
       ctx.setLineDash([]);
     }
 
+    const selectedBand = this.selectedBand();
+
     for (const lane of this.lanes()) {
       const selected = lane.id === this.selectedLaneId();
       ctx.strokeStyle = lane.isMarker ? '#ffb300' : (selected ? '#00e5ff' : '#4caf50');
@@ -313,15 +318,16 @@ export class GelAnalysis implements OnDestroy {
 
       const profile = this.profiles()[lane.id];
       if (profile) {
-        for (const band of profile.bands) {
+        profile.bands.forEach((band, i) => {
+          const isBandSelected = selectedBand?.laneId === lane.id && selectedBand.bandNumber === i + 1;
           const y = lane.y + band.position;
           ctx.beginPath();
           ctx.moveTo(lane.x, y);
           ctx.lineTo(lane.x + lane.width, y);
-          ctx.strokeStyle = '#ff1744';
-          ctx.lineWidth = 1;
+          ctx.strokeStyle = isBandSelected ? '#ffea00' : '#ff1744';
+          ctx.lineWidth = isBandSelected ? 3 : 1;
           ctx.stroke();
-        }
+        });
       }
     }
 
@@ -413,6 +419,22 @@ export class GelAnalysis implements OnDestroy {
   selectLane(laneId: string) {
     this.selectedLaneId.set(laneId);
     this.redrawOverlay();
+  }
+
+  selectBand(laneId: string, bandNumber: number): void {
+    const current = this.selectedBand();
+    if (current && current.laneId === laneId && current.bandNumber === bandNumber) {
+      this.selectedBand.set(null);
+    } else {
+      this.selectedBand.set({ laneId, bandNumber });
+      this.selectedLaneId.set(laneId);
+    }
+    this.redrawOverlay();
+  }
+
+  isBandSelected(row: { laneId: string; bandNumber: number }): boolean {
+    const selected = this.selectedBand();
+    return !!selected && selected.laneId === row.laneId && selected.bandNumber === row.bandNumber;
   }
 
   async updateSelectedLane(field: 'x' | 'y' | 'width' | 'height', value: number): Promise<void> {

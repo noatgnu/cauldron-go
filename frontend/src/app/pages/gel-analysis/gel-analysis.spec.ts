@@ -235,6 +235,42 @@ describe('GelAnalysis', () => {
     expect(state().drawMode()).toBe('boundary');
   });
 
+  it('selectBand sets the selected band and its parent lane', async () => {
+    await fixture.whenStable();
+
+    component.selectBand('lane1', 2);
+
+    expect(state().selectedBand()).toEqual({ laneId: 'lane1', bandNumber: 2 });
+    expect(state().selectedLaneId()).toBe('lane1');
+  });
+
+  it('selectBand clears the selection when the same band is clicked again', async () => {
+    await fixture.whenStable();
+    component.selectBand('lane1', 2);
+
+    component.selectBand('lane1', 2);
+
+    expect(state().selectedBand()).toBeNull();
+  });
+
+  it('selectBand switches to a different band without needing to deselect first', async () => {
+    await fixture.whenStable();
+    component.selectBand('lane1', 2);
+
+    component.selectBand('lane1', 3);
+
+    expect(state().selectedBand()).toEqual({ laneId: 'lane1', bandNumber: 3 });
+  });
+
+  it('isBandSelected reflects the current selection', async () => {
+    await fixture.whenStable();
+    component.selectBand('lane1', 2);
+
+    expect(component.isBandSelected({ laneId: 'lane1', bandNumber: 2 })).toBe(true);
+    expect(component.isBandSelected({ laneId: 'lane1', bandNumber: 3 })).toBe(false);
+    expect(component.isBandSelected({ laneId: 'lane2', bandNumber: 2 })).toBe(false);
+  });
+
   it('recomputeAllProfiles calls computeAllGelProfiles and stores the result', async () => {
     await fixture.whenStable();
     state().sessionId.set('sess-1');

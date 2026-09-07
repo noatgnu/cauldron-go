@@ -28,7 +28,7 @@ func TestFindPeaks_SimpleTwoBandProfile(t *testing.T) {
 	addGaussianBump(values, 75, 150, 3)
 
 	baseline := ComputeBaseline(values, "rolling-min")
-	bands := FindPeaks(values, baseline, models.GelPeakParams{Polarity: "light-bands"})
+	bands := FindPeaks(values, baseline, models.GelPeakParams{Polarity: "light-bands", MinDistance: 5})
 
 	if len(bands) != 2 {
 		t.Fatalf("expected 2 bands, got %d: %+v", len(bands), bands)
@@ -47,7 +47,7 @@ func TestFindPeaks_RespectsMinProminence(t *testing.T) {
 	addGaussianBump(values, 75, 5, 3) // tiny bump, should be filtered out
 
 	baseline := ComputeBaseline(values, "rolling-min")
-	bands := FindPeaks(values, baseline, models.GelPeakParams{Polarity: "light-bands", MinProminence: 0.2})
+	bands := FindPeaks(values, baseline, models.GelPeakParams{Polarity: "light-bands", MinProminence: 0.2, MinDistance: 5})
 
 	if len(bands) != 1 {
 		t.Fatalf("expected 1 band after prominence filtering, got %d: %+v", len(bands), bands)

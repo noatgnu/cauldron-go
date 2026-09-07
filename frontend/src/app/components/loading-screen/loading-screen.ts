@@ -1,12 +1,11 @@
 import { Component, ChangeDetectionStrategy, effect, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
 import { LoadingService } from '../../services/loading';
 
 @Component({
   selector: 'app-loading-screen',
   templateUrl: './loading-screen.html',
   styleUrls: ['./loading-screen.scss'],
-  imports: [CommonModule],
+  imports: [],
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush
 })

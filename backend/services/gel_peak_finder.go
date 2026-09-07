@@ -133,7 +133,9 @@ func FindPeaks(values, baseline []float64, params models.GelPeakParams) []models
 	}
 	minDistance := params.MinDistance
 	if minDistance <= 0 {
-		minDistance = maxInt(1, len(corrected)/20)
+		// Matches the X-axis lane-spacing default in scripts/gel-analysis/auto_detect.py
+		// (find_raw_peaks/detect_lanes use width/50); real bands can sit this close together.
+		minDistance = maxInt(1, len(corrected)/50)
 	}
 
 	type candidate struct {

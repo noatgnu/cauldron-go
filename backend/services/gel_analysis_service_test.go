@@ -85,7 +85,7 @@ func TestGelAnalysisService_SetLaneAndComputeProfile(t *testing.T) {
 		t.Fatalf("GetLanes: %v, %+v", err, lanes)
 	}
 
-	profile, err := svc.ComputeLaneProfile(meta.SessionID, "lane1", models.GelPeakParams{Polarity: "light-bands"})
+	profile, err := svc.ComputeLaneProfile(meta.SessionID, "lane1", models.GelPeakParams{Polarity: "light-bands", MinDistance: 5})
 	if err != nil {
 		t.Fatalf("ComputeLaneProfile: %v", err)
 	}
@@ -294,7 +294,7 @@ func TestGelAnalysisService_FitCalibrationAppliesMW(t *testing.T) {
 		t.Fatalf("SetLane(sample): %v", err)
 	}
 
-	params := models.GelPeakParams{Polarity: "light-bands"}
+	params := models.GelPeakParams{Polarity: "light-bands", MinDistance: 5}
 	if _, err := svc.ComputeAllProfiles(meta.SessionID, params); err != nil {
 		t.Fatalf("ComputeAllProfiles: %v", err)
 	}
@@ -341,7 +341,7 @@ func TestGelAnalysisService_FitCalibration_ErrorsOnBandCountMismatch(t *testing.
 	if err := svc.SetLane(meta.SessionID, markerLane); err != nil {
 		t.Fatalf("SetLane: %v", err)
 	}
-	if _, err := svc.ComputeLaneProfile(meta.SessionID, "marker", models.GelPeakParams{Polarity: "light-bands"}); err != nil {
+	if _, err := svc.ComputeLaneProfile(meta.SessionID, "marker", models.GelPeakParams{Polarity: "light-bands", MinDistance: 5}); err != nil {
 		t.Fatalf("ComputeLaneProfile: %v", err)
 	}
 

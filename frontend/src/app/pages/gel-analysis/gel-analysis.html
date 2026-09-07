@@ -372,7 +372,9 @@
           </ng-container>
 
           <tr mat-header-row *matHeaderRowDef="resultsColumns"></tr>
-          <tr mat-row *matRowDef="let row; columns: resultsColumns;"></tr>
+          <tr mat-row *matRowDef="let row; columns: resultsColumns;"
+              (click)="selectBand(row.laneId, row.bandNumber)"
+              [class.selected]="isBandSelected(row)"></tr>
         </table>
       </mat-card-content>
     </mat-card>

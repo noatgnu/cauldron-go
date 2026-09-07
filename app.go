@@ -207,10 +207,14 @@ func (a *App) Initialize() {
 	}
 
 	log.Println("[App.Initialize] Initializing plugin system V2...")
-	a.pluginLoaderV2 = services.NewPluginLoaderV2("", a.db, dockerImageBuilder)
+	exePath, _ := os.Executable()
+	pluginsDir := filepath.Join(filepath.Dir(exePath), "plugins")
+	services.MigrateThirdPartyPlugins(a.db, pluginsDir)
+	a.pluginLoaderV2 = services.NewPluginLoaderV2(pluginsDir, a.db, dockerImageBuilder)
 	if err := a.pluginLoaderV2.LoadPlugins(); err != nil {
 		log.Printf("[App.Initialize] Failed to load plugins: %v", err)
 	}
+	services.ReconcileOrphanedPluginData(a.db)
 	a.pluginExecutor = services.NewPluginExecutor()
 
 	log.Println("[App.Initialize] Wiring up job queue with script executor and plugin loader...")
@@ -224,8 +228,6 @@ func (a *App) Initialize() {
 
 	a.backupService = services.NewBackupService(a.db)
 
-	exePath, _ := os.Executable()
-	pluginsDir := filepath.Join(filepath.Dir(exePath), "plugins")
 	a.pluginInstaller = services.NewPluginInstallerV3(pluginsDir, a.db, a.pluginLoaderV2, a.gitAuthService, a.wailsApp)
 	log.Println("[App.Initialize] Plugin installer initialized")
 
