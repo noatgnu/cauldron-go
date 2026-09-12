@@ -611,9 +611,12 @@ func (s *ScriptExecutor) executeCommand(ctx context.Context, jobID string, cmd *
 		return fmt.Errorf("failed to create stderr pipe: %w", err)
 	}
 
+	lowerJobProcessPriority(cmd)
+
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("failed to start command: %w", err)
 	}
+	lowerJobProcessPriorityAfterStart(cmd)
 
 	done := make(chan error, 1)
 	go func() {

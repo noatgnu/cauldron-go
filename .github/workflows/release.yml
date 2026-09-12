@@ -198,6 +198,13 @@ jobs:
           if [ -f bin/plugin-scaffolder.exe ]; then cp bin/plugin-scaffolder.exe build/bin/windows-amd64/tools/; fi
           if [ -f bin/plugin-to-nextflow.exe ]; then cp bin/plugin-to-nextflow.exe build/bin/windows-amd64/tools/; fi
           if [ -d bin/external ]; then cp -r bin/external build/bin/windows-amd64/tools/; fi
+          for tool in uniprot-fetcher wide-to-long long-to-wide; do
+            src="bin/external/windows-amd64/$tool.exe"
+            if [ -f "$src" ]; then
+              mkdir -p "build/bin/windows-amd64/plugins/$tool"
+              cp "$src" "build/bin/windows-amd64/plugins/$tool/"
+            fi
+          done
         shell: bash
 
       - name: Check archive size before compression
@@ -381,6 +388,13 @@ jobs:
           if [ -f bin/plugin-scaffolder ]; then cp bin/plugin-scaffolder build/bin/linux-amd64/tools/; fi
           if [ -f bin/plugin-to-nextflow ]; then cp bin/plugin-to-nextflow build/bin/linux-amd64/tools/; fi
           if [ -d bin/external ]; then cp -r bin/external build/bin/linux-amd64/tools/; fi
+          for tool in uniprot-fetcher wide-to-long long-to-wide; do
+            src="bin/external/linux-amd64/$tool"
+            if [ -f "$src" ]; then
+              mkdir -p "build/bin/linux-amd64/plugins/$tool"
+              cp "$src" "build/bin/linux-amd64/plugins/$tool/"
+            fi
+          done
 
       - name: Check archive size before compression
         run: |
@@ -548,6 +562,13 @@ jobs:
           if [ -f bin/plugin-scaffolder ]; then cp bin/plugin-scaffolder build/bin/darwin-arm64/tools/; fi
           if [ -f bin/plugin-to-nextflow ]; then cp bin/plugin-to-nextflow build/bin/darwin-arm64/tools/; fi
           if [ -d bin/external ]; then cp -r bin/external build/bin/darwin-arm64/tools/; fi
+          for tool in uniprot-fetcher wide-to-long long-to-wide; do
+            src="bin/external/darwin-arm64/$tool"
+            if [ -f "$src" ]; then
+              mkdir -p "build/bin/darwin-arm64/plugins/$tool"
+              cp "$src" "build/bin/darwin-arm64/plugins/$tool/"
+            fi
+          done
 
       - name: Check archive size before compression
         run: |

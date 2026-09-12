@@ -8,6 +8,13 @@
     @if (imageMeta()) {
       <span class="spacer"></span>
 
+      <button mat-icon-button (click)="undo()" [disabled]="!canUndo()" matTooltip="Undo (Ctrl+Z)">
+        <mat-icon>undo</mat-icon>
+      </button>
+      <button mat-icon-button (click)="redo()" [disabled]="!canRedo()" matTooltip="Redo (Ctrl+Shift+Z)">
+        <mat-icon>redo</mat-icon>
+      </button>
+
       <button mat-stroked-button (click)="saveSession()">
         <mat-icon>save</mat-icon>
         Save Session
@@ -372,7 +379,9 @@
           </ng-container>
 
           <tr mat-header-row *matHeaderRowDef="resultsColumns"></tr>
-          <tr mat-row *matRowDef="let row; columns: resultsColumns;"></tr>
+          <tr mat-row *matRowDef="let row; columns: resultsColumns;"
+              (click)="selectBand(row.laneId, row.bandNumber)"
+              [class.selected]="isBandSelected(row)"></tr>
         </table>
       </mat-card-content>
     </mat-card>

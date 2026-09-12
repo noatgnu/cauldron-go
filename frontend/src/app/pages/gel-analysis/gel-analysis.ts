@@ -1,4 +1,4 @@
-import { Component, ElementRef, OnDestroy, ViewChild, computed, effect, inject, signal } from '@angular/core';
+import { Component, ElementRef, HostListener, OnDestroy, ViewChild, computed, effect, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -27,7 +27,13 @@ import { PluginEnvironmentDialog, PluginEnvironmentDialogData } from '../../comp
 import { PromptDialogComponent, PromptDialogData } from '../../components/prompt-dialog/prompt-dialog';
 import { GelLaneMap } from './gel-lane-map/gel-lane-map';
 
+interface GelHistorySnapshot {
+  lanes: GelLaneROI[];
+  boundary: GelBoundary | null;
+}
+
 interface ResultRow {
+  laneId: string;
   lane: string;
   bandNumber: number;
   position: number;
@@ -78,6 +84,7 @@ export class GelAnalysis implements OnDestroy {
   protected imagePreviewUrl = signal<string | null>(null);
   protected lanes = signal<GelLaneROI[]>([]);
   protected selectedLaneId = signal<string | null>(null);
+  protected selectedBand = signal<{ laneId: string; bandNumber: number } | null>(null);
   protected boundary = signal<GelBoundary | null>(null);
   protected boundaryPadding = signal(10);
   protected drawMode = signal<'lane' | 'boundary'>('lane');
@@ -110,6 +117,14 @@ export class GelAnalysis implements OnDestroy {
 
   protected sessions = signal<GelAnalysisSession[]>([]);
 
+  protected historyStack = signal<GelHistorySnapshot[]>([]);
+  protected redoStack = signal<GelHistorySnapshot[]>([]);
+  protected canUndo = computed(() => this.historyStack().length > 0);
+  protected canRedo = computed(() => this.redoStack().length > 0);
+  private readonly maxHistory = 50;
+  private pendingCoalesceKey: string | null = null;
+  private coalesceTimer: ReturnType<typeof setTimeout> | null = null;
+
   protected markerLanes = computed(() => this.lanes().filter(l => l.isMarker));
   protected selectedLane = computed(() => this.lanes().find(l => l.id === this.selectedLaneId()) ?? null);
   protected otherLanes = computed(() => this.lanes().filter(l => l.id !== this.selectedLaneId()));
@@ -136,6 +151,7 @@ export class GelAnalysis implements OnDestroy {
       if (!profile) continue;
       profile.bands.forEach((band, i) => {
         rows.push({
+          laneId,
           lane: lane?.label ?? laneId,
           bandNumber: i + 1,
           position: band.position,
@@ -178,6 +194,127 @@ export class GelAnalysis implements OnDestroy {
     return error instanceof Error && error.message.includes('cancelled by user');
   }
 
+  @HostListener('window:keydown', ['$event'])
+  handleUndoRedoKeydown(event: KeyboardEvent): void {
+    const target = event.target as HTMLElement | null;
+    if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+      return;
+    }
+    if (!(event.ctrlKey || event.metaKey)) return;
+
+    const key = event.key.toLowerCase();
+    if (key === 'z' && !event.shiftKey) {
+      event.preventDefault();
+      this.undo();
+    } else if ((key === 'z' && event.shiftKey) || key === 'y') {
+      event.preventDefault();
+      this.redo();
+    }
+  }
+
+  private snapshotState(): GelHistorySnapshot {
+    const boundary = this.boundary();
+    return {
+      lanes: this.lanes().map(l => ({ ...l })),
+      boundary: boundary ? { ...boundary } : null
+    };
+  }
+
+  /** Records the current state as an undo point before a mutation. coalesceKey groups rapid repeated edits to the same field (e.g. typing digits) into a single undo step instead of one per keystroke. */
+  private pushHistory(coalesceKey?: string): void {
+    if (this.coalesceTimer) {
+      clearTimeout(this.coalesceTimer);
+      this.coalesceTimer = null;
+    }
+
+    if (!coalesceKey || coalesceKey !== this.pendingCoalesceKey) {
+      this.historyStack.update(stack => {
+        const next = [...stack, this.snapshotState()];
+        return next.length > this.maxHistory ? next.slice(next.length - this.maxHistory) : next;
+      });
+      this.redoStack.set([]);
+    }
+
+    this.pendingCoalesceKey = coalesceKey ?? null;
+    if (coalesceKey) {
+      this.coalesceTimer = setTimeout(() => {
+        this.pendingCoalesceKey = null;
+        this.coalesceTimer = null;
+      }, 800);
+    }
+  }
+
+  private resetHistory(): void {
+    this.historyStack.set([]);
+    this.redoStack.set([]);
+    this.pendingCoalesceKey = null;
+    if (this.coalesceTimer) {
+      clearTimeout(this.coalesceTimer);
+      this.coalesceTimer = null;
+    }
+  }
+
+  async undo(): Promise<void> {
+    const stack = this.historyStack();
+    if (stack.length === 0) return;
+    const previous = stack[stack.length - 1];
+    this.historyStack.set(stack.slice(0, -1));
+    this.redoStack.update(r => [...r, this.snapshotState()]);
+    await this.applySnapshot(previous);
+  }
+
+  async redo(): Promise<void> {
+    const stack = this.redoStack();
+    if (stack.length === 0) return;
+    const next = stack[stack.length - 1];
+    this.redoStack.set(stack.slice(0, -1));
+    this.historyStack.update(h => [...h, this.snapshotState()]);
+    await this.applySnapshot(next);
+  }
+
+  private async applySnapshot(snapshot: GelHistorySnapshot): Promise<void> {
+    const sid = this.sessionId();
+    if (!sid) return;
+
+    const targetIds = new Set(snapshot.lanes.map(l => l.id));
+    const removedIds = this.lanes().map(l => l.id).filter(id => !targetIds.has(id));
+
+    try {
+      for (const laneId of removedIds) {
+        await this.wails.removeGelLane(sid, laneId);
+      }
+      for (const lane of snapshot.lanes) {
+        await this.wails.setGelLane(sid, lane);
+      }
+      if (snapshot.boundary) {
+        await this.wails.setGelBoundary(sid, snapshot.boundary);
+      } else {
+        await this.wails.clearGelBoundary(sid);
+      }
+
+      this.lanes.set(snapshot.lanes);
+      this.boundary.set(snapshot.boundary);
+      this.profiles.update(profiles => {
+        const kept: Partial<Record<string, GelLaneProfile>> = {};
+        for (const id of targetIds) {
+          if (profiles[id]) kept[id] = profiles[id];
+        }
+        return kept;
+      });
+      const selectedLaneId = this.selectedLaneId();
+      if (selectedLaneId && !targetIds.has(selectedLaneId)) {
+        this.selectedLaneId.set(null);
+      }
+      const selectedBand = this.selectedBand();
+      if (selectedBand && !targetIds.has(selectedBand.laneId)) {
+        this.selectedBand.set(null);
+      }
+      this.redrawOverlay();
+    } catch (error) {
+      this.notification.showError(`Failed to undo/redo: ${error}`);
+    }
+  }
+
   async openImage() {
     try {
       const path = await this.wails.openGelImageDialog();
@@ -209,6 +346,7 @@ export class GelAnalysis implements OnDestroy {
       this.calibrationLaneId.set(null);
       this.blackPoint.set(0);
       this.whitePoint.set(1);
+      this.resetHistory();
 
       // Canvas only exists in the DOM once loadingImage is false. Flip it before drawing.
       this.loadingImage.set(false);
@@ -301,6 +439,8 @@ export class GelAnalysis implements OnDestroy {
       ctx.setLineDash([]);
     }
 
+    const selectedBand = this.selectedBand();
+
     for (const lane of this.lanes()) {
       const selected = lane.id === this.selectedLaneId();
       ctx.strokeStyle = lane.isMarker ? '#ffb300' : (selected ? '#00e5ff' : '#4caf50');
@@ -313,15 +453,16 @@ export class GelAnalysis implements OnDestroy {
 
       const profile = this.profiles()[lane.id];
       if (profile) {
-        for (const band of profile.bands) {
+        profile.bands.forEach((band, i) => {
+          const isBandSelected = selectedBand?.laneId === lane.id && selectedBand.bandNumber === i + 1;
           const y = lane.y + band.position;
           ctx.beginPath();
           ctx.moveTo(lane.x, y);
           ctx.lineTo(lane.x + lane.width, y);
-          ctx.strokeStyle = '#ff1744';
-          ctx.lineWidth = 1;
+          ctx.strokeStyle = isBandSelected ? '#ffea00' : '#ff1744';
+          ctx.lineWidth = isBandSelected ? 3 : 1;
           ctx.stroke();
-        }
+        });
       }
     }
 
@@ -377,6 +518,8 @@ export class GelAnalysis implements OnDestroy {
       return;
     }
 
+    this.pushHistory();
+
     if (this.drawMode() === 'boundary') {
       const boundary: GelBoundary = { x: rect.x, y: rect.y, width: rect.width, height: rect.height } as GelBoundary;
       try {
@@ -415,11 +558,28 @@ export class GelAnalysis implements OnDestroy {
     this.redrawOverlay();
   }
 
+  selectBand(laneId: string, bandNumber: number): void {
+    const current = this.selectedBand();
+    if (current && current.laneId === laneId && current.bandNumber === bandNumber) {
+      this.selectedBand.set(null);
+    } else {
+      this.selectedBand.set({ laneId, bandNumber });
+      this.selectedLaneId.set(laneId);
+    }
+    this.redrawOverlay();
+  }
+
+  isBandSelected(row: { laneId: string; bandNumber: number }): boolean {
+    const selected = this.selectedBand();
+    return !!selected && selected.laneId === row.laneId && selected.bandNumber === row.bandNumber;
+  }
+
   async updateSelectedLane(field: 'x' | 'y' | 'width' | 'height', value: number): Promise<void> {
     const sid = this.sessionId();
     const lane = this.selectedLane();
     if (!sid || !lane || !Number.isFinite(value)) return;
 
+    this.pushHistory(`lane:${lane.id}:${field}`);
     const updated: GelLaneROI = { ...lane, [field]: value } as GelLaneROI;
     try {
       await this.wails.setGelLane(sid, updated);
@@ -436,6 +596,7 @@ export class GelAnalysis implements OnDestroy {
     const lane = this.selectedLane();
     if (!sid || !lane) return;
 
+    this.pushHistory(`lane:${lane.id}:laneIndex`);
     const laneIndex = value === null || !Number.isFinite(value) ? undefined : Math.max(0, Math.trunc(value));
     const updated: GelLaneROI = { ...lane, laneIndex } as GelLaneROI;
     try {
@@ -452,6 +613,7 @@ export class GelAnalysis implements OnDestroy {
     const lane = this.selectedLane();
     if (!sid || !lane || !source) return;
 
+    this.pushHistory();
     const updated: GelLaneROI = { ...lane, width: source.width, height: source.height } as GelLaneROI;
     try {
       await this.wails.setGelLane(sid, updated);
@@ -467,6 +629,7 @@ export class GelAnalysis implements OnDestroy {
     const lane = this.selectedLane();
     if (!sid || !lane) return;
 
+    this.pushHistory();
     try {
       const updated = await this.wails.centerGelLane(sid, lane.id);
       if (!updated) return;
@@ -534,6 +697,7 @@ export class GelAnalysis implements OnDestroy {
     const sid = this.sessionId();
     if (!sid) return;
 
+    this.pushHistory();
     try {
       const boundary = await this.wails.detectGelBoundary(sid, this.boundaryPadding());
       this.boundary.set(boundary);
@@ -548,6 +712,7 @@ export class GelAnalysis implements OnDestroy {
     const sid = this.sessionId();
     if (!sid) return;
 
+    this.pushHistory();
     try {
       await this.wails.clearGelBoundary(sid);
       this.boundary.set(null);
@@ -562,6 +727,7 @@ export class GelAnalysis implements OnDestroy {
     const boundary = this.boundary();
     if (!sid || !boundary || !Number.isFinite(value)) return;
 
+    this.pushHistory(`boundary:${field}`);
     const updated: GelBoundary = { ...boundary, [field]: value } as GelBoundary;
     try {
       await this.wails.setGelBoundary(sid, updated);
@@ -575,6 +741,7 @@ export class GelAnalysis implements OnDestroy {
   async removeLane(laneId: string) {
     const sid = this.sessionId();
     if (!sid) return;
+    this.pushHistory();
     try {
       await this.wails.removeGelLane(sid, laneId);
       this.lanes.update(lanes => lanes.filter(l => l.id !== laneId));
@@ -601,6 +768,7 @@ export class GelAnalysis implements OnDestroy {
     const markerMWs = await dialogRef.afterClosed().toPromise();
     if (!markerMWs) return;
 
+    this.pushHistory();
     const updated: GelLaneROI = { ...lane, isMarker: true, markerMWs } as GelLaneROI;
     try {
       await this.wails.setGelLane(sid, updated);
@@ -738,7 +906,8 @@ export class GelAnalysis implements OnDestroy {
     this.autoDetectPercentage.set(0);
     try {
       const result = await this.wails.runGelAutoDetect(sid, this.expectedLaneCount());
-      if (result?.lanes) {
+      if (result?.lanes && result.lanes.length > 0) {
+        this.pushHistory();
         for (const lane of result.lanes) {
           await this.wails.setGelLane(sid, lane);
         }
@@ -801,6 +970,7 @@ export class GelAnalysis implements OnDestroy {
       const loadedBoundary = await this.wails.getGelBoundary(meta.sessionId).catch(() => null);
       this.boundary.set(loadedBoundary);
       if (loadedBoundary) this.boundaryPanelExpanded.set(true);
+      this.resetHistory();
 
       // Canvas only exists in the DOM once loadingImage is false. Flip it before drawing.
       this.loadingImage.set(false);

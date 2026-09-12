@@ -382,6 +382,13 @@ jobs:
           mkdir -p build/bin/plugins
           mkdir -p build/bin/examples
           cp -r plugins/* build/bin/plugins/
+          for tool in uniprot-fetcher wide-to-long long-to-wide; do
+            src="bin/external/linux-amd64/$tool"
+            if [ -f "$src" ]; then
+              mkdir -p "build/bin/plugins/$tool"
+              cp "$src" "build/bin/plugins/$tool/"
+            fi
+          done
           cp -r examples/* build/bin/examples/
 
       - name: Create dummy frontend dist for embedding
@@ -492,6 +499,13 @@ jobs:
           mkdir -p build/bin/plugins
           mkdir -p build/bin/examples/diann
           cp -r plugins/* build/bin/plugins/
+          for tool in uniprot-fetcher wide-to-long long-to-wide; do
+            src="bin/external/linux-amd64/$tool"
+            if [ -f "$src" ]; then
+              mkdir -p "build/bin/plugins/$tool"
+              cp "$src" "build/bin/plugins/$tool/"
+            fi
+          done
           cp -r examples/diann/* build/bin/examples/diann/
 
       - name: Create dummy frontend dist for embedding

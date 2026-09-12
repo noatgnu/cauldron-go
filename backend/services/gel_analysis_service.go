@@ -800,18 +800,22 @@ func (s *GelAnalysisService) RunAutoDetect(sessionID, jobID string, expectedLane
 		"--polarity", polarity,
 		"--min-prominence", strconv.FormatFloat(minProminence, 'f', -1, 64),
 	}
+	// Always restrict detection to the drawn boundary, not just in anchor mode, so wells and
+	// tray/background outside it never get picked up as spurious lanes.
+	if boundary != nil {
+		args = append(args,
+			"--boundary-x0", strconv.FormatFloat(boundary.X, 'f', -1, 64),
+			"--boundary-x1", strconv.FormatFloat(boundary.X+boundary.Width, 'f', -1, 64),
+			"--boundary-y0", strconv.FormatFloat(boundary.Y, 'f', -1, 64),
+			"--boundary-y1", strconv.FormatFloat(boundary.Y+boundary.Height, 'f', -1, 64),
+		)
+	}
 	// A single anchor needs the boundary too (to derive a pitch estimate); 2+ anchors (e.g.
 	// multiple ladders on a large gel) let the script fit pitch directly from their real positions.
 	if expectedLaneCount > 0 && (len(anchors) >= 2 || (len(anchors) == 1 && boundary != nil)) {
 		anchorsJSON, err := json.Marshal(anchors)
 		if err == nil {
 			args = append(args, "--expected-lane-count", strconv.Itoa(expectedLaneCount), "--anchors-json", string(anchorsJSON))
-			if boundary != nil {
-				args = append(args,
-					"--boundary-x0", strconv.FormatFloat(boundary.X, 'f', -1, 64),
-					"--boundary-x1", strconv.FormatFloat(boundary.X+boundary.Width, 'f', -1, 64),
-				)
-			}
 		} else {
 			log.Printf("[GelAnalysisService] Could not marshal anchor lanes for auto-detect: %v", err)
 		}
