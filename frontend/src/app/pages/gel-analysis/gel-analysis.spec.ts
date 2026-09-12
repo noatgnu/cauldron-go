@@ -226,6 +226,115 @@ describe('GelAnalysis', () => {
     expect(wailsMock.setGelBoundary).not.toHaveBeenCalled();
   });
 
+  it('canUndo/canRedo reflect the history stacks', async () => {
+    await fixture.whenStable();
+    state().sessionId.set('sess-1');
+    expect(state().canUndo()).toBe(false);
+    expect(state().canRedo()).toBe(false);
+
+    state().lanes.set([{ id: 'lane1', label: 'Lane 1', x: 0, y: 0, width: 10, height: 10, isMarker: false }]);
+    await component.removeLane('lane1');
+
+    expect(state().canUndo()).toBe(true);
+    expect(state().canRedo()).toBe(false);
+  });
+
+  it('undo restores a removed lane and re-adds it on the backend', async () => {
+    await fixture.whenStable();
+    state().sessionId.set('sess-1');
+    const lane = { id: 'lane1', label: 'Lane 1', x: 0, y: 0, width: 10, height: 10, isMarker: false };
+    state().lanes.set([lane]);
+
+    await component.removeLane('lane1');
+    expect(state().lanes()).toEqual([]);
+
+    await component.undo();
+
+    expect(wailsMock.setGelLane).toHaveBeenCalledWith('sess-1', expect.objectContaining({ id: 'lane1' }));
+    expect(state().lanes()).toEqual([lane]);
+    expect(state().canUndo()).toBe(false);
+    expect(state().canRedo()).toBe(true);
+  });
+
+  it('redo re-applies an undone change', async () => {
+    await fixture.whenStable();
+    state().sessionId.set('sess-1');
+    const lane = { id: 'lane1', label: 'Lane 1', x: 0, y: 0, width: 10, height: 10, isMarker: false };
+    state().lanes.set([lane]);
+
+    await component.removeLane('lane1');
+    await component.undo();
+    await component.redo();
+
+    expect(wailsMock.removeGelLane).toHaveBeenLastCalledWith('sess-1', 'lane1');
+    expect(state().lanes()).toEqual([]);
+    expect(state().canRedo()).toBe(false);
+  });
+
+  it('undo does nothing when the history stack is empty', async () => {
+    await fixture.whenStable();
+    state().sessionId.set('sess-1');
+
+    await component.undo();
+
+    expect(wailsMock.setGelLane).not.toHaveBeenCalled();
+    expect(wailsMock.removeGelLane).not.toHaveBeenCalled();
+  });
+
+  it('a new action after undo clears the redo stack', async () => {
+    await fixture.whenStable();
+    state().sessionId.set('sess-1');
+    state().lanes.set([{ id: 'lane1', label: 'Lane 1', x: 0, y: 0, width: 10, height: 10, isMarker: false }]);
+
+    await component.removeLane('lane1');
+    await component.undo();
+    expect(state().canRedo()).toBe(true);
+
+    state().lanes.set([{ id: 'lane2', label: 'Lane 2', x: 0, y: 0, width: 10, height: 10, isMarker: false }]);
+    await component.removeLane('lane2');
+
+    expect(state().canRedo()).toBe(false);
+  });
+
+  it('undo restores a cleared boundary', async () => {
+    await fixture.whenStable();
+    state().sessionId.set('sess-1');
+    state().boundary.set({ x: 10, y: 0, width: 30, height: 24 });
+
+    await component.clearBoundary();
+    expect(state().boundary()).toBeNull();
+
+    await component.undo();
+
+    expect(wailsMock.setGelBoundary).toHaveBeenCalledWith('sess-1', { x: 10, y: 0, width: 30, height: 24 });
+    expect(state().boundary()).toEqual({ x: 10, y: 0, width: 30, height: 24 });
+  });
+
+  it('coalesces rapid edits to the same lane field into a single undo step', async () => {
+    await fixture.whenStable();
+    state().sessionId.set('sess-1');
+    state().lanes.set([{ id: 'lane1', label: 'Lane 1', x: 0, y: 0, width: 60, height: 600, isMarker: false }]);
+    state().selectedLaneId.set('lane1');
+
+    await component.updateSelectedLane('width', 70);
+    await component.updateSelectedLane('width', 75);
+    await component.updateSelectedLane('width', 80);
+
+    expect(state().historyStack().length).toBe(1);
+  });
+
+  it('a discrete action after a coalesced edit starts a new undo step', async () => {
+    await fixture.whenStable();
+    state().sessionId.set('sess-1');
+    state().lanes.set([{ id: 'lane1', label: 'Lane 1', x: 0, y: 0, width: 60, height: 600, isMarker: false }]);
+    state().selectedLaneId.set('lane1');
+
+    await component.updateSelectedLane('width', 70);
+    await component.removeLane('lane1');
+
+    expect(state().historyStack().length).toBe(2);
+  });
+
   it('setDrawMode switches the active draw mode', async () => {
     await fixture.whenStable();
     expect(state().drawMode()).toBe('lane');

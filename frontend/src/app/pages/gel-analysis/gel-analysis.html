@@ -8,6 +8,13 @@
     @if (imageMeta()) {
       <span class="spacer"></span>
 
+      <button mat-icon-button (click)="undo()" [disabled]="!canUndo()" matTooltip="Undo (Ctrl+Z)">
+        <mat-icon>undo</mat-icon>
+      </button>
+      <button mat-icon-button (click)="redo()" [disabled]="!canRedo()" matTooltip="Redo (Ctrl+Shift+Z)">
+        <mat-icon>redo</mat-icon>
+      </button>
+
       <button mat-stroked-button (click)="saveSession()">
         <mat-icon>save</mat-icon>
         Save Session

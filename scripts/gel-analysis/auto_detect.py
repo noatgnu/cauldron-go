@@ -282,8 +282,10 @@ def main() -> int:
     parser.add_argument("--min-prominence", type=float, default=0.05, help="Minimum lane-peak prominence as a fraction of the profile's range (0-1)")
     parser.add_argument("--expected-lane-count", type=int, default=0, help="Total number of physical lane slots in the gel (including any intentionally empty spacer wells); enables anchor-guided detection when combined with --anchors-json")
     parser.add_argument("--anchors-json", default=None, help='JSON list of known lanes, e.g. [{"index":0,"position":476,"width":72}]')
-    parser.add_argument("--boundary-x0", type=float, default=None, help="Left edge (pixels) of the gel's lane region")
-    parser.add_argument("--boundary-x1", type=float, default=None, help="Right edge (pixels) of the gel's lane region")
+    parser.add_argument("--boundary-x0", type=float, default=None, help="Left edge (pixels) of the gel's working region")
+    parser.add_argument("--boundary-x1", type=float, default=None, help="Right edge (pixels) of the gel's working region")
+    parser.add_argument("--boundary-y0", type=float, default=None, help="Top edge (pixels) of the gel's working region")
+    parser.add_argument("--boundary-y1", type=float, default=None, help="Bottom edge (pixels) of the gel's working region")
     args = parser.parse_args()
 
     os.makedirs(args.output, exist_ok=True)
@@ -291,6 +293,19 @@ def main() -> int:
     print(f"Loading image: {args.input}")
     image = load_image_array(args.input)
     print(f"Image shape: {image.shape}")
+
+    # Restrict every downstream step to the caller's boundary rectangle, if any, so wells, the
+    # gel/tray edge, and anything else outside it can never be mistaken for a lane or a band.
+    full_height, full_width = image.shape
+    crop_x0 = max(0, min(full_width, int(round(args.boundary_x0)))) if args.boundary_x0 is not None else 0
+    crop_x1 = max(0, min(full_width, int(round(args.boundary_x1)))) if args.boundary_x1 is not None else full_width
+    crop_y0 = max(0, min(full_height, int(round(args.boundary_y0)))) if args.boundary_y0 is not None else 0
+    crop_y1 = max(0, min(full_height, int(round(args.boundary_y1)))) if args.boundary_y1 is not None else full_height
+    crop_x1 = max(crop_x1, crop_x0 + 1)
+    crop_y1 = max(crop_y1, crop_y0 + 1)
+    if crop_x0 > 0 or crop_x1 < full_width or crop_y0 > 0 or crop_y1 < full_height:
+        print(f"Restricting detection to boundary: x[{crop_x0}:{crop_x1}] y[{crop_y0}:{crop_y1}]")
+        image = image[crop_y0:crop_y1, crop_x0:crop_x1]
 
     print("Searching for deskew angle...")
     angle = find_deskew_angle(image)
@@ -301,14 +316,18 @@ def main() -> int:
 
     lanes = None
     if args.expected_lane_count > 0 and args.anchors_json:
-        anchors = [(a["index"], a["position"], a["width"]) for a in json.loads(args.anchors_json)]
+        anchors = [(a["index"], a["position"] - crop_x0, a["width"]) for a in json.loads(args.anchors_json)]
         print(f"Detecting lanes (anchor-guided, expecting {args.expected_lane_count}, {len(anchors)} anchor(s))...")
-        lanes = detect_lanes_with_anchors(corrected, args.expected_lane_count, anchors, args.boundary_x0, args.boundary_x1)
+        lanes = detect_lanes_with_anchors(corrected, args.expected_lane_count, anchors, 0.0, float(corrected.shape[1]))
 
     if lanes is None:
         print("Detecting lanes...")
         lanes = detect_lanes(corrected, args.min_prominence)
     print(f"Detected {len(lanes)} lane(s)")
+
+    for lane in lanes:
+        lane["x"] += crop_x0
+        lane["y"] += crop_y0
 
     result = {
         "deskewAngle": angle,
