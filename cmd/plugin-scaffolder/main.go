@@ -182,6 +182,32 @@ func createExamplesDir(dir, pluginID string) error {
 	return os.WriteFile(filepath.Join(examplesDir, "params.json"), []byte(params), 0644)
 }
 
+// createDepsGraphScripts writes the static (non-templated) scripts the workflow's dependency-graph jobs call, for R-capable plugins only.
+func createDepsGraphScripts(dir string, hasR bool) error {
+	if !hasR {
+		return nil
+	}
+
+	scriptsDir := filepath.Join(dir, ".github", "scripts")
+	if err := os.MkdirAll(scriptsDir, 0755); err != nil {
+		return err
+	}
+
+	rScript, err := templates.GetTemplate("scaffold-generate-deps-graph.R.tmpl")
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(scriptsDir, "generate-deps-graph.R"), []byte(rScript), 0644); err != nil {
+		return err
+	}
+
+	pyScript, err := templates.GetTemplate("scaffold-merge-deps-graph.py.tmpl")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(scriptsDir, "merge-deps-graph.py"), []byte(pyScript), 0644)
+}
+
 // createGithubWorkflow uses [[ ]] delimiters, not renderTemplate's default {{ }}, since the workflow YAML itself uses ${{ }} for GitHub Actions expressions.
 func createGithubWorkflow(dir string, data map[string]string) error {
 	tmplStr, err := templates.GetTemplate("scaffold-github-workflow.yml.tmpl")
@@ -326,6 +352,15 @@ func main() {
 		os.Exit(1)
 	}
 	fmt.Println("[SUCCESS] Created .github/workflows/test-plugin.yml")
+
+	hasR := pluginRuntime == "r" || pluginRuntime == "pythonWithR"
+	if err := createDepsGraphScripts(pluginDir, hasR); err != nil {
+		fmt.Printf("[ERROR] Failed to create dependency-graph scripts: %v\n", err)
+		os.Exit(1)
+	}
+	if hasR {
+		fmt.Println("[SUCCESS] Created .github/scripts/generate-deps-graph.R and merge-deps-graph.py")
+	}
 
 	fmt.Println()
 	fmt.Println("==========================================")
