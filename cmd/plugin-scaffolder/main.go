@@ -182,13 +182,22 @@ func createExamplesDir(dir, pluginID string) error {
 	return os.WriteFile(filepath.Join(examplesDir, "params.json"), []byte(params), 0644)
 }
 
+// createGithubWorkflow uses [[ ]] delimiters, not renderTemplate's default {{ }}, since the workflow YAML itself uses ${{ }} for GitHub Actions expressions.
 func createGithubWorkflow(dir string, data map[string]string) error {
-	content, err := renderTemplate("scaffold-github-workflow.yml.tmpl", map[string]interface{}{
+	tmplStr, err := templates.GetTemplate("scaffold-github-workflow.yml.tmpl")
+	if err != nil {
+		return err
+	}
+	tmpl, err := template.New("scaffold-github-workflow.yml.tmpl").Delims("[[", "]]").Parse(tmplStr)
+	if err != nil {
+		return err
+	}
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, map[string]interface{}{
 		"ID":        data["id"],
 		"HasPython": data["runtime"] == "python" || data["runtime"] == "pythonWithR",
 		"HasR":      data["runtime"] == "r" || data["runtime"] == "pythonWithR",
-	})
-	if err != nil {
+	}); err != nil {
 		return err
 	}
 
@@ -196,7 +205,7 @@ func createGithubWorkflow(dir string, data map[string]string) error {
 	if err := os.MkdirAll(workflowDir, 0755); err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(workflowDir, "test-plugin.yml"), []byte(content), 0644)
+	return os.WriteFile(filepath.Join(workflowDir, "test-plugin.yml"), buf.Bytes(), 0644)
 }
 
 func main() {
