@@ -867,6 +867,18 @@ func (a *App) ComputeAllGelProfiles(sessionID string, params models.GelPeakParam
 	return a.gelAnalysisService.ComputeAllProfiles(sessionID, params)
 }
 
+func (a *App) SetGelBandOverride(sessionID string, laneID string, override models.GelBandOverride) (*models.GelLaneProfile, error) {
+	return a.gelAnalysisService.SetBandOverride(sessionID, laneID, override)
+}
+
+func (a *App) RemoveGelBandOverride(sessionID string, laneID string, overrideID string) (*models.GelLaneProfile, error) {
+	return a.gelAnalysisService.RemoveBandOverride(sessionID, laneID, overrideID)
+}
+
+func (a *App) GetGelBandOverrides(sessionID string, laneID string) ([]models.GelBandOverride, error) {
+	return a.gelAnalysisService.GetBandOverrides(sessionID, laneID)
+}
+
 func (a *App) FitGelCalibrationCurve(sessionID string, markerLaneID string) (*models.GelCalibrationCurve, error) {
 	return a.gelAnalysisService.FitCalibrationCurve(sessionID, markerLaneID)
 }

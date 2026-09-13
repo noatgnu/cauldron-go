@@ -69,4 +69,47 @@ describe('PluginRegistryDetail', () => {
   it('should create', () => {
     expect(component).toBeTruthy();
   });
+
+  describe('convertMarkdownToHtml', () => {
+    it('preserves underscores inside inline code spans', () => {
+      const html = component.convertMarkdownToHtml('- **Entrypoint**: `total_proteomics_qc_normalisation.R`');
+      expect(html).toContain('<code>total_proteomics_qc_normalisation.R</code>');
+      expect(html).not.toContain('totalproteomicsqc_normalisation.R');
+    });
+
+    it('preserves underscores inside inline code within a markdown table', () => {
+      const markdown = [
+        '| Name | Label |',
+        '|------|-------|',
+        '| `pg_matrix_file` | Protein Group Matrix File |',
+        '| `stats_file` | Stats File |',
+        '| `annotation_file` | Sample Annotation File |',
+        '| `min_unique_peptides` | Minimum Proteotypic Peptides |'
+      ].join('\n');
+
+      const html = component.convertMarkdownToHtml(markdown);
+
+      expect(html).toContain('<code>pg_matrix_file</code>');
+      expect(html).toContain('<code>stats_file</code>');
+      expect(html).toContain('<code>annotation_file</code>');
+      expect(html).toContain('<code>min_unique_peptides</code>');
+      expect(html).not.toContain('pgmatrixfile');
+      expect(html).not.toContain('statsfile');
+      expect(html).not.toContain('annotationfile');
+      expect(html).not.toContain('minuniquepeptides');
+    });
+
+    it('still applies real emphasis markers outside code spans', () => {
+      const html = component.convertMarkdownToHtml('this is _italic_ and this is **bold**');
+      expect(html).toContain('<em>italic</em>');
+      expect(html).toContain('<strong>bold</strong>');
+    });
+
+    it('preserves underscores inside a fenced code block', () => {
+      const html = component.convertMarkdownToHtml('```\nmin_unique_peptides = 2\n```');
+      expect(html).toContain('<pre><code>');
+      expect(html).toContain('min_unique_peptides = 2');
+      expect(html).not.toContain('miniquepeptides');
+    });
+  });
 });

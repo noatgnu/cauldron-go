@@ -1,0 +1,14 @@
+# Examples
+
+Put sample input files here for manual testing and for CI.
+
+`params.json` holds the `--param`/`--params-json` values `cauldron job run` uses against this
+plugin's inputs (see `plugin.yaml`'s `inputs:` section, or run
+`cauldron plugin inputs {{ .ID }}` once installed). CI runs this automatically via
+`.github/workflows/test-plugin.yml`; it's skipped until this file has real values.
+
+```json
+{
+  "input_file": "examples/sample.csv"
+}
+```

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -118,5 +119,63 @@ func TestCreateGitignore(t *testing.T) {
 	}
 	if !strings.Contains(string(content), "__pycache__/") {
 		t.Errorf("expected __pycache__/ in .gitignore, got:\n%s", content)
+	}
+}
+
+func TestCreateExamplesDir(t *testing.T) {
+	dir := t.TempDir()
+	if err := createExamplesDir(dir, "my-plugin"); err != nil {
+		t.Fatalf("createExamplesDir error: %v", err)
+	}
+
+	readme, err := os.ReadFile(filepath.Join(dir, "examples", "README.md"))
+	if err != nil {
+		t.Fatalf("failed to read examples/README.md: %v", err)
+	}
+	if !strings.Contains(string(readme), "my-plugin") {
+		t.Errorf("expected plugin id in examples/README.md, got:\n%s", readme)
+	}
+
+	params, err := os.ReadFile(filepath.Join(dir, "examples", "params.json"))
+	if err != nil {
+		t.Fatalf("failed to read examples/params.json: %v", err)
+	}
+	var decoded map[string]interface{}
+	if err := json.Unmarshal(params, &decoded); err != nil {
+		t.Fatalf("examples/params.json is not valid JSON: %v\n%s", err, params)
+	}
+}
+
+func TestCreateGithubWorkflow(t *testing.T) {
+	for _, runtime := range []string{"python", "r", "pythonWithR"} {
+		t.Run(runtime, func(t *testing.T) {
+			dir := t.TempDir()
+			if err := createGithubWorkflow(dir, scaffoldData(runtime)); err != nil {
+				t.Fatalf("createGithubWorkflow error: %v", err)
+			}
+
+			raw, err := os.ReadFile(filepath.Join(dir, ".github", "workflows", "test-plugin.yml"))
+			if err != nil {
+				t.Fatalf("failed to read generated workflow: %v", err)
+			}
+
+			var workflow map[string]interface{}
+			if err := yaml.Unmarshal(raw, &workflow); err != nil {
+				t.Fatalf("generated workflow for runtime %q is not valid YAML: %v\n%s", runtime, err, raw)
+			}
+
+			content := string(raw)
+			if !strings.Contains(content, "my-plugin") {
+				t.Errorf("expected plugin id in workflow, got:\n%s", content)
+			}
+			wantPython := runtime == "python" || runtime == "pythonWithR"
+			wantR := runtime == "r" || runtime == "pythonWithR"
+			if strings.Contains(content, "setup-python") != wantPython {
+				t.Errorf("setup-python step presence = %v, want %v for runtime %q, got:\n%s", strings.Contains(content, "setup-python"), wantPython, runtime, content)
+			}
+			if strings.Contains(content, "setup-r") != wantR {
+				t.Errorf("setup-r step presence = %v, want %v for runtime %q, got:\n%s", strings.Contains(content, "setup-r"), wantR, runtime, content)
+			}
+		})
 	}
 }

@@ -56,7 +56,7 @@ func runCLI(args []string) bool {
 		if !verbose {
 			log.SetOutput(io.Discard)
 		}
-		if err := cliDoctor(); err != nil {
+		if err := cliDoctor(filtered[1:]); err != nil {
 			os.Exit(1)
 		}
 		return true
@@ -137,8 +137,9 @@ func (c *cliContext) close() {
 	c.db.Close()
 }
 
+// newCLIContext honors CAULDRON_PLUGINS_DIR when set.
 func newCLIContext() (*cliContext, error) {
-	return newCLIContextWithPluginsDir("")
+	return newCLIContextWithPluginsDir(os.Getenv("CAULDRON_PLUGINS_DIR"))
 }
 
 // newCLIContextWithPluginsDir is newCLIContext with an explicit plugins directory, used by tests to point at the repo's built-in plugins/ folder.
@@ -447,7 +448,14 @@ func readNonEmptyLines(path string) ([]string, error) {
 	return lines, scanner.Err()
 }
 
-func cliDoctor() error {
+// cliDoctor reports environment health; --configure also persists a detected Python/R path as the global default.
+func cliDoctor(args []string) error {
+	fs := flag.NewFlagSet("doctor", flag.ContinueOnError)
+	configure := fs.Bool("configure", false, "persist the first detected Python/R interpreter as the global default if none is configured")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+
 	fmt.Println("Cauldron Doctor")
 	fmt.Println("===============")
 
@@ -473,6 +481,10 @@ func cliDoctor() error {
 		report(false, "Python", "no Python environment detected")
 	} else {
 		report(true, "Python", fmt.Sprintf("%d environment(s) detected (%s)", len(pyEnvs), pyEnvs[0].Path))
+		if *configure && ctx.settings.GetConfig().PythonPath == "" {
+			ctx.settings.Set("pythonPath", pyEnvs[0].Path)
+			fmt.Printf("          -> configured as global Python\n")
+		}
 	}
 
 	rEnvs, err := ctx.envService.DetectREnvironments()
@@ -480,6 +492,10 @@ func cliDoctor() error {
 		report(false, "R", "no R environment detected")
 	} else {
 		report(true, "R", fmt.Sprintf("%d environment(s) detected (%s)", len(rEnvs), rEnvs[0].Path))
+		if *configure && ctx.settings.GetConfig().RPath == "" {
+			ctx.settings.Set("rPath", rEnvs[0].Path)
+			fmt.Printf("          -> configured as global R\n")
+		}
 	}
 
 	if ctx.uvService.IsUvAvailable() {

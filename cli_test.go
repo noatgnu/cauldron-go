@@ -171,8 +171,40 @@ func TestCLIPluginInstallAndUninstall(t *testing.T) {
 }
 
 func TestCLIDoctor(t *testing.T) {
-	if err := cliDoctor(); err != nil {
+	if err := cliDoctor(nil); err != nil {
 		t.Fatalf("cliDoctor error: %v", err)
+	}
+}
+
+func TestCLIDoctor_Configure(t *testing.T) {
+	if err := cliDoctor([]string{"--configure"}); err != nil {
+		t.Fatalf("cliDoctor --configure error: %v", err)
+	}
+
+	ctx, err := newCLIContext()
+	if err != nil {
+		t.Fatalf("newCLIContext error: %v", err)
+	}
+	defer ctx.close()
+
+	pyEnvs, _ := ctx.envService.DetectPythonEnvironments()
+	if len(pyEnvs) > 0 && ctx.settings.GetConfig().PythonPath == "" {
+		t.Error("expected --configure to persist a detected Python path")
+	}
+}
+
+func TestNewCLIContext_PluginsDirEnvVar(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("CAULDRON_PLUGINS_DIR", dir)
+
+	ctx, err := newCLIContext()
+	if err != nil {
+		t.Fatalf("newCLIContext error: %v", err)
+	}
+	defer ctx.close()
+
+	if got := ctx.pluginLoaderV2.GetPluginsDirectory(); got != dir {
+		t.Errorf("plugins directory = %q, want %q", got, dir)
 	}
 }
 

@@ -68,6 +68,13 @@ def find_deskew_angle(image: np.ndarray, max_angle: float = 5.0, step: float = 0
     return best_angle
 
 
+def detect_polarity(image: np.ndarray) -> str:
+    """Infers dark-bands or light-bands from the image's own mean-vs-median skew."""
+    mean = float(image.mean())
+    median = float(np.median(image))
+    return "light-bands" if mean > median else "dark-bands"
+
+
 def subtract_background(image: np.ndarray, polarity: str = "dark-bands", kernel_fraction: float = 0.05) -> np.ndarray:
     """Estimates a smooth background via large-kernel morphological filtering and subtracts it, leaving positive band signal and ~0 elsewhere."""
     kernel_size = max(3, int(min(image.shape) * kernel_fraction))
@@ -100,12 +107,22 @@ def segment_lane_boundaries(smoothed: np.ndarray, peaks: list[int], width: int) 
     return [(boundaries[i], boundaries[i + 1]) for i in range(len(sorted_peaks))], sorted_peaks
 
 
-def tighten_lane_width(smoothed: np.ndarray, peak: int, lo: int, hi: int, rel_height: float = 0.9) -> tuple[int, int]:
+def tighten_lane_width(smoothed: np.ndarray, peak: int, lo: int, hi: int, rel_height: float = 0.9, floor_search_cap: int | None = None) -> tuple[int, int]:
     """Shrinks a peak's safe [lo,hi) region inward until the profile drops most of the way to the
-    local floor on each side, clamped to [lo,hi)."""
+    local floor on each side, clamped to [lo,hi).
+
+    floor_search_cap bounds how far from the peak the floor itself is sampled from (not how far the
+    threshold-crossing search may travel, which still covers the whole [lo,hi) region). Without it,
+    an outermost lane's safe region runs all the way to the array edge with nothing to cut against,
+    so its floor is the minimum over that entire span -- a single stray low point far past the
+    lane's real edge (common in a wide boundary with a lot of leftover open background) drags the
+    threshold down and lets the box balloon out to meet it instead of stopping at the true edge."""
     peak_val = smoothed[peak]
-    left_floor = smoothed[lo:peak + 1].min()
-    right_floor = smoothed[peak:hi + 1].min()
+
+    left_floor_lo = max(lo, peak - floor_search_cap) if floor_search_cap else lo
+    right_floor_hi = min(hi, peak + floor_search_cap) if floor_search_cap else hi
+    left_floor = smoothed[left_floor_lo:peak + 1].min()
+    right_floor = smoothed[peak:right_floor_hi + 1].min()
     left_thresh = peak_val - rel_height * (peak_val - left_floor)
     right_thresh = peak_val - rel_height * (peak_val - right_floor)
 
@@ -122,35 +139,29 @@ def tighten_lane_width(smoothed: np.ndarray, peak: int, lo: int, hi: int, rel_he
     return x0, x1
 
 
-def detect_lanes(image: np.ndarray, min_prominence: float = 0.05) -> list[dict]:
-    """Detects lane column-ranges from the column-sum profile via find_peaks, valley-cut
-    segmentation, and width tightening."""
+def _detect_lanes_at_prominence(image: np.ndarray, smoothed: np.ndarray, min_distance: int, min_prominence: float, min_row_cv: float = 0.6) -> list[dict]:
+    """One threshold trial: peak-find, valley-cut segment, tighten, and row-CV filter at a single
+    prominence fraction. Called repeatedly by detect_lanes's sweep."""
     height, width = image.shape
-    profile = image.sum(axis=0)
-
-    smooth_window = max(3, width // 200)
-    kernel = np.ones(smooth_window) / smooth_window
-    smoothed = np.convolve(profile, kernel, mode="same")
-
-    min_distance = max(1, width // 50)
     prominence = (smoothed.max() - smoothed.min()) * min_prominence
-
     peaks, _ = find_peaks(smoothed, distance=min_distance, prominence=prominence)
     if len(peaks) == 0:
         return []
 
     safe_regions, sorted_peaks = segment_lane_boundaries(smoothed, peaks.tolist(), width)
 
+    # A lane's floor should come from nearby background, not wherever the safe region's global
+    # minimum happens to sit -- which can be far away for the outermost lane, whose safe region
+    # runs to the array edge with nothing to cut against.
+    floor_search_cap = 3 * min_distance
+
     candidates = []
     for peak, (lo, hi) in zip(sorted_peaks, safe_regions):
-        x0, x1 = tighten_lane_width(smoothed, peak, lo, hi)
+        x0, x1 = tighten_lane_width(smoothed, peak, lo, hi, floor_search_cap=floor_search_cap)
         if x1 > x0:
             candidates.append((x0, x1))
     if not candidates:
         return []
-
-    # Row variation filters flat artifacts; not filtering by width since width reflects sharpness, not true size.
-    min_row_cv = 0.6
 
     lanes = []
     for x0, x1 in candidates:
@@ -166,6 +177,70 @@ def detect_lanes(image: np.ndarray, min_prominence: float = 0.05) -> list[dict]:
             "height": float(height),
             "index": len(lanes),
         })
+
+    return lanes
+
+
+def _pool_lane_candidates(trials: list[list[dict]]) -> list[dict]:
+    """Merges lane candidates found across multiple prominence-threshold trials into unique
+    positions, recording in `_support` how many of the trials independently found each one. A real
+    lane's peak position doesn't move with the threshold and is prominent enough to clear most of a
+    reasonable sweep, so it gets rediscovered in nearly every trial; a peak from background texture
+    is typically only prominent enough to clear the loosest few thresholds, so it is rediscovered
+    in very few. This is stability selection (Meinshausen & Bühlmann, 2010): running a detector
+    across a sweep of its own threshold and keeping only what stays selected across most of it,
+    which needs no assumption about what a real lane's width or spacing should look like."""
+    merged: list[dict] = []
+    for lane in sorted((l for trial in trials for l in trial), key=lambda l: l["x"]):
+        if merged and lane["x"] < merged[-1]["x"] + merged[-1]["width"]:
+            merged[-1]["_support"] += 1
+            continue
+        lane["_support"] = 1
+        merged.append(lane)
+    return merged
+
+
+def detect_lanes(image: np.ndarray, min_prominence: float = 0.05, expected_lane_count: int = 0) -> list[dict]:
+    """Detects lane column-ranges from the column-sum profile. A single fixed prominence threshold
+    can't generalize across gels with different background noise or band brightness: a threshold
+    right for a clean, high-contrast scan can let a noisy one's background texture through as
+    spurious lanes, while a threshold tuned for a noisy scan can drop a real faint lane on a clean
+    one. Instead of committing to one threshold, this pools candidates across a sweep of them and
+    keeps whichever were found consistently across it (see _pool_lane_candidates)."""
+    height, width = image.shape
+    profile = image.sum(axis=0)
+
+    smooth_window = max(3, width // 200)
+    kernel = np.ones(smooth_window) / smooth_window
+    smoothed = np.convolve(profile, kernel, mode="same")
+
+    min_distance = max(1, width // 50)
+
+    candidate_fractions = sorted(set([min_prominence, 0.03, 0.05, 0.08, 0.12, 0.18, 0.25, 0.35]))
+    trials = [
+        lanes for lanes in (
+            _detect_lanes_at_prominence(image, smoothed, min_distance, frac)
+            for frac in candidate_fractions
+        )
+        if lanes
+    ]
+    if not trials:
+        return []
+
+    pooled = _pool_lane_candidates(trials)
+
+    if expected_lane_count > 0:
+        # Known ground truth: keep exactly the N candidates found in the most trials, since a real
+        # lane's support count should dominate a spurious one's regardless of the exact cutoff.
+        lanes = sorted(pooled, key=lambda l: l["_support"], reverse=True)[:expected_lane_count]
+    else:
+        # No ground truth: keep whatever was found in a majority of the sweep.
+        lanes = [l for l in pooled if l["_support"] > len(trials) / 2]
+
+    for lane in lanes:
+        lane.pop("_support", None)
+    for i, lane in enumerate(sorted(lanes, key=lambda l: l["x"])):
+        lane["index"] = i
 
     return lanes
 
@@ -278,8 +353,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Gel Analysis auto-detect (lanes, deskew, background subtraction)")
     parser.add_argument("--input", required=True, help="Path to the input gel image (PNG or TIFF)")
     parser.add_argument("--output", required=True, help="Output directory for lanes.json")
-    parser.add_argument("--polarity", default="dark-bands", choices=["dark-bands", "light-bands"], help="Band polarity relative to background")
-    parser.add_argument("--min-prominence", type=float, default=0.05, help="Minimum lane-peak prominence as a fraction of the profile's range (0-1)")
+    parser.add_argument("--polarity", default=None, choices=["dark-bands", "light-bands"], help="Band polarity relative to background; auto-detected from the image if omitted")
+    parser.add_argument("--min-prominence", type=float, default=0.05, help="Lane-peak prominence as a fraction of the profile's range (0-1); one of several thresholds swept during detection, always included alongside the built-in sweep")
     parser.add_argument("--expected-lane-count", type=int, default=0, help="Total number of physical lane slots in the gel (including any intentionally empty spacer wells); enables anchor-guided detection when combined with --anchors-json")
     parser.add_argument("--anchors-json", default=None, help='JSON list of known lanes, e.g. [{"index":0,"position":476,"width":72}]')
     parser.add_argument("--boundary-x0", type=float, default=None, help="Left edge (pixels) of the gel's working region")
@@ -303,16 +378,42 @@ def main() -> int:
     crop_y1 = max(0, min(full_height, int(round(args.boundary_y1)))) if args.boundary_y1 is not None else full_height
     crop_x1 = max(crop_x1, crop_x0 + 1)
     crop_y1 = max(crop_y1, crop_y0 + 1)
-    if crop_x0 > 0 or crop_x1 < full_width or crop_y0 > 0 or crop_y1 < full_height:
-        print(f"Restricting detection to boundary: x[{crop_x0}:{crop_x1}] y[{crop_y0}:{crop_y1}]")
-        image = image[crop_y0:crop_y1, crop_x0:crop_x1]
+    has_boundary = crop_x0 > 0 or crop_x1 < full_width or crop_y0 > 0 or crop_y1 < full_height
+
+    if has_boundary:
+        # Background subtraction below looks kernel_size/2 pixels either side of every point; at a
+        # hard crop edge it has no real neighbors there, which can misjudge the local background
+        # right at the boundary and produce a false peak or floor. Process a margin-padded region
+        # for accurate context, then crop back to the exact boundary before any lane is detected,
+        # so nothing outside the boundary itself can ever be reported.
+        crop_width = crop_x1 - crop_x0
+        crop_height = crop_y1 - crop_y0
+        margin = max(3, int(min(crop_height, crop_width) * 0.05))
+        pad_x0 = max(0, crop_x0 - margin)
+        pad_x1 = min(full_width, crop_x1 + margin)
+        pad_y0 = max(0, crop_y0 - margin)
+        pad_y1 = min(full_height, crop_y1 + margin)
+        print(f"Restricting detection to boundary: x[{crop_x0}:{crop_x1}] y[{crop_y0}:{crop_y1}] "
+              f"(padded to x[{pad_x0}:{pad_x1}] y[{pad_y0}:{pad_y1}] for edge-accurate background estimation)")
+        working = image[pad_y0:pad_y1, pad_x0:pad_x1]
+    else:
+        working = image
+        pad_x0 = pad_y0 = 0
 
     print("Searching for deskew angle...")
-    angle = find_deskew_angle(image)
+    angle = find_deskew_angle(working)
     print(f"Estimated deskew angle: {angle:.2f} degrees (reported only, not applied)")
 
+    polarity = args.polarity or detect_polarity(working)
+    print(f"Using polarity: {polarity}")
+
     print("Subtracting background (for lane-finding only, not returned)...")
-    corrected = subtract_background(image, args.polarity)
+    corrected = subtract_background(working, polarity)
+
+    if has_boundary:
+        local_x0, local_x1 = crop_x0 - pad_x0, crop_x1 - pad_x0
+        local_y0, local_y1 = crop_y0 - pad_y0, crop_y1 - pad_y0
+        corrected = corrected[local_y0:local_y1, local_x0:local_x1]
 
     lanes = None
     if args.expected_lane_count > 0 and args.anchors_json:
@@ -322,7 +423,7 @@ def main() -> int:
 
     if lanes is None:
         print("Detecting lanes...")
-        lanes = detect_lanes(corrected, args.min_prominence)
+        lanes = detect_lanes(corrected, args.min_prominence, args.expected_lane_count)
     print(f"Detected {len(lanes)} lane(s)")
 
     for lane in lanes:

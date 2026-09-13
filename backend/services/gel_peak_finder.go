@@ -9,7 +9,7 @@ import (
 )
 
 // AnalysisEngineVersion identifies this file's math behavior. Bump only when a result-affecting change is made, not for unrelated app changes.
-const AnalysisEngineVersion = "1.0.0"
+const AnalysisEngineVersion = "1.1.0"
 
 // SmoothProfile applies a centered moving average; a window of 0 or 1 disables smoothing.
 func SmoothProfile(values []float64, window int) []float64 {
@@ -38,8 +38,8 @@ func SmoothProfile(values []float64, window int) []float64 {
 	return out
 }
 
-// ComputeBaseline estimates a local background to subtract before peak detection: "rolling-min" (default), "percentile" (5th, more noise-tolerant), or "none".
-func ComputeBaseline(values []float64, method string) []float64 {
+// ComputeBaseline estimates a local background to subtract before peak detection: "rolling-min" (default), "percentile" (5th, more noise-tolerant), or "none". polarity picks which side of each window is background: light-bands tracks the low envelope, dark-bands tracks the high envelope.
+func ComputeBaseline(values []float64, method string, polarity string) []float64 {
 	baseline := make([]float64, len(values))
 	if len(values) == 0 {
 		return baseline
@@ -47,7 +47,19 @@ func ComputeBaseline(values []float64, method string) []float64 {
 	if method == "" {
 		method = "rolling-min"
 	}
+	trackHigh := polarity == "dark-bands"
 	if method == "none" {
+		if trackHigh {
+			maxVal := values[0]
+			for _, v := range values {
+				if v > maxVal {
+					maxVal = v
+				}
+			}
+			for i := range baseline {
+				baseline[i] = maxVal
+			}
+		}
 		return baseline
 	}
 
@@ -72,48 +84,108 @@ func ComputeBaseline(values []float64, method string) []float64 {
 		switch method {
 		case "percentile":
 			idx := int(float64(len(windowVals)-1) * 0.05)
+			if trackHigh {
+				idx = len(windowVals) - 1 - idx
+			}
 			baseline[i] = windowVals[idx]
-		default: // "rolling-min"
-			baseline[i] = windowVals[0]
+		default: // "rolling-min"/"rolling-max"
+			if trackHigh {
+				baseline[i] = windowVals[len(windowVals)-1]
+			} else {
+				baseline[i] = windowVals[0]
+			}
 		}
 	}
 	return baseline
 }
 
-// FindPeaks is a dependency-free equivalent of scipy.signal.find_peaks: local maxima -> prominence filter -> min-distance non-max suppression.
-func FindPeaks(values, baseline []float64, params models.GelPeakParams) []models.GelBand {
+// DetectPolarity infers dark-bands or light-bands from a profile's own mean-vs-median skew.
+func DetectPolarity(values []float64) string {
 	if len(values) == 0 {
-		return nil
+		return "dark-bands"
 	}
 
+	sorted := append([]float64(nil), values...)
+	sort.Float64s(sorted)
+	mid := len(sorted) / 2
+	median := sorted[mid]
+	if len(sorted)%2 == 0 {
+		median = (sorted[mid-1] + sorted[mid]) / 2
+	}
+
+	var sum float64
+	for _, v := range values {
+		sum += v
+	}
+	mean := sum / float64(len(values))
+
+	if mean > median {
+		return "light-bands"
+	}
+	return "dark-bands"
+}
+
+type peakCandidate struct {
+	index      int
+	leftBase   int
+	rightBase  int
+	prominence float64
+}
+
+// trimEdgeOutliers drops leading/trailing candidates isolated from the main cluster by a much larger gap than typical; candidates must already be sorted by index.
+func trimEdgeOutliers(candidates []peakCandidate) []peakCandidate {
+	const isolationRatio = 3.0
+	for len(candidates) >= 3 {
+		gaps := make([]int, len(candidates)-1)
+		for i := 1; i < len(candidates); i++ {
+			gaps[i-1] = candidates[i].index - candidates[i-1].index
+		}
+		sortedGaps := append([]int(nil), gaps...)
+		sort.Ints(sortedGaps)
+		median := float64(sortedGaps[len(sortedGaps)/2])
+		if median <= 0 {
+			break
+		}
+
+		frontGap := float64(gaps[0])
+		backGap := float64(gaps[len(gaps)-1])
+		if frontGap > isolationRatio*median {
+			candidates = candidates[1:]
+			continue
+		}
+		if backGap > isolationRatio*median {
+			candidates = candidates[:len(candidates)-1]
+			continue
+		}
+		break
+	}
+	return candidates
+}
+
+// computeCorrectedProfile applies the same smoothing and baseline subtraction as FindPeaks, shared with manual band synthesis.
+func computeCorrectedProfile(values, baseline []float64, params models.GelPeakParams) (corrected []float64, profileMax float64) {
 	smoothWindow := params.SmoothingWindow
 	if smoothWindow == 0 {
 		smoothWindow = 7
 	}
 	smoothed := SmoothProfile(values, smoothWindow)
 
-	if params.Polarity == "light-bands" {
-		// leave as-is: bands are already maxima
-	} else {
-		maxVal := smoothed[0]
-		for _, v := range smoothed {
-			if v > maxVal {
-				maxVal = v
-			}
-		}
-		inverted := make([]float64, len(smoothed))
-		for i, v := range smoothed {
-			inverted[i] = maxVal - v
-		}
-		smoothed = inverted
+	polarity := params.Polarity
+	if polarity == "" {
+		polarity = DetectPolarity(values)
 	}
 
-	corrected := make([]float64, len(smoothed))
-	profileMax := 0.0
+	corrected = make([]float64, len(smoothed))
 	for i := range smoothed {
-		v := smoothed[i]
+		var v float64
 		if i < len(baseline) {
-			v -= baseline[i]
+			if polarity == "light-bands" {
+				v = smoothed[i] - baseline[i]
+			} else {
+				v = baseline[i] - smoothed[i]
+			}
+		} else {
+			v = smoothed[i]
 		}
 		if v < 0 {
 			v = 0
@@ -123,29 +195,33 @@ func FindPeaks(values, baseline []float64, params models.GelPeakParams) []models
 			profileMax = v
 		}
 	}
+	return corrected, profileMax
+}
+
+// FindPeaks is a dependency-free equivalent of scipy.signal.find_peaks: local maxima -> prominence filter -> min-distance non-max suppression.
+func FindPeaks(values, baseline []float64, params models.GelPeakParams) []models.GelBand {
+	if len(values) == 0 {
+		return nil
+	}
+
+	corrected, profileMax := computeCorrectedProfile(values, baseline, params)
 	if profileMax == 0 {
 		return nil
 	}
 
 	minProminence := params.MinProminence
 	if minProminence <= 0 {
-		minProminence = 0.05
+		minProminence = 0.035
 	}
 	minDistance := params.MinDistance
 	if minDistance <= 0 {
-		// Matches the X-axis lane-spacing default in scripts/gel-analysis/auto_detect.py
-		// (find_raw_peaks/detect_lanes use width/50); real bands can sit this close together.
-		minDistance = maxInt(1, len(corrected)/50)
+		minDistance = maxInt(1, len(corrected)/130)
 	}
 
-	type candidate struct {
-		index      int
-		leftBase   int
-		rightBase  int
-		prominence float64
-	}
+	// Bounds how far the prominence base search may travel, so a slow background drift can't fake a large prominence.
+	baseSearchCap := 2 * minDistance
 
-	var candidates []candidate
+	var candidates []peakCandidate
 	for i := 1; i < len(corrected)-1; i++ {
 		if corrected[i] < corrected[i-1] || corrected[i] < corrected[i+1] {
 			continue
@@ -163,7 +239,8 @@ func FindPeaks(values, baseline []float64, params models.GelPeakParams) []models
 
 		leftBase := i
 		leftMin := peakVal
-		for j := i - 1; j >= 0; j-- {
+		leftLimit := i - baseSearchCap
+		for j := i - 1; j >= 0 && j >= leftLimit; j-- {
 			if corrected[j] > peakVal {
 				break
 			}
@@ -175,7 +252,8 @@ func FindPeaks(values, baseline []float64, params models.GelPeakParams) []models
 
 		rightBase := peakEnd
 		rightMin := peakVal
-		for j := peakEnd + 1; j < len(corrected); j++ {
+		rightLimit := peakEnd + baseSearchCap
+		for j := peakEnd + 1; j < len(corrected) && j <= rightLimit; j++ {
 			if corrected[j] > peakVal {
 				break
 			}
@@ -194,7 +272,7 @@ func FindPeaks(values, baseline []float64, params models.GelPeakParams) []models
 			continue
 		}
 
-		candidates = append(candidates, candidate{
+		candidates = append(candidates, peakCandidate{
 			index:      peakIdx,
 			leftBase:   leftBase,
 			rightBase:  rightBase,
@@ -206,7 +284,7 @@ func FindPeaks(values, baseline []float64, params models.GelPeakParams) []models
 		return corrected[candidates[i].index] > corrected[candidates[j].index]
 	})
 
-	var accepted []candidate
+	var accepted []peakCandidate
 	for _, c := range candidates {
 		tooClose := false
 		for _, a := range accepted {
@@ -221,6 +299,19 @@ func FindPeaks(values, baseline []float64, params models.GelPeakParams) []models
 	}
 
 	sort.Slice(accepted, func(i, j int) bool { return accepted[i].index < accepted[j].index })
+	accepted = trimEdgeOutliers(accepted)
+
+	if params.EdgeExclusionFraction > 0 {
+		lo := params.EdgeExclusionFraction * float64(len(values)-1)
+		hi := float64(len(values)-1) - lo
+		filtered := accepted[:0]
+		for _, c := range accepted {
+			if float64(c.index) >= lo && float64(c.index) <= hi {
+				filtered = append(filtered, c)
+			}
+		}
+		accepted = filtered
+	}
 
 	var totalArea float64
 	bands := make([]models.GelBand, 0, len(accepted))
@@ -247,6 +338,104 @@ func FindPeaks(values, baseline []float64, params models.GelPeakParams) []models
 	}
 
 	return bands
+}
+
+// ApplyBandOverrides removes Excluded bands and adds a manual band per non-excluded override, then recomputes RelativeQuantity.
+func ApplyBandOverrides(bands []models.GelBand, overrides []models.GelBandOverride, values, baseline []float64, params models.GelPeakParams) []models.GelBand {
+	if len(overrides) == 0 {
+		return bands
+	}
+
+	excluded := make(map[float64]bool)
+	for _, o := range overrides {
+		if o.Excluded {
+			excluded[o.Position] = true
+		}
+	}
+
+	kept := make([]models.GelBand, 0, len(bands))
+	for _, b := range bands {
+		if excluded[b.Position] {
+			continue
+		}
+		kept = append(kept, b)
+	}
+
+	minDistance := params.MinDistance
+	if minDistance <= 0 {
+		minDistance = maxInt(1, len(values)/130)
+	}
+	var corrected []float64
+	for _, o := range overrides {
+		if o.Excluded {
+			continue
+		}
+		alreadyCovered := false
+		for _, b := range kept {
+			if absFloat(b.Position-o.Position) < float64(minDistance) {
+				alreadyCovered = true
+				break
+			}
+		}
+		if alreadyCovered {
+			continue
+		}
+		if corrected == nil {
+			corrected, _ = computeCorrectedProfile(values, baseline, params)
+		}
+		kept = append(kept, synthesizeManualBand(corrected, len(values), o))
+	}
+
+	sort.Slice(kept, func(i, j int) bool { return kept[i].Position < kept[j].Position })
+
+	var totalArea float64
+	for _, b := range kept {
+		totalArea += b.Area
+	}
+	if totalArea > 0 {
+		for i := range kept {
+			kept[i].RelativeQuantity = kept[i].Area / totalArea * 100
+		}
+	}
+
+	return kept
+}
+
+// synthesizeManualBand measures Intensity/Area/Width directly from the corrected profile over [Position-Width/2, Position+Width/2].
+func synthesizeManualBand(corrected []float64, profileLength int, o models.GelBandOverride) models.GelBand {
+	width := o.Width
+	if width <= 0 {
+		width = 1
+	}
+	left := clampInt(int(math.Round(o.Position-width/2)), 0, len(corrected)-1)
+	right := clampInt(int(math.Round(o.Position+width/2)), 0, len(corrected)-1)
+	if right < left {
+		right = left
+	}
+
+	intensity := corrected[left]
+	var area float64
+	for j := left; j < right; j++ {
+		area += (corrected[j] + corrected[j+1]) / 2
+		if corrected[j+1] > intensity {
+			intensity = corrected[j+1]
+		}
+	}
+
+	return models.GelBand{
+		Position:         o.Position,
+		RelativePosition: relativePosition(int(math.Round(o.Position)), profileLength),
+		Intensity:        intensity,
+		Area:             area,
+		Width:            float64(right - left),
+	}
+}
+
+func absFloat(v float64) float64 {
+	if v < 0 {
+		return -v
+	}
+	return v
 }
 
 func relativePosition(index, length int) float64 {

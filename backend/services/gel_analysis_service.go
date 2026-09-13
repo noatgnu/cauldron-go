@@ -25,15 +25,16 @@ import (
 
 // gelSessionState is in-memory-only working state for one loaded gel image; only the lightweight recipe (GelAnalysisSession) is ever persisted.
 type gelSessionState struct {
-	imagePath   string
-	imageHash   string
-	image       *GelImageBuffer
-	rawMetadata map[string]string
-	lanes       map[string]models.GelLaneROI
-	boundary    *models.GelBoundary
-	profiles    map[string]models.GelLaneProfile
-	calibration *models.GelCalibrationCurve
-	cancel      context.CancelFunc
+	imagePath     string
+	imageHash     string
+	image         *GelImageBuffer
+	rawMetadata   map[string]string
+	lanes         map[string]models.GelLaneROI
+	bandOverrides map[string][]models.GelBandOverride
+	boundary      *models.GelBoundary
+	profiles      map[string]models.GelLaneProfile
+	calibration   *models.GelCalibrationCurve
+	cancel        context.CancelFunc
 
 	lastPeakParams *models.GelPeakParams
 
@@ -111,12 +112,13 @@ func (s *GelAnalysisService) LoadImage(path string) (*models.GelImageMeta, error
 
 	s.mu.Lock()
 	s.sessions[sessionID] = &gelSessionState{
-		imagePath:   path,
-		imageHash:   meta.ImageSHA256,
-		image:       buf,
-		rawMetadata: rawMetadata,
-		lanes:       make(map[string]models.GelLaneROI),
-		profiles:    make(map[string]models.GelLaneProfile),
+		imagePath:     path,
+		imageHash:     meta.ImageSHA256,
+		image:         buf,
+		rawMetadata:   rawMetadata,
+		lanes:         make(map[string]models.GelLaneROI),
+		bandOverrides: make(map[string][]models.GelBandOverride),
+		profiles:      make(map[string]models.GelLaneProfile),
 	}
 	s.mu.Unlock()
 
@@ -286,10 +288,7 @@ func (s *GelAnalysisService) ClearBoundary(sessionID string) error {
 	return nil
 }
 
-// DetectBoundary derives the boundary as the bounding box of all current lanes, expanded by
-// paddingPx on every side and clamped to the image. There is no reliable way to find the gel's
-// physical edge from pixel intensity alone (background varies smoothly, with no sharp
-// discontinuity), so this is a padded lane bounding box rather than true edge detection.
+// DetectBoundary derives the boundary as the bounding box of all current lanes, padded by paddingPx and clamped to the image.
 func (s *GelAnalysisService) DetectBoundary(sessionID string, paddingPx float64) (*models.GelBoundary, error) {
 	session, err := s.getSession(sessionID)
 	if err != nil {
@@ -352,8 +351,12 @@ func (s *GelAnalysisService) ComputeLaneProfile(sessionID, laneID string, params
 	}
 
 	values := session.image.SumColumnRange(int(lane.X), int(lane.Y), int(lane.X+lane.Width), int(lane.Y+lane.Height))
-	baseline := ComputeBaseline(values, params.BaselineMethod)
+	if params.Polarity == "" {
+		params.Polarity = DetectPolarity(values)
+	}
+	baseline := ComputeBaseline(values, params.BaselineMethod, params.Polarity)
 	bands := FindPeaks(values, baseline, params)
+	bands = ApplyBandOverrides(bands, session.bandOverrides[laneID], values, baseline, params)
 
 	profile := models.GelLaneProfile{
 		LaneID:   laneID,
@@ -396,6 +399,75 @@ func (s *GelAnalysisService) ComputeAllProfiles(sessionID string, params models.
 		out[id] = p
 	}
 	return out, nil
+}
+
+// SetBandOverride upserts (by ID) one band correction for a lane and recomputes that lane's profile immediately.
+func (s *GelAnalysisService) SetBandOverride(sessionID, laneID string, override models.GelBandOverride) (*models.GelLaneProfile, error) {
+	session, err := s.getSession(sessionID)
+	if err != nil {
+		return nil, err
+	}
+
+	s.mu.Lock()
+	overrides := session.bandOverrides[laneID]
+	replaced := false
+	for i, o := range overrides {
+		if o.ID == override.ID {
+			overrides[i] = override
+			replaced = true
+			break
+		}
+	}
+	if !replaced {
+		overrides = append(overrides, override)
+	}
+	session.bandOverrides[laneID] = overrides
+
+	params := models.GelPeakParams{}
+	if session.lastPeakParams != nil {
+		params = *session.lastPeakParams
+	}
+	s.mu.Unlock()
+
+	return s.ComputeLaneProfile(sessionID, laneID, params)
+}
+
+// RemoveBandOverride deletes one band correction and recomputes that lane's profile.
+func (s *GelAnalysisService) RemoveBandOverride(sessionID, laneID, overrideID string) (*models.GelLaneProfile, error) {
+	session, err := s.getSession(sessionID)
+	if err != nil {
+		return nil, err
+	}
+
+	s.mu.Lock()
+	overrides := session.bandOverrides[laneID]
+	kept := overrides[:0]
+	for _, o := range overrides {
+		if o.ID != overrideID {
+			kept = append(kept, o)
+		}
+	}
+	session.bandOverrides[laneID] = kept
+
+	params := models.GelPeakParams{}
+	if session.lastPeakParams != nil {
+		params = *session.lastPeakParams
+	}
+	s.mu.Unlock()
+
+	return s.ComputeLaneProfile(sessionID, laneID, params)
+}
+
+// GetBandOverrides returns the current band corrections for a lane.
+func (s *GelAnalysisService) GetBandOverrides(sessionID, laneID string) ([]models.GelBandOverride, error) {
+	session, err := s.getSession(sessionID)
+	if err != nil {
+		return nil, err
+	}
+
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return session.bandOverrides[laneID], nil
 }
 
 // FitCalibrationCurve pairs the marker lane's bands 1:1 (top-to-bottom) with its declared MarkerMWs and fits a log10(MW)-vs-migration line.
@@ -620,6 +692,10 @@ func (s *GelAnalysisService) SaveSession(sessionID, name string) (uint, error) {
 	for _, l := range session.lanes {
 		lanes = append(lanes, l)
 	}
+	bandOverrides := make(models.GelBandOverrideList, 0)
+	for _, overrides := range session.bandOverrides {
+		bandOverrides = append(bandOverrides, overrides...)
+	}
 	imagePath := session.imagePath
 	imageHash := session.imageHash
 	autoDetectUsed := session.autoDetectUsed
@@ -640,6 +716,7 @@ func (s *GelAnalysisService) SaveSession(sessionID, name string) (uint, error) {
 		Name:           name,
 		ImagePath:      imagePath,
 		Lanes:          lanes,
+		BandOverrides:  bandOverrides,
 		Boundary:       boundaryJSON,
 		ImageSHA256:    imageHash,
 		AppVersion:     s.appVersion,
@@ -673,6 +750,9 @@ func (s *GelAnalysisService) LoadSavedSession(id uint) (*models.GelImageMeta, er
 	for _, lane := range record.Lanes {
 		session.lanes[lane.ID] = lane
 	}
+	for _, override := range record.BandOverrides {
+		session.bandOverrides[override.LaneID] = append(session.bandOverrides[override.LaneID], override)
+	}
 	if record.Boundary != "" {
 		var boundary models.GelBoundary
 		if err := json.Unmarshal([]byte(record.Boundary), &boundary); err == nil {
@@ -700,18 +780,14 @@ func (s *GelAnalysisService) DeleteSavedSession(id uint) error {
 	return s.db.GetDB().Delete(&models.GelAnalysisSession{}, id).Error
 }
 
-// anchorLane is one already-known lane's position/index, handed to the auto-detect script as a
-// trusted reference point. anchorLaneJSON's field names must match auto_detect.py's --anchors-json.
+// anchorLane is one already-known lane's position/index, handed to the auto-detect script as a trusted reference point.
 type anchorLane struct {
 	Index    int     `json:"index"`
 	Position float64 `json:"position"`
 	Width    float64 `json:"width"`
 }
 
-// findAnchorLanes returns every lane with LaneIndex set, sorted by index. Typically the ladder(s),
-// including multiple on a large gel loaded with more than one for cross-plate calibration. Each
-// pins down where that slot sits in the full expected sequence, so anchor-guided detection knows
-// where to place every other slot.
+// findAnchorLanes returns every lane with LaneIndex set, sorted by index.
 func findAnchorLanes(lanes map[string]models.GelLaneROI) []anchorLane {
 	var anchors []anchorLane
 	for _, lane := range lanes {
@@ -729,9 +805,6 @@ func findAnchorLanes(lanes map[string]models.GelLaneROI) []anchorLane {
 }
 
 // RunAutoDetect writes the working image to a temp 16-bit PNG and runs the bundled Python script synchronously; jobID is a synthetic bookkeeping string, never a real JobQueueService job.
-// expectedLaneCount enables anchor-guided detection (geometrically placing exactly that many
-// lanes from a known lane's position/index and the session's boundary) when > 0, an anchor lane
-// exists, and a boundary is set; otherwise it falls back to plain profile-based detection.
 func (s *GelAnalysisService) RunAutoDetect(sessionID, jobID string, expectedLaneCount int) (*GelAutoDetectResult, error) {
 	session, err := s.getSession(sessionID)
 	if err != nil {
@@ -780,8 +853,8 @@ func (s *GelAnalysisService) RunAutoDetect(sessionID, jobID string, expectedLane
 
 	s.progress.EmitProgress(ProgressTypeAnalysis, progressID, "Running Python auto-detect...", 30)
 
-	polarity := "dark-bands"
-	minProminence := 0.05
+	var polarity string
+	minProminence := 0.08
 	s.mu.RLock()
 	if session.lastPeakParams != nil {
 		if session.lastPeakParams.Polarity != "" {
@@ -797,11 +870,11 @@ func (s *GelAnalysisService) RunAutoDetect(sessionID, jobID string, expectedLane
 
 	args := []string{
 		"--input", inputPath, "--output", outputDir,
-		"--polarity", polarity,
 		"--min-prominence", strconv.FormatFloat(minProminence, 'f', -1, 64),
 	}
-	// Always restrict detection to the drawn boundary, not just in anchor mode, so wells and
-	// tray/background outside it never get picked up as spurious lanes.
+	if polarity != "" {
+		args = append(args, "--polarity", polarity)
+	}
 	if boundary != nil {
 		args = append(args,
 			"--boundary-x0", strconv.FormatFloat(boundary.X, 'f', -1, 64),
@@ -810,12 +883,13 @@ func (s *GelAnalysisService) RunAutoDetect(sessionID, jobID string, expectedLane
 			"--boundary-y1", strconv.FormatFloat(boundary.Y+boundary.Height, 'f', -1, 64),
 		)
 	}
-	// A single anchor needs the boundary too (to derive a pitch estimate); 2+ anchors (e.g.
-	// multiple ladders on a large gel) let the script fit pitch directly from their real positions.
+	if expectedLaneCount > 0 {
+		args = append(args, "--expected-lane-count", strconv.Itoa(expectedLaneCount))
+	}
 	if expectedLaneCount > 0 && (len(anchors) >= 2 || (len(anchors) == 1 && boundary != nil)) {
 		anchorsJSON, err := json.Marshal(anchors)
 		if err == nil {
-			args = append(args, "--expected-lane-count", strconv.Itoa(expectedLaneCount), "--anchors-json", string(anchorsJSON))
+			args = append(args, "--anchors-json", string(anchorsJSON))
 		} else {
 			log.Printf("[GelAnalysisService] Could not marshal anchor lanes for auto-detect: %v", err)
 		}
