@@ -176,6 +176,37 @@ func TestCreateGithubWorkflow(t *testing.T) {
 			if strings.Contains(content, "setup-r") != wantR {
 				t.Errorf("setup-r step presence = %v, want %v for runtime %q, got:\n%s", strings.Contains(content, "setup-r"), wantR, runtime, content)
 			}
+
+			jobs, _ := workflow["jobs"].(map[string]interface{})
+			_, hasGenerateDeps := jobs["generate-deps"]
+			_, hasMergeDeps := jobs["merge-deps-graph"]
+			if hasGenerateDeps != wantR || hasMergeDeps != wantR {
+				t.Errorf("generate-deps/merge-deps-graph jobs presence = %v/%v, want %v for runtime %q", hasGenerateDeps, hasMergeDeps, wantR, runtime)
+			}
 		})
 	}
+}
+
+func TestCreateDepsGraphScripts(t *testing.T) {
+	t.Run("R plugin gets both scripts", func(t *testing.T) {
+		dir := t.TempDir()
+		if err := createDepsGraphScripts(dir, true); err != nil {
+			t.Fatalf("createDepsGraphScripts error: %v", err)
+		}
+		for _, name := range []string{"generate-deps-graph.R", "merge-deps-graph.py"} {
+			if _, err := os.Stat(filepath.Join(dir, ".github", "scripts", name)); err != nil {
+				t.Errorf("expected %s to be created: %v", name, err)
+			}
+		}
+	})
+
+	t.Run("non-R plugin gets nothing", func(t *testing.T) {
+		dir := t.TempDir()
+		if err := createDepsGraphScripts(dir, false); err != nil {
+			t.Fatalf("createDepsGraphScripts error: %v", err)
+		}
+		if _, err := os.Stat(filepath.Join(dir, ".github", "scripts")); !os.IsNotExist(err) {
+			t.Errorf("expected no .github/scripts directory for a non-R plugin")
+		}
+	})
 }

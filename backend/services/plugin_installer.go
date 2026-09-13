@@ -2,12 +2,14 @@ package services
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"log"
 	"os"
 	"path/filepath"
+	goruntime "runtime"
 	"strings"
 	"time"
 
@@ -214,6 +216,10 @@ func (pi *PluginInstaller) InstallPlugin(repoURL string, commitHash string, regi
 	log.Printf("[PluginInstaller] Successfully installed plugin [ID:%d] to: %s", registry.ID, finalDir)
 
 	if progressCallback != nil {
+		reportSystemRequirements(finalDir, progressCallback)
+	}
+
+	if progressCallback != nil {
 		progressCallback("Reloading plugins...")
 	}
 
@@ -222,6 +228,63 @@ func (pi *PluginInstaller) InstallPlugin(repoURL string, commitHash string, regi
 	}
 
 	return pluginDef.Plugin.ID, nil
+}
+
+// installCommandFor returns the package-manager command for a GOOS's sysreqs, or "" if that platform has no known install command.
+func installCommandFor(goos string, names []string) string {
+	switch goos {
+	case "linux":
+		return "sudo apt install " + strings.Join(names, " ")
+	case "darwin":
+		return "brew install " + strings.Join(names, " ")
+	default:
+		return ""
+	}
+}
+
+// reportSystemRequirements reads dependencies.json if present and reports any declared system packages for the current OS via progressCallback. Windows is skipped: nothing in dependencies.json covers it, and R packages there rarely hit this class of missing-shared-library failure.
+func reportSystemRequirements(pluginDir string, progressCallback func(string)) {
+	graph, err := loadDependencyGraph(pluginDir)
+	if err != nil || graph == nil {
+		return
+	}
+
+	reqs := graph.SystemRequirements[goruntime.GOOS]
+	if len(reqs) == 0 {
+		return
+	}
+
+	names := make([]string, 0, len(reqs))
+	for _, req := range reqs {
+		names = append(names, req.Packages...)
+	}
+	if len(names) == 0 {
+		return
+	}
+
+	cmd := installCommandFor(goruntime.GOOS, names)
+	if cmd == "" {
+		return
+	}
+
+	progressCallback(fmt.Sprintf("This plugin needs these system packages: %s (run: %s)", strings.Join(names, ", "), cmd))
+}
+
+// loadDependencyGraph reads and parses dependencies.json from a plugin directory, if present.
+func loadDependencyGraph(pluginDir string) (*models.PluginDependencyGraph, error) {
+	data, err := os.ReadFile(filepath.Join(pluginDir, "dependencies.json"))
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	var graph models.PluginDependencyGraph
+	if err := json.Unmarshal(data, &graph); err != nil {
+		return nil, err
+	}
+	return &graph, nil
 }
 
 func (pi *PluginInstaller) readPluginDefinition(pluginDir string) (*models.PluginDefinition, error) {

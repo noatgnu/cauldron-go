@@ -20,7 +20,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev
-{{ if .HasPython }}
+[[ if .HasPython ]]
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -29,28 +29,37 @@ jobs:
       - name: Install Python dependencies
         run: |
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-{{ end }}
-{{ if .HasR }}
+[[ end ]]
+[[ if .HasR ]]
       - name: Set up R
         uses: r-lib/actions/setup-r@v2
         with:
           r-version: 'release'
+          use-public-rspm: true
+
+      - name: Read R package list
+        id: r_pkgs
+        run: |
+          echo "packages<<CAULDRON_PKGS_EOF" >> "$GITHUB_OUTPUT"
+          if [ -f r-packages.txt ]; then
+            awk 'NF' r-packages.txt | sed 's/^/any::/' >> "$GITHUB_OUTPUT"
+          fi
+          echo "CAULDRON_PKGS_EOF" >> "$GITHUB_OUTPUT"
 
       - name: Install R dependencies
-        run: |
-          if [ -f r-packages.txt ]; then
-            Rscript -e '
-              if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager")
-              pkgs <- readLines("r-packages.txt")
-              pkgs <- pkgs[nzchar(trimws(pkgs))]
-              for (p in pkgs) if (!requireNamespace(p, quietly = TRUE)) BiocManager::install(p, update = FALSE, ask = FALSE)
-            '
-          fi
-{{ end }}
+        if: steps.r_pkgs.outputs.packages != ''
+        uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          packages: ${{ steps.r_pkgs.outputs.packages }}
+[[ end ]]
       - name: Build cauldron CLI and plugin-validator
         run: |
           git clone --depth 1 https://github.com/noatgnu/cauldron-go.git /tmp/cauldron-go
           cd /tmp/cauldron-go
+          mkdir -p frontend/dist/browser resources/licenses
+          echo '<!DOCTYPE html><html><head><title>Placeholder</title></head><body>Placeholder</body></html>' > frontend/dist/browser/index.html
+          echo '[]' > resources/licenses/go-licenses.json
+          echo '[]' > resources/licenses/npm-licenses.json
           go build -o /usr/local/bin/cauldron .
           go build -o /usr/local/bin/plugin-validator ./cmd/plugin-validator
 
@@ -62,8 +71,8 @@ jobs:
 
       - name: Stage plugin
         run: |
-          mkdir -p /tmp/cauldron-plugins/{{ .ID }}
-          cp -r . /tmp/cauldron-plugins/{{ .ID }}
+          mkdir -p /tmp/cauldron-plugins/[[ .ID ]]
+          cp -r . /tmp/cauldron-plugins/[[ .ID ]]
 
       - name: List loaded plugin
         env:
@@ -74,4 +83,74 @@ jobs:
         if: hashFiles('examples/params.json') != ''
         env:
           CAULDRON_PLUGINS_DIR: /tmp/cauldron-plugins
-        run: cauldron job run --params-json "$(cat examples/params.json)" {{ .ID }}
+        run: cauldron job run --params-json "$(cat examples/params.json)" [[ .ID ]]
+
+      - name: Resolve output directory
+        if: hashFiles('examples/params.json') != ''
+        run: echo "CAULDRON_OUTPUT_DIR=$HOME/Documents/CauldronOutputs" >> "$GITHUB_ENV"
+
+      - name: Upload plugin output
+        if: hashFiles('examples/params.json') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: plugin-output
+          path: ${{ env.CAULDRON_OUTPUT_DIR }}
+          if-no-files-found: warn
+[[ if .HasR ]]
+  generate-deps:
+    if: hashFiles('r-packages.txt') != ''
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+          - os: macos-latest
+            platform: darwin
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout plugin repo
+        uses: actions/checkout@v4
+
+      - name: Set up R
+        uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: 'release'
+          use-public-rspm: true
+
+      - name: Resolve dependency graph (no install)
+        run: Rscript .github/scripts/generate-deps-graph.R
+
+      - name: Upload partial dependency graph
+        uses: actions/upload-artifact@v4
+        with:
+          name: deps-${{ matrix.platform }}
+          path: deps-partial.json
+
+  merge-deps-graph:
+    needs: generate-deps
+    if: github.event_name == 'push' && hashFiles('r-packages.txt') != ''
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout plugin repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download partial dependency graphs
+        uses: actions/download-artifact@v4
+        with:
+          pattern: deps-*
+          path: deps-downloaded
+
+      - name: Merge into dependencies.json
+        run: python3 .github/scripts/merge-deps-graph.py
+
+      - name: Commit dependency graph
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add dependencies.json
+          git diff --staged --quiet || git commit -m "Auto-generate dependency graph [skip ci]"
+          git diff --staged --quiet || git push
+[[ end ]]
