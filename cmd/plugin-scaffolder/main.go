@@ -161,6 +161,44 @@ func createGitignore(dir string) error {
 	return os.WriteFile(gitignorePath, []byte(content), 0644)
 }
 
+func createExamplesDir(dir, pluginID string) error {
+	examplesDir := filepath.Join(dir, "examples")
+	if err := os.MkdirAll(examplesDir, 0755); err != nil {
+		return err
+	}
+
+	readme, err := renderTemplate("scaffold-examples-readme.md.tmpl", map[string]string{"ID": pluginID})
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(examplesDir, "README.md"), []byte(readme), 0644); err != nil {
+		return err
+	}
+
+	params, err := templates.GetTemplate("scaffold-examples-params.json.tmpl")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(examplesDir, "params.json"), []byte(params), 0644)
+}
+
+func createGithubWorkflow(dir string, data map[string]string) error {
+	content, err := renderTemplate("scaffold-github-workflow.yml.tmpl", map[string]interface{}{
+		"ID":        data["id"],
+		"HasPython": data["runtime"] == "python" || data["runtime"] == "pythonWithR",
+		"HasR":      data["runtime"] == "r" || data["runtime"] == "pythonWithR",
+	})
+	if err != nil {
+		return err
+	}
+
+	workflowDir := filepath.Join(dir, ".github", "workflows")
+	if err := os.MkdirAll(workflowDir, 0755); err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(workflowDir, "test-plugin.yml"), []byte(content), 0644)
+}
+
 func main() {
 	fmt.Println("CauldronGO Plugin Scaffolding Tool")
 	fmt.Println("==========================================")
@@ -266,6 +304,20 @@ func main() {
 	}
 	fmt.Println("[SUCCESS] Created .gitignore")
 
+	fmt.Println("Creating examples/...")
+	if err := createExamplesDir(pluginDir, pluginID); err != nil {
+		fmt.Printf("[ERROR] Failed to create examples directory: %v\n", err)
+		os.Exit(1)
+	}
+	fmt.Println("[SUCCESS] Created examples/README.md and examples/params.json")
+
+	fmt.Println("Creating GitHub Actions workflow...")
+	if err := createGithubWorkflow(pluginDir, data); err != nil {
+		fmt.Printf("[ERROR] Failed to create GitHub Actions workflow: %v\n", err)
+		os.Exit(1)
+	}
+	fmt.Println("[SUCCESS] Created .github/workflows/test-plugin.yml")
+
 	fmt.Println()
 	fmt.Println("==========================================")
 	fmt.Println("Plugin Created Successfully!")
@@ -274,10 +326,11 @@ func main() {
 	fmt.Println("Next steps:")
 	fmt.Printf("  1. Edit %s/plugin.yaml to add inputs/outputs\n", pluginDir)
 	fmt.Printf("  2. Implement analysis logic in %s/%s\n", pluginDir, scriptName)
-	fmt.Println("  3. Add example data (optional)")
+	fmt.Printf("  3. Add example input files and fill in %s/examples/params.json\n", pluginDir)
 	fmt.Printf("  4. Validate: ./bin/plugin-validator %s\n", pluginDir)
 	fmt.Printf("  5. Generate docs: ./bin/plugin-doc-generator %s\n", pluginDir)
 	fmt.Printf("  6. Test in UI: Navigate to Plugin View → %s → %s\n", pluginCategory, pluginName)
+	fmt.Println("  7. Push to a repo; .github/workflows/test-plugin.yml runs the same test on every push/PR")
 	fmt.Println()
 	fmt.Println("[SUCCESS] Happy coding!")
 }
