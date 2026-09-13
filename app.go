@@ -56,6 +56,7 @@ type App struct {
 	tableFileService       *services.TableFileService
 	updateCheckService     *services.UpdateCheckService
 	gelAnalysisService     *services.GelAnalysisService
+	stagedUploadService    *services.StagedUploadService
 	ready                  chan bool
 	logFilePath            string
 	appVersion             string
@@ -142,6 +143,12 @@ func (a *App) Initialize() {
 	log.Println("[App.Initialize] Initializing script executor...")
 	a.scriptExecutor = services.NewScriptExecutor(a.settings, a.db)
 	a.gelAnalysisService = services.NewGelAnalysisService(a.db, a.scriptExecutor, services.NewProgressNotifierV3(a.wailsApp), a.envService, a.appVersion)
+	a.stagedUploadService, err = services.NewStagedUploadService(userDataPath, services.DefaultStagedUploadTTL)
+	if err != nil {
+		log.Printf("[App.Initialize] ERROR: Failed to initialize staged upload service: %v\n", err)
+		return
+	}
+	go a.stagedUploadCleanupLoop()
 	a.scriptExecutor.SetUpdateCallback(func(jobID string, update models.Job) {
 		job, err := a.jobQueue.GetJob(jobID)
 		if err != nil {
@@ -2329,4 +2336,76 @@ func (a *App) InstallPluginRequirements(pluginID string) error {
 	}
 
 	return nil
+}
+
+// clientIDProvider is implemented by application.Window in server mode (*application.BrowserWindow),
+// which is otherwise indistinguishable from the desktop's *application.WebviewWindow through the
+// Window interface alone.
+type clientIDProvider interface {
+	ClientID() string
+}
+
+// clientIDFromContext resolves the calling frontend's client ID from a bound method's injected
+// context. Desktop windows don't implement clientIDProvider, so this returns "local" there; server
+// mode's *application.BrowserWindow does, giving each browser tab its own upload namespace.
+func clientIDFromContext(ctx context.Context) string {
+	if ctx == nil {
+		return "local"
+	}
+	if w, ok := ctx.Value(application.WindowKey).(clientIDProvider); ok {
+		if id := w.ClientID(); id != "" {
+			return id
+		}
+	}
+	return "local"
+}
+
+// stagedUploadCleanupLoop periodically removes expired staged uploads so interrupted or abandoned
+// transfers don't accumulate on disk indefinitely.
+func (a *App) stagedUploadCleanupLoop() {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("[stagedUploadCleanupLoop] PANIC: %v\n%s", r, debug.Stack())
+		}
+	}()
+
+	ticker := time.NewTicker(1 * time.Hour)
+	defer ticker.Stop()
+	for range ticker.C {
+		if a.stagedUploadService == nil {
+			continue
+		}
+		if removed, err := a.stagedUploadService.Cleanup(); err != nil {
+			log.Printf("[stagedUploadCleanupLoop] cleanup error: %v", err)
+		} else if removed > 0 {
+			log.Printf("[stagedUploadCleanupLoop] removed %d expired staged upload(s)", removed)
+		}
+	}
+}
+
+// StartChunkedUpload begins or resumes a chunked upload for the calling client, returning the
+// indices of chunks already received (empty for a fresh upload).
+func (a *App) StartChunkedUpload(ctx context.Context, uploadID string, filename string, totalChunks int) ([]int, error) {
+	return a.stagedUploadService.StartChunkedUpload(clientIDFromContext(ctx), uploadID, filename, totalChunks)
+}
+
+// WriteChunk stores one chunk of an in-progress chunked upload.
+func (a *App) WriteChunk(ctx context.Context, uploadID string, chunkIndex int, data []byte) error {
+	return a.stagedUploadService.WriteChunk(clientIDFromContext(ctx), uploadID, chunkIndex, data)
+}
+
+// GetReceivedUploadChunks reports which chunk indices are currently stored for an in-progress upload.
+func (a *App) GetReceivedUploadChunks(ctx context.Context, uploadID string) ([]int, error) {
+	return a.stagedUploadService.ReceivedChunks(clientIDFromContext(ctx), uploadID)
+}
+
+// CompleteChunkedUpload assembles all received chunks into the final staged file and returns its
+// server-local path for existing path-based methods (e.g. LoadGelImage) to consume unchanged.
+func (a *App) CompleteChunkedUpload(ctx context.Context, uploadID string) (string, error) {
+	return a.stagedUploadService.CompleteChunkedUpload(clientIDFromContext(ctx), uploadID)
+}
+
+// AbortChunkedUpload discards an in-progress chunked upload session.
+func (a *App) AbortChunkedUpload(ctx context.Context, uploadID string) error {
+	return a.stagedUploadService.AbortChunkedUpload(clientIDFromContext(ctx), uploadID)
 }
