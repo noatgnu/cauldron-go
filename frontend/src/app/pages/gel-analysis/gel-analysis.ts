@@ -15,9 +15,11 @@ import { MatMenuModule } from '@angular/material/menu';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatSliderModule } from '@angular/material/slider';
-import { MatExpansionModule } from '@angular/material/expansion';
+import { MatTabsModule } from '@angular/material/tabs';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
+import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatDialog } from '@angular/material/dialog';
-import { Wails, GelImageMeta, GelLaneROI, GelBoundary, GelPeakParams, GelLaneProfile, GelCalibrationCurve, GelAnalysisSession } from '../../core/services/wails';
+import { Wails, GelImageMeta, GelLaneROI, GelBoundary, GelPeakParams, GelLaneProfile, GelBandOverride, GelCalibrationCurve, GelAnalysisSession } from '../../core/services/wails';
 import { NotificationService } from '../../core/services/notification.service';
 import { GelLaneMwDialog, GelLaneMwDialogData } from '../../components/gel-lane-mw-dialog/gel-lane-mw-dialog';
 import { GelCalibrationPlot } from '../../components/gel-calibration-plot/gel-calibration-plot';
@@ -30,6 +32,7 @@ import { GelLaneMap } from './gel-lane-map/gel-lane-map';
 interface GelHistorySnapshot {
   lanes: GelLaneROI[];
   boundary: GelBoundary | null;
+  bandOverrides: Record<string, GelBandOverride[]>;
 }
 
 interface ResultRow {
@@ -63,7 +66,9 @@ interface ResultRow {
     MatDividerModule,
     MatTooltipModule,
     MatSliderModule,
-    MatExpansionModule,
+    MatTabsModule,
+    MatSlideToggleModule,
+    MatButtonToggleModule,
     GelCalibrationPlot,
     GelLaneMap
   ],
@@ -87,9 +92,10 @@ export class GelAnalysis implements OnDestroy {
   protected selectedBand = signal<{ laneId: string; bandNumber: number } | null>(null);
   protected boundary = signal<GelBoundary | null>(null);
   protected boundaryPadding = signal(10);
-  protected drawMode = signal<'lane' | 'boundary'>('lane');
+  protected drawMode = signal<'none' | 'lane' | 'boundary' | 'band'>('none');
   protected expectedLaneCount = signal(0);
   protected profiles = signal<Partial<Record<string, GelLaneProfile>>>({});
+  protected bandOverrides = signal<Record<string, GelBandOverride[]>>({});
   protected calibration = signal<GelCalibrationCurve | null>(null);
   protected calibrationLaneId = signal<string | null>(null);
 
@@ -98,16 +104,18 @@ export class GelAnalysis implements OnDestroy {
   protected zoomLevel = signal<number | null>(null);
   protected viewportRect = signal<{ left: number; top: number; width: number; height: number } | null>(null);
 
-  protected lanesPanelExpanded = signal(true);
-  protected boundaryPanelExpanded = signal(false);
-  protected peakPanelExpanded = signal(true);
-  protected calibrationPanelExpanded = signal(false);
+  protected hoverGuideEnabled = signal(true);
+  protected hoverY = signal<number | null>(null);
+
+  /** 0 = Lanes, 1 = Boundary, 2 = Peak Detection, 3 = Calibration. */
+  protected selectedControlTab = signal(0);
 
   protected smoothingWindow = signal(7);
   protected minProminence = signal(0.05);
   protected minDistance = signal(0);
   protected baselineMethod = signal<'rolling-min' | 'percentile' | 'none'>('rolling-min');
-  protected polarity = signal<'dark-bands' | 'light-bands'>('dark-bands');
+  protected polarity = signal<'auto' | 'dark-bands' | 'light-bands'>('auto');
+  protected edgeExclusionFraction = signal(0);
 
   protected loadingImage = signal(false);
   protected computingProfiles = signal(false);
@@ -138,7 +146,7 @@ export class GelAnalysis implements OnDestroy {
 
   protected showMinimap = computed(() => this.zoomLevel() !== null);
 
-  protected resultsColumns = ['lane', 'bandNumber', 'position', 'relativePosition', 'intensity', 'area', 'molecularWeight', 'relativeQuantity'];
+  protected resultsColumns = ['lane', 'bandNumber', 'position', 'relativePosition', 'intensity', 'area', 'molecularWeight', 'relativeQuantity', 'actions'];
 
   protected resultsRows = computed<ResultRow[]>(() => {
     const profiles = this.profiles();
@@ -214,9 +222,14 @@ export class GelAnalysis implements OnDestroy {
 
   private snapshotState(): GelHistorySnapshot {
     const boundary = this.boundary();
+    const bandOverrides: Record<string, GelBandOverride[]> = {};
+    for (const [laneId, overrides] of Object.entries(this.bandOverrides())) {
+      bandOverrides[laneId] = overrides.map(o => ({ ...o }));
+    }
     return {
       lanes: this.lanes().map(l => ({ ...l })),
-      boundary: boundary ? { ...boundary } : null
+      boundary: boundary ? { ...boundary } : null,
+      bandOverrides
     };
   }
 
@@ -301,6 +314,34 @@ export class GelAnalysis implements OnDestroy {
         }
         return kept;
       });
+
+      const currentOverrides = this.bandOverrides();
+      const overrideLaneIds = new Set([...Object.keys(snapshot.bandOverrides), ...Object.keys(currentOverrides)]);
+      const nextOverrides: Record<string, GelBandOverride[]> = {};
+      for (const laneId of overrideLaneIds) {
+        if (!targetIds.has(laneId)) continue;
+
+        const target = snapshot.bandOverrides[laneId] ?? [];
+        const current = currentOverrides[laneId] ?? [];
+        const targetIdSet = new Set(target.map(o => o.id));
+        const currentIdSet = new Set(current.map(o => o.id));
+
+        for (const o of current) {
+          if (!targetIdSet.has(o.id)) {
+            const updated = await this.wails.removeGelBandOverride(sid, laneId, o.id);
+            if (updated) this.profiles.update(p => ({ ...p, [laneId]: updated }));
+          }
+        }
+        for (const o of target) {
+          if (!currentIdSet.has(o.id)) {
+            const updated = await this.wails.setGelBandOverride(sid, laneId, o);
+            if (updated) this.profiles.update(p => ({ ...p, [laneId]: updated }));
+          }
+        }
+        if (target.length > 0) nextOverrides[laneId] = target;
+      }
+      this.bandOverrides.set(nextOverrides);
+
       const selectedLaneId = this.selectedLaneId();
       if (selectedLaneId && !targetIds.has(selectedLaneId)) {
         this.selectedLaneId.set(null);
@@ -342,6 +383,7 @@ export class GelAnalysis implements OnDestroy {
       this.lanes.set([]);
       this.boundary.set(null);
       this.profiles.set({});
+      this.bandOverrides.set({});
       this.calibration.set(null);
       this.calibrationLaneId.set(null);
       this.blackPoint.set(0);
@@ -351,6 +393,7 @@ export class GelAnalysis implements OnDestroy {
       // Canvas only exists in the DOM once loadingImage is false. Flip it before drawing.
       this.loadingImage.set(false);
       await this.refreshPreview();
+      this.fitToWindow();
     } catch (error) {
       this.notification.showError(`Failed to load image: ${error}`);
       this.loadingImage.set(false);
@@ -455,23 +498,37 @@ export class GelAnalysis implements OnDestroy {
       if (profile) {
         profile.bands.forEach((band, i) => {
           const isBandSelected = selectedBand?.laneId === lane.id && selectedBand.bandNumber === i + 1;
-          const y = lane.y + band.position;
-          ctx.beginPath();
-          ctx.moveTo(lane.x, y);
-          ctx.lineTo(lane.x + lane.width, y);
-          ctx.strokeStyle = isBandSelected ? '#ffea00' : '#ff1744';
-          ctx.lineWidth = isBandSelected ? 3 : 1;
-          ctx.stroke();
+          const halfWidth = Math.max(1, band.width) / 2;
+          const top = lane.y + band.position - halfWidth;
+          const color = isBandSelected ? '#ffea00' : '#ff1744';
+          ctx.fillStyle = isBandSelected ? 'rgba(255, 234, 0, 0.25)' : 'rgba(255, 23, 68, 0.2)';
+          ctx.fillRect(lane.x, top, lane.width, halfWidth * 2);
+          ctx.strokeStyle = color;
+          ctx.lineWidth = isBandSelected ? 3 : 1.5;
+          ctx.strokeRect(lane.x, top, lane.width, halfWidth * 2);
         });
       }
     }
 
     if (this.draftRect) {
-      ctx.strokeStyle = this.drawMode() === 'boundary' ? '#ff9100' : '#00e5ff';
+      ctx.strokeStyle = this.drawMode() === 'boundary' ? '#ff9100' : this.drawMode() === 'band' ? '#76ff03' : '#00e5ff';
       ctx.setLineDash([4, 4]);
       ctx.lineWidth = 2;
       ctx.strokeRect(this.draftRect.x, this.draftRect.y, this.draftRect.width, this.draftRect.height);
       ctx.setLineDash([]);
+    }
+
+    const hoverY = this.hoverY();
+    if (hoverY !== null) {
+      ctx.save();
+      ctx.strokeStyle = 'rgba(0, 229, 255, 0.85)';
+      ctx.setLineDash([6, 4]);
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(0, hoverY);
+      ctx.lineTo(overlay.width, hoverY);
+      ctx.stroke();
+      ctx.restore();
     }
   }
 
@@ -488,6 +545,7 @@ export class GelAnalysis implements OnDestroy {
   }
 
   onOverlayMouseDown(event: MouseEvent) {
+    if (this.drawMode() === 'none') return;
     const point = this.toImageCoords(event);
     if (!point) return;
     this.dragStart = point;
@@ -495,22 +553,33 @@ export class GelAnalysis implements OnDestroy {
   }
 
   onOverlayMouseMove(event: MouseEvent) {
-    if (!this.dragStart) return;
     const point = this.toImageCoords(event);
     if (!point) return;
 
-    const x = Math.min(this.dragStart.x, point.x);
-    const y = Math.min(this.dragStart.y, point.y);
-    const width = Math.abs(point.x - this.dragStart.x);
-    const height = Math.abs(point.y - this.dragStart.y);
-    this.draftRect = { x, y, width, height };
-    this.redrawOverlay();
+    if (this.dragStart) {
+      const x = Math.min(this.dragStart.x, point.x);
+      const y = Math.min(this.dragStart.y, point.y);
+      const width = Math.abs(point.x - this.dragStart.x);
+      const height = Math.abs(point.y - this.dragStart.y);
+      this.draftRect = { x, y, width, height };
+      this.redrawOverlay();
+      return;
+    }
+
+    if (this.hoverGuideEnabled()) {
+      const withinAnyLane = this.lanes().some(l =>
+        point.x >= l.x && point.x <= l.x + l.width && point.y >= l.y && point.y <= l.y + l.height
+      );
+      this.hoverY.set(withinAnyLane ? point.y : null);
+      this.redrawOverlay();
+    }
   }
 
   async onOverlayMouseUp() {
     const rect = this.draftRect;
     this.dragStart = null;
     this.draftRect = null;
+    this.hoverY.set(null);
 
     const sid = this.sessionId();
     if (!rect || !sid || rect.width < 3 || rect.height < 3) {
@@ -520,12 +589,41 @@ export class GelAnalysis implements OnDestroy {
 
     this.pushHistory();
 
+    if (this.drawMode() === 'band') {
+      const centerY = rect.y + rect.height / 2;
+      const lane = this.lanes().find(l => centerY >= l.y && centerY <= l.y + l.height);
+      if (!lane) {
+        this.notification.showError('Drag within a lane to add a manual band there.');
+        this.redrawOverlay();
+        return;
+      }
+      const override: GelBandOverride = {
+        id: crypto.randomUUID(),
+        laneId: lane.id,
+        position: centerY - lane.y,
+        width: rect.height,
+        excluded: false
+      };
+      try {
+        const updated = await this.wails.setGelBandOverride(sid, lane.id, override);
+        if (updated) {
+          this.profiles.update(profiles => ({ ...profiles, [lane.id]: updated }));
+        }
+        this.bandOverrides.update(m => ({ ...m, [lane.id]: [...(m[lane.id] ?? []), override] }));
+        this.selectedLaneId.set(lane.id);
+        this.redrawOverlay();
+      } catch (error) {
+        this.notification.showError(`Failed to add band: ${error}`);
+      }
+      return;
+    }
+
     if (this.drawMode() === 'boundary') {
       const boundary: GelBoundary = { x: rect.x, y: rect.y, width: rect.width, height: rect.height } as GelBoundary;
       try {
         await this.wails.setGelBoundary(sid, boundary);
         this.boundary.set(boundary);
-        this.boundaryPanelExpanded.set(true);
+        this.selectedControlTab.set(1);
         this.redrawOverlay();
       } catch (error) {
         this.notification.showError(`Failed to save boundary: ${error}`);
@@ -572,6 +670,38 @@ export class GelAnalysis implements OnDestroy {
   isBandSelected(row: { laneId: string; bandNumber: number }): boolean {
     const selected = this.selectedBand();
     return !!selected && selected.laneId === row.laneId && selected.bandNumber === row.bandNumber;
+  }
+
+  /** Excludes a false-positive band from the lane's profile going forward; persists with the session and survives recomputes. */
+  async removeBand(laneId: string, position: number): Promise<void> {
+    const sid = this.sessionId();
+    if (!sid) return;
+
+    this.pushHistory();
+
+    const selected = this.selectedBand();
+    if (selected?.laneId === laneId) {
+      this.selectedBand.set(null);
+    }
+
+    const override: GelBandOverride = {
+      id: crypto.randomUUID(),
+      laneId,
+      position,
+      width: 0,
+      excluded: true
+    };
+
+    try {
+      const updated = await this.wails.setGelBandOverride(sid, laneId, override);
+      if (updated) {
+        this.profiles.update(profiles => ({ ...profiles, [laneId]: updated }));
+      }
+      this.bandOverrides.update(m => ({ ...m, [laneId]: [...(m[laneId] ?? []), override] }));
+      this.redrawOverlay();
+    } catch (error) {
+      this.notification.showError(`Failed to remove band: ${error}`);
+    }
   }
 
   async updateSelectedLane(field: 'x' | 'y' | 'width' | 'height', value: number): Promise<void> {
@@ -640,8 +770,16 @@ export class GelAnalysis implements OnDestroy {
     }
   }
 
-  setDrawMode(mode: 'lane' | 'boundary') {
+  setDrawMode(mode: 'none' | 'lane' | 'boundary' | 'band') {
     this.drawMode.set(mode);
+  }
+
+  setHoverGuideEnabled(enabled: boolean): void {
+    this.hoverGuideEnabled.set(enabled);
+    if (!enabled) {
+      this.hoverY.set(null);
+      this.redrawOverlay();
+    }
   }
 
   /** value is a percentage (25-400); null resets to fit-to-container. */
@@ -653,6 +791,19 @@ export class GelAnalysis implements OnDestroy {
   resetZoom(): void {
     this.zoomLevel.set(null);
     this.viewportRect.set(null);
+  }
+
+  /** Scales so the whole image (both width and height) fits inside the visible canvas area at once. */
+  fitToWindow(): void {
+    const stack = this.canvasStackRef?.nativeElement;
+    const meta = this.imageMeta();
+    if (!stack || !meta || meta.width === 0 || meta.height === 0) {
+      this.resetZoom();
+      return;
+    }
+    const scale = Math.min(stack.clientWidth / meta.width, stack.clientHeight / meta.height);
+    this.zoomLevel.set(scale > 0 ? scale : null);
+    this.scheduleViewportRectUpdate();
   }
 
   onCanvasScroll(): void {
@@ -701,7 +852,7 @@ export class GelAnalysis implements OnDestroy {
     try {
       const boundary = await this.wails.detectGelBoundary(sid, this.boundaryPadding());
       this.boundary.set(boundary);
-      this.boundaryPanelExpanded.set(true);
+      this.selectedControlTab.set(1);
       this.redrawOverlay();
     } catch (error) {
       this.notification.showError(`Failed to detect boundary: ${error}`);
@@ -774,7 +925,7 @@ export class GelAnalysis implements OnDestroy {
       await this.wails.setGelLane(sid, updated);
       this.lanes.update(lanes => lanes.map(l => (l.id === lane.id ? updated : l)));
       this.calibrationLaneId.set(lane.id);
-      this.calibrationPanelExpanded.set(true);
+      this.selectedControlTab.set(3);
       this.redrawOverlay();
     } catch (error) {
       this.notification.showError(`Failed to update lane: ${error}`);
@@ -782,12 +933,14 @@ export class GelAnalysis implements OnDestroy {
   }
 
   private currentPeakParams(): GelPeakParams {
+    const polarity = this.polarity();
     return {
       smoothingWindow: this.smoothingWindow(),
       minProminence: this.minProminence(),
       minDistance: this.minDistance(),
       baselineMethod: this.baselineMethod(),
-      polarity: this.polarity()
+      polarity: polarity === 'auto' ? '' : polarity,
+      edgeExclusionFraction: this.edgeExclusionFraction()
     } as GelPeakParams;
   }
 
@@ -906,15 +1059,27 @@ export class GelAnalysis implements OnDestroy {
     this.autoDetectPercentage.set(0);
     try {
       const result = await this.wails.runGelAutoDetect(sid, this.expectedLaneCount());
-      if (result?.lanes && result.lanes.length > 0) {
+      const detected = result?.lanes ?? [];
+      const existing = this.lanes();
+      const newLanes = detected.filter(lane =>
+        !existing.some(l => lane.x < l.x + l.width && lane.x + lane.width > l.x)
+      );
+
+      if (newLanes.length > 0) {
         this.pushHistory();
-        for (const lane of result.lanes) {
+        for (const lane of newLanes) {
           await this.wails.setGelLane(sid, lane);
         }
-        this.lanes.update(lanes => [...lanes, ...result.lanes]);
+        this.lanes.update(lanes => [...lanes, ...newLanes]);
       }
       await this.refreshPreview();
-      this.notification.showSuccess(`Auto-detect found ${result?.lanes?.length ?? 0} lane(s)`);
+
+      const skipped = detected.length - newLanes.length;
+      if (skipped > 0) {
+        this.notification.showSuccess(`Auto-detect added ${newLanes.length} new lane(s) (${skipped} already present)`);
+      } else {
+        this.notification.showSuccess(`Auto-detect found ${newLanes.length} lane(s)`);
+      }
     } catch (error) {
       this.notification.showError(`Auto-detect failed: ${error}`);
     } finally {
@@ -966,15 +1131,24 @@ export class GelAnalysis implements OnDestroy {
       this.profiles.set({});
       this.calibration.set(null);
       this.calibrationLaneId.set(null);
-      this.lanes.set(await this.wails.getGelLanes(meta.sessionId));
+      const loadedLanes = await this.wails.getGelLanes(meta.sessionId);
+      this.lanes.set(loadedLanes);
       const loadedBoundary = await this.wails.getGelBoundary(meta.sessionId).catch(() => null);
       this.boundary.set(loadedBoundary);
-      if (loadedBoundary) this.boundaryPanelExpanded.set(true);
+      if (loadedBoundary) this.selectedControlTab.set(1);
+
+      const bandOverrides: Record<string, GelBandOverride[]> = {};
+      for (const lane of loadedLanes) {
+        const overrides = await this.wails.getGelBandOverrides(meta.sessionId, lane.id).catch(() => []);
+        if (overrides.length > 0) bandOverrides[lane.id] = overrides;
+      }
+      this.bandOverrides.set(bandOverrides);
       this.resetHistory();
 
       // Canvas only exists in the DOM once loadingImage is false. Flip it before drawing.
       this.loadingImage.set(false);
       await this.refreshPreview();
+      this.fitToWindow();
     } catch (error) {
       this.notification.showError(`Failed to load session: ${error}`);
       this.loadingImage.set(false);

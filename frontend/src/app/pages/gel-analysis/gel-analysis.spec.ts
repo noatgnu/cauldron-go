@@ -54,7 +54,10 @@ describe('GelAnalysis', () => {
       setGelBoundary: vi.fn().mockResolvedValue(undefined),
       getGelBoundary: vi.fn().mockResolvedValue(null),
       clearGelBoundary: vi.fn().mockResolvedValue(undefined),
-      detectGelBoundary: vi.fn()
+      detectGelBoundary: vi.fn(),
+      setGelBandOverride: vi.fn(),
+      removeGelBandOverride: vi.fn(),
+      getGelBandOverrides: vi.fn().mockResolvedValue([])
     };
 
     notificationMock = {
@@ -310,6 +313,42 @@ describe('GelAnalysis', () => {
     expect(state().boundary()).toEqual({ x: 10, y: 0, width: 30, height: 24 });
   });
 
+  it('undo restores a band removed via removeBand', async () => {
+    await fixture.whenStable();
+    state().sessionId.set('sess-1');
+    state().lanes.set([{ id: 'lane1', label: 'Lane 1', x: 0, y: 0, width: 60, height: 600, isMarker: false }]);
+    const profileWithBand = { laneId: 'lane1', values: [], baseline: [], bands: [{ position: 25, relativePosition: 0.25, intensity: 10, area: 10, width: 5, relativeQuantity: 100 }] };
+    const profileWithoutBand = { laneId: 'lane1', values: [], baseline: [], bands: [] };
+    wailsMock.setGelBandOverride.mockResolvedValue(profileWithoutBand);
+
+    await component.removeBand('lane1', 25);
+
+    expect(state().profiles()['lane1']).toEqual(profileWithoutBand);
+    expect(state().bandOverrides()['lane1'].length).toBe(1);
+
+    wailsMock.setGelBandOverride.mockResolvedValue(profileWithBand);
+    await component.undo();
+
+    expect(wailsMock.removeGelBandOverride).toHaveBeenCalledWith('sess-1', 'lane1', expect.any(String));
+    expect(state().bandOverrides()['lane1'] ?? []).toEqual([]);
+  });
+
+  it('redo re-applies a band removal after undo', async () => {
+    await fixture.whenStable();
+    state().sessionId.set('sess-1');
+    state().lanes.set([{ id: 'lane1', label: 'Lane 1', x: 0, y: 0, width: 60, height: 600, isMarker: false }]);
+    const profileWithoutBand = { laneId: 'lane1', values: [], baseline: [], bands: [] };
+    wailsMock.setGelBandOverride.mockResolvedValue(profileWithoutBand);
+    wailsMock.removeGelBandOverride.mockResolvedValue({ laneId: 'lane1', values: [], baseline: [], bands: [{ position: 25 }] });
+
+    await component.removeBand('lane1', 25);
+    await component.undo();
+    await component.redo();
+
+    expect(wailsMock.setGelBandOverride).toHaveBeenLastCalledWith('sess-1', 'lane1', expect.objectContaining({ laneId: 'lane1', position: 25, excluded: true }));
+    expect(state().bandOverrides()['lane1'].length).toBe(1);
+  });
+
   it('coalesces rapid edits to the same lane field into a single undo step', async () => {
     await fixture.whenStable();
     state().sessionId.set('sess-1');
@@ -335,9 +374,42 @@ describe('GelAnalysis', () => {
     expect(state().historyStack().length).toBe(2);
   });
 
-  it('setDrawMode switches the active draw mode', async () => {
+  it('hover guide is enabled by default', async () => {
     await fixture.whenStable();
-    expect(state().drawMode()).toBe('lane');
+    expect(state().hoverGuideEnabled()).toBe(true);
+  });
+
+  it('setHoverGuideEnabled(false) disables tracking and clears any active guide line', async () => {
+    await fixture.whenStable();
+    state().hoverY.set(150);
+
+    component.setHoverGuideEnabled(false);
+
+    expect(state().hoverGuideEnabled()).toBe(false);
+    expect(state().hoverY()).toBeNull();
+  });
+
+  it('setHoverGuideEnabled(true) re-enables tracking', async () => {
+    await fixture.whenStable();
+    component.setHoverGuideEnabled(false);
+
+    component.setHoverGuideEnabled(true);
+
+    expect(state().hoverGuideEnabled()).toBe(true);
+  });
+
+  it('onOverlayMouseUp clears the hover guide line', async () => {
+    await fixture.whenStable();
+    state().hoverY.set(200);
+
+    await component.onOverlayMouseUp();
+
+    expect(state().hoverY()).toBeNull();
+  });
+
+  it('setDrawMode defaults to none and switches the active draw mode', async () => {
+    await fixture.whenStable();
+    expect(state().drawMode()).toBe('none');
 
     component.setDrawMode('boundary');
 
@@ -380,6 +452,62 @@ describe('GelAnalysis', () => {
     expect(component.isBandSelected({ laneId: 'lane2', bandNumber: 2 })).toBe(false);
   });
 
+  it('removeBand sets an excluded override and stores the updated profile', async () => {
+    await fixture.whenStable();
+    state().sessionId.set('sess-1');
+    const updatedProfile = { laneId: 'lane1', values: [], baseline: [], bands: [{ position: 50, relativePosition: 0.5, intensity: 10, area: 10, width: 5, relativeQuantity: 100 }] };
+    wailsMock.setGelBandOverride.mockResolvedValue(updatedProfile);
+
+    await component.removeBand('lane1', 25);
+
+    expect(wailsMock.setGelBandOverride).toHaveBeenCalledWith('sess-1', 'lane1', expect.objectContaining({ laneId: 'lane1', position: 25, excluded: true }));
+    expect(state().profiles()['lane1']).toEqual(updatedProfile);
+  });
+
+  it('removeBand clears the selected band if it belonged to that lane', async () => {
+    await fixture.whenStable();
+    state().sessionId.set('sess-1');
+    state().selectedBand.set({ laneId: 'lane1', bandNumber: 1 });
+    wailsMock.setGelBandOverride.mockResolvedValue({ laneId: 'lane1', values: [], baseline: [], bands: [] });
+
+    await component.removeBand('lane1', 25);
+
+    expect(state().selectedBand()).toBeNull();
+  });
+
+  it('removeBand does nothing without a session', async () => {
+    await fixture.whenStable();
+
+    await component.removeBand('lane1', 25);
+
+    expect(wailsMock.setGelBandOverride).not.toHaveBeenCalled();
+  });
+
+  it('onOverlayMouseUp in band mode adds a manual band at the drag span within the lane', async () => {
+    await fixture.whenStable();
+    state().sessionId.set('sess-1');
+    state().lanes.set([{ id: 'lane1', label: 'Lane 1', x: 0, y: 100, width: 60, height: 400, isMarker: false }]);
+    state().drawMode.set('band');
+    (component as any).draftRect = { x: 10, y: 140, width: 20, height: 20 };
+    wailsMock.setGelBandOverride.mockResolvedValue({ laneId: 'lane1', values: [], baseline: [], bands: [] });
+
+    await component.onOverlayMouseUp();
+
+    expect(wailsMock.setGelBandOverride).toHaveBeenCalledWith('sess-1', 'lane1', expect.objectContaining({ laneId: 'lane1', position: 50, width: 20, excluded: false }));
+  });
+
+  it('onOverlayMouseUp in band mode shows an error when the drag falls outside any lane', async () => {
+    await fixture.whenStable();
+    state().sessionId.set('sess-1');
+    state().lanes.set([{ id: 'lane1', label: 'Lane 1', x: 0, y: 100, width: 60, height: 400, isMarker: false }]);
+    state().drawMode.set('band');
+    (component as any).draftRect = { x: 10, y: 10, width: 20, height: 20 };
+
+    await component.onOverlayMouseUp();
+
+    expect(wailsMock.setGelBandOverride).not.toHaveBeenCalled();
+  });
+
   it('recomputeAllProfiles calls computeAllGelProfiles and stores the result', async () => {
     await fixture.whenStable();
     state().sessionId.set('sess-1');
@@ -390,6 +518,54 @@ describe('GelAnalysis', () => {
 
     expect(wailsMock.computeAllGelProfiles).toHaveBeenCalledWith('sess-1', expect.any(Object));
     expect(state().profiles()).toEqual(profiles);
+  });
+
+  it('polarity defaults to auto', async () => {
+    await fixture.whenStable();
+    expect(state().polarity()).toBe('auto');
+  });
+
+  it('recomputeAllProfiles sends an empty polarity when set to auto, so the backend auto-detects', async () => {
+    await fixture.whenStable();
+    state().sessionId.set('sess-1');
+    wailsMock.computeAllGelProfiles.mockResolvedValue({});
+
+    await component.recomputeAllProfiles();
+
+    expect(wailsMock.computeAllGelProfiles).toHaveBeenCalledWith('sess-1', expect.objectContaining({ polarity: '' }));
+  });
+
+  it('recomputeAllProfiles sends an explicit polarity when manually chosen', async () => {
+    await fixture.whenStable();
+    state().sessionId.set('sess-1');
+    state().polarity.set('light-bands');
+    wailsMock.computeAllGelProfiles.mockResolvedValue({});
+
+    await component.recomputeAllProfiles();
+
+    expect(wailsMock.computeAllGelProfiles).toHaveBeenCalledWith('sess-1', expect.objectContaining({ polarity: 'light-bands' }));
+  });
+
+  it('edgeExclusionFraction defaults to 0 and is sent as-is', async () => {
+    await fixture.whenStable();
+    state().sessionId.set('sess-1');
+    wailsMock.computeAllGelProfiles.mockResolvedValue({});
+
+    await component.recomputeAllProfiles();
+
+    expect(state().edgeExclusionFraction()).toBe(0);
+    expect(wailsMock.computeAllGelProfiles).toHaveBeenCalledWith('sess-1', expect.objectContaining({ edgeExclusionFraction: 0 }));
+  });
+
+  it('recomputeAllProfiles sends a set edgeExclusionFraction', async () => {
+    await fixture.whenStable();
+    state().sessionId.set('sess-1');
+    state().edgeExclusionFraction.set(0.05);
+    wailsMock.computeAllGelProfiles.mockResolvedValue({});
+
+    await component.recomputeAllProfiles();
+
+    expect(wailsMock.computeAllGelProfiles).toHaveBeenCalledWith('sess-1', expect.objectContaining({ edgeExclusionFraction: 0.05 }));
   });
 
   it('fitCalibration shows an error when no ladder lane is selected', async () => {
@@ -529,6 +705,60 @@ describe('GelAnalysis', () => {
     expect(wailsMock.runGelAutoDetect).toHaveBeenCalledWith('sess-1', 12);
   });
 
+  it('runAutoDetect skips a detected lane that overlaps an already-existing one', async () => {
+    await fixture.whenStable();
+    state().sessionId.set('sess-1');
+    state().lanes.set([{ id: 'lane1', label: 'Lane 1', x: 100, y: 0, width: 50, height: 200, isMarker: false }]);
+    wailsMock.getPluginEnvironmentBinding.mockResolvedValue({ pluginID: 'gel-analysis', environmentType: 'python', environmentPath: '/venv' });
+    wailsMock.runGelAutoDetect.mockResolvedValue({
+      lanes: [{ id: 'detected1', label: 'Lane 1', x: 110, y: 0, width: 40, height: 200, isMarker: false }],
+      deskewAngle: 0
+    });
+
+    await component.runAutoDetect();
+
+    expect(state().lanes().length).toBe(1);
+    expect(state().lanes()[0].id).toBe('lane1');
+    expect(wailsMock.setGelLane).not.toHaveBeenCalled();
+  });
+
+  it('runAutoDetect adds a detected lane that does not overlap any existing lane', async () => {
+    await fixture.whenStable();
+    state().sessionId.set('sess-1');
+    state().lanes.set([{ id: 'lane1', label: 'Lane 1', x: 100, y: 0, width: 50, height: 200, isMarker: false }]);
+    wailsMock.getPluginEnvironmentBinding.mockResolvedValue({ pluginID: 'gel-analysis', environmentType: 'python', environmentPath: '/venv' });
+    wailsMock.runGelAutoDetect.mockResolvedValue({
+      lanes: [{ id: 'detected1', label: 'Lane 2', x: 300, y: 0, width: 40, height: 200, isMarker: false }],
+      deskewAngle: 0
+    });
+
+    await component.runAutoDetect();
+
+    expect(state().lanes().length).toBe(2);
+    expect(state().lanes().map((l: any) => l.id)).toContain('detected1');
+    expect(wailsMock.setGelLane).toHaveBeenCalledWith('sess-1', expect.objectContaining({ id: 'detected1' }));
+  });
+
+  it('runAutoDetect adds only the non-overlapping lane from a mixed result', async () => {
+    await fixture.whenStable();
+    state().sessionId.set('sess-1');
+    state().lanes.set([{ id: 'lane1', label: 'Lane 1', x: 100, y: 0, width: 50, height: 200, isMarker: false }]);
+    wailsMock.getPluginEnvironmentBinding.mockResolvedValue({ pluginID: 'gel-analysis', environmentType: 'python', environmentPath: '/venv' });
+    wailsMock.runGelAutoDetect.mockResolvedValue({
+      lanes: [
+        { id: 'overlap', label: 'Lane 1', x: 110, y: 0, width: 40, height: 200, isMarker: false },
+        { id: 'fresh', label: 'Lane 2', x: 300, y: 0, width: 40, height: 200, isMarker: false }
+      ],
+      deskewAngle: 0
+    });
+
+    await component.runAutoDetect();
+
+    const ids = state().lanes().map((l: any) => l.id);
+    expect(ids).toEqual(['lane1', 'fresh']);
+    expect(notificationMock.showSuccess).toHaveBeenCalledWith('Auto-detect added 1 new lane(s) (1 already present)');
+  });
+
   it('updateLaneIndex persists a lane index onto the selected lane', async () => {
     await fixture.whenStable();
     state().sessionId.set('sess-1');
@@ -609,6 +839,26 @@ describe('GelAnalysis', () => {
     expect(state().zoomLevel()).toBeNull();
   });
 
+  it('fitToWindow scales to the smaller of width/height fit ratios', async () => {
+    await fixture.whenStable();
+    state().imageMeta.set({ width: 1000, height: 200 });
+    (component as any).canvasStackRef = { nativeElement: { clientWidth: 500, clientHeight: 500 } };
+
+    component.fitToWindow();
+
+    expect(state().zoomLevel()).toBeCloseTo(0.5, 5);
+  });
+
+  it('fitToWindow falls back to fit-to-container without image metadata', async () => {
+    await fixture.whenStable();
+    state().imageMeta.set(null);
+    state().zoomLevel.set(2);
+
+    component.fitToWindow();
+
+    expect(state().zoomLevel()).toBeNull();
+  });
+
   it('canvasDisplayWidth is null at fit-to-container zoom', async () => {
     await fixture.whenStable();
     state().imageMeta.set({ width: 800, height: 600 });
@@ -625,53 +875,53 @@ describe('GelAnalysis', () => {
     expect(state().canvasDisplayWidth()).toBe(1200);
   });
 
-  it('detectBoundary expands the boundary panel on success', async () => {
+  it('detectBoundary switches to the boundary tab on success', async () => {
     await fixture.whenStable();
     state().sessionId.set('sess-1');
     state().lanes.set([{ id: 'lane1', label: 'Lane 1', x: 20, y: 0, width: 10, height: 4, isMarker: false }]);
     state().boundaryPadding.set(10);
-    state().boundaryPanelExpanded.set(false);
+    state().selectedControlTab.set(0);
     wailsMock.detectGelBoundary.mockResolvedValue({ x: 10, y: 0, width: 30, height: 24 });
 
     await component.detectBoundary();
 
-    expect(state().boundaryPanelExpanded()).toBe(true);
+    expect(state().selectedControlTab()).toBe(1);
   });
 
-  it('loadSession expands the boundary panel when a boundary is already stored', async () => {
+  it('loadSession switches to the boundary tab when a boundary is already stored', async () => {
     await fixture.whenStable();
     wailsMock.loadGelSession.mockResolvedValue({ sessionId: 'sess-1', width: 800, height: 600 });
     wailsMock.getGelBoundary.mockResolvedValue({ x: 10, y: 0, width: 30, height: 24 });
     wailsMock.getGelImagePreview.mockRejectedValueOnce(new Error('no canvas in test environment'));
-    state().boundaryPanelExpanded.set(false);
+    state().selectedControlTab.set(0);
 
     await component.loadSession(1);
 
-    expect(state().boundaryPanelExpanded()).toBe(true);
+    expect(state().selectedControlTab()).toBe(1);
   });
 
-  it('loadSession leaves the boundary panel collapsed when no boundary is stored', async () => {
+  it('loadSession leaves the lanes tab active when no boundary is stored', async () => {
     await fixture.whenStable();
     wailsMock.loadGelSession.mockResolvedValue({ sessionId: 'sess-1', width: 800, height: 600 });
     wailsMock.getGelBoundary.mockResolvedValue(null);
     wailsMock.getGelImagePreview.mockRejectedValueOnce(new Error('no canvas in test environment'));
-    state().boundaryPanelExpanded.set(false);
+    state().selectedControlTab.set(0);
 
     await component.loadSession(1);
 
-    expect(state().boundaryPanelExpanded()).toBe(false);
+    expect(state().selectedControlTab()).toBe(0);
   });
 
-  it('markAsLadder expands the calibration panel', async () => {
+  it('markAsLadder switches to the calibration tab', async () => {
     await fixture.whenStable();
     state().sessionId.set('sess-1');
     const lane = { id: 'lane1', label: 'Lane 1', x: 0, y: 0, width: 10, height: 10, isMarker: false };
     state().lanes.set([lane]);
-    state().calibrationPanelExpanded.set(false);
+    state().selectedControlTab.set(0);
     dialogMock.open.mockReturnValueOnce({ afterClosed: () => of([66000, 45000, 31000]) });
 
     await component.markAsLadder(lane as any);
 
-    expect(state().calibrationPanelExpanded()).toBe(true);
+    expect(state().selectedControlTab()).toBe(3);
   });
 });

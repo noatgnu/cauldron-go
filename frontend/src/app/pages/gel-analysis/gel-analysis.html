@@ -59,6 +59,29 @@
   } @else {
     <div class="analysis-content">
       <div class="canvas-panel">
+        <mat-button-toggle-group class="draw-mode-group" [value]="drawMode()" (change)="setDrawMode($event.value)">
+          <mat-button-toggle value="none" matTooltip="Pan and inspect only">
+            <mat-icon>pan_tool</mat-icon> None
+          </mat-button-toggle>
+          <mat-button-toggle value="lane" matTooltip="Drag a rectangle on the image to create a lane">
+            <mat-icon>add_box</mat-icon> Draw Lane
+          </mat-button-toggle>
+          <mat-button-toggle value="boundary" matTooltip="Drag a rectangle on the image to set the gel boundary">
+            <mat-icon>crop_free</mat-icon> Draw Boundary
+          </mat-button-toggle>
+          <mat-button-toggle value="band" matTooltip="Drag a vertical span within a lane to add a band the auto-detector missed">
+            <mat-icon>add_chart</mat-icon> Add Band
+          </mat-button-toggle>
+        </mat-button-toggle-group>
+        <p class="hint-text mode-hint">
+          @switch (drawMode()) {
+            @case ('lane') { <mat-icon>touch_app</mat-icon> Drag on the image to draw a lane rectangle. }
+            @case ('boundary') { <mat-icon>touch_app</mat-icon> Drag on the image to set the gel boundary rectangle. }
+            @case ('band') { <mat-icon>touch_app</mat-icon> Drag a vertical span within a lane to add a band there. }
+            @default { Select a mode above to draw a lane, set the boundary, or add a band. }
+          }
+        </p>
+
         <div class="canvas-stack" #canvasStack (scroll)="onCanvasScroll()">
           <canvas #imageCanvas class="image-canvas"
                   [style.width.px]="canvasDisplayWidth()"
@@ -84,13 +107,6 @@
             }
           </div>
         }
-        <p class="hint-text">
-          @if (drawMode() === 'lane') {
-            Drag on the image to draw a lane rectangle.
-          } @else {
-            Drag on the image to set the gel boundary rectangle.
-          }
-        </p>
 
         <div class="canvas-controls">
           <div class="display-levels">
@@ -108,45 +124,51 @@
 
           <div class="zoom-controls">
             <span class="display-levels-label">Zoom</span>
-            <mat-slider min="25" max="400" step="25" discrete class="levels-slider" matTooltip="Zoom the image; scroll to pan">
+            <mat-slider min="5" max="400" step="5" discrete class="levels-slider" matTooltip="Zoom the image; scroll to pan">
               <input matSliderThumb [ngModel]="zoomLevel() ? zoomLevel()! * 100 : 100" (ngModelChange)="setZoom($event)">
             </mat-slider>
-            <button mat-icon-button (click)="resetZoom()" matTooltip="Fit to width">
+            <button mat-icon-button (click)="fitToWindow()" matTooltip="Fit entire image in view">
+              <mat-icon>zoom_out_map</mat-icon>
+            </button>
+            <button mat-icon-button (click)="resetZoom()" matTooltip="Fit to width, 100% if smaller">
               <mat-icon>fit_screen</mat-icon>
             </button>
+          </div>
+
+          <div class="hover-guide-controls">
+            <span class="display-levels-label">Hover Guide</span>
+            <mat-slide-toggle [checked]="hoverGuideEnabled()" (change)="setHoverGuideEnabled($event.checked)"
+                               matTooltip="Show a line across all lanes at your cursor's height, to compare band positions"></mat-slide-toggle>
           </div>
         </div>
       </div>
 
       <div class="side-panel">
-        <mat-accordion multi>
-          <mat-expansion-panel [expanded]="lanesPanelExpanded()" (expandedChange)="lanesPanelExpanded.set($event)">
-            <mat-expansion-panel-header>
-              <mat-panel-title><mat-icon>view_column</mat-icon> Lanes</mat-panel-title>
-              <mat-panel-description>{{ lanes().length }} lane(s)</mat-panel-description>
-            </mat-expansion-panel-header>
-
+        <mat-tab-group class="control-tabs" [selectedIndex]="selectedControlTab()" (selectedIndexChange)="selectedControlTab.set($event)">
+          <mat-tab>
+            <ng-template mat-tab-label>
+              <mat-icon>view_column</mat-icon>
+              <span>Lanes</span>
+            </ng-template>
+            <div class="tab-content">
             <mat-form-field appearance="outline" class="param-field" matTooltip="Total lane slots for Auto-detect">
               <mat-label>Expected lanes</mat-label>
               <input matInput type="number" min="0" [(ngModel)]="expectedLaneCount">
             </mat-form-field>
-            <button mat-stroked-button (click)="runAutoDetect()" [disabled]="autoDetecting()">
-              <mat-icon>auto_awesome</mat-icon>
-              Auto-detect
-            </button>
-            @if (autoDetecting()) {
-              <button mat-stroked-button color="warn" (click)="cancelAutoDetect()">
-                <mat-icon>cancel</mat-icon>
-                Cancel
+            <div class="icon-button-row">
+              <button mat-icon-button (click)="runAutoDetect()" [disabled]="autoDetecting()" matTooltip="Auto-detect lanes">
+                <mat-icon>auto_awesome</mat-icon>
               </button>
+              @if (autoDetecting()) {
+                <button mat-icon-button color="warn" (click)="cancelAutoDetect()" matTooltip="Cancel auto-detect">
+                  <mat-icon>cancel</mat-icon>
+                </button>
+              }
+            </div>
+            @if (autoDetecting()) {
               <mat-progress-bar mode="determinate" [value]="autoDetectPercentage()"></mat-progress-bar>
               <p class="hint-text">{{ autoDetectMessage() }}</p>
             }
-
-            <button mat-stroked-button [color]="drawMode() === 'lane' ? 'primary' : undefined" (click)="setDrawMode('lane')">
-              <mat-icon>add_box</mat-icon>
-              Draw Lane
-            </button>
 
             <app-gel-lane-map
               [lanes]="lanes()"
@@ -186,9 +208,8 @@
                   <input matInput type="number" min="1" [ngModel]="lane.height" (ngModelChange)="updateSelectedLane('height', $event)">
                 </mat-form-field>
               </div>
-              <button mat-stroked-button (click)="centerSelectedLane()" matTooltip="Re-center on the actual lane signal">
+              <button mat-icon-button (click)="centerSelectedLane()" matTooltip="Re-center on the actual lane signal">
                 <mat-icon>center_focus_strong</mat-icon>
-                Center Lane
               </button>
               <mat-form-field appearance="outline" class="param-field" matTooltip="Position in the full sequence, e.g. ladder = lane 3 of 12">
                 <mat-label>Lane index (1-based, optional)</mat-label>
@@ -210,31 +231,27 @@
             } @else if (lanes().length > 0) {
               <p class="hint-text">Select a lane above to view and edit it.</p>
             }
-          </mat-expansion-panel>
+            </div>
+          </mat-tab>
 
-          <mat-expansion-panel [expanded]="boundaryPanelExpanded()" (expandedChange)="boundaryPanelExpanded.set($event)">
-            <mat-expansion-panel-header>
-              <mat-panel-title>
-                <mat-icon>crop_free</mat-icon> Gel Boundary
-                <mat-icon class="info-icon" matTooltip="Derived from current lanes' bounding box, not physical edge detection">info_outline</mat-icon>
-              </mat-panel-title>
-              <mat-panel-description>{{ boundary() ? 'Set' : 'Not set' }}</mat-panel-description>
-            </mat-expansion-panel-header>
-
-            <p class="hint-text">Drag on the image or edit below to adjust.</p>
-
-            <button mat-stroked-button [color]="drawMode() === 'boundary' ? 'primary' : undefined" (click)="setDrawMode('boundary')">
-              <mat-icon>add_box</mat-icon>
-              Draw Boundary
-            </button>
+          <mat-tab>
+            <ng-template mat-tab-label>
+              <mat-icon>crop_free</mat-icon>
+              <span>Boundary</span>
+            </ng-template>
+            <div class="tab-content">
+            <p class="hint-text">
+              {{ boundary() ? 'Boundary is set.' : 'Boundary is not set.' }}
+              Derived from lanes' bounding box, not physical edge detection.
+            </p>
+            <p class="hint-text">Use "Draw Boundary" mode above the image, or edit below.</p>
 
             <mat-form-field appearance="outline" class="param-field">
               <mat-label>Auto-detect padding (px)</mat-label>
               <input matInput type="number" min="0" [(ngModel)]="boundaryPadding">
             </mat-form-field>
-            <button mat-stroked-button (click)="detectBoundary()" [disabled]="lanes().length === 0" matTooltip="Fit to a padded bounding box of all current lanes">
+            <button mat-icon-button (click)="detectBoundary()" [disabled]="lanes().length === 0" matTooltip="Auto-detect boundary: fit to a padded bounding box of all current lanes">
               <mat-icon>auto_awesome</mat-icon>
-              Auto-detect Boundary
             </button>
             @if (boundary(); as b) {
               <div class="lane-dimensions">
@@ -255,19 +272,19 @@
                   <input matInput type="number" min="1" [ngModel]="b.height" (ngModelChange)="updateBoundary('height', $event)">
                 </mat-form-field>
               </div>
-              <button mat-stroked-button (click)="clearBoundary()">
+              <button mat-icon-button (click)="clearBoundary()" matTooltip="Clear boundary">
                 <mat-icon>clear</mat-icon>
-                Clear Boundary
               </button>
             }
-          </mat-expansion-panel>
+            </div>
+          </mat-tab>
 
-          <mat-expansion-panel [expanded]="peakPanelExpanded()" (expandedChange)="peakPanelExpanded.set($event)">
-            <mat-expansion-panel-header>
-              <mat-panel-title><mat-icon>tune</mat-icon> Peak Detection</mat-panel-title>
-              <mat-panel-description>{{ polarity() === 'dark-bands' ? 'Dark' : 'Light' }} bands</mat-panel-description>
-            </mat-expansion-panel-header>
-
+          <mat-tab>
+            <ng-template mat-tab-label>
+              <mat-icon>tune</mat-icon>
+              <span>Peak Detection</span>
+            </ng-template>
+            <div class="tab-content">
             <mat-form-field appearance="outline" class="param-field">
               <mat-label>Smoothing window</mat-label>
               <input matInput type="number" min="0" [(ngModel)]="smoothingWindow">
@@ -290,10 +307,16 @@
             </mat-form-field>
             <mat-form-field appearance="outline" class="param-field">
               <mat-label>Polarity</mat-label>
-              <mat-select [(ngModel)]="polarity">
+              <mat-select [(ngModel)]="polarity" matTooltip="Auto detects from the image's own brightness distribution">
+                <mat-option value="auto">Auto</mat-option>
                 <mat-option value="dark-bands">Dark bands</mat-option>
                 <mat-option value="light-bands">Light bands</mat-option>
               </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="param-field">
+              <mat-label>Edge exclusion (0-0.5)</mat-label>
+              <input matInput type="number" step="0.01" min="0" max="0.5" [(ngModel)]="edgeExclusionFraction"
+                     matTooltip="Excludes this fraction of the lane's length from both ends when searching for bands, for gels where a loading well or dye front is mistaken for a band">
             </mat-form-field>
             <button mat-raised-button color="primary" (click)="recomputeAllProfiles()" [disabled]="computingProfiles() || lanes().length === 0">
               @if (computingProfiles()) {
@@ -302,14 +325,16 @@
                 Recompute All Profiles
               }
             </button>
-          </mat-expansion-panel>
+            </div>
+          </mat-tab>
 
-          <mat-expansion-panel [expanded]="calibrationPanelExpanded()" (expandedChange)="calibrationPanelExpanded.set($event)">
-            <mat-expansion-panel-header>
-              <mat-panel-title><mat-icon>show_chart</mat-icon> Calibration</mat-panel-title>
-              <mat-panel-description>{{ calibration() ? ('R² = ' + (calibration()!.rSquared | number:'1.2-2')) : 'Not fitted' }}</mat-panel-description>
-            </mat-expansion-panel-header>
-
+          <mat-tab>
+            <ng-template mat-tab-label>
+              <mat-icon>show_chart</mat-icon>
+              <span>Calibration</span>
+            </ng-template>
+            <div class="tab-content">
+            <p class="hint-text">{{ calibration() ? ('Fitted, R² = ' + (calibration()!.rSquared | number:'1.2-2')) : 'Not fitted yet.' }}</p>
             <mat-form-field appearance="outline" class="param-field">
               <mat-label>Ladder lane</mat-label>
               <mat-select [(ngModel)]="calibrationLaneId">
@@ -322,8 +347,9 @@
               Fit Calibration Curve
             </button>
             <app-gel-calibration-plot [curve]="calibration()"></app-gel-calibration-plot>
-          </mat-expansion-panel>
-        </mat-accordion>
+            </div>
+          </mat-tab>
+        </mat-tab-group>
       </div>
     </div>
 
@@ -331,19 +357,18 @@
       <mat-card-content>
         <div class="results-header">
           <h3><mat-icon>table_chart</mat-icon> Results</h3>
-          <button mat-stroked-button (click)="viewProvenance()" matTooltip="What produced this result: image hash, versions, Python environment">
+          <span class="spacer"></span>
+          <button mat-icon-button (click)="viewProvenance()" matTooltip="Provenance: what produced this result (image hash, versions, Python environment)">
             <mat-icon>verified</mat-icon>
-            Provenance
           </button>
-          <button mat-stroked-button (click)="viewRawMetadata()" matTooltip="Unparsed tags embedded in the source image file">
+          <button mat-icon-button (click)="viewRawMetadata()" matTooltip="Raw metadata: unparsed tags embedded in the source image file">
             <mat-icon>description</mat-icon>
-            Raw Metadata
           </button>
-          <button mat-stroked-button (click)="exportResults()" [disabled]="resultsRows().length === 0">
+          <button mat-icon-button (click)="exportResults()" [disabled]="resultsRows().length === 0" matTooltip="Export results as CSV">
             <mat-icon>download</mat-icon>
-            Export CSV
           </button>
         </div>
+        <div class="results-table-scroll">
         <table mat-table [dataSource]="resultsRows()" class="full-width-table">
           <ng-container matColumnDef="lane">
             <th mat-header-cell *matHeaderCellDef>Lane</th>
@@ -377,12 +402,21 @@
             <th mat-header-cell *matHeaderCellDef>% of Lane</th>
             <td mat-cell *matCellDef="let row">{{ row.relativeQuantity | number:'1.1-1' }}%</td>
           </ng-container>
+          <ng-container matColumnDef="actions">
+            <th mat-header-cell *matHeaderCellDef></th>
+            <td mat-cell *matCellDef="let row">
+              <button mat-icon-button (click)="removeBand(row.laneId, row.position); $event.stopPropagation()" matTooltip="Remove this band (e.g. a false positive)">
+                <mat-icon>close</mat-icon>
+              </button>
+            </td>
+          </ng-container>
 
           <tr mat-header-row *matHeaderRowDef="resultsColumns"></tr>
           <tr mat-row *matRowDef="let row; columns: resultsColumns;"
               (click)="selectBand(row.laneId, row.bandNumber)"
               [class.selected]="isBandSelected(row)"></tr>
         </table>
+        </div>
       </mat-card-content>
     </mat-card>
   }

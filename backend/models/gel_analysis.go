@@ -15,14 +15,11 @@ type GelLaneROI struct {
 	Height    float64   `json:"height"`
 	IsMarker  bool      `json:"isMarker"`
 	MarkerMWs []float64 `json:"markerMWs,omitempty"`
-	// LaneIndex is this lane's known 0-based position within the full expected sequence (e.g. the
-	// ladder is lane 3 of 12).
+	// LaneIndex is this lane's known 0-based position within the full expected sequence (e.g. the ladder is lane 3 of 12).
 	LaneIndex *int `json:"laneIndex,omitempty"`
 }
 
-// GelBoundary is the single working-region rectangle for a session, in source-image pixel
-// coordinates. Auto-detect derives it from currently known lanes; the user can also drag/resize
-// it manually like a lane ROI.
+// GelBoundary is the single working-region rectangle for a session, in source-image pixel coordinates.
 type GelBoundary struct {
 	X      float64 `json:"x"`
 	Y      float64 `json:"y"`
@@ -30,13 +27,14 @@ type GelBoundary struct {
 	Height float64 `json:"height"`
 }
 
-// GelPeakParams controls smoothing/baseline/peak-detection behavior for ComputeLaneProfile.
+// GelPeakParams controls smoothing/baseline/peak-detection behavior for ComputeLaneProfile. EdgeExclusionFraction (0-0.5, default 0) excludes bands whose position falls within that fraction of the lane's length from either end, for gels where a loading well or dye front produces a real, band-shaped intensity bump that isn't an actual protein band.
 type GelPeakParams struct {
-	SmoothingWindow int     `json:"smoothingWindow"`
-	MinProminence   float64 `json:"minProminence"`
-	MinDistance     int     `json:"minDistance"`
-	BaselineMethod  string  `json:"baselineMethod"`
-	Polarity        string  `json:"polarity"`
+	SmoothingWindow       int     `json:"smoothingWindow"`
+	MinProminence         float64 `json:"minProminence"`
+	MinDistance           int     `json:"minDistance"`
+	BaselineMethod        string  `json:"baselineMethod"`
+	Polarity              string  `json:"polarity"`
+	EdgeExclusionFraction float64 `json:"edgeExclusionFraction"`
 }
 
 // GelBand is one detected peak along a lane's intensity profile.
@@ -56,6 +54,15 @@ type GelLaneProfile struct {
 	Values   []float64 `json:"values"`
 	Baseline []float64 `json:"baseline"`
 	Bands    []GelBand `json:"bands"`
+}
+
+// GelBandOverride corrects one band: Excluded removes it, or a non-excluded override adds a manual band of Width centered on Position.
+type GelBandOverride struct {
+	ID       string  `json:"id"`
+	LaneID   string  `json:"laneId"`
+	Position float64 `json:"position"`
+	Width    float64 `json:"width"`
+	Excluded bool    `json:"excluded"`
 }
 
 type GelCalibrationPoint struct {
@@ -124,21 +131,47 @@ func (l GelLaneROIList) Value() (driver.Value, error) {
 	return json.Marshal(l)
 }
 
+// GelBandOverrideList is a JSON-in-TEXT-column type, mirroring GelLaneROIList.
+type GelBandOverrideList []GelBandOverride
+
+func (l *GelBandOverrideList) Scan(value interface{}) error {
+	if value == nil {
+		*l = []GelBandOverride{}
+		return nil
+	}
+
+	bytes, ok := value.([]byte)
+	if !ok {
+		*l = []GelBandOverride{}
+		return nil
+	}
+
+	return json.Unmarshal(bytes, l)
+}
+
+func (l GelBandOverrideList) Value() (driver.Value, error) {
+	if len(l) == 0 {
+		return "[]", nil
+	}
+	return json.Marshal(l)
+}
+
 // GelAnalysisSession is a reopenable "recipe" (image path, lanes, params, provenance snapshot).
 type GelAnalysisSession struct {
-	ID             uint           `gorm:"primaryKey" json:"id"`
-	Name           string         `gorm:"not null" json:"name"`
-	ImagePath      string         `gorm:"not null" json:"imagePath"`
-	Lanes          GelLaneROIList `gorm:"type:text" json:"lanes"`
-	Boundary       string         `gorm:"type:text" json:"boundary"`
-	PeakParams     string         `gorm:"type:text" json:"peakParams"`
-	Notes          string         `json:"notes"`
-	ImageSHA256    string         `json:"imageSha256"`
-	AppVersion     string         `json:"appVersion"`
-	EngineVersion  string         `json:"engineVersion"`
-	AutoDetectUsed bool           `json:"autoDetectUsed"`
-	PythonVersion  string         `json:"pythonVersion"`
-	PythonPackages StringArray    `gorm:"type:text" json:"pythonPackages"`
-	CreatedAt      int64          `gorm:"not null" json:"createdAt"`
-	UpdatedAt      int64          `gorm:"not null" json:"updatedAt"`
+	ID             uint                `gorm:"primaryKey" json:"id"`
+	Name           string              `gorm:"not null" json:"name"`
+	ImagePath      string              `gorm:"not null" json:"imagePath"`
+	Lanes          GelLaneROIList      `gorm:"type:text" json:"lanes"`
+	BandOverrides  GelBandOverrideList `gorm:"type:text" json:"bandOverrides"`
+	Boundary       string              `gorm:"type:text" json:"boundary"`
+	PeakParams     string              `gorm:"type:text" json:"peakParams"`
+	Notes          string              `json:"notes"`
+	ImageSHA256    string              `json:"imageSha256"`
+	AppVersion     string              `json:"appVersion"`
+	EngineVersion  string              `json:"engineVersion"`
+	AutoDetectUsed bool                `json:"autoDetectUsed"`
+	PythonVersion  string              `json:"pythonVersion"`
+	PythonPackages StringArray         `gorm:"type:text" json:"pythonPackages"`
+	CreatedAt      int64               `gorm:"not null" json:"createdAt"`
+	UpdatedAt      int64               `gorm:"not null" json:"updatedAt"`
 }

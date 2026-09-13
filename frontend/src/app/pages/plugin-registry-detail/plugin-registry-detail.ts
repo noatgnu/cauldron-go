@@ -141,6 +141,22 @@ export class PluginRegistryDetail implements OnInit {
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;');
 
+      // Pull code out before any other rule runs, so identifiers like `pg_matrix_file` can never
+      // be misread as emphasis/table/heading syntax by the regexes below.
+      const codeBlocks: string[] = [];
+      html = html.replace(/```([^`]*?)```/gs, (_match, code) => {
+        const token = `CODEBLOCK${codeBlocks.length}`;
+        codeBlocks.push(`<pre><code>${code}</code></pre>`);
+        return token;
+      });
+
+      const inlineCode: string[] = [];
+      html = html.replace(/`([^`]+)`/g, (_match, code) => {
+        const token = `INLINECODE${inlineCode.length}`;
+        inlineCode.push(`<code>${code}</code>`);
+        return token;
+      });
+
       html = this.parseMarkdownTables(html);
 
       html = html.replace(/^#{4}\s+(.*$)/gim, '<h4>$1</h4>')
@@ -162,16 +178,12 @@ export class PluginRegistryDetail implements OnInit {
           return match;
         });
 
-      html = html.replace(/```([^`]*?)```/gs, '<pre><code>$1</code></pre>');
-
       html = html.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>')
         .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
         .replace(/\*(.+?)\*/g, '<em>$1</em>')
         .replace(/___(.+?)___/g, '<strong><em>$1</em></strong>')
         .replace(/__(.+?)__/g, '<strong>$1</strong>')
         .replace(/_(.+?)_/g, '<em>$1</em>');
-
-      html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
 
       html = html.replace(/\n\n+/g, '</p><p>')
         .replace(/\n/g, '<br>');
@@ -184,6 +196,11 @@ export class PluginRegistryDetail implements OnInit {
         .replace(/<\/table><br>/g, '</table>')
         .replace(/<br><pre>/g, '<pre>')
         .replace(/<\/pre><br>/g, '</pre>');
+
+      // Restore protected code last, after every other rule ran over the placeholders instead of
+      // the raw code text.
+      html = html.replace(/INLINECODE(\d+)/g, (_match, i) => inlineCode[Number(i)]);
+      html = html.replace(/CODEBLOCK(\d+)/g, (_match, i) => codeBlocks[Number(i)]);
 
       return `<div>${html}</div>`;
     } catch (error) {

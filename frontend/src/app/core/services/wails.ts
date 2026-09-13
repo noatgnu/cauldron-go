@@ -35,6 +35,7 @@ export type GelLaneROI = models.GelLaneROI;
 export type GelBoundary = models.GelBoundary;
 export type GelPeakParams = models.GelPeakParams;
 export type GelBand = models.GelBand;
+export type GelBandOverride = models.GelBandOverride;
 export type GelLaneProfile = models.GelLaneProfile;
 export type GelCalibrationPoint = models.GelCalibrationPoint;
 export type GelCalibrationCurve = models.GelCalibrationCurve;
@@ -1224,6 +1225,24 @@ export class Wails {
     if (!this.isWails) throw new Error('Wails not available');
     await this.waitForBackend();
     return WailsApp.ComputeAllGelProfiles(sessionID, params);
+  }
+
+  async setGelBandOverride(sessionID: string, laneID: string, override: GelBandOverride): Promise<GelLaneProfile | null> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.SetGelBandOverride(sessionID, laneID, override);
+  }
+
+  async removeGelBandOverride(sessionID: string, laneID: string, overrideID: string): Promise<GelLaneProfile | null> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.RemoveGelBandOverride(sessionID, laneID, overrideID);
+  }
+
+  async getGelBandOverrides(sessionID: string, laneID: string): Promise<GelBandOverride[]> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.GetGelBandOverrides(sessionID, laneID);
   }
 
   async fitGelCalibrationCurve(sessionID: string, markerLaneID: string): Promise<GelCalibrationCurve | null> {

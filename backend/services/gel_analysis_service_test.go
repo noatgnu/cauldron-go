@@ -439,6 +439,150 @@ func TestGelAnalysisService_SaveAndReloadSession(t *testing.T) {
 	}
 }
 
+func TestGelAnalysisService_SetBandOverride_ExcludesBand(t *testing.T) {
+	svc, _ := newTestGelAnalysisService(t)
+
+	path := filepath.Join(t.TempDir(), "band-override.png")
+	values := gaussianProfile(100, 1000, map[int]float64{25: 5000, 75: 4000}, 3)
+	writeSingleColumnGray16(t, path, values)
+
+	meta, err := svc.LoadImage(path)
+	if err != nil {
+		t.Fatalf("LoadImage: %v", err)
+	}
+	lane := models.GelLaneROI{ID: "lane1", Label: "Lane 1", X: 0, Y: 0, Width: 1, Height: 100}
+	if err := svc.SetLane(meta.SessionID, lane); err != nil {
+		t.Fatalf("SetLane: %v", err)
+	}
+
+	params := models.GelPeakParams{Polarity: "light-bands", MinDistance: 5}
+	profile, err := svc.ComputeLaneProfile(meta.SessionID, "lane1", params)
+	if err != nil {
+		t.Fatalf("ComputeLaneProfile: %v", err)
+	}
+	if len(profile.Bands) != 2 {
+		t.Fatalf("expected 2 bands before exclusion, got %d: %+v", len(profile.Bands), profile.Bands)
+	}
+	falsePositive := profile.Bands[0]
+
+	updated, err := svc.SetBandOverride(meta.SessionID, "lane1", models.GelBandOverride{
+		ID: "override1", LaneID: "lane1", Position: falsePositive.Position, Excluded: true,
+	})
+	if err != nil {
+		t.Fatalf("SetBandOverride: %v", err)
+	}
+	if len(updated.Bands) != 1 {
+		t.Fatalf("expected 1 band after exclusion, got %d: %+v", len(updated.Bands), updated.Bands)
+	}
+	if updated.Bands[0].Position == falsePositive.Position {
+		t.Errorf("excluded band position %v is still present", falsePositive.Position)
+	}
+	if updated.Bands[0].RelativeQuantity != 100 {
+		t.Errorf("remaining band RelativeQuantity = %v, want 100 (sole survivor)", updated.Bands[0].RelativeQuantity)
+	}
+}
+
+func TestGelAnalysisService_RemoveBandOverride_RestoresBand(t *testing.T) {
+	svc, _ := newTestGelAnalysisService(t)
+
+	path := filepath.Join(t.TempDir(), "band-override-remove.png")
+	values := gaussianProfile(100, 1000, map[int]float64{25: 5000, 75: 4000}, 3)
+	writeSingleColumnGray16(t, path, values)
+
+	meta, err := svc.LoadImage(path)
+	if err != nil {
+		t.Fatalf("LoadImage: %v", err)
+	}
+	lane := models.GelLaneROI{ID: "lane1", Label: "Lane 1", X: 0, Y: 0, Width: 1, Height: 100}
+	if err := svc.SetLane(meta.SessionID, lane); err != nil {
+		t.Fatalf("SetLane: %v", err)
+	}
+
+	params := models.GelPeakParams{Polarity: "light-bands", MinDistance: 5}
+	profile, err := svc.ComputeLaneProfile(meta.SessionID, "lane1", params)
+	if err != nil {
+		t.Fatalf("ComputeLaneProfile: %v", err)
+	}
+	target := profile.Bands[0]
+
+	if _, err := svc.SetBandOverride(meta.SessionID, "lane1", models.GelBandOverride{
+		ID: "override1", LaneID: "lane1", Position: target.Position, Excluded: true,
+	}); err != nil {
+		t.Fatalf("SetBandOverride: %v", err)
+	}
+
+	overrides, err := svc.GetBandOverrides(meta.SessionID, "lane1")
+	if err != nil || len(overrides) != 1 {
+		t.Fatalf("GetBandOverrides: %v, %+v", err, overrides)
+	}
+
+	restored, err := svc.RemoveBandOverride(meta.SessionID, "lane1", "override1")
+	if err != nil {
+		t.Fatalf("RemoveBandOverride: %v", err)
+	}
+	if len(restored.Bands) != 2 {
+		t.Fatalf("expected 2 bands after removing the override, got %d: %+v", len(restored.Bands), restored.Bands)
+	}
+
+	overrides, err = svc.GetBandOverrides(meta.SessionID, "lane1")
+	if err != nil || len(overrides) != 0 {
+		t.Fatalf("expected 0 overrides after removal, got %v, %+v", err, overrides)
+	}
+}
+
+func TestGelAnalysisService_SaveAndReloadSession_PreservesBandOverrides(t *testing.T) {
+	svc, _ := newTestGelAnalysisService(t)
+
+	path := filepath.Join(t.TempDir(), "save-reload-overrides.png")
+	values := gaussianProfile(100, 1000, map[int]float64{25: 5000, 75: 4000}, 3)
+	writeSingleColumnGray16(t, path, values)
+
+	meta, err := svc.LoadImage(path)
+	if err != nil {
+		t.Fatalf("LoadImage: %v", err)
+	}
+	lane := models.GelLaneROI{ID: "lane1", Label: "Lane 1", X: 0, Y: 0, Width: 1, Height: 100}
+	if err := svc.SetLane(meta.SessionID, lane); err != nil {
+		t.Fatalf("SetLane: %v", err)
+	}
+
+	params := models.GelPeakParams{Polarity: "light-bands", MinDistance: 5}
+	profile, err := svc.ComputeLaneProfile(meta.SessionID, "lane1", params)
+	if err != nil {
+		t.Fatalf("ComputeLaneProfile: %v", err)
+	}
+	target := profile.Bands[0]
+
+	if _, err := svc.SetBandOverride(meta.SessionID, "lane1", models.GelBandOverride{
+		ID: "override1", LaneID: "lane1", Position: target.Position, Excluded: true,
+	}); err != nil {
+		t.Fatalf("SetBandOverride: %v", err)
+	}
+
+	id, err := svc.SaveSession(meta.SessionID, "Session With Overrides")
+	if err != nil {
+		t.Fatalf("SaveSession: %v", err)
+	}
+
+	reopenedMeta, err := svc.LoadSavedSession(id)
+	if err != nil {
+		t.Fatalf("LoadSavedSession: %v", err)
+	}
+
+	reopenedOverrides, err := svc.GetBandOverrides(reopenedMeta.SessionID, "lane1")
+	if err != nil || len(reopenedOverrides) != 1 || reopenedOverrides[0].ID != "override1" {
+		t.Fatalf("expected the saved band override to be restored, got %v, %+v", err, reopenedOverrides)
+	}
+
+	reopenedProfile, err := svc.ComputeLaneProfile(reopenedMeta.SessionID, "lane1", params)
+	if err != nil {
+		t.Fatalf("ComputeLaneProfile after reload: %v", err)
+	}
+	if len(reopenedProfile.Bands) != 1 {
+		t.Fatalf("expected the restored exclusion to still apply, got %d bands: %+v", len(reopenedProfile.Bands), reopenedProfile.Bands)
+	}
+}
+
 func TestGelAnalysisService_ExportResultsCSV(t *testing.T) {
 	svc, _ := newTestGelAnalysisService(t)
 
