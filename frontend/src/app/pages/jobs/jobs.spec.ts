@@ -85,4 +85,37 @@ describe('Jobs', () => {
       expect(routerMock.navigate).toHaveBeenCalledWith(['/jobs', job.id]);
     });
   });
+
+  describe('constructing with a job update already pending', () => {
+    it('does not loop forever reconciling the jobs list', async () => {
+      const job = { id: 'job-1', name: 'Test Job', type: 'pca-analysis', status: 'completed', createdAt: Date.now() };
+      const presetWailsMock = {
+        getAllJobs: vi.fn().mockResolvedValue([job]),
+        getJobQueueStatus: vi.fn().mockResolvedValue({ status: 'running' }),
+        queueStatus: signal({ status: 'running' }),
+        jobUpdate: signal(job),
+        progress: signal({ type: 'script', id: job.id, message: 'done', percentage: 100, status: 'completed' }),
+        logToFile: vi.fn().mockResolvedValue(undefined)
+      };
+
+      TestBed.resetTestingModule();
+      await TestBed.configureTestingModule({
+        imports: [Jobs, NoopAnimationsModule],
+        providers: [
+          { provide: Wails, useValue: presetWailsMock },
+          { provide: NotificationService, useValue: notificationMock },
+          { provide: Router, useValue: routerMock },
+          { provide: MatDialog, useValue: dialogMock }
+        ]
+      }).compileComponents();
+
+      const presetFixture = TestBed.createComponent(Jobs);
+      presetFixture.detectChanges();
+      await presetFixture.whenStable();
+
+      const jobs = (presetFixture.componentInstance as any).jobs();
+      expect(jobs).toHaveLength(1);
+      expect(jobs[0].id).toBe(job.id);
+    });
+  });
 });

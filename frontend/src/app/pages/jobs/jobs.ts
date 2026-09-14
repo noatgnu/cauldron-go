@@ -1,4 +1,4 @@
-import { Component, OnInit, signal, ChangeDetectionStrategy, effect } from '@angular/core';
+import { Component, OnInit, signal, ChangeDetectionStrategy, effect, untracked } from '@angular/core';
 import { Router } from '@angular/router';
 import { MatCardModule } from '@angular/material/card';
 import { MatChipsModule } from '@angular/material/chips';
@@ -61,7 +61,7 @@ export class Jobs implements OnInit {
       const job = this.wails.jobUpdate();
       if (!job) return;
 
-      const currentJobs = this.jobs();
+      const currentJobs = untracked(() => this.jobs());
       const index = currentJobs.findIndex(j => j.id === job.id);
 
       if (index >= 0) {
@@ -79,7 +79,7 @@ export class Jobs implements OnInit {
 
       if (progress.type === 'script' || progress.type === 'analysis') {
         const jobId = progress.id;
-        const currentProgress = this.jobProgress();
+        const currentProgress = untracked(() => this.jobProgress());
 
         if (progress.status === 'completed' || progress.status === 'error') {
           const { [jobId]: _, ...rest } = currentProgress;
