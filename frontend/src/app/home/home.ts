@@ -1,4 +1,4 @@
-import { Component, OnInit, signal, computed, ChangeDetectionStrategy, effect } from '@angular/core';
+import { Component, OnInit, signal, computed, ChangeDetectionStrategy, effect, untracked } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { MatCardModule } from '@angular/material/card';
@@ -67,7 +67,7 @@ export class Home implements OnInit {
     effect(() => {
       const job = this.wails.jobUpdate();
       if (job) {
-        const currentJobs = this.jobs();
+        const currentJobs = untracked(() => this.jobs());
         const index = currentJobs.findIndex(j => j.id === job.id);
         if (index >= 0) {
           const updated = [...currentJobs];

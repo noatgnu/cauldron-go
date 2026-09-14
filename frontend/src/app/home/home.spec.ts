@@ -1,4 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { signal } from '@angular/core';
 import { vi } from 'vitest';
 
 import { Home } from './home';
@@ -70,5 +71,16 @@ describe('Home', () => {
     fixture.detectChanges();
     const el: HTMLElement = fixture.nativeElement;
     expect(el.querySelector('.debug-card')).not.toBeNull();
+  });
+
+  it('does not loop forever reconciling the jobs list when a job update is already pending on construction', async () => {
+    const job = { id: 'job-1', name: 'Test Job', type: 'pca-analysis', status: 'completed', createdAt: Date.now() };
+    wailsMock.jobUpdate = signal(job);
+    createComponent();
+    await fixture.whenStable();
+
+    const jobs = (component as any).jobs();
+    expect(jobs).toHaveLength(1);
+    expect(jobs[0].id).toBe(job.id);
   });
 });
