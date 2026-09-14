@@ -1,0 +1,27 @@
+<div class="login-page">
+  <mat-card class="login-card">
+    <mat-card-content>
+      <h2>Cauldron Server</h2>
+      <p class="hint">Enter the server access token to continue.</p>
+
+      <form (ngSubmit)="submit()">
+        <mat-form-field appearance="outline" class="full-width-field">
+          <mat-label>Access Token</mat-label>
+          <input matInput type="password" name="token" [ngModel]="token()" (ngModelChange)="token.set($event)" [disabled]="loading()" autofocus>
+        </mat-form-field>
+
+        @if (error()) {
+          <p class="error">{{ error() }}</p>
+        }
+
+        <button mat-raised-button color="primary" type="submit" [disabled]="loading() || !token()">
+          @if (loading()) {
+            <mat-spinner diameter="18"></mat-spinner>
+          } @else {
+            Sign In
+          }
+        </button>
+      </form>
+    </mat-card-content>
+  </mat-card>
+</div>

@@ -16,9 +16,13 @@
         mat-raised-button
         color="primary"
         (click)="installPlugin()"
-        [disabled]="isInstalled()">
-        <mat-icon>{{ isInstalled() ? 'check_circle' : 'download' }}</mat-icon>
-        {{ isInstalled() ? 'Installed' : 'Install Plugin' }}
+        [disabled]="isInstalled() || checkingDependencies()">
+        @if (checkingDependencies()) {
+          <mat-spinner diameter="18"></mat-spinner>
+        } @else {
+          <mat-icon>{{ isInstalled() ? 'check_circle' : 'download' }}</mat-icon>
+        }
+        {{ checkingDependencies() ? 'Checking plugin...' : (isInstalled() ? 'Installed' : 'Install Plugin') }}
       </button>
     </div>
 

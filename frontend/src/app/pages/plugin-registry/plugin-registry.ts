@@ -53,6 +53,7 @@ export class PluginRegistry implements OnInit {
   protected loading = signal(false);
   protected loadingCategories = signal(false);
   protected totalCount = signal(0);
+  protected checkingPluginId = signal<string | null>(null);
   protected pageSize = 10;
   protected pageIndex = 0;
   protected installedPluginRepos = signal<Set<string>>(new Set());
@@ -207,6 +208,7 @@ export class PluginRegistry implements OnInit {
       let hasRDeps = false;
       let runtimeEnvironments: string[] = [];
 
+      this.checkingPluginId.set(plugin.id);
       try {
         const deps = await this.wails.fetchPluginDependencies(plugin.repository);
         await this.wails.logToFile(`[PluginRegistry] Raw deps response: ${JSON.stringify(deps)}`);
@@ -219,6 +221,8 @@ export class PluginRegistry implements OnInit {
         if (plugin.runtime?.environments) {
           runtimeEnvironments = plugin.runtime.environments;
         }
+      } finally {
+        this.checkingPluginId.set(null);
       }
 
       await this.wails.logToFile(`[PluginRegistry] Opening install dialog for: ${plugin.name}`);

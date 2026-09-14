@@ -1,5 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, Router } from '@angular/router';
+import { MatDialog } from '@angular/material/dialog';
 import { PluginRegistryDetail } from './plugin-registry-detail';
 import { Wails } from '../../core/services/wails';
 import { NotificationService } from '../../core/services/notification.service';
@@ -18,6 +19,7 @@ describe('PluginRegistryDetail', () => {
   let notificationMock: any;
   let pluginV2ServiceMock: any;
   let sanitizerMock: any;
+  let dialogMock: any;
 
   beforeEach(async () => {
     activatedRouteMock = {
@@ -47,6 +49,9 @@ describe('PluginRegistryDetail', () => {
     sanitizerMock = {
       bypassSecurityTrustHtml: vi.fn().mockImplementation((val) => val)
     };
+    dialogMock = {
+      open: vi.fn().mockReturnValue({ afterClosed: () => of(undefined) })
+    };
 
     await TestBed.configureTestingModule({
       imports: [PluginRegistryDetail, NoopAnimationsModule],
@@ -59,6 +64,8 @@ describe('PluginRegistryDetail', () => {
         { provide: DomSanitizer, useValue: sanitizerMock }
       ]
     })
+    // overrideProvider reliably replaces MatDialog even though the component imports MatDialogModule itself.
+    .overrideProvider(MatDialog, { useValue: dialogMock })
     .compileComponents();
 
     fixture = TestBed.createComponent(PluginRegistryDetail);
@@ -68,6 +75,41 @@ describe('PluginRegistryDetail', () => {
 
   it('should create', () => {
     expect(component).toBeTruthy();
+  });
+
+  describe('installPlugin', () => {
+    beforeEach(() => {
+      (component as any).plugin.set({
+        id: '1',
+        name: 'Test',
+        description: 'Test',
+        repository: 'https://github.com/test/repo',
+        author: { name: 'Test' }
+      });
+    });
+
+    it('sets checkingDependencies while fetching and clears it on success', async () => {
+      let sawCheckingTrue = false;
+      wailsMock.fetchPluginDependencies = vi.fn().mockImplementation(async () => {
+        sawCheckingTrue = (component as any).checkingDependencies();
+        return { hasPythonDeps: false, hasRDeps: true, runtimeEnvironments: ['r'] };
+      });
+
+      await component.installPlugin();
+
+      expect(sawCheckingTrue).toBe(true);
+      expect((component as any).checkingDependencies()).toBe(false);
+      expect(dialogMock.open).toHaveBeenCalled();
+    });
+
+    it('clears checkingDependencies even when the dependency fetch fails', async () => {
+      wailsMock.fetchPluginDependencies = vi.fn().mockRejectedValue(new Error('network error'));
+
+      await component.installPlugin();
+
+      expect((component as any).checkingDependencies()).toBe(false);
+      expect(dialogMock.open).toHaveBeenCalled();
+    });
   });
 
   describe('convertMarkdownToHtml', () => {

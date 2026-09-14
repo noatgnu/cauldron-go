@@ -554,6 +554,47 @@ build_wails() {
     fi
 }
 
+build_server_platform() {
+    PLATFORM="${1:-linux/amd64}"
+
+    if [ ! -f "$PROJECT_ROOT/resources/licenses/go-licenses.json" ] || [ ! -f "$PROJECT_ROOT/resources/licenses/npm-licenses.json" ]; then
+        generate_licenses
+    fi
+
+    build_external_tools "$PLATFORM"
+    print_header "Building Cauldron Server ($PLATFORM)"
+    cd "$PROJECT_ROOT"
+
+    local os_part="${PLATFORM%/*}"
+    local arch_part="${PLATFORM#*/}"
+    local platform_dir="$PROJECT_ROOT/build/bin/${os_part}-${arch_part}"
+    mkdir -p "$platform_dir"
+
+    local output_name="cauldron-server"
+    if [ "$os_part" = "windows" ]; then
+        output_name="cauldron-server.exe"
+    fi
+
+    # -tags server excludes every desktop/cgo file at the SDK level, so this never needs a cross-compiler.
+    echo "Building headless server for $os_part/$arch_part (CGO disabled, -tags server)..."
+    if CGO_ENABLED=0 GOOS="$os_part" GOARCH="$arch_part" go build -tags server -ldflags="$LDFLAGS" -o "$platform_dir/$output_name" . 2>&1 | tee "/tmp/cauldron-server-build-${os_part}-${arch_part}.log"; then
+        if grep -q "undefined:" "/tmp/cauldron-server-build-${os_part}-${arch_part}.log"; then
+            print_error "Cauldron server build failed for $PLATFORM"
+            echo "Check /tmp/cauldron-server-build-${os_part}-${arch_part}.log for details"
+            exit 1
+        fi
+        copy_resources "$platform_dir" "$PLATFORM" || print_error "Warning: Failed to copy some resources, but build succeeded"
+        print_success "Cauldron server built for $PLATFORM"
+        echo ""
+        echo "Executable location: $platform_dir/$output_name"
+        ls -lh "$platform_dir/$output_name"
+    else
+        print_error "Cauldron server build failed for $PLATFORM"
+        echo "Check /tmp/cauldron-server-build-${os_part}-${arch_part}.log for details"
+        exit 1
+    fi
+}
+
 build_wails_with_task() {
     PLATFORM="${1:-windows/amd64}"
 
@@ -789,6 +830,7 @@ Commands:
   bindings              Generate Wails v3 bindings
   icons                 Generate application icons (PNG, ICO, ICNS, Windows resources)
   wails [PLATFORM]      Build the Wails v3 application (default: windows/amd64)
+  server [PLATFORM]     Build the headless Cauldron server (-tags server, no cgo)
   wails-task [PLATFORM] Build using Taskfile (requires 'task' CLI)
   all-platforms         Build for all supported platforms (windows, linux, darwin)
   tools                 Build developer tools (plugin-validator, etc.)
@@ -828,6 +870,7 @@ Examples:
   ./build.sh tools                    # Build developer tools
   ./build.sh external linux/amd64     # Build external utilities for Linux
   ./build.sh wails linux/amd64        # Build Wails app for Linux
+  ./build.sh server linux/amd64       # Build the headless server for Linux
   ./build.sh wails-task linux/amd64   # Build using Taskfile
   ./build.sh dev                      # Start development server
   ./build.sh rebuild --skip-licenses  # Clean and rebuild without licenses
@@ -858,6 +901,19 @@ case "$COMMAND" in
         ;;
     wails)
         build_wails "$PLATFORM"
+        ;;
+    server)
+        build_dev_tools
+        if [ "$SKIP_LICENSES" = false ]; then
+            generate_licenses
+        else
+            echo "Skipping license generation (--skip-licenses flag provided)"
+        fi
+        build_shared_lib
+        build_frontend
+        build_server_platform "$PLATFORM"
+        print_header "Server Build Complete!"
+        print_success "Cauldron server ready to run"
         ;;
     wails-task)
         build_wails_with_task "$PLATFORM"

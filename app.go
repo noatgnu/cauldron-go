@@ -58,6 +58,7 @@ type App struct {
 	gelAnalysisService     *services.GelAnalysisService
 	stagedUploadService    *services.StagedUploadService
 	jobOutputBatcher       *services.JobOutputBatcher
+	serverAuthService      *services.ServerAuthService
 	ready                  chan bool
 	logFilePath            string
 	appVersion             string
@@ -118,6 +119,17 @@ func (a *App) Initialize() {
 	}
 	a.db = db
 	log.Println("[App.Initialize] Database initialized successfully")
+
+	if isServerMode() {
+		authService, err := services.NewServerAuthService(a.db)
+		if err != nil {
+			log.Printf("[App.Initialize] ERROR: Failed to initialize server auth: %v\n", err)
+			return
+		}
+		a.serverAuthService = authService
+		log.Printf("=== Cauldron server auth token (save this): %s ===\n", authService.Token())
+		fmt.Printf("=== Cauldron server auth token (save this): %s ===\n", authService.Token())
+	}
 
 	log.Println("[App.Initialize] Initializing services...")
 	a.settings = services.NewSettingsServiceV3(db)

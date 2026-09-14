@@ -186,6 +186,10 @@ jobs:
           CGO_ENABLED=0 go build -ldflags="-s -w -H windowsgui -X main.appVersion=${{ github.ref_name }}" -o build/bin/windows-amd64/cauldron.exe .
         shell: bash
 
+      - name: Build Server Binary
+        run: CGO_ENABLED=0 go build -tags server -ldflags="-s -w -X main.appVersion=${{ github.ref_name }}" -o build/bin/windows-amd64/cauldron-server.exe .
+        shell: bash
+
       - name: Copy Resources
         run: |
           cp -r examples build/bin/windows-amd64/
@@ -216,7 +220,7 @@ jobs:
       - name: Create Archive
         run: |
           cd build/bin/windows-amd64
-          7z a ../../../cauldron-windows-amd64.zip cauldron.exe examples/ scripts/ plugins/ tools/
+          7z a ../../../cauldron-windows-amd64.zip cauldron.exe cauldron-server.exe examples/ scripts/ plugins/ tools/
         shell: bash
 
       - name: Upload Artifact
@@ -372,6 +376,9 @@ jobs:
           mkdir -p build/bin/linux-amd64
           CGO_ENABLED=1 go build -tags gtk4 -ldflags="-s -w -X main.appVersion=${{ github.ref_name }}" -o build/bin/linux-amd64/cauldron .
 
+      - name: Build Server Binary
+        run: CGO_ENABLED=0 go build -tags server -ldflags="-s -w -X main.appVersion=${{ github.ref_name }}" -o build/bin/linux-amd64/cauldron-server .
+
       - name: Clean up test environments
         run: |
           rm -rf R python cpython*.tar.gz cooker
@@ -403,7 +410,7 @@ jobs:
       - name: Create Archive
         run: |
           cd build/bin/linux-amd64
-          XZ_OPT=-9 tar -cJf ../../../cauldron-linux-amd64.tar.xz cauldron examples/ scripts/ plugins/ tools/
+          XZ_OPT=-9 tar -cJf ../../../cauldron-linux-amd64.tar.xz cauldron cauldron-server examples/ scripts/ plugins/ tools/
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
@@ -543,6 +550,9 @@ jobs:
           mkdir -p build/bin/darwin-arm64
           CGO_ENABLED=1 go build -ldflags="-s -w -X main.appVersion=${{ github.ref_name }}" -o build/bin/darwin-arm64/cauldron .
 
+      - name: Build Server Binary
+        run: CGO_ENABLED=0 go build -tags server -ldflags="-s -w -X main.appVersion=${{ github.ref_name }}" -o build/bin/darwin-arm64/cauldron-server .
+
       - name: Verify Build
         run: ls -l build/bin/darwin-arm64/
 
@@ -577,7 +587,7 @@ jobs:
       - name: Create Archive
         run: |
           cd build/bin/darwin-arm64
-          XZ_OPT=-9 tar -cJf ../../../cauldron-darwin-arm64.tar.xz cauldron examples/ scripts/ plugins/ tools/
+          XZ_OPT=-9 tar -cJf ../../../cauldron-darwin-arm64.tar.xz cauldron cauldron-server examples/ scripts/ plugins/ tools/
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4

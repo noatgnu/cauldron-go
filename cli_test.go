@@ -723,3 +723,64 @@ func TestCLIDbBackupAndRestore_Integration(t *testing.T) {
 		t.Errorf("expected restore output to report settings restored, got: %q", restoreOutput)
 	}
 }
+
+func TestNewTerminalOutputLines_FirstCallReturnsEverything(t *testing.T) {
+	lines, truncated := newTerminalOutputLines([]string{"a", "b"}, "", false)
+	if truncated {
+		t.Error("expected no truncation on the first call")
+	}
+	if len(lines) != 2 || lines[0] != "a" || lines[1] != "b" {
+		t.Errorf("lines = %v, want [a b]", lines)
+	}
+}
+
+func TestNewTerminalOutputLines_ReturnsOnlyLinesAfterLastSeen(t *testing.T) {
+	lines, truncated := newTerminalOutputLines([]string{"a", "b", "c"}, "b", true)
+	if truncated {
+		t.Error("expected no truncation when lastSeen is still present")
+	}
+	if len(lines) != 1 || lines[0] != "c" {
+		t.Errorf("lines = %v, want [c]", lines)
+	}
+}
+
+func TestNewTerminalOutputLines_NoNewLinesWhenLastSeenIsMostRecent(t *testing.T) {
+	lines, truncated := newTerminalOutputLines([]string{"a", "b", "c"}, "c", true)
+	if truncated {
+		t.Error("expected no truncation when lastSeen is the most recent line")
+	}
+	if len(lines) != 0 {
+		t.Errorf("expected no new lines, got %v", lines)
+	}
+}
+
+func TestNewTerminalOutputLines_DetectsRollingBufferEviction(t *testing.T) {
+	// Simulates the 100-line cap: lastSeen has been evicted from the front of the buffer.
+	lines, truncated := newTerminalOutputLines([]string{"d", "e", "f"}, "a", true)
+	if !truncated {
+		t.Error("expected truncation to be detected when lastSeen is no longer present")
+	}
+	if len(lines) != 3 || lines[0] != "d" {
+		t.Errorf("expected all current lines to be treated as new after truncation, got %v", lines)
+	}
+}
+
+func TestNewTerminalOutputLines_HandlesDuplicateLinesByMostRecentOccurrence(t *testing.T) {
+	lines, truncated := newTerminalOutputLines([]string{"x", "y", "x", "z"}, "x", true)
+	if truncated {
+		t.Error("expected no truncation: 'x' is still present")
+	}
+	if len(lines) != 1 || lines[0] != "z" {
+		t.Errorf("expected to resync at the most recent occurrence of 'x', got %v", lines)
+	}
+}
+
+func TestNewTerminalOutputLines_EmptyOutputAfterHavingSeenLines(t *testing.T) {
+	lines, truncated := newTerminalOutputLines(nil, "a", true)
+	if !truncated {
+		t.Error("expected truncation when the buffer is now empty but lines were previously seen")
+	}
+	if len(lines) != 0 {
+		t.Errorf("expected no lines from an empty buffer, got %v", lines)
+	}
+}
