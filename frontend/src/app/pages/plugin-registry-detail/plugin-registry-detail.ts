@@ -37,6 +37,7 @@ export class PluginRegistryDetail implements OnInit {
   protected loading = signal(false);
   protected readmeHtml = signal<SafeHtml>('');
   protected isInstalled = signal(false);
+  protected checkingDependencies = signal(false);
 
   inputColumns = ['name', 'type', 'required', 'default', 'description'];
   outputColumns = ['name', 'type', 'description'];
@@ -309,6 +310,7 @@ export class PluginRegistryDetail implements OnInit {
       let hasRDeps = false;
       let runtimeEnvironments: string[] = [];
 
+      this.checkingDependencies.set(true);
       try {
         const deps = await this.wails.fetchPluginDependencies(plugin.repository);
         await this.wails.logToFile(`[PluginRegistryDetail] Raw deps response: ${JSON.stringify(deps)}`);
@@ -321,6 +323,8 @@ export class PluginRegistryDetail implements OnInit {
         if (plugin.runtime?.environments) {
           runtimeEnvironments = plugin.runtime.environments;
         }
+      } finally {
+        this.checkingDependencies.set(false);
       }
 
       await this.wails.logToFile(`[PluginRegistryDetail] Opening install dialog for: ${plugin.name}`);

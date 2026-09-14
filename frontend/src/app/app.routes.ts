@@ -11,25 +11,33 @@ import { PluginRegistry } from './pages/plugin-registry/plugin-registry';
 import { PluginRegistryDetail } from './pages/plugin-registry-detail/plugin-registry-detail';
 import { About } from './pages/about/about';
 import { TableBrowser } from './pages/table-browser/table-browser';
+import { authGuard } from './core/guards/auth.guard';
 
 export const routes: Routes = [
-  { path: '', redirectTo: 'home', pathMatch: 'full' },
-  { path: 'home', component: Home },
-  { path: 'about', component: About },
-  { path: 'settings', redirectTo: 'settings/general', pathMatch: 'full' },
-  { path: 'settings/:section', component: Settings },
-  { path: 'jobs', component: Jobs },
-  { path: 'jobs/:id', component: JobDetail },
-  { path: 'job/:id', component: JobDetail },
-  { path: 'plugins', component: Plugins },
-  { path: 'plugin-list', component: PluginList },
-  { path: 'plugin-registry', component: PluginRegistry },
-  { path: 'plugin-registry/:id', component: PluginRegistryDetail },
-  { path: 'plugin/:id', component: PluginExecute },
-  { path: 'plugin-editor', component: PluginEditor },
-  { path: 'plugin-editor/new', component: PluginEditor },
-  { path: 'plugin-editor/:id', component: PluginEditor },
-  { path: 'table-browser', component: TableBrowser },
-  { path: 'gel-analysis', loadComponent: () => import('./pages/gel-analysis/gel-analysis').then(m => m.GelAnalysis) },
-  { path: '**', redirectTo: '' }
+  { path: 'login', loadComponent: () => import('./pages/login/login').then(m => m.Login) },
+  {
+    path: '',
+    canActivateChild: [authGuard],
+    children: [
+      { path: '', redirectTo: 'home', pathMatch: 'full' },
+      { path: 'home', component: Home },
+      { path: 'about', component: About },
+      { path: 'settings', redirectTo: 'settings/general', pathMatch: 'full' },
+      { path: 'settings/:section', component: Settings },
+      { path: 'jobs', component: Jobs },
+      { path: 'jobs/:id', component: JobDetail },
+      { path: 'job/:id', component: JobDetail },
+      { path: 'plugins', component: Plugins },
+      { path: 'plugin-list', component: PluginList },
+      { path: 'plugin-registry', component: PluginRegistry },
+      { path: 'plugin-registry/:id', component: PluginRegistryDetail },
+      { path: 'plugin/:id', component: PluginExecute },
+      { path: 'plugin-editor', component: PluginEditor },
+      { path: 'plugin-editor/new', component: PluginEditor },
+      { path: 'plugin-editor/:id', component: PluginEditor },
+      { path: 'table-browser', component: TableBrowser },
+      { path: 'gel-analysis', loadComponent: () => import('./pages/gel-analysis/gel-analysis').then(m => m.GelAnalysis) },
+      { path: '**', redirectTo: '' }
+    ]
+  }
 ];

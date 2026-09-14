@@ -869,7 +869,8 @@ func coercePluginParams(plugin *models.PluginV2, params map[string]interface{}) 
 // waitForJob polls a job until it reaches a terminal status, printing new output lines as they appear, since the process must stay alive for the queue's workers to run it at all.
 func waitForJob(ctx *cliContext, jobID string, timeout time.Duration) (*models.Job, error) {
 	deadline := time.Now().Add(timeout)
-	printedLines := 0
+	var lastPrinted string
+	printedAny := false
 
 	for {
 		job, err := ctx.jobQueue.GetJob(jobID)
@@ -877,11 +878,16 @@ func waitForJob(ctx *cliContext, jobID string, timeout time.Duration) (*models.J
 			return nil, fmt.Errorf("failed to look up job: %w", err)
 		}
 
-		if len(job.TerminalOutput) > printedLines {
-			for _, line := range job.TerminalOutput[printedLines:] {
-				fmt.Println("   ", line)
-			}
-			printedLines = len(job.TerminalOutput)
+		newLines, truncated := newTerminalOutputLines(job.TerminalOutput, lastPrinted, printedAny)
+		if truncated {
+			fmt.Println("    ... (earlier output omitted; job exceeded the retained line buffer) ...")
+		}
+		for _, line := range newLines {
+			fmt.Println("   ", line)
+		}
+		if len(job.TerminalOutput) > 0 {
+			lastPrinted = job.TerminalOutput[len(job.TerminalOutput)-1]
+			printedAny = true
 		}
 
 		if job.Status == models.JobStatusCompleted || job.Status == models.JobStatusFailed {
@@ -894,6 +900,21 @@ func waitForJob(ctx *cliContext, jobID string, timeout time.Duration) (*models.J
 
 		time.Sleep(500 * time.Millisecond)
 	}
+}
+
+// newTerminalOutputLines returns the lines in output that come after lastSeen, tracking by content
+// rather than array length since TerminalOutput is a rolling window that can evict old lines --
+// a plain length comparison silently stops detecting new lines forever once that eviction starts.
+func newTerminalOutputLines(output []string, lastSeen string, hasSeen bool) (newLines []string, truncated bool) {
+	if !hasSeen {
+		return output, false
+	}
+	for i := len(output) - 1; i >= 0; i-- {
+		if output[i] == lastSeen {
+			return output[i+1:], false
+		}
+	}
+	return output, true
 }
 
 func cliJobList() error {

@@ -6,6 +6,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { Events, Window } from '@wailsio/runtime';
 import { Sidenav } from './layout/sidenav/sidenav';
 import { Breadcrumbs } from './layout/breadcrumbs/breadcrumbs';
+import { QuickNav } from './layout/quick-nav/quick-nav';
 import { ProtocolHandlerService } from './core/services/protocol-handler.service';
 import { LoadingScreenComponent } from './components/loading-screen/loading-screen';
 import { LoadingService } from './services/loading';
@@ -18,7 +19,7 @@ import { ConfirmPluginInstallation, SaveGitAuthConfig, ConfirmPluginInstallation
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, MatSidenavModule, Sidenav, Breadcrumbs, LoadingScreenComponent],
+  imports: [RouterOutlet, MatSidenavModule, Sidenav, Breadcrumbs, QuickNav, LoadingScreenComponent],
   templateUrl: './app.html',
   styleUrl: './app.scss',
   changeDetection: ChangeDetectionStrategy.OnPush

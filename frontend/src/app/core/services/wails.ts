@@ -114,10 +114,21 @@ export class Wails {
   bindingsUpdated: Signal<number> = this._bindingsUpdated.asReadonly();
 
   constructor() {
-    this._backendReadyPromise = this.isWails
-      ? WailsApp.GetPluginsV2().then(() => { this._backendReady = true; })
-      : Promise.resolve();
+    this._backendReadyPromise = this.isWails ? this.probeBackendReady() : Promise.resolve();
     this.setupEventListeners();
+  }
+
+  // Retries instead of rejecting permanently, since a pre-login 401 in server mode would otherwise block waitForBackend() forever.
+  private async probeBackendReady(): Promise<void> {
+    for (;;) {
+      try {
+        await WailsApp.GetPluginsV2();
+        this._backendReady = true;
+        return;
+      } catch {
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+    }
   }
 
   private waitForBackend(): Promise<void> {

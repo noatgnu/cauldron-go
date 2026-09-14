@@ -1,0 +1,31 @@
+@if (visible()) {
+  <button mat-fab class="quick-nav-fab" [matMenuTriggerFor]="menu" aria-label="Open navigation menu">
+    <mat-icon>apps</mat-icon>
+  </button>
+  <mat-menu #menu="matMenu">
+    <button mat-menu-item (click)="navigate('/home')">
+      <mat-icon>home</mat-icon>
+      <span>Home</span>
+    </button>
+    <button mat-menu-item (click)="navigate('/jobs')">
+      <mat-icon>work</mat-icon>
+      <span>Jobs</span>
+    </button>
+    <button mat-menu-item (click)="navigate('/table-browser')">
+      <mat-icon>table_chart</mat-icon>
+      <span>Table Browser</span>
+    </button>
+    <button mat-menu-item (click)="navigate('/gel-analysis')">
+      <mat-icon>biotech</mat-icon>
+      <span>Gel Analysis</span>
+    </button>
+    <button mat-menu-item (click)="navigate('/settings')">
+      <mat-icon>settings</mat-icon>
+      <span>Settings</span>
+    </button>
+    <button mat-menu-item (click)="navigate('/about')">
+      <mat-icon>info</mat-icon>
+      <span>About</span>
+    </button>
+  </mat-menu>
+}

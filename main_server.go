@@ -19,7 +19,8 @@ func runApplication(app *App) error {
 			application.NewService(app),
 		},
 		Assets: application.AssetOptions{
-			Handler: newSPAHandler(getAssets()),
+			Handler:    newServerHandler(app, getAssets()),
+			Middleware: authMiddleware(app),
 		},
 		Server: application.ServerOptions{},
 		OnShutdown: func() {

@@ -131,10 +131,14 @@
               mat-icon-button
               color="primary"
               (click)="installPlugin(plugin)"
-              [disabled]="!plugin.repository || isPluginInstalled(plugin)"
-              [matTooltip]="isPluginInstalled(plugin) ? 'Already Installed' : 'Install Plugin'"
+              [disabled]="!plugin.repository || isPluginInstalled(plugin) || checkingPluginId() === plugin.id"
+              [matTooltip]="checkingPluginId() === plugin.id ? 'Checking plugin...' : (isPluginInstalled(plugin) ? 'Already Installed' : 'Install Plugin')"
               [attr.aria-label]="isPluginInstalled(plugin) ? 'Plugin already installed' : 'Install plugin'">
-              <mat-icon>download</mat-icon>
+              @if (checkingPluginId() === plugin.id) {
+                <mat-spinner diameter="18"></mat-spinner>
+              } @else {
+                <mat-icon>download</mat-icon>
+              }
             </button>
             @if (plugin.repository) {
               <a

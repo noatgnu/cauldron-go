@@ -52,6 +52,11 @@ func (pi *PluginInstaller) IsPluginInstalled(repoURL string) (bool, error) {
 func (pi *PluginInstaller) FetchPluginInfo(repoURL string) (*models.PluginDefinition, error) {
 	log.Printf("[PluginInstaller] Fetching plugin info from: %s", repoURL)
 
+	if def, ok := fetchPluginYAMLFromGitHubRaw(repoURL); ok {
+		log.Printf("[PluginInstaller] Fetched plugin.yaml via GitHub raw content API, skipped full clone")
+		return def, nil
+	}
+
 	tempDir := filepath.Join(pi.pluginsDir, ".temp-info-"+fmt.Sprintf("%d", time.Now().Unix()))
 	defer os.RemoveAll(tempDir)
 
