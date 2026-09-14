@@ -1094,13 +1094,21 @@ func (e *EnvironmentService) DeleteVirtualEnvironment(id uint) error {
 	return e.db.GetDB().Delete(&VirtualEnvironment{}, id).Error
 }
 
+// getActiveRPath prefers the DB-tracked active R environment (set via SetActiveREnvironment,
+// e.g. by picking one from the detected-environments dropdown), falling back to the global
+// R path setting (set via the Settings page's manual Browse, which never touches the DB row).
 func (e *EnvironmentService) getActiveRPath() (string, error) {
 	cfg := e.db.GetDB()
 	var rEnv REnvironmentDB
-	if err := cfg.Where("is_active = ?", true).First(&rEnv).Error; err != nil {
-		return "", fmt.Errorf("no active R environment found")
+	if err := cfg.Where("is_active = ?", true).First(&rEnv).Error; err == nil {
+		return rEnv.Path, nil
 	}
-	return rEnv.Path, nil
+
+	if globalRPath := e.settingsService.GetConfig().RPath; globalRPath != "" {
+		return globalRPath, nil
+	}
+
+	return "", fmt.Errorf("no active R environment found")
 }
 
 func (e *EnvironmentService) CreateRenvEnvironment(name string, packages []string, pluginID string, useCache bool, pluginFolderPath string) error {

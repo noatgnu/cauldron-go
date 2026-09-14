@@ -5,6 +5,7 @@ import { of } from 'rxjs';
 import { GelAnalysis } from './gel-analysis';
 import { Wails } from '../../core/services/wails';
 import { NotificationService } from '../../core/services/notification.service';
+import { FilePickerService } from '../../core/services/file-picker.service';
 import { MatDialog } from '@angular/material/dialog';
 import { PlotlyModule } from 'angular-plotly.js';
 import { PlotlyMock, mockMatchMedia } from '../../core/mocks/plotly-mock';
@@ -15,6 +16,7 @@ describe('GelAnalysis', () => {
   let wailsMock: any;
   let notificationMock: any;
   let dialogMock: any;
+  let filePickerMock: any;
 
   function state(): any {
     return component as any;
@@ -71,12 +73,17 @@ describe('GelAnalysis', () => {
       open: vi.fn().mockReturnValue({ afterClosed: () => of(null) })
     };
 
+    filePickerMock = {
+      pickFilePath: vi.fn((openNativeDialog: () => Promise<string>) => openNativeDialog())
+    };
+
     await TestBed.configureTestingModule({
       imports: [GelAnalysis, PlotlyModule.forRoot(PlotlyMock)],
       providers: [
         { provide: Wails, useValue: wailsMock },
         { provide: NotificationService, useValue: notificationMock },
-        { provide: MatDialog, useValue: dialogMock }
+        { provide: MatDialog, useValue: dialogMock },
+        { provide: FilePickerService, useValue: filePickerMock }
       ]
     }).compileComponents();
 

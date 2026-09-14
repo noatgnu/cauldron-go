@@ -13,18 +13,53 @@ const pluginsDirSettingKey = "pluginsDirLastKnown"
 
 // MigrateThirdPartyPlugins carries over plugin folders from a previous version's plugins directory that are missing from the current one, since each portable install/upgrade gets its own folder.
 func MigrateThirdPartyPlugins(db *DatabaseService, currentPluginsDir string) {
+	candidateDirs := map[string]bool{}
+
 	previousDir, err := db.GetSetting(pluginsDirSettingKey)
 	if err != nil {
 		log.Printf("[PluginDirMigration] Failed to read last known plugins dir: %v", err)
 	}
-
 	if previousDir != "" && previousDir != currentPluginsDir {
-		copyMissingPluginFolders(previousDir, currentPluginsDir)
+		candidateDirs[previousDir] = true
+	}
+
+	// Fallback for upgrades from a version older than this breadcrumb: infer previous dirs from the DB's own registry rows.
+	for _, dir := range previousPluginDirsFromRegistry(db, currentPluginsDir) {
+		candidateDirs[dir] = true
+	}
+
+	for dir := range candidateDirs {
+		copyMissingPluginFolders(dir, currentPluginsDir)
 	}
 
 	if err := db.SaveSetting(pluginsDirSettingKey, currentPluginsDir); err != nil {
 		log.Printf("[PluginDirMigration] Failed to record current plugins dir: %v", err)
 	}
+}
+
+func previousPluginDirsFromRegistry(db *DatabaseService, currentPluginsDir string) []string {
+	entries, err := db.GetAllPluginRegistryEntries()
+	if err != nil {
+		log.Printf("[PluginDirMigration] Failed to list plugin registry entries: %v", err)
+		return nil
+	}
+
+	dirs := map[string]bool{}
+	for _, entry := range entries {
+		if entry.FolderPath == "" {
+			continue
+		}
+		dir := filepath.Dir(entry.FolderPath)
+		if dir != "" && dir != currentPluginsDir {
+			dirs[dir] = true
+		}
+	}
+
+	result := make([]string, 0, len(dirs))
+	for dir := range dirs {
+		result = append(result, dir)
+	}
+	return result
 }
 
 // copyMissingPluginFolders copies every top-level folder in previousDir not already present in currentDir, so freshly-bundled built-ins are never overwritten.

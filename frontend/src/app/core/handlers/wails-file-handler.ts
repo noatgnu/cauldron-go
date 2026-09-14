@@ -1,10 +1,11 @@
 import { Injectable } from '@angular/core';
 import { FileHandler, FileInfo, ImportedFile } from '@cauldron/forms';
 import { Wails } from '../services/wails';
+import { FilePickerService } from '../services/file-picker.service';
 
 @Injectable({ providedIn: 'root' })
 export class WailsFileHandler implements FileHandler {
-  constructor(private wails: Wails) {}
+  constructor(private wails: Wails, private filePicker: FilePickerService) {}
 
   async readFile(path: string): Promise<string> {
     return this.wails.readFile(path);
@@ -20,11 +21,14 @@ export class WailsFileHandler implements FileHandler {
   }
 
   async openFileDialog(title: string, accept?: string): Promise<string | null> {
-    const path = await this.wails.openFileDialog(title);
-    return path || null;
+    return this.filePicker.pickFilePath(() => this.wails.openFileDialog(title), accept);
   }
 
   async openDirectoryDialog(title: string): Promise<string | null> {
+    const capabilities = await this.wails.getRuntimeCapabilities();
+    if (!capabilities.nativeFileAccess) {
+      throw new Error('Selecting a directory is not supported in server mode');
+    }
     const path = await this.wails.openDirectoryDialog(title);
     return path || null;
   }

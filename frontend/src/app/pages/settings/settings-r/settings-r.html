@@ -34,7 +34,7 @@
       <mat-spinner diameter="24"></mat-spinner>
       <span>Detecting R environments...</span>
     </div>
-  } @else {
+  } @else if (!rVersion()) {
     <div class="detecting-container">
       <mat-icon color="warn">info</mat-icon>
       <span>No R environments found in PATH</span>

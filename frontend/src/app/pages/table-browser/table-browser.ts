@@ -16,6 +16,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatCardModule } from '@angular/material/card';
 import { Wails, DataFileInfo } from '../../core/services/wails';
 import { NotificationService } from '../../core/services/notification.service';
+import { FilePickerService } from '../../core/services/file-picker.service';
 
 type Delimiter = ',' | '\t';
 
@@ -44,6 +45,7 @@ type Delimiter = ',' | '\t';
 export class TableBrowser implements OnDestroy {
   private readonly wails = inject(Wails);
   private readonly notification = inject(NotificationService);
+  private readonly filePicker = inject(FilePickerService);
 
   protected filePath = signal<string | null>(null);
   protected fileInfo = signal<DataFileInfo | null>(null);
@@ -89,7 +91,7 @@ export class TableBrowser implements OnDestroy {
 
   async openFile() {
     try {
-      const path = await this.wails.openTableFileDialog();
+      const path = await this.filePicker.pickFilePath(() => this.wails.openTableFileDialog(), '.parquet,.csv,.tsv');
       if (!path) return;
       await this.loadFile(path);
     } catch (error) {

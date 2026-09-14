@@ -57,6 +57,7 @@ type App struct {
 	updateCheckService     *services.UpdateCheckService
 	gelAnalysisService     *services.GelAnalysisService
 	stagedUploadService    *services.StagedUploadService
+	jobOutputBatcher       *services.JobOutputBatcher
 	ready                  chan bool
 	logFilePath            string
 	appVersion             string
@@ -149,7 +150,28 @@ func (a *App) Initialize() {
 		return
 	}
 	go a.stagedUploadCleanupLoop()
+
+	a.jobOutputBatcher = services.NewJobOutputBatcher(300*time.Millisecond, func(jobID string, lines []string) {
+		job, err := a.jobQueue.GetJob(jobID)
+		if err != nil {
+			return
+		}
+
+		job.TerminalOutput = append(job.TerminalOutput, lines...)
+		maxLines := 100
+		if len(job.TerminalOutput) > maxLines {
+			job.TerminalOutput = job.TerminalOutput[len(job.TerminalOutput)-maxLines:]
+		}
+
+		if err := a.db.GetDB().Model(job).Select("*").Updates(job).Error; err != nil {
+			log.Printf("[App] Failed to save job output %s: %v", jobID, err)
+		}
+	})
+
 	a.scriptExecutor.SetUpdateCallback(func(jobID string, update models.Job) {
+		// Flush buffered output first so the job's final TerminalOutput is complete before this status write.
+		a.jobOutputBatcher.FlushJob(jobID)
+
 		job, err := a.jobQueue.GetJob(jobID)
 		if err != nil {
 			log.Printf("[App] Failed to get job %s: %v", jobID, err)
@@ -181,20 +203,7 @@ func (a *App) Initialize() {
 	})
 
 	a.scriptExecutor.SetOutputCallback(func(jobID string, line string) {
-		job, err := a.jobQueue.GetJob(jobID)
-		if err != nil {
-			return
-		}
-
-		job.TerminalOutput = append(job.TerminalOutput, line)
-		maxLines := 100
-		if len(job.TerminalOutput) > maxLines {
-			job.TerminalOutput = job.TerminalOutput[len(job.TerminalOutput)-maxLines:]
-		}
-
-		if err := a.db.GetDB().Model(job).Select("*").Updates(job).Error; err != nil {
-			log.Printf("[App] Failed to save job output %s: %v", jobID, err)
-		}
+		a.jobOutputBatcher.Add(jobID, line)
 
 		a.emitEvent("job:output", map[string]interface{}{
 			"jobId":  jobID,

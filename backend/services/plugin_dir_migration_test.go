@@ -101,6 +101,74 @@ func TestMigrateThirdPartyPlugins_NoopWhenPathUnchanged(t *testing.T) {
 	}
 }
 
+func TestMigrateThirdPartyPlugins_InfersPreviousDirFromStaleRegistryRowWhenNoBreadcrumb(t *testing.T) {
+	db := createTestDB(t)
+	oldDir := t.TempDir()
+	newDir := t.TempDir()
+	writeTestFile(t, filepath.Join(oldDir, "my-plugin", "plugin.yaml"), "id: my-plugin")
+
+	stale := models.PluginRegistry{PluginID: "my-plugin", Name: "My Plugin", FolderPath: filepath.Join(oldDir, "my-plugin")}
+	if err := db.GetDB().Create(&stale).Error; err != nil {
+		t.Fatalf("create stale registry: %v", err)
+	}
+
+	// No pluginsDirSettingKey saved: simulates upgrading from a version that predates the breadcrumb.
+	MigrateThirdPartyPlugins(db, newDir)
+
+	got, err := os.ReadFile(filepath.Join(newDir, "my-plugin", "plugin.yaml"))
+	if err != nil {
+		t.Fatalf("expected plugin.yaml carried over via registry inference, got: %v", err)
+	}
+	if string(got) != "id: my-plugin" {
+		t.Errorf("copied content = %q, want %q", got, "id: my-plugin")
+	}
+}
+
+func TestMigrateThirdPartyPlugins_IgnoresRegistryRowsAlreadyUnderCurrentDir(t *testing.T) {
+	db := createTestDB(t)
+	newDir := t.TempDir()
+	writeTestFile(t, filepath.Join(newDir, "my-plugin", "plugin.yaml"), "id: my-plugin")
+
+	upToDate := models.PluginRegistry{PluginID: "my-plugin", Name: "My Plugin", FolderPath: filepath.Join(newDir, "my-plugin")}
+	if err := db.GetDB().Create(&upToDate).Error; err != nil {
+		t.Fatalf("create registry: %v", err)
+	}
+
+	MigrateThirdPartyPlugins(db, newDir)
+
+	entries, err := os.ReadDir(newDir)
+	if err != nil {
+		t.Fatalf("ReadDir: %v", err)
+	}
+	if len(entries) != 1 {
+		t.Errorf("expected only the original plugin folder, got %d entries", len(entries))
+	}
+}
+
+func TestMigrateThirdPartyPlugins_CombinesBreadcrumbAndRegistryInference(t *testing.T) {
+	db := createTestDB(t)
+	breadcrumbDir := t.TempDir()
+	registryDir := t.TempDir()
+	newDir := t.TempDir()
+	writeTestFile(t, filepath.Join(breadcrumbDir, "plugin-a", "plugin.yaml"), "id: plugin-a")
+	writeTestFile(t, filepath.Join(registryDir, "plugin-b", "plugin.yaml"), "id: plugin-b")
+	db.SaveSetting(pluginsDirSettingKey, breadcrumbDir)
+
+	stale := models.PluginRegistry{PluginID: "plugin-b", Name: "Plugin B", FolderPath: filepath.Join(registryDir, "plugin-b")}
+	if err := db.GetDB().Create(&stale).Error; err != nil {
+		t.Fatalf("create stale registry: %v", err)
+	}
+
+	MigrateThirdPartyPlugins(db, newDir)
+
+	if _, err := os.Stat(filepath.Join(newDir, "plugin-a", "plugin.yaml")); err != nil {
+		t.Errorf("expected plugin-a carried over from breadcrumb dir: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(newDir, "plugin-b", "plugin.yaml")); err != nil {
+		t.Errorf("expected plugin-b carried over from registry-inferred dir: %v", err)
+	}
+}
+
 func TestReconcileOrphanedPluginData_ReattachesEnvVarsAndRemovesStaleRow(t *testing.T) {
 	db := createTestDB(t)
 	currentFolder := t.TempDir()
