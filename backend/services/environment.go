@@ -12,8 +12,6 @@ import (
 	"strings"
 	"time"
 
-	"strconv"
-
 	"github.com/noatgnu/cauldron-go/backend/models"
 	"gopkg.in/yaml.v3"
 )
@@ -1105,7 +1103,7 @@ func (e *EnvironmentService) getActiveRPath() (string, error) {
 	return rEnv.Path, nil
 }
 
-func (e *EnvironmentService) CreateRenvEnvironment(name string, packages []string, pluginID string, useCache bool) error {
+func (e *EnvironmentService) CreateRenvEnvironment(name string, packages []string, pluginID string, useCache bool, pluginFolderPath string) error {
 	log.Printf("[CreateRenvEnvironment] Creating renv environment: %s for plugin: %s (useCache: %v)\n", name, pluginID, useCache)
 
 	rPath, err := e.getActiveRPath()
@@ -1165,24 +1163,17 @@ func (e *EnvironmentService) CreateRenvEnvironment(name string, packages []strin
 
 	e.progressNotifier.EmitStart(ProgressTypeInstall, "renv-init", "Initializing renv...")
 
-	// Attempt to resolve numeric ID to plugin string ID (folder name)
-	resolvedPluginID := pluginID
-	if id, err := strconv.ParseUint(pluginID, 10, 64); err == nil {
-		var pluginRegistry models.PluginRegistry
-		if err := e.db.GetDB().First(&pluginRegistry, id).Error; err == nil {
-			resolvedPluginID = pluginRegistry.PluginID
-		}
-	}
-
 	// 1. Check if the source plugin has a renv.lock we can use
-	pluginLockPath := filepath.Join("plugins", resolvedPluginID, "renv.lock")
-	targetLockPath := filepath.Join(projectPath, "renv.lock")
 	hasExistingLock := false
-	if _, err := os.Stat(pluginLockPath); err == nil {
-		log.Printf("[CreateRenvEnvironment] Found existing renv.lock for plugin %s, copying...\n", resolvedPluginID)
-		if lockData, err := os.ReadFile(pluginLockPath); err == nil {
-			if err := os.WriteFile(targetLockPath, lockData, 0644); err == nil {
-				hasExistingLock = true
+	if pluginFolderPath != "" {
+		pluginLockPath := filepath.Join(pluginFolderPath, "renv.lock")
+		targetLockPath := filepath.Join(projectPath, "renv.lock")
+		if _, err := os.Stat(pluginLockPath); err == nil {
+			log.Printf("[CreateRenvEnvironment] Found existing renv.lock for plugin %s, copying...\n", pluginID)
+			if lockData, err := os.ReadFile(pluginLockPath); err == nil {
+				if err := os.WriteFile(targetLockPath, lockData, 0644); err == nil {
+					hasExistingLock = true
+				}
 			}
 		}
 	}
@@ -1233,15 +1224,17 @@ func (e *EnvironmentService) CreateRenvEnvironment(name string, packages []strin
 
 	// Auto-install plugin requirements if no lock file was used or for extra packages
 	var packagesToInstall []string
-	if pluginID != "" {
+	if pluginFolderPath != "" {
 		// Try to load plugin definition to get inline packages
-		pluginYamlPath := filepath.Join("plugins", resolvedPluginID, "plugin.yaml")
+		pluginYamlPath := filepath.Join(pluginFolderPath, "plugin.yaml")
 		var inlinePackages []string
 		var packagesFile string
 
 		if pluginDef, err := loadPluginDefinition(pluginYamlPath); err == nil {
 			inlinePackages = pluginDef.Execution.Requirements.Packages
 			packagesFile = pluginDef.Execution.Requirements.RPackagesFile
+		} else {
+			log.Printf("[CreateRenvEnvironment] Warning: Failed to load plugin.yaml at %s: %v\n", pluginYamlPath, err)
 		}
 
 		// Use inline packages if available
@@ -1250,7 +1243,7 @@ func (e *EnvironmentService) CreateRenvEnvironment(name string, packages []strin
 			packagesToInstall = append(packagesToInstall, inlinePackages...)
 		} else if packagesFile != "" {
 			// Use explicit rPackagesFile from plugin.yaml
-			packagesPath := filepath.Join("plugins", resolvedPluginID, packagesFile)
+			packagesPath := filepath.Join(pluginFolderPath, packagesFile)
 			if _, err := os.Stat(packagesPath); err == nil {
 				log.Printf("[CreateRenvEnvironment] Loading packages from %s\n", packagesPath)
 				pluginPackages, err := e.LoadRPackagesFromFile(packagesPath)
@@ -1263,8 +1256,10 @@ func (e *EnvironmentService) CreateRenvEnvironment(name string, packages []strin
 				log.Printf("[CreateRenvEnvironment] Warning: Specified rPackagesFile '%s' not found\n", packagesPath)
 			}
 		} else {
-			log.Printf("[CreateRenvEnvironment] No package requirements specified for plugin %s (resolved from %s)\n", resolvedPluginID, pluginID)
+			log.Printf("[CreateRenvEnvironment] No package requirements specified for plugin %s\n", pluginID)
 		}
+	} else if pluginID != "" {
+		log.Printf("[CreateRenvEnvironment] Warning: could not resolve folder for plugin %s, skipping auto-discovered packages\n", pluginID)
 	}
 
 	if len(packages) > 0 {
@@ -1317,6 +1312,7 @@ func (e *EnvironmentService) InstallRenvPackages(projectPath string, rPath strin
 	}
 
 	totalPackages := len(packages)
+	var failedPackages []string
 	for i, pkg := range packages {
 		pkg = strings.TrimSpace(pkg)
 		if pkg == "" || baseMap[pkg] {
@@ -1365,8 +1361,9 @@ func (e *EnvironmentService) InstallRenvPackages(projectPath string, rPath strin
 			output, err = cmdBioc.CombinedOutput()
 			if err != nil {
 				log.Printf("[InstallRenvPackages] Failed to install %s: %v\nOutput: %s", pkg, err, string(output))
-				// We log and continue like the original script to ensure other packages get a chance
+				// Log and continue so the rest of the packages still get a chance; failures are aggregated below.
 				e.progressNotifier.EmitProgress(ProgressTypeInstall, "renv-packages", fmt.Sprintf("Warning: Failed to install %s", pkg), percentage)
+				failedPackages = append(failedPackages, pkg)
 				continue
 			}
 		}
@@ -1387,6 +1384,12 @@ func (e *EnvironmentService) InstallRenvPackages(projectPath string, rPath strin
 	cmd.Env = envSnap
 	if err := cmd.Run(); err != nil {
 		log.Printf("[InstallRenvPackages] Warning: snapshot failed: %v", err)
+	}
+
+	if len(failedPackages) > 0 {
+		errMsg := fmt.Sprintf("failed to install %d of %d package(s): %s (see the log file for R output)", len(failedPackages), totalPackages, strings.Join(failedPackages, ", "))
+		e.progressNotifier.EmitError(ProgressTypeInstall, "renv-packages", "R package installation incomplete", errMsg)
+		return fmt.Errorf("%s", errMsg)
 	}
 
 	e.progressNotifier.EmitComplete(ProgressTypeInstall, "renv-packages", "R packages installed successfully")

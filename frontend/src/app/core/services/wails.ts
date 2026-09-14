@@ -53,6 +53,12 @@ export interface GitAuthConfig {
   updatedAt: number;
 }
 
+export interface RuntimeCapabilities {
+  serverMode: boolean;
+  nativeFileAccess: boolean;
+  maxUploadChunkBytes: number;
+}
+
 export interface ImportedFile {
   id: number;
   name: string;
@@ -1349,5 +1355,12 @@ export class Wails {
     if (!this.isWails) throw new Error('Wails not available');
     await this.waitForBackend();
     return WailsApp.AbortChunkedUpload(uploadId);
+  }
+
+  /** Tells the caller whether to use native OS file dialogs (desktop) or browser-side chunked upload (server mode). */
+  async getRuntimeCapabilities(): Promise<RuntimeCapabilities> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.GetRuntimeCapabilities();
   }
 }

@@ -687,7 +687,8 @@ func (a *App) DeleteVirtualEnvironment(id uint) error {
 
 func (a *App) CreateRenvEnvironment(name string, packages []string, pluginID string, useCache bool) error {
 	log.Printf("[App] Creating renv environment: %s with %d packages for plugin: %s (useCache: %v)", name, len(packages), pluginID, useCache)
-	return a.envService.CreateRenvEnvironment(name, packages, pluginID, useCache)
+	pluginFolderPath := a.resolvePluginFolderPath(pluginID, "CreateRenvEnvironment")
+	return a.envService.CreateRenvEnvironment(name, packages, pluginID, useCache, pluginFolderPath)
 }
 
 func (a *App) GetRenvEnvironments() ([]services.RenvEnvironment, error) {
@@ -2298,20 +2299,6 @@ func (a *App) InstallPluginRequirements(pluginID string) error {
 	if plugin.Definition.Execution.Requirements.RPackagesFile != "" && plugin.Definition.Runtime.HasEnvironment("r") {
 		reqPath := filepath.Join(plugin.FolderPath, plugin.Definition.Execution.Requirements.RPackagesFile)
 		if _, err := os.Stat(reqPath); err == nil {
-			rPath := config.RPath
-
-			rBinding, err := a.db.GetPluginEnvironmentBinding(pluginID, "r")
-			if err == nil && rBinding != nil {
-				rPath = rBinding.EnvironmentPath
-				log.Printf("[App] Using bound R environment: %s", rPath)
-			} else {
-				log.Printf("[App] No R binding found, using global R: %s", rPath)
-			}
-
-			if rPath == "" {
-				return fmt.Errorf("R path not configured")
-			}
-
 			content, err := os.ReadFile(reqPath)
 			if err != nil {
 				return fmt.Errorf("failed to read R packages file: %w", err)
@@ -2328,8 +2315,35 @@ func (a *App) InstallPluginRequirements(pluginID string) error {
 
 			if len(packages) > 0 {
 				log.Printf("[App] Installing R packages: %v", packages)
-				if err := a.envService.InstallRPackages(rPath, packages); err != nil {
-					return fmt.Errorf("failed to install R packages: %w", err)
+
+				// EnvironmentPath on an "r" binding is the renv project dir, not an executable.
+				var boundRenv *services.RenvEnvironment
+				rBinding, bindingErr := a.db.GetPluginEnvironmentBinding(pluginID, "r")
+				if bindingErr == nil && rBinding != nil {
+					renvEnv, renvErr := a.db.GetRenvEnvironmentByID(rBinding.EnvironmentID)
+					if renvErr == nil && renvEnv.BaseRPath != "" {
+						if _, statErr := os.Stat(renvEnv.BaseRPath); statErr == nil {
+							boundRenv = renvEnv
+							log.Printf("[App] Using bound renv environment: %s [%s]", renvEnv.ProjectPath, renvEnv.BaseRPath)
+						} else {
+							log.Printf("[App] Warning: renv's recorded R interpreter not found at %s, falling back to global R", renvEnv.BaseRPath)
+						}
+					}
+				}
+
+				if boundRenv != nil {
+					if err := a.envService.InstallRenvPackages(boundRenv.ProjectPath, boundRenv.BaseRPath, packages, boundRenv.UseGlobalCache); err != nil {
+						return fmt.Errorf("failed to install R packages: %w", err)
+					}
+				} else {
+					rPath := config.RPath
+					if rPath == "" {
+						return fmt.Errorf("R path not configured")
+					}
+					log.Printf("[App] No R binding found, using global R: %s", rPath)
+					if err := a.envService.InstallRPackages(rPath, packages); err != nil {
+						return fmt.Errorf("failed to install R packages: %w", err)
+					}
 				}
 			}
 		}
@@ -2408,4 +2422,21 @@ func (a *App) CompleteChunkedUpload(ctx context.Context, uploadID string) (strin
 // AbortChunkedUpload discards an in-progress chunked upload session.
 func (a *App) AbortChunkedUpload(ctx context.Context, uploadID string) error {
 	return a.stagedUploadService.AbortChunkedUpload(clientIDFromContext(ctx), uploadID)
+}
+
+// RuntimeCapabilities tells the frontend which file-access strategy to use: native OS dialogs
+// (desktop, same filesystem as the app) or browser-side chunked upload (server mode, no shared filesystem).
+type RuntimeCapabilities struct {
+	ServerMode          bool `json:"serverMode"`
+	NativeFileAccess    bool `json:"nativeFileAccess"`
+	MaxUploadChunkBytes int  `json:"maxUploadChunkBytes"`
+}
+
+func (a *App) GetRuntimeCapabilities() RuntimeCapabilities {
+	server := isServerMode()
+	return RuntimeCapabilities{
+		ServerMode:          server,
+		NativeFileAccess:    !server,
+		MaxUploadChunkBytes: services.MaxChunkBytes,
+	}
 }
