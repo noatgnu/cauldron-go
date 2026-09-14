@@ -98,7 +98,6 @@ jobs:
           if-no-files-found: warn
 [[ if .HasR ]]
   generate-deps:
-    if: hashFiles('r-packages.txt') != ''
     strategy:
       fail-fast: false
       matrix:
@@ -129,7 +128,7 @@ jobs:
 
   merge-deps-graph:
     needs: generate-deps
-    if: github.event_name == 'push' && hashFiles('r-packages.txt') != ''
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout plugin repo
@@ -151,6 +150,8 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add dependencies.json
-          git diff --staged --quiet || git commit -m "Auto-generate dependency graph [skip ci]"
-          git diff --staged --quiet || git push
+          if ! git diff --staged --quiet; then
+            git commit -m "Auto-generate dependency graph [skip ci]"
+            git push
+          fi
 [[ end ]]

@@ -11,8 +11,6 @@ import (
 	"sort"
 	"strings"
 	"time"
-
-	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
 // appVersion is set at build time via -ldflags "-X main.appVersion=...".
@@ -178,50 +176,8 @@ func main() {
 
 	log.Println("Creating Wails application...")
 
-	wailsApp := application.New(application.Options{
-		Name:        "Cauldron",
-		Description: "Proteomics data visualization and analysis",
-		Icon:        iconPNG,
-		Services: []application.Service{
-			application.NewService(app),
-		},
-		Assets: application.AssetOptions{
-			Handler: newSPAHandler(getAssets()),
-		},
-		Mac: application.MacOptions{
-			ApplicationShouldTerminateAfterLastWindowClosed: true,
-		},
-		OnShutdown: func() {
-			app.Shutdown()
-		},
-	})
-
-	app.SetApplication(wailsApp)
-
-	appMenu := createApplicationMenu(app)
-	wailsApp.Menu.SetApplicationMenu(appMenu)
-
-	mainWindow := wailsApp.Window.NewWithOptions(application.WebviewWindowOptions{
-		Title:            "Cauldron",
-		Width:            1280,
-		Height:           800,
-		URL:              "/",
-		BackgroundColour: application.NewRGB(27, 38, 54),
-		Mac: application.MacWindow{
-			TitleBar: application.MacTitleBar{
-				AppearsTransparent: true,
-			},
-		},
-	})
-
-	app.SetMainWindow(mainWindow)
-	mainWindow.SetMenu(appMenu)
-
-	go app.Initialize()
-
-	err = wailsApp.Run()
-	if err != nil {
-		log.Printf("ERROR: Wails.Run failed: %v\n", err)
+	if err := runApplication(app); err != nil {
+		log.Printf("ERROR: application run failed: %v\n", err)
 		println("Error:", err.Error())
 	}
 

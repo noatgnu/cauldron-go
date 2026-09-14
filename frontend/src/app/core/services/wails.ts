@@ -53,6 +53,12 @@ export interface GitAuthConfig {
   updatedAt: number;
 }
 
+export interface RuntimeCapabilities {
+  serverMode: boolean;
+  nativeFileAccess: boolean;
+  maxUploadChunkBytes: number;
+}
+
 export interface ImportedFile {
   id: number;
   name: string;
@@ -1316,5 +1322,45 @@ export class Wails {
     if (!this.isWails) throw new Error('Wails not available');
     await this.waitForBackend();
     return WailsApp.CancelGelAutoDetect(sessionID);
+  }
+
+  /** Returns the indices of chunks already received, for resuming an in-progress upload. */
+  async startChunkedUpload(uploadId: string, filename: string, totalChunks: number): Promise<number[]> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.StartChunkedUpload(uploadId, filename, totalChunks);
+  }
+
+  /** data must be base64-encoded chunk bytes. */
+  async writeChunk(uploadId: string, chunkIndex: number, data: string): Promise<void> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.WriteChunk(uploadId, chunkIndex, data);
+  }
+
+  async getReceivedUploadChunks(uploadId: string): Promise<number[]> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.GetReceivedUploadChunks(uploadId);
+  }
+
+  /** Returns the server-local path of the assembled file. */
+  async completeChunkedUpload(uploadId: string): Promise<string> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.CompleteChunkedUpload(uploadId);
+  }
+
+  async abortChunkedUpload(uploadId: string): Promise<void> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.AbortChunkedUpload(uploadId);
+  }
+
+  /** Tells the caller whether to use native OS file dialogs (desktop) or browser-side chunked upload (server mode). */
+  async getRuntimeCapabilities(): Promise<RuntimeCapabilities> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.GetRuntimeCapabilities();
   }
 }
