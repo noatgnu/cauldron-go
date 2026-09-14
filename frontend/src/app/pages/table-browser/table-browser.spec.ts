@@ -4,6 +4,7 @@ import { vi } from 'vitest';
 import { TableBrowser } from './table-browser';
 import { Wails } from '../../core/services/wails';
 import { NotificationService } from '../../core/services/notification.service';
+import { FilePickerService } from '../../core/services/file-picker.service';
 
 const sampleInfo = {
   path: '/data/sample.parquet',
@@ -32,6 +33,7 @@ describe('TableBrowser', () => {
   let fixture: ComponentFixture<TableBrowser>;
   let wailsMock: any;
   let notificationMock: any;
+  let filePickerMock: any;
 
   function createComponent() {
     fixture = TestBed.createComponent(TableBrowser);
@@ -58,12 +60,16 @@ describe('TableBrowser', () => {
       showInfo: vi.fn(),
       showWarning: vi.fn()
     };
+    filePickerMock = {
+      pickFilePath: vi.fn((openNativeDialog: () => Promise<string>) => openNativeDialog())
+    };
 
     await TestBed.configureTestingModule({
       imports: [TableBrowser],
       providers: [
         { provide: Wails, useValue: wailsMock },
-        { provide: NotificationService, useValue: notificationMock }
+        { provide: NotificationService, useValue: notificationMock },
+        { provide: FilePickerService, useValue: filePickerMock }
       ]
     })
       .compileComponents();

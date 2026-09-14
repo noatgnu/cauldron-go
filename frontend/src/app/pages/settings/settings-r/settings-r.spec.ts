@@ -70,6 +70,27 @@ describe('SettingsR', () => {
     expect(wailsMock.getRenvEnvironments).toHaveBeenCalled();
   });
 
+  it('does not warn "No R environments found" when a manually configured R path is verified', async () => {
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const text = fixture.nativeElement.textContent;
+    expect(text).not.toContain('No R environments found in PATH');
+  });
+
+  it('warns "No R environments found" when nothing is detected or configured', async () => {
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    wailsMock.getRVersion.mockResolvedValue('');
+    await component.loadVersion();
+    fixture.detectChanges();
+
+    const text = fixture.nativeElement.textContent;
+    expect(text).toContain('No R environments found in PATH');
+  });
+
   it('opens the R portable env dialog set to r-portable and refreshes on close', () => {
     const detectSpy = vi.spyOn(component, 'detectAllREnvironments').mockResolvedValue(undefined);
     const loadVersionSpy = vi.spyOn(component, 'loadVersion').mockResolvedValue(undefined);

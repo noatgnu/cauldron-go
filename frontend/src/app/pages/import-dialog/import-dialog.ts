@@ -6,6 +6,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTableModule } from '@angular/material/table';
 import { MatIconModule } from '@angular/material/icon';
 import { Wails, DataFilePreview } from '../../core/services/wails';
+import { FilePickerService } from '../../core/services/file-picker.service';
 
 @Component({
   selector: 'app-import-dialog',
@@ -30,6 +31,7 @@ export class ImportDialog {
 
   constructor(
     private wails: Wails,
+    private filePicker: FilePickerService,
     private dialogRef: MatDialogRef<ImportDialog>
   ) {}
 
@@ -38,7 +40,7 @@ export class ImportDialog {
     this.loading.set(true);
 
     try {
-      const filePath = await this.wails.openDataFileDialog();
+      const filePath = await this.filePicker.pickFilePath(() => this.wails.openDataFileDialog(), '.csv,.tsv,.txt');
       if (!filePath) {
         this.loading.set(false);
         return;

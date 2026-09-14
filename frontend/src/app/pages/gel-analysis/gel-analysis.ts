@@ -21,6 +21,7 @@ import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatDialog } from '@angular/material/dialog';
 import { Wails, GelImageMeta, GelLaneROI, GelBoundary, GelPeakParams, GelLaneProfile, GelBandOverride, GelCalibrationCurve, GelAnalysisSession } from '../../core/services/wails';
 import { NotificationService } from '../../core/services/notification.service';
+import { FilePickerService } from '../../core/services/file-picker.service';
 import { GelLaneMwDialog, GelLaneMwDialogData } from '../../components/gel-lane-mw-dialog/gel-lane-mw-dialog';
 import { GelCalibrationPlot } from '../../components/gel-calibration-plot/gel-calibration-plot';
 import { GelProvenanceDialog, GelProvenanceDialogData } from '../../components/gel-provenance-dialog/gel-provenance-dialog';
@@ -77,6 +78,7 @@ interface ResultRow {
 })
 export class GelAnalysis implements OnDestroy {
   private readonly wails = inject(Wails);
+  private readonly filePicker = inject(FilePickerService);
   private readonly notification = inject(NotificationService);
   private readonly dialog = inject(MatDialog);
 
@@ -358,7 +360,7 @@ export class GelAnalysis implements OnDestroy {
 
   async openImage() {
     try {
-      const path = await this.wails.openGelImageDialog();
+      const path = await this.filePicker.pickFilePath(() => this.wails.openGelImageDialog(), '.tif,.tiff,.png,.jpg,.jpeg');
       if (!path) return;
       await this.loadImage(path);
     } catch (error) {

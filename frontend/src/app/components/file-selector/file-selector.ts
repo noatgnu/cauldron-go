@@ -8,6 +8,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { Events } from '@wailsio/runtime';
 import { Wails, ImportedFile } from '../../core/services/wails';
+import { FilePickerService } from '../../core/services/file-picker.service';
 
 @Component({
   selector: 'app-file-selector',
@@ -35,7 +36,7 @@ export class FileSelector implements OnInit {
   protected loading = signal(false);
   protected currentSelection = signal('');
 
-  constructor(private wails: Wails) {}
+  constructor(private wails: Wails, private filePicker: FilePickerService) {}
 
   async ngOnInit() {
     await this.loadImportedFiles();
@@ -67,7 +68,7 @@ export class FileSelector implements OnInit {
 
   async browseFile(): Promise<void> {
     try {
-      const path = await this.wails.openDataFileDialog();
+      const path = await this.filePicker.pickFilePath(() => this.wails.openDataFileDialog(), '.csv,.tsv,.txt');
       if (path) {
         await this.wails.importDataFile(path);
         this.currentSelection.set(path);
