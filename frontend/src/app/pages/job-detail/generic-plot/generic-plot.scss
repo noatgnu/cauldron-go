@@ -8,7 +8,7 @@
 
   p {
     margin: 0;
-    color: rgba(0, 0, 0, 0.6);
+    color: var(--mat-sys-on-surface-variant);
   }
 }
 
@@ -17,9 +17,9 @@
   align-items: center;
   gap: 12px;
   padding: 16px;
-  background-color: #fef0f0;
+  background-color: var(--mat-sys-error-container);
   border-radius: 4px;
-  color: #d32f2f;
+  color: var(--mat-sys-on-error-container);
 
   mat-icon {
     font-size: 24px;

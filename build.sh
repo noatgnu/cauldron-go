@@ -900,6 +900,8 @@ case "$COMMAND" in
         build_external_tools "$PLATFORM"
         ;;
     wails)
+        build_shared_lib
+        build_frontend
         build_wails "$PLATFORM"
         ;;
     server)

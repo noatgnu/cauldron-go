@@ -9,7 +9,7 @@ h2[mat-dialog-title] {
   padding: 16px 20px;
   font-size: 20px;
   font-weight: 500;
-  border-bottom: 1px solid #e0e0e0;
+  border-bottom: 1px solid var(--mat-sys-outline-variant);
 }
 
 mat-dialog-content {
@@ -41,13 +41,13 @@ mat-dialog-content {
     margin: 0 0 8px 0;
     font-size: 15px;
     font-weight: 600;
-    color: rgba(0, 0, 0, 0.87);
+    color: var(--mat-sys-on-surface);
   }
 
   .help-text {
     margin: 0 0 16px 0;
     font-size: 13px;
-    color: rgba(0, 0, 0, 0.6);
+    color: var(--mat-sys-on-surface-variant);
     line-height: 1.4;
   }
 }
@@ -117,15 +117,15 @@ mat-divider {
 
 .batch-operations {
   padding: 16px;
-  background-color: #f5f5f5;
-  border-top: 1px solid #e0e0e0;
-  border-bottom: 1px solid #e0e0e0;
+  background-color: var(--mat-sys-surface-container);
+  border-top: 1px solid var(--mat-sys-outline-variant);
+  border-bottom: 1px solid var(--mat-sys-outline-variant);
 
   h3 {
     margin: 0 0 12px 0;
     font-size: 14px;
     font-weight: 600;
-    color: rgba(0, 0, 0, 0.87);
+    color: var(--mat-sys-on-surface);
   }
 
   .operation-buttons {
@@ -144,7 +144,7 @@ mat-divider {
     padding: 8px 16px;
     font-size: 12px;
     font-weight: 600;
-    color: rgba(0, 0, 0, 0.54);
+    color: var(--mat-sys-on-surface-variant);
     text-transform: uppercase;
   }
 }
@@ -163,18 +163,18 @@ mat-divider {
     position: sticky;
     top: 0;
     z-index: 10;
-    background-color: #fafafa;
+    background-color: var(--mat-sys-surface-container);
 
     tr {
-      border-bottom: 2px solid #e0e0e0;
+      border-bottom: 2px solid var(--mat-sys-outline-variant);
     }
 
     th {
       padding: 12px 8px;
       text-align: left;
       font-weight: 600;
-      color: rgba(0, 0, 0, 0.87);
-      background-color: #fafafa;
+      color: var(--mat-sys-on-surface);
+      background-color: var(--mat-sys-surface-container);
 
       &.checkbox-col {
         width: 48px;
@@ -202,18 +202,18 @@ mat-divider {
 
   tbody {
     tr {
-      border-bottom: 1px solid #e0e0e0;
+      border-bottom: 1px solid var(--mat-sys-outline-variant);
       transition: background-color 0.2s;
 
       &:hover {
-        background-color: #f5f5f5;
+        background-color: var(--mat-sys-surface-container-high);
       }
 
       &.selected {
-        background-color: #e3f2fd;
+        background-color: var(--mat-sys-primary-container);
 
         &:hover {
-          background-color: #bbdefb;
+          background-color: color-mix(in srgb, var(--mat-sys-primary-container) 85%, var(--mat-sys-on-primary-container) 15%);
         }
       }
     }
@@ -235,21 +235,22 @@ mat-divider {
   .table-input {
     width: 100%;
     padding: 6px 8px;
-    border: 1px solid #e0e0e0;
+    border: 1px solid var(--mat-sys-outline-variant);
     border-radius: 4px;
     font-size: 13px;
     font-family: inherit;
-    background-color: #fff;
+    background-color: var(--mat-sys-surface);
+    color: var(--mat-sys-on-surface);
     transition: border-color 0.2s, box-shadow 0.2s;
 
     &:focus {
       outline: none;
-      border-color: #1976d2;
-      box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.1);
+      border-color: var(--mat-sys-primary);
+      box-shadow: 0 0 0 2px color-mix(in srgb, var(--mat-sys-primary) 10%, transparent);
     }
 
     &:read-only {
-      background-color: #f5f5f5;
+      background-color: var(--mat-sys-surface-container);
       cursor: not-allowed;
     }
   }
@@ -257,20 +258,20 @@ mat-divider {
   .color-input {
     width: 48px;
     height: 32px;
-    border: 1px solid #e0e0e0;
+    border: 1px solid var(--mat-sys-outline-variant);
     border-radius: 4px;
     cursor: pointer;
     padding: 2px;
     transition: border-color 0.2s, box-shadow 0.2s;
 
     &:hover {
-      border-color: rgba(0, 0, 0, 0.54);
+      border-color: var(--mat-sys-on-surface-variant);
     }
 
     &:focus {
       outline: none;
-      border-color: #1976d2;
-      box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.1);
+      border-color: var(--mat-sys-primary);
+      box-shadow: 0 0 0 2px color-mix(in srgb, var(--mat-sys-primary) 10%, transparent);
     }
   }
 }
@@ -280,8 +281,8 @@ mat-dialog-actions {
   justify-content: space-between;
   align-items: center;
   padding: 12px 16px;
-  border-top: 1px solid #e0e0e0;
-  background-color: #fafafa;
+  border-top: 1px solid var(--mat-sys-outline-variant);
+  background-color: var(--mat-sys-surface-container);
   flex-wrap: wrap;
   gap: 8px;
 

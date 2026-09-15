@@ -4,7 +4,7 @@ h2[mat-dialog-title] {
   gap: 12px;
 
   mat-icon {
-    color: #1976d2;
+    color: var(--mat-sys-primary);
   }
 }
 
@@ -22,7 +22,7 @@ mat-dialog-content {
 .package-count {
   margin-bottom: 16px;
   font-size: 14px;
-  color: rgba(0, 0, 0, 0.6);
+  color: var(--mat-sys-on-surface-variant);
   text-align: right;
 }
 
@@ -36,14 +36,14 @@ mat-dialog-content {
 
   p {
     margin: 0;
-    color: rgba(0, 0, 0, 0.6);
+    color: var(--mat-sys-on-surface-variant);
   }
 }
 
 .no-packages {
   text-align: center;
   padding: 40px;
-  color: rgba(0, 0, 0, 0.5);
+  color: var(--mat-sys-on-surface-variant);
   font-style: italic;
 }
 
@@ -51,7 +51,7 @@ mat-list {
   mat-list-item {
     font-family: monospace;
     font-size: 13px;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+    border-bottom: 1px solid var(--mat-sys-outline-variant);
 
     &:last-child {
       border-bottom: none;

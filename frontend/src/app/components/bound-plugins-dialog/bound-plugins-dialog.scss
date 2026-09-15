@@ -12,7 +12,7 @@
 .env-info {
   margin: 8px 0 16px 0;
   font-size: 14px;
-  color: rgba(0, 0, 0, 0.7);
+  color: var(--mat-sys-on-surface-variant);
 }
 
 mat-divider {
@@ -30,7 +30,7 @@ mat-list-item {
 
   [matListItemLine] {
     font-size: 12px;
-    color: rgba(0, 0, 0, 0.6);
+    color: var(--mat-sys-on-surface-variant);
     white-space: normal;
     line-height: 1.4;
   }
@@ -39,6 +39,6 @@ mat-list-item {
 .no-plugins {
   padding: 16px;
   text-align: center;
-  color: rgba(0, 0, 0, 0.54);
+  color: var(--mat-sys-on-surface-variant);
   font-style: italic;
 }
