@@ -835,14 +835,20 @@ func generateMermaidDiagram(steps []WorkflowStep) string {
 
 	for i, step := range uniqueSteps {
 		step.ID = fmt.Sprintf("step%d", i+1)
+		// Node text is quoted because Mermaid's flowchart grammar treats
+		// unquoted parentheses/brackets/etc. inside [..]/{..} as syntax, not
+		// text, and will fail to parse a label containing them otherwise.
+		// A literal double-quote uses Mermaid's own #quot; entity escape,
+		// not Go's string-escaping rules.
+		label := strings.ReplaceAll(step.Label, `"`, "#quot;")
 		nodeShape := ""
 		switch step.Type {
 		case "decision":
-			nodeShape = fmt.Sprintf("{%s}", step.Label)
+			nodeShape = fmt.Sprintf(`{"%s"}`, label)
 		case "process":
-			nodeShape = fmt.Sprintf("[%s]", step.Label)
+			nodeShape = fmt.Sprintf(`["%s"]`, label)
 		default:
-			nodeShape = fmt.Sprintf("[%s]", step.Label)
+			nodeShape = fmt.Sprintf(`["%s"]`, label)
 		}
 
 		lines = append(lines, fmt.Sprintf("    %s%s", step.ID, nodeShape))

@@ -171,11 +171,40 @@ func TestGenerateMermaidDiagram_DecisionShape(t *testing.T) {
 
 	diagram := generateMermaidDiagram(steps)
 
-	if !strings.Contains(diagram, "step1[Load data]") {
-		t.Errorf("expected process node '[Load data]' in diagram:\n%s", diagram)
+	if !strings.Contains(diagram, `step1["Load data"]`) {
+		t.Errorf(`expected process node 'step1["Load data"]' in diagram:`+"\n%s", diagram)
 	}
-	if !strings.Contains(diagram, "step2{Optional QC}") {
-		t.Errorf("expected decision node '{Optional QC}' in diagram:\n%s", diagram)
+	if !strings.Contains(diagram, `step2{"Optional QC"}`) {
+		t.Errorf(`expected decision node 'step2{"Optional QC"}' in diagram:`+"\n%s", diagram)
+	}
+}
+
+func TestGenerateMermaidDiagram_LabelWithParensIsQuoted(t *testing.T) {
+	// Regression test: Mermaid's flowchart grammar treats unquoted parentheses
+	// inside [..] as syntax, not text, and fails to parse the node otherwise.
+	// This reproduces the exact label that broke rendering in a real plugin.
+	steps := []WorkflowStep{
+		{ID: "step1", Label: "Filtering proteins (contaminants and minimum peptides)", Type: "process"},
+	}
+
+	diagram := generateMermaidDiagram(steps)
+
+	want := `step1["Filtering proteins (contaminants and minimum peptides)"]`
+	if !strings.Contains(diagram, want) {
+		t.Errorf("expected quoted node %q in diagram:\n%s", want, diagram)
+	}
+}
+
+func TestGenerateMermaidDiagram_LabelWithDoubleQuoteIsEscaped(t *testing.T) {
+	steps := []WorkflowStep{
+		{ID: "step1", Label: `Loading "raw" data`, Type: "process"},
+	}
+
+	diagram := generateMermaidDiagram(steps)
+
+	want := `step1["Loading #quot;raw#quot; data"]`
+	if !strings.Contains(diagram, want) {
+		t.Errorf("expected escaped node %q in diagram:\n%s", want, diagram)
 	}
 }
 
