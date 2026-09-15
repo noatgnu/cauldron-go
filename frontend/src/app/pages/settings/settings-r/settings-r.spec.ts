@@ -107,4 +107,20 @@ describe('SettingsR', () => {
     expect(detectSpy).toHaveBeenCalled();
     expect(loadVersionSpy).toHaveBeenCalled();
   });
+
+  it('registers a manually browsed R path so it shows up in the detected list', async () => {
+    wailsMock.openFile = vi.fn().mockResolvedValue('/opt/custom-r/bin/Rscript');
+    wailsMock.setSetting = vi.fn().mockResolvedValue(undefined);
+    wailsMock.registerManualREnvironment = vi.fn().mockResolvedValue({
+      name: 'Manual R', path: '/opt/custom-r/bin/Rscript', type: 'manual', version: 'R 4.4.0'
+    });
+    const detectSpy = vi.spyOn(component, 'detectAllREnvironments').mockResolvedValue(undefined);
+    const loadVersionSpy = vi.spyOn(component, 'loadVersion').mockResolvedValue(undefined);
+
+    await component.browseR();
+
+    expect(wailsMock.registerManualREnvironment).toHaveBeenCalledWith('/opt/custom-r/bin/Rscript');
+    expect(detectSpy).toHaveBeenCalled();
+    expect(loadVersionSpy).toHaveBeenCalled();
+  });
 });

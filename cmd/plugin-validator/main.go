@@ -20,6 +20,35 @@ type FieldOption struct {
 	Label string `yaml:"label"`
 }
 
+// SelectOption accepts either a plain scalar ("pca") or a {value, label}
+// mapping, matching the real plugin schema (see cmd/plugin-doc-generator,
+// which already supports both forms) — the plain []string form this
+// validator used before rejected the mapping form as invalid YAML.
+type SelectOption struct {
+	Value string
+	Label string
+}
+
+func (s *SelectOption) UnmarshalYAML(value *yaml.Node) error {
+	if value.Kind == yaml.ScalarNode {
+		s.Value = value.Value
+		s.Label = value.Value
+		return nil
+	}
+
+	if value.Kind == yaml.MappingNode {
+		var fo FieldOption
+		if err := value.Decode(&fo); err != nil {
+			return err
+		}
+		s.Value = fo.Value
+		s.Label = fo.Label
+		return nil
+	}
+
+	return fmt.Errorf("invalid option format")
+}
+
 type FieldGroup struct {
 	Name    string        `yaml:"name"`
 	Options []FieldOption `yaml:"options"`
@@ -39,7 +68,7 @@ type PluginInput struct {
 	Type                        string               `yaml:"type"`
 	Required                    bool                 `yaml:"required"`
 	Default                     interface{}          `yaml:"default,omitempty"`
-	Options                     []string             `yaml:"options,omitempty"`
+	Options                     []SelectOption       `yaml:"options,omitempty"`
 	OptionsFromFile             string               `yaml:"optionsFromFile,omitempty"`
 	Groups                      []FieldGroup         `yaml:"groups,omitempty"`
 	GroupsFromFile              string               `yaml:"groupsFromFile,omitempty"`

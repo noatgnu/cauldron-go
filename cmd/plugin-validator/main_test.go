@@ -73,6 +73,49 @@ func TestValidatePlugin_WarnsWhenDiagramEnabledWithNoStepMarkers(t *testing.T) {
 	}
 }
 
+func TestValidatePlugin_SelectOptionsAcceptMappingForm(t *testing.T) {
+	dir := t.TempDir()
+	yamlPath := filepath.Join(dir, "plugin.yaml")
+	yamlContent := `
+plugin:
+  id: "test-plugin"
+  name: "Test Plugin"
+  description: "A test plugin"
+  version: "1.0.0"
+  category: "utilities"
+
+runtime:
+  environments: ["r"]
+  entrypoint: "run.R"
+
+inputs:
+  - name: method
+    label: Method
+    type: select
+    required: true
+    options:
+      - value: "none"
+        label: "No Normalization"
+      - value: "median"
+        label: "Median Centering"
+
+execution:
+  outputDir: "--output_folder"
+  argsMapping: {}
+`
+	if err := os.WriteFile(yamlPath, []byte(yamlContent), 0644); err != nil {
+		t.Fatalf("failed to write plugin.yaml: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "run.R"), []byte("x <- 1\n"), 0644); err != nil {
+		t.Fatalf("failed to write run.R: %v", err)
+	}
+
+	valid, errors := validatePlugin(yamlPath)
+	if !valid {
+		t.Fatalf("expected {value, label} options to parse as valid YAML, got errors: %v", errors)
+	}
+}
+
 func TestScriptHasStepMarkers(t *testing.T) {
 	dir := t.TempDir()
 

@@ -621,8 +621,16 @@ func (a *App) SetActivePythonEnvironment(path string) error {
 	return a.db.SetActivePythonEnvironment(path)
 }
 
+func (a *App) RegisterManualPythonEnvironment(path string) (services.PythonEnvironment, error) {
+	return a.envService.RegisterManualPythonEnvironment(path)
+}
+
 func (a *App) SetActiveREnvironment(path string) error {
 	return a.db.SetActiveREnvironment(path)
+}
+
+func (a *App) RegisterManualREnvironment(path string) (services.REnvironment, error) {
+	return a.envService.RegisterManualREnvironment(path)
 }
 
 func (a *App) InstallPythonPackages(pythonPath string, packages []string) error {

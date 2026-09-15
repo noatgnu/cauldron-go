@@ -77,4 +77,20 @@ describe('SettingsPython', () => {
     expect(detectSpy).toHaveBeenCalled();
     expect(loadVersionSpy).toHaveBeenCalled();
   });
+
+  it('registers a manually browsed Python path so it shows up in the detected list', async () => {
+    wailsMock.openFile = vi.fn().mockResolvedValue('/opt/custom-python/bin/python3');
+    wailsMock.setSetting = vi.fn().mockResolvedValue(undefined);
+    wailsMock.registerManualPythonEnvironment = vi.fn().mockResolvedValue({
+      name: 'Manual Python', path: '/opt/custom-python/bin/python3', type: 'manual', version: 'Python 3.12.0', isVirtual: false
+    });
+    const detectSpy = vi.spyOn(component, 'detectAllPythonEnvironments').mockResolvedValue(undefined);
+    const loadVersionSpy = vi.spyOn(component, 'loadVersion').mockResolvedValue(undefined);
+
+    await component.browsePython();
+
+    expect(wailsMock.registerManualPythonEnvironment).toHaveBeenCalledWith('/opt/custom-python/bin/python3');
+    expect(detectSpy).toHaveBeenCalled();
+    expect(loadVersionSpy).toHaveBeenCalled();
+  });
 });

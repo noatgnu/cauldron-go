@@ -175,6 +175,8 @@ jobs:
           mkdir -p build/windows
           cp resources/appicon.png build/appicon.png
           cp resources/icon.ico build/windows/icon.ico
+          chmod +x scripts/generate-icons.sh
+          ./scripts/generate-icons.sh winres
         shell: bash
 
       - name: Build Application

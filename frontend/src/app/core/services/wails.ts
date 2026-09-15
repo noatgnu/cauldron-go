@@ -420,6 +420,18 @@ export class Wails {
     return WailsApp.SetActiveREnvironment(path);
   }
 
+  async registerManualPythonEnvironment(path: string): Promise<PythonEnvironment> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.RegisterManualPythonEnvironment(path);
+  }
+
+  async registerManualREnvironment(path: string): Promise<REnvironment> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.RegisterManualREnvironment(path);
+  }
+
   async getLicenseInfo(): Promise<any> {
     if (!this.isWails) throw new Error('Wails not available');
     await this.waitForBackend();
