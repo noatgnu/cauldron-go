@@ -639,34 +639,67 @@ func generateHTMLWrapper(markdownContent string) string {
 }
 
 type WorkflowStep struct {
-	ID          string
-	Label       string
-	Type        string
-	Conditional bool
-	SubSteps    []WorkflowStep
+	ID    string
+	Label string
+	Type  string
 }
 
-func parseRScript(scriptPath string, pluginDir string, seenFiles map[string]bool) ([]WorkflowStep, error) {
+// stepMarkerPattern matches the `# @step: Label` / `# @step-if: Label` comment
+// convention, valid identically in R and Python since both use `#` line comments.
+// The label is captured to end-of-line, so punctuation in it (parens, quotes,
+// apostrophes) is never mistaken for the end of the match.
+var stepMarkerPattern = regexp.MustCompile(`^#+\s*@step(-if)?\s*:\s*(.+)$`)
+
+// parseStepMarker checks a single trimmed line for an `@step`/`@step-if` marker.
+// Returns the step (with a fresh ID) and true if the line matched.
+func parseStepMarker(line string, stepID *int) (WorkflowStep, bool) {
+	matches := stepMarkerPattern.FindStringSubmatch(line)
+	if len(matches) < 3 {
+		return WorkflowStep{}, false
+	}
+
+	label := strings.TrimSpace(matches[2])
+	if label == "" {
+		return WorkflowStep{}, false
+	}
+
+	stepType := "process"
+	if matches[1] == "-if" {
+		stepType = "decision"
+	}
+
+	*stepID++
+	return WorkflowStep{
+		ID:    fmt.Sprintf("step%d", *stepID),
+		Label: label,
+		Type:  stepType,
+	}, true
+}
+
+// parseRScript returns steps found via the `@step`/`@step-if` marker convention
+// and, separately, steps found via the legacy `message("[N/M] Label")` convention.
+// The caller prefers the marker-based steps and only falls back to the legacy
+// ones when a script has none, so existing plugins keep working unmodified.
+func parseRScript(scriptPath string, pluginDir string, seenFiles map[string]bool) (markerSteps []WorkflowStep, legacySteps []WorkflowStep, err error) {
 	absPath, err := filepath.Abs(scriptPath)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if seenFiles[absPath] {
-		return nil, nil
+		return nil, nil, nil
 	}
 	seenFiles[absPath] = true
 
 	data, err := os.ReadFile(scriptPath)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	content := string(data)
 	lines := strings.Split(content, "\n")
-	steps := []WorkflowStep{}
 	stepID := len(seenFiles) * 100 // Prevent ID collisions across files
 
-	stepPattern := regexp.MustCompile(`message\(.*\[(\d+)/(\d+)\]\s*(.+?)["')]`)
+	legacyPattern := regexp.MustCompile(`message\(.*\[(\d+)/(\d+)\]\s*(.+?)["')]`)
 	sourcePattern := regexp.MustCompile(`source\s*\(\s*["'](.+?)["']\s*\)`)
 
 	for _, line := range lines {
@@ -679,21 +712,27 @@ func parseRScript(scriptPath string, pluginDir string, seenFiles map[string]bool
 			// Resolve relative to the current script's directory
 			sourcedPath := filepath.Join(filepath.Dir(scriptPath), sourcedFile)
 			if _, err := os.Stat(sourcedPath); err == nil {
-				subSteps, _ := parseRScript(sourcedPath, pluginDir, seenFiles)
-				steps = append(steps, subSteps...)
+				subMarker, subLegacy, _ := parseRScript(sourcedPath, pluginDir, seenFiles)
+				markerSteps = append(markerSteps, subMarker...)
+				legacySteps = append(legacySteps, subLegacy...)
 			}
 			continue
 		}
 
-		// 2. Look for steps
-		matches := stepPattern.FindStringSubmatch(line)
+		// 2. Look for the @step/@step-if marker convention
+		if step, ok := parseStepMarker(line, &stepID); ok {
+			markerSteps = append(markerSteps, step)
+			continue
+		}
+
+		// 3. Fall back to the legacy message("[N/M] Label") convention
+		matches := legacyPattern.FindStringSubmatch(line)
 		if len(matches) >= 4 {
-			stepLabel := matches[3]
-			stepLabel = strings.TrimSpace(stepLabel)
+			stepLabel := strings.TrimSpace(matches[3])
 
 			if stepLabel != "" && !strings.HasPrefix(stepLabel, "=") {
 				stepID++
-				steps = append(steps, WorkflowStep{
+				legacySteps = append(legacySteps, WorkflowStep{
 					ID:    fmt.Sprintf("step%d", stepID),
 					Label: stepLabel,
 					Type:  "process",
@@ -702,30 +741,30 @@ func parseRScript(scriptPath string, pluginDir string, seenFiles map[string]bool
 		}
 	}
 
-	return steps, nil
+	return markerSteps, legacySteps, nil
 }
 
-func parsePythonScript(scriptPath string, pluginDir string, seenFiles map[string]bool) ([]WorkflowStep, error) {
+// parsePythonScript mirrors parseRScript's marker/legacy split for Python entrypoints.
+func parsePythonScript(scriptPath string, pluginDir string, seenFiles map[string]bool) (markerSteps []WorkflowStep, legacySteps []WorkflowStep, err error) {
 	absPath, err := filepath.Abs(scriptPath)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if seenFiles[absPath] {
-		return nil, nil
+		return nil, nil, nil
 	}
 	seenFiles[absPath] = true
 
 	data, err := os.ReadFile(scriptPath)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	content := string(data)
 	lines := strings.Split(content, "\n")
-	steps := []WorkflowStep{}
 	stepID := len(seenFiles) * 100
 
-	stepPattern := regexp.MustCompile(`(?:print|logger\.info)\(.*\[(\d+)/(\d+)\]\s*(.+?)["')]`)
+	legacyPattern := regexp.MustCompile(`(?:print|logger\.info)\(.*\[(\d+)/(\d+)\]\s*(.+?)["')]`)
 	// Basic support for local imports like 'from .src import module' or similar patterns
 	importPattern := regexp.MustCompile(`(?:import|from)\s+([\w\.]+)`)
 
@@ -742,21 +781,26 @@ func parsePythonScript(scriptPath string, pluginDir string, seenFiles map[string
 			}
 			for _, p := range potentialPaths {
 				if _, err := os.Stat(p); err == nil {
-					subSteps, _ := parsePythonScript(p, pluginDir, seenFiles)
-					steps = append(steps, subSteps...)
+					subMarker, subLegacy, _ := parsePythonScript(p, pluginDir, seenFiles)
+					markerSteps = append(markerSteps, subMarker...)
+					legacySteps = append(legacySteps, subLegacy...)
 					break
 				}
 			}
 		}
 
-		matches := stepPattern.FindStringSubmatch(line)
+		if step, ok := parseStepMarker(line, &stepID); ok {
+			markerSteps = append(markerSteps, step)
+			continue
+		}
+
+		matches := legacyPattern.FindStringSubmatch(line)
 		if len(matches) >= 4 {
-			stepLabel := matches[3]
-			stepLabel = strings.TrimSpace(stepLabel)
+			stepLabel := strings.TrimSpace(matches[3])
 
 			if stepLabel != "" && !strings.HasPrefix(stepLabel, "=") {
 				stepID++
-				steps = append(steps, WorkflowStep{
+				legacySteps = append(legacySteps, WorkflowStep{
 					ID:    fmt.Sprintf("step%d", stepID),
 					Label: stepLabel,
 					Type:  "process",
@@ -765,41 +809,7 @@ func parsePythonScript(scriptPath string, pluginDir string, seenFiles map[string
 		}
 	}
 
-	return steps, nil
-}
-
-func extractMessageContent(line string) string {
-	line = strings.TrimSpace(line)
-
-	startQuote := strings.Index(line, "\"")
-	if startQuote == -1 {
-		startQuote = strings.Index(line, "'")
-	}
-	if startQuote == -1 {
-		return "Processing step"
-	}
-
-	endQuote := strings.LastIndex(line, "\"")
-	if endQuote == -1 {
-		endQuote = strings.LastIndex(line, "'")
-	}
-	if endQuote <= startQuote {
-		return "Processing step"
-	}
-
-	content := line[startQuote+1 : endQuote]
-	content = strings.TrimSpace(content)
-
-	if strings.Contains(content, "[") && strings.Contains(content, "]") {
-		start := strings.Index(content, "[")
-		end := strings.Index(content, "]")
-		if end > start {
-			content = content[end+1:]
-			content = strings.TrimSpace(content)
-		}
-	}
-
-	return content
+	return markerSteps, legacySteps, nil
 }
 
 func generateMermaidDiagram(steps []WorkflowStep) string {
@@ -859,7 +869,7 @@ func generateDiagramSection(plugin PluginConfig, pluginDir string) string {
 		return ""
 	}
 
-	var steps []WorkflowStep
+	var markerSteps, legacySteps []WorkflowStep
 	var err error
 	seenFiles := make(map[string]bool)
 
@@ -871,14 +881,24 @@ func generateDiagramSection(plugin PluginConfig, pluginDir string) string {
 	primaryEnv := envs[0]
 	switch primaryEnv {
 	case "r":
-		steps, err = parseRScript(scriptPath, pluginDir, seenFiles)
+		markerSteps, legacySteps, err = parseRScript(scriptPath, pluginDir, seenFiles)
 	case "python":
-		steps, err = parsePythonScript(scriptPath, pluginDir, seenFiles)
+		markerSteps, legacySteps, err = parsePythonScript(scriptPath, pluginDir, seenFiles)
 	default:
 		return ""
 	}
 
-	if err != nil || len(steps) == 0 {
+	if err != nil {
+		return ""
+	}
+
+	// Prefer the @step/@step-if marker convention; fall back to the legacy
+	// message("[N/M] Label") form only when a script has no markers at all.
+	steps := markerSteps
+	if len(steps) == 0 {
+		steps = legacySteps
+	}
+	if len(steps) == 0 {
 		return ""
 	}
 

@@ -31,12 +31,15 @@ def main():
     output_dir = Path(args.output_folder)
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    # @step: Loading input data
     print(f"Loading data from {args.input_file}...")
     # df = pd.read_csv(args.input_file, sep='\t')
 
+    # @step: Processing
     print("Processing...")
 
     # Save results
+    # @step: Saving results
     output_file = output_dir / 'output.txt'
     print(f"Saving results to {output_file}...")
     # df.to_csv(output_file, sep='\t', index=False)

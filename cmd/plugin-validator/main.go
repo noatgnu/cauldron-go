@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 
 	"gopkg.in/yaml.v3"
 )
@@ -152,6 +153,10 @@ type ExampleData struct {
 	Values  map[string]interface{} `yaml:"values"`
 }
 
+type DiagramConfig struct {
+	Enabled bool `yaml:"enabled"`
+}
+
 type PluginConfig struct {
 	Plugin     PluginMetadata    `yaml:"plugin"`
 	Runtime    PluginRuntime     `yaml:"runtime"`
@@ -161,6 +166,38 @@ type PluginConfig struct {
 	Annotation *AnnotationConfig `yaml:"annotation,omitempty"`
 	Execution  PluginExecution   `yaml:"execution"`
 	Example    *ExampleData      `yaml:"example,omitempty"`
+	Diagram    *DiagramConfig    `yaml:"diagram,omitempty"`
+}
+
+// stepMarkerPattern matches the `# @step: Label` / `# @step-if: Label` convention
+// (see cmd/plugin-doc-generator). Only used here to warn when diagram.enabled is
+// on but the entrypoint has no step markers at all, not to extract labels.
+var stepMarkerPattern = regexp.MustCompile(`(?m)^\s*#+\s*@step(-if)?\s*:\s*(.+)$`)
+
+// legacyStepPatterns are the older `message("[N/M] Label")` (R) /
+// `print("[N/M] Label")` / `logger.info("[N/M] Label")` (Python) conventions,
+// still supported by plugin-doc-generator as a fallback.
+var legacyStepPatterns = []*regexp.Regexp{
+	regexp.MustCompile(`message\(.*\[\d+/\d+\]`),
+	regexp.MustCompile(`(?:print|logger\.info)\(.*\[\d+/\d+\]`),
+}
+
+func scriptHasStepMarkers(scriptPath string) bool {
+	data, err := os.ReadFile(scriptPath)
+	if err != nil {
+		return false
+	}
+
+	content := string(data)
+	if stepMarkerPattern.MatchString(content) {
+		return true
+	}
+	for _, p := range legacyStepPatterns {
+		if p.MatchString(content) {
+			return true
+		}
+	}
+	return false
 }
 
 func printError(msg string) {
@@ -230,6 +267,11 @@ func validatePlugin(pluginPath string) (bool, []string) {
 			scriptPath := filepath.Join(pluginDir, entrypoint)
 			if _, err := os.Stat(scriptPath); os.IsNotExist(err) {
 				errors = append(errors, fmt.Sprintf("Entrypoint not found: %s", entrypoint))
+			} else if plugin.Diagram != nil && plugin.Diagram.Enabled && !scriptHasStepMarkers(scriptPath) {
+				warnings = append(warnings, fmt.Sprintf(
+					"diagram.enabled is true but %s has no step markers, so no diagram will be generated; add '# @step: Label' comments to mark pipeline stages",
+					entrypoint,
+				))
 			}
 		}
 	}
