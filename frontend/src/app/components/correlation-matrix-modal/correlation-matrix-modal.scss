@@ -40,9 +40,9 @@
   flex-direction: column;
   gap: 8px;
   padding: 12px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--mat-sys-outline-variant);
   border-radius: 4px;
-  background-color: #fafafa;
+  background-color: var(--mat-sys-surface-container);
 
   .section-label {
     font-weight: 600;
@@ -64,12 +64,12 @@
     .color-picker {
       width: 60px;
       height: 36px;
-      border: 1px solid #ccc;
+      border: 1px solid var(--mat-sys-outline-variant);
       border-radius: 4px;
       cursor: pointer;
 
       &:hover {
-        border-color: #999;
+        border-color: var(--mat-sys-outline);
       }
     }
   }

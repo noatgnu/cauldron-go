@@ -16,7 +16,7 @@ mat-dialog-content {
   p {
     margin: 0;
     font-size: 13px;
-    color: rgba(0, 0, 0, 0.6);
+    color: var(--mat-sys-on-surface-variant);
   }
 
   button {
@@ -37,7 +37,7 @@ mat-dialog-content {
   p {
     margin: 0;
     font-size: 13px;
-    color: rgba(0, 0, 0, 0.6);
+    color: var(--mat-sys-on-surface-variant);
   }
 }
 
@@ -48,7 +48,7 @@ mat-dialog-content {
 }
 
 .file-info {
-  background: #f5f5f5;
+  background: var(--mat-sys-surface-container);
   border-radius: 8px;
   padding: 12px;
 
@@ -61,7 +61,7 @@ mat-dialog-content {
       font-size: 32px;
       width: 32px;
       height: 32px;
-      color: rgba(0, 0, 0, 0.6);
+      color: var(--mat-sys-on-surface-variant);
     }
 
     .file-name {
@@ -72,7 +72,7 @@ mat-dialog-content {
 
     .file-details {
       font-size: 12px;
-      color: rgba(0, 0, 0, 0.6);
+      color: var(--mat-sys-on-surface-variant);
     }
   }
 }
@@ -82,7 +82,7 @@ mat-dialog-content {
     font-size: 13px;
     font-weight: 500;
     margin: 0 0 12px 0;
-    color: rgba(0, 0, 0, 0.6);
+    color: var(--mat-sys-on-surface-variant);
   }
 
   table {
@@ -91,7 +91,7 @@ mat-dialog-content {
 
     th {
       font-weight: 500;
-      background: #f5f5f5;
+      background: var(--mat-sys-surface-container);
     }
 
     td, th {
