@@ -142,4 +142,10 @@ func TestScriptHasStepMarkers(t *testing.T) {
 	if scriptHasStepMarkers(nonePath) {
 		t.Error("expected no markers to be detected in a plain script")
 	}
+
+	branchPath := filepath.Join(dir, "branch.R")
+	os.WriteFile(branchPath, []byte("# @step[id=load]: Loading data\n"), 0644)
+	if !scriptHasStepMarkers(branchPath) {
+		t.Error("expected a branch/loop-style @step[...] marker to be detected")
+	}
 }

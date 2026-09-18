@@ -198,10 +198,11 @@ type PluginConfig struct {
 	Diagram    *DiagramConfig    `yaml:"diagram,omitempty"`
 }
 
-// stepMarkerPattern matches the `# @step: Label` / `# @step-if: Label` convention
-// (see cmd/plugin-doc-generator). Only used here to warn when diagram.enabled is
-// on but the entrypoint has no step markers at all, not to extract labels.
-var stepMarkerPattern = regexp.MustCompile(`(?m)^\s*#+\s*@step(-if)?\s*:\s*(.+)$`)
+// stepMarkerPattern matches the `# @step: Label` / `# @step-if: Label` convention,
+// including the optional `[id=..,from=..,loop-to=..]` branch/merge/loop attribute
+// block (see cmd/plugin-doc-generator). Only used here to warn when diagram.enabled
+// is on but the entrypoint has no step markers at all, not to extract labels.
+var stepMarkerPattern = regexp.MustCompile(`(?m)^\s*#+\s*@step(-if)?(?:\[[^\]]*\])?\s*:\s*(.+)$`)
 
 // legacyStepPatterns are the older `message("[N/M] Label")` (R) /
 // `print("[N/M] Label")` / `logger.info("[N/M] Label")` (Python) conventions,
