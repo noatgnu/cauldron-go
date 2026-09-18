@@ -920,7 +920,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22.23.1'
           cache: 'npm'
 
       - name: Install dependencies
@@ -1031,7 +1031,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22.23.1'
 
       - name: Build shared-lib
         working-directory: cauldron-go/shared-lib
@@ -1131,7 +1131,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22.23.1'
 
       - name: Build shared-lib
         working-directory: cauldron-go/shared-lib

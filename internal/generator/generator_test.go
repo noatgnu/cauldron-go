@@ -1,6 +1,8 @@
 package generator
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -158,5 +160,111 @@ func TestGenerateREADME_UsageExamplesUseInputFile(t *testing.T) {
 	}
 	if strings.Contains(content, "--input '") {
 		t.Errorf("README usage examples should reference --input_file, not the nonexistent --input param, got:\n%s", content)
+	}
+}
+
+func TestGeneratePackageJSON_MatchesSharedLibAngularVersion(t *testing.T) {
+	outDir := t.TempDir()
+	g := &SPAGenerator{
+		config:     SPAConfig{OutputDir: outDir},
+		definition: testDefinition(),
+		pluginDir:  outDir,
+	}
+
+	if err := g.generatePackageJSON(); err != nil {
+		t.Fatalf("generatePackageJSON error: %v", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(outDir, "package.json"))
+	if err != nil {
+		t.Fatalf("failed to read generated package.json: %v", err)
+	}
+	content := string(data)
+
+	// @cauldron/forms (shared-lib) is built against Angular 22.
+	for _, want := range []string{`"@angular/core": "^22.1.4"`, `"@angular/cli": "^22.1.6"`} {
+		if !strings.Contains(content, want) {
+			t.Errorf("expected generated package.json to contain %q, got:\n%s", want, content)
+		}
+	}
+	if strings.Contains(content, "21.") {
+		t.Errorf("expected no leftover Angular 21 version pins, got:\n%s", content)
+	}
+}
+
+func TestGenerateGithubWorkflow_UsesSupportedNodeVersion(t *testing.T) {
+	outDir := t.TempDir()
+	g := &SPAGenerator{
+		config:     SPAConfig{OutputDir: outDir},
+		definition: testDefinition(),
+		pluginDir:  outDir,
+	}
+
+	if err := g.generateGithubWorkflow(); err != nil {
+		t.Fatalf("generateGithubWorkflow error: %v", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(outDir, ".github", "workflows", "deploy.yml"))
+	if err != nil {
+		t.Fatalf("failed to read generated workflow: %v", err)
+	}
+	content := string(data)
+
+	// Must match this repo's own .github/workflows/*.yml pin.
+	if !strings.Contains(content, "node-version: '22.23.1'") {
+		t.Errorf("expected generated workflow to pin node-version '22.23.1', got:\n%s", content)
+	}
+	if strings.Contains(content, "node-version: '20'") {
+		t.Errorf("expected no leftover Node 20 pin, got:\n%s", content)
+	}
+}
+
+func TestGeneratePluginWorkflowWithVersions_UsesSupportedNodeVersion(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		environment string
+	}{
+		{name: "python", environment: "python"},
+		{name: "r", environment: "r"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			pluginDir := t.TempDir()
+			yamlContent := `
+plugin:
+  id: "test-plugin"
+  name: "Test Plugin"
+  description: "A test plugin"
+  version: "1.0.0"
+  category: "utilities"
+
+runtime:
+  environments: ["` + tc.environment + `"]
+  entrypoint: "run"
+
+execution:
+  outputDir: "--output_folder"
+  argsMapping: {}
+`
+			if err := os.WriteFile(filepath.Join(pluginDir, "plugin.yaml"), []byte(yamlContent), 0644); err != nil {
+				t.Fatalf("failed to write plugin.yaml: %v", err)
+			}
+
+			if err := GeneratePluginWorkflowWithVersions(pluginDir, "0.28.0", "0.5.0"); err != nil {
+				t.Fatalf("GeneratePluginWorkflowWithVersions error: %v", err)
+			}
+
+			data, err := os.ReadFile(filepath.Join(pluginDir, ".github", "workflows", "deploy-spa.yml"))
+			if err != nil {
+				t.Fatalf("failed to read generated workflow: %v", err)
+			}
+			content := string(data)
+
+			if !strings.Contains(content, "node-version: '22.23.1'") {
+				t.Errorf("expected generated workflow to pin node-version '22.23.1', got:\n%s", content)
+			}
+			if strings.Contains(content, "node-version: '20'") {
+				t.Errorf("expected no leftover Node 20 pin, got:\n%s", content)
+			}
+		})
 	}
 }
