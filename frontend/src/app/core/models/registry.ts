@@ -161,6 +161,14 @@ export interface RegistryCategoryListResponse {
   results: RegistryCategory[];
 }
 
+export interface RegistryFilterOptions {
+  categories: string[];
+  subcategories: string[];
+  authors: string[];
+  tags: string[];
+  languages: string[];
+}
+
 export interface PluginUpdateInfo {
   plugin_id: string;
   current_commit: string;

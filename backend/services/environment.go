@@ -195,6 +195,34 @@ func (e *EnvironmentService) detectSystemPython() (PythonEnvironment, error) {
 		nil
 }
 
+// RegisterManualPythonEnvironment persists a manually browsed-to Python path
+// as a real PythonEnvironment row and marks it active, so it shows up
+// everywhere detected environments do (e.g. the venv-creation picker), not
+// just in the plain pythonPath setting.
+func (e *EnvironmentService) RegisterManualPythonEnvironment(path string) (PythonEnvironment, error) {
+	if _, err := os.Stat(path); err != nil {
+		return PythonEnvironment{}, fmt.Errorf("Python path does not exist: %s", path)
+	}
+
+	env := PythonEnvironment{
+		Name:      "Manual Python",
+		Path:      path,
+		Type:      "manual",
+		Version:   e.getPythonVersion(path),
+		IsVirtual: false,
+	}
+
+	if err := e.db.SavePythonEnvironment(env); err != nil {
+		return PythonEnvironment{}, fmt.Errorf("failed to save Python environment: %w", err)
+	}
+
+	if err := e.db.SetActivePythonEnvironment(path); err != nil {
+		return PythonEnvironment{}, fmt.Errorf("failed to set active Python environment: %w", err)
+	}
+
+	return env, nil
+}
+
 func (e *EnvironmentService) detectPortableR() (REnvironment, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
@@ -561,6 +589,34 @@ func (e *EnvironmentService) detectDefaultR() (REnvironment, error) {
 			IsDefault: true,
 		},
 		nil
+}
+
+// RegisterManualREnvironment persists a manually browsed-to R path as a real
+// REnvironment row and marks it active, so it shows up everywhere detected
+// environments do (e.g. the renv-creation picker), not just in the plain
+// rPath setting.
+func (e *EnvironmentService) RegisterManualREnvironment(path string) (REnvironment, error) {
+	if _, err := os.Stat(path); err != nil {
+		return REnvironment{}, fmt.Errorf("R path does not exist: %s", path)
+	}
+
+	env := REnvironment{
+		Name:    "Manual R",
+		Path:    path,
+		Type:    "manual",
+		Version: e.getRVersion(path),
+		LibPath: e.getRLibPath(path),
+	}
+
+	if err := e.db.SaveREnvironment(env); err != nil {
+		return REnvironment{}, fmt.Errorf("failed to save R environment: %w", err)
+	}
+
+	if err := e.db.SetActiveREnvironment(path); err != nil {
+		return REnvironment{}, fmt.Errorf("failed to set active R environment: %w", err)
+	}
+
+	return env, nil
 }
 
 func (e *EnvironmentService) detectRenvEnvironments() []RenvEnvironment {

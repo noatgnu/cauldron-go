@@ -266,3 +266,125 @@ func TestGenerateDiagramSection(t *testing.T) {
 		t.Errorf("expected empty section when entrypoint is missing, got:\n%s", got)
 	}
 }
+
+func TestGenerateMermaidDiagram_SimpleChainIsByteIdenticalToBaseline(t *testing.T) {
+	steps := []WorkflowStep{
+		{ID: "step1", Label: "Load data", Type: "process"},
+		{ID: "step2", Label: "Optional QC", Type: "decision"},
+	}
+
+	got := generateMermaidDiagram(steps)
+	want := "```mermaid\n" +
+		"flowchart TD\n" +
+		"    Start([Start]) --> step1\n" +
+		`    step1["Load data"]` + "\n" +
+		"    step1 --> step2\n" +
+		`    step2{"Optional QC"}` + "\n" +
+		"    step2 --> End([End])\n" +
+		"```"
+
+	if got != want {
+		t.Errorf("simple chain diagram changed shape:\ngot:\n%s\n\nwant:\n%s", got, want)
+	}
+}
+
+func TestParseStepMarker_IdFromLoopToAttributes(t *testing.T) {
+	stepID := 0
+
+	step, ok := parseStepMarker(`# @step[id=load]: Loading data`, &stepID)
+	if !ok || step.ID != "load" || !step.HasExplicitID {
+		t.Fatalf("expected explicit id 'load', got %+v ok=%v", step, ok)
+	}
+
+	step, ok = parseStepMarker(`# @step-if[id=check]: Has peptides?`, &stepID)
+	if !ok || step.ID != "check" || step.Type != "decision" {
+		t.Fatalf("expected decision step id 'check', got %+v ok=%v", step, ok)
+	}
+
+	step, ok = parseStepMarker(`# @step[id=msqrob2,from=check:yes]: Run msqrob2`, &stepID)
+	if !ok || len(step.From) != 1 || step.From[0].Anchor != "check" || step.From[0].Label != "yes" {
+		t.Fatalf("expected from=check:yes, got %+v ok=%v", step, ok)
+	}
+
+	step, ok = parseStepMarker(`# @step[from=msqrob2+limma]: Complete`, &stepID)
+	if !ok || len(step.From) != 2 || step.From[0].Anchor != "msqrob2" || step.From[1].Anchor != "limma" {
+		t.Fatalf("expected merge from msqrob2+limma, got %+v ok=%v", step, ok)
+	}
+	if step.HasExplicitID {
+		t.Errorf("expected auto-assigned id when id= is omitted, got explicit %q", step.ID)
+	}
+
+	step, ok = parseStepMarker(`# @step[id=process,from=more:yes,loop-to=fetch]: Process batch`, &stepID)
+	if !ok || len(step.LoopTo) != 1 || step.LoopTo[0].Anchor != "fetch" {
+		t.Fatalf("expected loop-to=fetch, got %+v ok=%v", step, ok)
+	}
+}
+
+func TestGenerateMermaidDiagram_BranchAndMerge(t *testing.T) {
+	steps := []WorkflowStep{
+		{ID: "load", Label: "Loading data", Type: "process", HasExplicitID: true},
+		{ID: "check", Label: "Has peptides?", Type: "decision", HasExplicitID: true},
+		{ID: "msqrob2", Label: "Run msqrob2", Type: "process", HasExplicitID: true,
+			From: []WorkflowEdgeRef{{Anchor: "check", Label: "yes"}}},
+		{ID: "limma", Label: "Run limma", Type: "process", HasExplicitID: true,
+			From: []WorkflowEdgeRef{{Anchor: "check", Label: "no"}}},
+		{Label: "Complete", Type: "process",
+			From: []WorkflowEdgeRef{{Anchor: "msqrob2"}, {Anchor: "limma"}}},
+	}
+
+	diagram := generateMermaidDiagram(steps)
+
+	for _, want := range []string{
+		`Start([Start]) --> load`,
+		`check -->|"yes"| msqrob2`,
+		`check -->|"no"| limma`,
+		`msqrob2 --> step1`,
+		`limma --> step1`,
+		`step1["Complete"]`,
+		`step1 --> End([End])`,
+	} {
+		if !strings.Contains(diagram, want) {
+			t.Errorf("expected diagram to contain %q, got:\n%s", want, diagram)
+		}
+	}
+}
+
+func TestGenerateMermaidDiagram_LoopBack(t *testing.T) {
+	steps := []WorkflowStep{
+		{ID: "fetch", Label: "Fetch next batch", Type: "process", HasExplicitID: true},
+		{ID: "more", Label: "More batches remaining?", Type: "decision", HasExplicitID: true},
+		{ID: "process", Label: "Process batch", Type: "process", HasExplicitID: true,
+			From:   []WorkflowEdgeRef{{Anchor: "more", Label: "yes"}},
+			LoopTo: []WorkflowEdgeRef{{Anchor: "fetch"}}},
+		{Label: "All batches processed", Type: "process",
+			From: []WorkflowEdgeRef{{Anchor: "more", Label: "no"}}},
+	}
+
+	diagram := generateMermaidDiagram(steps)
+
+	if !strings.Contains(diagram, "process --> fetch") {
+		t.Errorf("expected a loop-back edge from process to fetch, got:\n%s", diagram)
+	}
+	if !strings.Contains(diagram, `more -->|"yes"| process`) {
+		t.Errorf("expected the gated forward edge into the loop body, got:\n%s", diagram)
+	}
+}
+
+func TestGenerateMermaidDiagram_UnresolvedAnchorDegradesGracefully(t *testing.T) {
+	steps := []WorkflowStep{
+		{Label: "Orphaned branch step", Type: "process",
+			From: []WorkflowEdgeRef{{Anchor: "does-not-exist", Label: "yes"}}},
+	}
+
+	diagram := generateMermaidDiagram(steps)
+
+	if !strings.Contains(diagram, `step1["Orphaned branch step"]`) {
+		t.Errorf("expected the step itself to still render, got:\n%s", diagram)
+	}
+	if strings.Contains(diagram, "does-not-exist") {
+		t.Errorf("expected the unresolved anchor to be silently dropped, got:\n%s", diagram)
+	}
+	if !strings.Contains(diagram, "Start([Start]) --> step1") {
+		t.Errorf("expected the step with no resolved incoming edge to become a root, got:\n%s", diagram)
+	}
+}

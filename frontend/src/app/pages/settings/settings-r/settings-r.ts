@@ -139,6 +139,8 @@ export class SettingsR implements OnInit {
       if (path) {
         this.config.update(c => ({ ...c, rPath: path }));
         await this.saveSetting('rPath', path);
+        await this.wails.registerManualREnvironment(path);
+        await this.detectAllREnvironments();
         await this.loadVersion();
       }
     } catch (error) {

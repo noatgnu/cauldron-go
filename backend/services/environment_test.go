@@ -499,3 +499,99 @@ func TestEmptyCustomStoragePaths(t *testing.T) {
 		t.Error("Expected non-empty default renv storage dir when custom path is empty")
 	}
 }
+
+func TestRegisterManualREnvironment(t *testing.T) {
+	envService, db, _ := createTestEnvironmentService(t)
+
+	manualPath := os.Args[0] // any real file on disk; getRVersion degrades to "Unknown" gracefully
+
+	env, err := envService.RegisterManualREnvironment(manualPath)
+	if err != nil {
+		t.Fatalf("RegisterManualREnvironment failed: %v", err)
+	}
+	if env.Path != manualPath {
+		t.Errorf("expected path %s, got %s", manualPath, env.Path)
+	}
+	if env.Type != "manual" {
+		t.Errorf("expected type 'manual', got %s", env.Type)
+	}
+
+	envs, err := db.GetREnvironments()
+	if err != nil {
+		t.Fatalf("GetREnvironments failed: %v", err)
+	}
+	found := false
+	for _, e := range envs {
+		if e.Path == manualPath {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected manually registered R environment to appear in GetREnvironments")
+	}
+
+	active, err := db.GetActiveREnvironment()
+	if err != nil {
+		t.Fatalf("GetActiveREnvironment failed: %v", err)
+	}
+	if active.Path != manualPath {
+		t.Errorf("expected manually registered environment to become active, got active path %s", active.Path)
+	}
+}
+
+func TestRegisterManualREnvironment_NonexistentPath(t *testing.T) {
+	envService, _, _ := createTestEnvironmentService(t)
+
+	_, err := envService.RegisterManualREnvironment("/does/not/exist/Rscript")
+	if err == nil {
+		t.Error("expected an error for a nonexistent R path")
+	}
+}
+
+func TestRegisterManualPythonEnvironment(t *testing.T) {
+	envService, db, _ := createTestEnvironmentService(t)
+
+	manualPath := os.Args[0]
+
+	env, err := envService.RegisterManualPythonEnvironment(manualPath)
+	if err != nil {
+		t.Fatalf("RegisterManualPythonEnvironment failed: %v", err)
+	}
+	if env.Path != manualPath {
+		t.Errorf("expected path %s, got %s", manualPath, env.Path)
+	}
+	if env.Type != "manual" {
+		t.Errorf("expected type 'manual', got %s", env.Type)
+	}
+
+	envs, err := db.GetPythonEnvironments()
+	if err != nil {
+		t.Fatalf("GetPythonEnvironments failed: %v", err)
+	}
+	found := false
+	for _, e := range envs {
+		if e.Path == manualPath {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected manually registered Python environment to appear in GetPythonEnvironments")
+	}
+
+	active, err := db.GetActivePythonEnvironment()
+	if err != nil {
+		t.Fatalf("GetActivePythonEnvironment failed: %v", err)
+	}
+	if active.Path != manualPath {
+		t.Errorf("expected manually registered environment to become active, got active path %s", active.Path)
+	}
+}
+
+func TestRegisterManualPythonEnvironment_NonexistentPath(t *testing.T) {
+	envService, _, _ := createTestEnvironmentService(t)
+
+	_, err := envService.RegisterManualPythonEnvironment("/does/not/exist/python3")
+	if err == nil {
+		t.Error("expected an error for a nonexistent Python path")
+	}
+}

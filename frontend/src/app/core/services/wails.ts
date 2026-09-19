@@ -420,6 +420,18 @@ export class Wails {
     return WailsApp.SetActiveREnvironment(path);
   }
 
+  async registerManualPythonEnvironment(path: string): Promise<PythonEnvironment> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.RegisterManualPythonEnvironment(path);
+  }
+
+  async registerManualREnvironment(path: string): Promise<REnvironment> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.RegisterManualREnvironment(path);
+  }
+
   async getLicenseInfo(): Promise<any> {
     if (!this.isWails) throw new Error('Wails not available');
     await this.waitForBackend();
@@ -1085,10 +1097,10 @@ export class Wails {
     return WailsApp.GetLogFilePath();
   }
 
-  async listRegistryPlugins(searchQuery: string, categoryName: string, authorName: string, limit: number, offset: number): Promise<any> {
+  async listRegistryPlugins(searchQuery: string, categoryName: string, authorName: string, subcategory: string, language: string, tag: string, limit: number, offset: number): Promise<any> {
     if (!this.isWails) throw new Error('Wails not available');
     await this.waitForBackend();
-    return WailsApp.ListRegistryPlugins(searchQuery, categoryName, authorName, limit, offset);
+    return WailsApp.ListRegistryPlugins(searchQuery, categoryName, authorName, subcategory, language, tag, limit, offset);
   }
 
   async getRegistryPlugin(id: string): Promise<any> {
@@ -1101,6 +1113,12 @@ export class Wails {
     if (!this.isWails) throw new Error('Wails not available');
     await this.waitForBackend();
     return WailsApp.ListRegistryCategories();
+  }
+
+  async getRegistryFilterOptions(): Promise<any> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.GetRegistryFilterOptions();
   }
 
   async installPluginFromRegistry(pluginID: string, commitHash: string = ''): Promise<void> {

@@ -1,13 +1,22 @@
 package main
 
 import (
+	"archive/tar"
+	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
+	goruntime "runtime"
 	"testing"
 	"time"
 
 	"github.com/noatgnu/cauldron-go/backend/models"
 	"github.com/noatgnu/cauldron-go/backend/services"
+	"github.com/ulikunitz/xz"
 )
 
 func TestE2ESettingsManagement(t *testing.T) {
@@ -1133,5 +1142,140 @@ func TestE2EGelAnalysis(t *testing.T) {
 		if err := app.CloseGelSession(sessionID); err != nil {
 			t.Fatalf("CloseGelSession failed: %v", err)
 		}
+	})
+}
+
+func e2eTranslatePlatform(goos string) string {
+	switch goos {
+	case "windows":
+		return "win"
+	default:
+		return goos
+	}
+}
+
+func e2eMakeTarXz(t *testing.T, files map[string]string) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	xzWriter, err := xz.NewWriter(&buf)
+	if err != nil {
+		t.Fatalf("xz.NewWriter: %v", err)
+	}
+	tw := tar.NewWriter(xzWriter)
+	for name, content := range files {
+		body := []byte(content)
+		hdr := &tar.Header{Name: name, Typeflag: tar.TypeReg, Size: int64(len(body)), Mode: 0755}
+		if err := tw.WriteHeader(hdr); err != nil {
+			t.Fatalf("tar WriteHeader: %v", err)
+		}
+		if _, err := tw.Write(body); err != nil {
+			t.Fatalf("tar Write: %v", err)
+		}
+	}
+	if err := tw.Close(); err != nil {
+		t.Fatalf("tar Close: %v", err)
+	}
+	if err := xzWriter.Close(); err != nil {
+		t.Fatalf("xz Close: %v", err)
+	}
+	return buf.Bytes()
+}
+
+// TestE2EPortableEnvironment exercises the real App-bound methods the Settings > R/Python
+// "Download portable environment" dialog calls, catching wiring gaps that mocked frontend
+// specs and backend-service-only tests can't (e.g. App.Initialize leaving a service nil).
+func TestE2EPortableEnvironment(t *testing.T) {
+	dataDir := t.TempDir()
+	switch goruntime.GOOS {
+	case "windows":
+		t.Setenv("LOCALAPPDATA", dataDir)
+	default:
+		t.Setenv("XDG_DATA_HOME", dataDir)
+	}
+
+	app := NewApp()
+	app.Initialize()
+	defer app.Shutdown()
+
+	time.Sleep(500 * time.Millisecond)
+
+	t.Run("GetPortableEnvironmentURL resolves a real published release", func(t *testing.T) {
+		if testing.Short() {
+			t.Skip("skipping real network test")
+		}
+		url, err := app.GetPortableEnvironmentURL(e2eTranslatePlatform(goruntime.GOOS), "x86_64", "latest", "python")
+		if err != nil {
+			t.Fatalf("GetPortableEnvironmentURL failed: %v", err)
+		}
+		if url == "" {
+			t.Error("expected a non-empty download URL")
+		}
+		t.Logf("Resolved URL: %s", url)
+	})
+
+	t.Run("GetPortableEnvironmentPath errors before install", func(t *testing.T) {
+		_, err := app.GetPortableEnvironmentPath("python")
+		if err == nil {
+			t.Error("expected an error for an environment that has not been installed yet")
+		}
+	})
+
+	t.Run("DownloadPortableEnvironment installs via the App binding end to end", func(t *testing.T) {
+		platform := e2eTranslatePlatform(goruntime.GOOS)
+		var exeName string
+		if goruntime.GOOS == "windows" {
+			exeName = "python.exe"
+		} else {
+			exeName = "bin/python"
+		}
+		archiveData := e2eMakeTarXz(t, map[string]string{
+			fmt.Sprintf("bin/%s/python/%s", platform, exeName): "#!/bin/sh\necho python",
+		})
+		hash := sha256.Sum256(archiveData)
+		hashStr := hex.EncodeToString(hash[:])
+
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch r.URL.Path {
+			case "/python.tar.xz":
+				w.Write(archiveData)
+			case "/python.tar.xz.sha256":
+				fmt.Fprintf(w, "%s  python.tar.xz\n", hashStr)
+			default:
+				http.NotFound(w, r)
+			}
+		}))
+		defer server.Close()
+
+		if err := app.DownloadPortableEnvironment(server.URL+"/python.tar.xz", "python"); err != nil {
+			t.Fatalf("DownloadPortableEnvironment failed: %v", err)
+		}
+
+		path, err := app.GetPortableEnvironmentPath("python")
+		if err != nil {
+			t.Fatalf("GetPortableEnvironmentPath after install failed: %v", err)
+		}
+		if _, statErr := os.Stat(path); statErr != nil {
+			t.Errorf("installed executable not found at %s: %v", path, statErr)
+		}
+		t.Logf("Installed at: %s", path)
+	})
+
+	t.Run("ListAvailableRVersions resolves real published R-portable releases", func(t *testing.T) {
+		if testing.Short() {
+			t.Skip("skipping real network test")
+		}
+		versions, err := app.ListAvailableRVersions()
+		if err != nil {
+			t.Fatalf("ListAvailableRVersions failed: %v", err)
+		}
+		t.Logf("Found %d available R versions", len(versions))
+	})
+
+	t.Run("ListInstalledRVersions returns without error before any install", func(t *testing.T) {
+		versions, err := app.ListInstalledRVersions()
+		if err != nil {
+			t.Fatalf("ListInstalledRVersions failed: %v", err)
+		}
+		t.Logf("Found %d installed R versions", len(versions))
 	})
 }

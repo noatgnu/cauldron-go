@@ -21,6 +21,9 @@ describe('PluginRegistry', () => {
     wailsMock = {
       listRegistryPlugins: vi.fn().mockResolvedValue({ plugins: [], total: 0 }),
       listRegistryCategories: vi.fn().mockResolvedValue([]),
+      getRegistryFilterOptions: vi.fn().mockResolvedValue({
+        categories: [], subcategories: [], authors: [], tags: [], languages: []
+      }),
       getPluginsV2: vi.fn().mockResolvedValue([]),
       progress: signal(null),
       logToFile: vi.fn().mockResolvedValue(undefined)
@@ -55,6 +58,48 @@ describe('PluginRegistry', () => {
 
   it('should create', () => {
     expect(component).toBeTruthy();
+  });
+
+  it('loads filter options on init', () => {
+    expect(wailsMock.getRegistryFilterOptions).toHaveBeenCalled();
+  });
+
+  describe('filter changes', () => {
+    it('passes subcategory, language and tag filters to listRegistryPlugins', async () => {
+      component.selectedSubcategory = 'quality-control';
+      component.selectedLanguage = 'python';
+      component.selectedTag = 'proteomics';
+
+      await component.loadPlugins();
+
+      expect(wailsMock.listRegistryPlugins).toHaveBeenCalledWith(
+        '', '', '', 'quality-control', 'python', 'proteomics', (component as any).pageSize, 0
+      );
+    });
+
+    it('resets to the first page when a filter changes', async () => {
+      (component as any).pageIndex = 3;
+
+      await component.onLanguageChange();
+
+      expect((component as any).pageIndex).toBe(0);
+    });
+
+    it('clearFilters resets all filter fields and reloads', async () => {
+      component.searchQuery = 'x';
+      component.selectedCategory = 'a';
+      component.selectedSubcategory = 'b';
+      component.selectedLanguage = 'c';
+      component.selectedTag = 'd';
+
+      await component.clearFilters();
+
+      expect(component.searchQuery).toBe('');
+      expect(component.selectedCategory).toBe('');
+      expect(component.selectedSubcategory).toBe('');
+      expect(component.selectedLanguage).toBe('');
+      expect(component.selectedTag).toBe('');
+    });
   });
 
   describe('installPlugin', () => {

@@ -638,27 +638,79 @@ func generateHTMLWrapper(markdownContent string) string {
 	return strings.ReplaceAll(htmlTemplate, "{{CONTENT}}", htmlContent)
 }
 
+type WorkflowEdgeRef struct {
+	Anchor string
+	Label  string
+}
+
 type WorkflowStep struct {
-	ID    string
-	Label string
-	Type  string
+	ID            string
+	Label         string
+	Type          string
+	From          []WorkflowEdgeRef
+	LoopTo        []WorkflowEdgeRef
+	HasExplicitID bool
 }
 
 // stepMarkerPattern matches the `# @step: Label` / `# @step-if: Label` comment
-// convention, valid identically in R and Python since both use `#` line comments.
-// The label is captured to end-of-line, so punctuation in it (parens, quotes,
-// apostrophes) is never mistaken for the end of the match.
-var stepMarkerPattern = regexp.MustCompile(`^#+\s*@step(-if)?\s*:\s*(.+)$`)
+// convention, valid identically in R and Python since both use `#` line comments,
+// plus an optional `[id=..,from=..,loop-to=..]` attribute block for real branch/
+// merge/loop edges (see parseStepAttributes). The label is captured to end-of-line,
+// so punctuation in it (parens, quotes, apostrophes) is never mistaken for the end
+// of the match.
+var stepMarkerPattern = regexp.MustCompile(`^#+\s*@step(-if)?(?:\[([^\]]*)\])?\s*:\s*(.+)$`)
+
+// parseEdgeRefList parses a `+`-joined list of `anchor[:label]` entries, used for
+// both `from=` (possibly several, for a merge) and `loop-to=` (usually one).
+func parseEdgeRefList(raw string) []WorkflowEdgeRef {
+	var refs []WorkflowEdgeRef
+	for _, entry := range strings.Split(raw, "+") {
+		entry = strings.TrimSpace(entry)
+		if entry == "" {
+			continue
+		}
+		anchor, label, _ := strings.Cut(entry, ":")
+		anchor = strings.TrimSpace(anchor)
+		if anchor == "" {
+			continue
+		}
+		refs = append(refs, WorkflowEdgeRef{Anchor: anchor, Label: strings.TrimSpace(label)})
+	}
+	return refs
+}
+
+// parseStepAttributes parses the optional `id=..,from=..,loop-to=..` block from
+// inside a `@step[...]`/`@step-if[...]` marker's brackets.
+func parseStepAttributes(raw string) (id string, from []WorkflowEdgeRef, loopTo []WorkflowEdgeRef) {
+	for _, pair := range strings.Split(raw, ",") {
+		key, value, ok := strings.Cut(pair, "=")
+		if !ok {
+			continue
+		}
+		key = strings.TrimSpace(key)
+		value = strings.TrimSpace(value)
+		switch key {
+		case "id":
+			id = value
+		case "from":
+			from = parseEdgeRefList(value)
+		case "loop-to":
+			loopTo = parseEdgeRefList(value)
+		}
+	}
+	return id, from, loopTo
+}
 
 // parseStepMarker checks a single trimmed line for an `@step`/`@step-if` marker.
-// Returns the step (with a fresh ID) and true if the line matched.
+// Returns the step (with a fresh ID, or its explicit `id=` if given) and true if
+// the line matched.
 func parseStepMarker(line string, stepID *int) (WorkflowStep, bool) {
 	matches := stepMarkerPattern.FindStringSubmatch(line)
-	if len(matches) < 3 {
+	if len(matches) < 4 {
 		return WorkflowStep{}, false
 	}
 
-	label := strings.TrimSpace(matches[2])
+	label := strings.TrimSpace(matches[3])
 	if label == "" {
 		return WorkflowStep{}, false
 	}
@@ -668,11 +720,20 @@ func parseStepMarker(line string, stepID *int) (WorkflowStep, bool) {
 		stepType = "decision"
 	}
 
-	*stepID++
+	id, from, loopTo := parseStepAttributes(matches[2])
+	hasExplicitID := id != ""
+	if id == "" {
+		*stepID++
+		id = fmt.Sprintf("step%d", *stepID)
+	}
+
 	return WorkflowStep{
-		ID:    fmt.Sprintf("step%d", *stepID),
-		Label: label,
-		Type:  stepType,
+		ID:            id,
+		Label:         label,
+		Type:          stepType,
+		From:          from,
+		LoopTo:        loopTo,
+		HasExplicitID: hasExplicitID,
 	}, true
 }
 
@@ -812,54 +873,125 @@ func parsePythonScript(scriptPath string, pluginDir string, seenFiles map[string
 	return markerSteps, legacySteps, nil
 }
 
+// mermaidSafeLabel quotes text safely for Mermaid node/edge labels. Mermaid's
+// flowchart grammar treats unquoted parentheses/brackets/etc. inside [..]/{../
+// |..| as syntax, not text, and fails to parse a label containing them
+// otherwise. A literal double-quote uses Mermaid's own #quot; entity escape,
+// not Go's string-escaping rules.
+func mermaidSafeLabel(label string) string {
+	return strings.ReplaceAll(label, `"`, "#quot;")
+}
+
+type mermaidEdge struct {
+	From  string
+	To    string
+	Label string
+}
+
 func generateMermaidDiagram(steps []WorkflowStep) string {
 	if len(steps) == 0 {
 		return ""
 	}
 
-	lines := []string{
-		"```mermaid",
-		"flowchart TD",
-		"    Start([Start]) --> step1",
-	}
-
+	// Dedup: by explicit ID when set, else by label (matches the original
+	// dedup behavior for plain, non-branching steps).
 	uniqueSteps := []WorkflowStep{}
-	seenLabels := make(map[string]bool)
-
+	seen := make(map[string]bool)
 	for _, step := range steps {
-		if !seenLabels[step.Label] {
-			seenLabels[step.Label] = true
+		key := "label:" + step.Label
+		if step.HasExplicitID {
+			key = "id:" + step.ID
+		}
+		if !seen[key] {
+			seen[key] = true
 			uniqueSteps = append(uniqueSteps, step)
 		}
 	}
 
-	for i, step := range uniqueSteps {
-		step.ID = fmt.Sprintf("step%d", i+1)
-		// Node text is quoted because Mermaid's flowchart grammar treats
-		// unquoted parentheses/brackets/etc. inside [..]/{..} as syntax, not
-		// text, and will fail to parse a label containing them otherwise.
-		// A literal double-quote uses Mermaid's own #quot; entity escape,
-		// not Go's string-escaping rules.
-		label := strings.ReplaceAll(step.Label, `"`, "#quot;")
-		nodeShape := ""
-		switch step.Type {
-		case "decision":
-			nodeShape = fmt.Sprintf(`{"%s"}`, label)
-		case "process":
-			nodeShape = fmt.Sprintf(`["%s"]`, label)
-		default:
-			nodeShape = fmt.Sprintf(`["%s"]`, label)
-		}
-
-		lines = append(lines, fmt.Sprintf("    %s%s", step.ID, nodeShape))
-
-		if i < len(uniqueSteps)-1 {
-			lines = append(lines, fmt.Sprintf("    %s --> step%d", step.ID, i+2))
+	// Renumber non-explicit steps sequentially (cosmetic, reproduces the
+	// original step1..stepN numbering); explicit IDs are left untouched.
+	autoNum := 0
+	for i := range uniqueSteps {
+		if !uniqueSteps[i].HasExplicitID {
+			autoNum++
+			uniqueSteps[i].ID = fmt.Sprintf("step%d", autoNum)
 		}
 	}
 
-	lastStep := fmt.Sprintf("step%d", len(uniqueSteps))
-	lines = append(lines, fmt.Sprintf("    %s --> End([End])", lastStep))
+	anchorIndex := make(map[string]int, len(uniqueSteps))
+	for i, step := range uniqueSteps {
+		anchorIndex[step.ID] = i
+	}
+
+	var edges []mermaidEdge
+	hasIncoming := make(map[string]bool, len(uniqueSteps))
+	hasOutgoing := make(map[string]bool, len(uniqueSteps))
+
+	for i, step := range uniqueSteps {
+		if len(step.From) > 0 {
+			for _, ref := range step.From {
+				fromIdx, ok := anchorIndex[ref.Anchor]
+				if !ok {
+					continue
+				}
+				fromID := uniqueSteps[fromIdx].ID
+				edges = append(edges, mermaidEdge{From: fromID, To: step.ID, Label: ref.Label})
+				hasIncoming[step.ID] = true
+				hasOutgoing[fromID] = true
+			}
+		} else if i > 0 {
+			prevID := uniqueSteps[i-1].ID
+			edges = append(edges, mermaidEdge{From: prevID, To: step.ID})
+			hasIncoming[step.ID] = true
+			hasOutgoing[prevID] = true
+		}
+
+		for _, ref := range step.LoopTo {
+			toIdx, ok := anchorIndex[ref.Anchor]
+			if !ok {
+				continue
+			}
+			toID := uniqueSteps[toIdx].ID
+			edges = append(edges, mermaidEdge{From: step.ID, To: toID, Label: ref.Label})
+			hasOutgoing[step.ID] = true
+			hasIncoming[toID] = true
+		}
+	}
+
+	outgoingBySource := make(map[string][]mermaidEdge, len(uniqueSteps))
+	for _, e := range edges {
+		outgoingBySource[e.From] = append(outgoingBySource[e.From], e)
+	}
+
+	lines := []string{"```mermaid", "flowchart TD"}
+
+	for _, step := range uniqueSteps {
+		if !hasIncoming[step.ID] {
+			lines = append(lines, fmt.Sprintf("    Start([Start]) --> %s", step.ID))
+		}
+	}
+
+	for _, step := range uniqueSteps {
+		label := mermaidSafeLabel(step.Label)
+		nodeShape := fmt.Sprintf(`["%s"]`, label)
+		if step.Type == "decision" {
+			nodeShape = fmt.Sprintf(`{"%s"}`, label)
+		}
+		lines = append(lines, fmt.Sprintf("    %s%s", step.ID, nodeShape))
+
+		for _, e := range outgoingBySource[step.ID] {
+			if e.Label != "" {
+				lines = append(lines, fmt.Sprintf(`    %s -->|"%s"| %s`, e.From, mermaidSafeLabel(e.Label), e.To))
+			} else {
+				lines = append(lines, fmt.Sprintf("    %s --> %s", e.From, e.To))
+			}
+		}
+
+		if !hasOutgoing[step.ID] {
+			lines = append(lines, fmt.Sprintf("    %s --> End([End])", step.ID))
+		}
+	}
+
 	lines = append(lines, "```")
 
 	return strings.Join(lines, "\n")

@@ -38,6 +38,43 @@
       </mat-select>
       <mat-icon matPrefix>filter_list</mat-icon>
     </mat-form-field>
+
+    <mat-form-field appearance="outline" class="registry-filter">
+      <mat-label>Subcategory</mat-label>
+      <mat-select [(ngModel)]="selectedSubcategory" (selectionChange)="onSubcategoryChange()">
+        <mat-option value="">All Subcategories</mat-option>
+        @for (subcategory of filterOptions().subcategories; track subcategory) {
+          <mat-option [value]="subcategory">{{ subcategory }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="registry-filter">
+      <mat-label>Language</mat-label>
+      <mat-select [(ngModel)]="selectedLanguage" (selectionChange)="onLanguageChange()">
+        <mat-option value="">All Languages</mat-option>
+        @for (language of filterOptions().languages; track language) {
+          <mat-option [value]="language">{{ language }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="registry-filter">
+      <mat-label>Tag</mat-label>
+      <mat-select [(ngModel)]="selectedTag" (selectionChange)="onTagChange()">
+        <mat-option value="">All Tags</mat-option>
+        @for (tag of filterOptions().tags; track tag) {
+          <mat-option [value]="tag">{{ tag }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    @if (searchQuery || selectedCategory || selectedSubcategory || selectedLanguage || selectedTag) {
+      <button mat-button (click)="clearFilters()" class="clear-filters-button">
+        <mat-icon>clear</mat-icon>
+        Clear
+      </button>
+    }
   </div>
 
   @if (loading()) {

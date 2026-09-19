@@ -423,6 +423,15 @@ prepare_icons() {
 
     if [ -f "$PROJECT_ROOT/rsrc_windows_amd64.syso" ]; then
         print_success "Windows resource file (amd64) found"
+    elif [ -x "$PROJECT_ROOT/scripts/generate-icons.sh" ]; then
+        print_info "rsrc_windows_amd64.syso missing (this embeds the .exe icon) -- generating it..."
+        if "$PROJECT_ROOT/scripts/generate-icons.sh" winres; then
+            print_success "Windows resource file (amd64) generated"
+        else
+            print_error "Warning: failed to generate rsrc_windows_amd64.syso -- the .exe will build without an embedded icon"
+        fi
+    else
+        print_error "Warning: rsrc_windows_amd64.syso not found and scripts/generate-icons.sh is unavailable -- the .exe will build without an embedded icon"
     fi
 }
 

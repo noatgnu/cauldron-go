@@ -153,6 +153,8 @@ export class SettingsPython implements OnInit {
       if (path) {
         this.config.update(c => ({ ...c, pythonPath: path }));
         await this.saveSetting('pythonPath', path);
+        await this.wails.registerManualPythonEnvironment(path);
+        await this.detectAllPythonEnvironments();
         await this.loadVersion();
       }
     } catch (error) {

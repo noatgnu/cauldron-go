@@ -23,7 +23,8 @@ import {
   RegistryPlugin,
   RegistryPluginListResponse,
   RegistryCategory,
-  RegistryCategoryListResponse
+  RegistryCategoryListResponse,
+  RegistryFilterOptions
 } from '../../core/models/registry';
 
 @Component({
@@ -50,6 +51,7 @@ import {
 export class PluginRegistry implements OnInit {
   protected plugins = signal<RegistryPlugin[]>([]);
   protected categories = signal<RegistryCategory[]>([]);
+  protected filterOptions = signal<RegistryFilterOptions>({ categories: [], subcategories: [], authors: [], tags: [], languages: [] });
   protected loading = signal(false);
   protected loadingCategories = signal(false);
   protected totalCount = signal(0);
@@ -60,6 +62,9 @@ export class PluginRegistry implements OnInit {
 
   searchQuery = '';
   selectedCategory = '';
+  selectedSubcategory = '';
+  selectedLanguage = '';
+  selectedTag = '';
 
   displayedColumns: string[] = ['name', 'version', 'category', 'author', 'updated', 'actions'];
 
@@ -74,6 +79,7 @@ export class PluginRegistry implements OnInit {
   async ngOnInit(): Promise<void> {
     await this.loadInstalledPlugins();
     await this.loadCategories();
+    await this.loadFilterOptions();
     await this.loadPlugins();
   }
 
@@ -116,6 +122,15 @@ export class PluginRegistry implements OnInit {
     }
   }
 
+  async loadFilterOptions(): Promise<void> {
+    try {
+      const options = await this.wails.getRegistryFilterOptions() as RegistryFilterOptions;
+      this.filterOptions.set(options);
+    } catch (error) {
+      await this.wails.logToFile(`[PluginRegistry] Failed to load filter options: ${error}`);
+    }
+  }
+
   async loadPlugins(): Promise<void> {
     this.loading.set(true);
     try {
@@ -124,6 +139,9 @@ export class PluginRegistry implements OnInit {
         this.searchQuery,
         this.selectedCategory,
         '',
+        this.selectedSubcategory,
+        this.selectedLanguage,
+        this.selectedTag,
         this.pageSize,
         offset
       ) as RegistryPluginListResponse;
@@ -150,6 +168,31 @@ export class PluginRegistry implements OnInit {
     await this.loadPlugins();
   }
 
+  async onSubcategoryChange(): Promise<void> {
+    this.pageIndex = 0;
+    await this.loadPlugins();
+  }
+
+  async onLanguageChange(): Promise<void> {
+    this.pageIndex = 0;
+    await this.loadPlugins();
+  }
+
+  async onTagChange(): Promise<void> {
+    this.pageIndex = 0;
+    await this.loadPlugins();
+  }
+
+  async clearFilters(): Promise<void> {
+    this.searchQuery = '';
+    this.selectedCategory = '';
+    this.selectedSubcategory = '';
+    this.selectedLanguage = '';
+    this.selectedTag = '';
+    this.pageIndex = 0;
+    await this.loadPlugins();
+  }
+
   async onPageChange(event: PageEvent): Promise<void> {
     this.pageIndex = event.pageIndex;
     this.pageSize = event.pageSize;
@@ -159,6 +202,7 @@ export class PluginRegistry implements OnInit {
   async refreshRegistry(): Promise<void> {
     this.notification.showInfo('Refreshing registry data...');
     await this.loadCategories();
+    await this.loadFilterOptions();
     await this.loadPlugins();
     await this.loadInstalledPlugins();
     this.notification.showSuccess('Registry data refreshed successfully');
