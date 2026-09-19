@@ -375,7 +375,7 @@ describe('Wails Service Integration Tests', () => {
       };
       mockWailsApp.ListRegistryPlugins.mockResolvedValue(mockResult);
 
-      const result = await mockWailsApp.ListRegistryPlugins('', '', '', 10, 0);
+      const result = await mockWailsApp.ListRegistryPlugins('', '', '', '', '', '', 10, 0);
 
       expect(result.plugins).toHaveLength(2);
       expect(result.total).toBe(2);

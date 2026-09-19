@@ -134,6 +134,21 @@ func TestListPlugins_Success(t *testing.T) {
 			t.Errorf("expected author 'John', got '%s'", author)
 		}
 
+		subcategory := r.URL.Query().Get("subcategory")
+		if subcategory != "sub" {
+			t.Errorf("expected subcategory 'sub', got '%s'", subcategory)
+		}
+
+		language := r.URL.Query().Get("language")
+		if language != "python" {
+			t.Errorf("expected language 'python', got '%s'", language)
+		}
+
+		tag := r.URL.Query().Get("tag")
+		if tag != "proteomics" {
+			t.Errorf("expected tag 'proteomics', got '%s'", tag)
+		}
+
 		limit := r.URL.Query().Get("limit")
 		if limit != "10" {
 			t.Errorf("expected limit 10, got %s", limit)
@@ -155,7 +170,7 @@ func TestListPlugins_Success(t *testing.T) {
 
 	service := NewPluginRegistryService(ctx, settingsService, gitAuthService)
 
-	result, err := service.ListPlugins("test", "Analysis", "John", 10, 20)
+	result, err := service.ListPlugins("test", "Analysis", "John", "sub", "python", "proteomics", 10, 20)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -202,7 +217,7 @@ func TestListPlugins_EmptyParams(t *testing.T) {
 
 	service := NewPluginRegistryService(ctx, settingsService, gitAuthService)
 
-	_, err := service.ListPlugins("", "", "", 0, 0)
+	_, err := service.ListPlugins("", "", "", "", "", "", 0, 0)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -215,7 +230,7 @@ func TestListPlugins_NoRegistryURL(t *testing.T) {
 
 	service := NewPluginRegistryService(ctx, settingsService, gitAuthService)
 
-	_, err := service.ListPlugins("", "", "", 0, 0)
+	_, err := service.ListPlugins("", "", "", "", "", "", 0, 0)
 	if err == nil {
 		t.Error("expected error when registry URL is not configured")
 	}

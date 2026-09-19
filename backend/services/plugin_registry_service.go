@@ -43,7 +43,7 @@ func (s *PluginRegistryService) getClient() (*registry.Client, error) {
 	return s.client, nil
 }
 
-func (s *PluginRegistryService) ListPlugins(searchQuery string, categoryName string, authorName string, limit int, offset int) (*registry.PluginListResponse, error) {
+func (s *PluginRegistryService) ListPlugins(searchQuery string, categoryName string, authorName string, subcategory string, language string, tag string, limit int, offset int) (*registry.PluginListResponse, error) {
 	client, err := s.getClient()
 	if err != nil {
 		return nil, err
@@ -61,6 +61,18 @@ func (s *PluginRegistryService) ListPlugins(searchQuery string, categoryName str
 
 	if authorName != "" {
 		params["author__name"] = authorName
+	}
+
+	if subcategory != "" {
+		params["subcategory"] = subcategory
+	}
+
+	if language != "" {
+		params["language"] = language
+	}
+
+	if tag != "" {
+		params["tag"] = tag
 	}
 
 	if limit > 0 {
@@ -172,6 +184,23 @@ func (s *PluginRegistryService) ListCategories() (*registry.CategoryListResponse
 	}
 
 	log.Printf("[PluginRegistryService] Found %d categories", result.Count)
+	return result, nil
+}
+
+func (s *PluginRegistryService) ListFilterOptions() (*registry.FilterOptions, error) {
+	client, err := s.getClient()
+	if err != nil {
+		return nil, err
+	}
+
+	log.Printf("[PluginRegistryService] Fetching filter options")
+
+	result, err := client.ListFilterOptions()
+	if err != nil {
+		log.Printf("[PluginRegistryService] Failed to list filter options: %v", err)
+		return nil, err
+	}
+
 	return result, nil
 }
 

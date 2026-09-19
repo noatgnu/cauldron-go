@@ -87,6 +87,7 @@ type Plugin struct {
 	SchemaVersion          int           `json:"schema_version"`
 	Author                 *Author       `json:"author"`
 	Category               *Category     `json:"category"`
+	Subcategory            string        `json:"subcategory,omitempty"`
 	Icon                   string        `json:"icon,omitempty"`
 	Repository             string        `json:"repository,omitempty"`
 	CommitHash             string        `json:"commit_hash,omitempty"`
@@ -280,6 +281,43 @@ func (c *Client) ListCategories() (*CategoryListResponse, error) {
 		Previous: nil,
 		Results:  categories,
 	}, nil
+}
+
+type FilterOptions struct {
+	Categories    []string `json:"categories"`
+	Subcategories []string `json:"subcategories"`
+	Authors       []string `json:"authors"`
+	Tags          []string `json:"tags"`
+	Languages     []string `json:"languages"`
+}
+
+func (c *Client) ListFilterOptions() (*FilterOptions, error) {
+	endpoint := fmt.Sprintf("%s/api/plugins/filter_options/", c.BaseURL)
+
+	req, err := http.NewRequest("GET", endpoint, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("unexpected status code %d: %s", resp.StatusCode, string(body))
+	}
+
+	var result FilterOptions
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &result, nil
 }
 
 func (c *Client) CheckUpdate(pluginID string) (*UpdateInfo, error) {

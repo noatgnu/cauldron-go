@@ -54,16 +54,26 @@
 
 .search-filters {
   display: flex;
+  flex-wrap: wrap;
   gap: 16px;
   align-items: center;
 
   .search-field {
     flex: 1;
+    min-width: 240px;
     max-width: 500px;
   }
 
   .category-filter {
-    width: 240px;
+    width: 200px;
+  }
+
+  .registry-filter {
+    width: 160px;
+  }
+
+  .clear-filters-button {
+    align-self: center;
   }
 }
 

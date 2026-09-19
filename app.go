@@ -145,8 +145,7 @@ func (a *App) Initialize() {
 	a.updateCheckService = services.NewUpdateCheckService(a.appVersion)
 	a.rPortableService, err = services.NewRPortableServiceV3(a.wailsApp)
 	if err != nil {
-		log.Printf("[App.Initialize] ERROR: Failed to initialize R portable service: %v\n", err)
-		return
+		log.Printf("[App.Initialize] Warning: Failed to initialize R portable service, R-portable install/list will be unavailable: %v\n", err)
 	}
 
 	log.Println("[App.Initialize] Initializing job queue...")
@@ -158,8 +157,7 @@ func (a *App) Initialize() {
 	a.gelAnalysisService = services.NewGelAnalysisService(a.db, a.scriptExecutor, services.NewProgressNotifierV3(a.wailsApp), a.envService, a.appVersion)
 	a.stagedUploadService, err = services.NewStagedUploadService(userDataPath, services.DefaultStagedUploadTTL)
 	if err != nil {
-		log.Printf("[App.Initialize] ERROR: Failed to initialize staged upload service: %v\n", err)
-		return
+		log.Printf("[App.Initialize] Warning: Failed to initialize staged upload service, chunked uploads will be unavailable: %v\n", err)
 	}
 	go a.stagedUploadCleanupLoop()
 
@@ -1189,22 +1187,37 @@ func (a *App) ListUvPackages(venvPythonPath string) ([]string, error) {
 }
 
 func (a *App) ListAvailableRVersions() ([]rversion.Release, error) {
+	if a.rPortableService == nil {
+		return nil, fmt.Errorf("R portable service is unavailable")
+	}
 	return a.rPortableService.ListAvailableRVersions()
 }
 
 func (a *App) ListInstalledRVersions() ([]string, error) {
+	if a.rPortableService == nil {
+		return nil, fmt.Errorf("R portable service is unavailable")
+	}
 	return a.rPortableService.ListInstalledRVersions()
 }
 
 func (a *App) InstallRVersion(version string) error {
+	if a.rPortableService == nil {
+		return fmt.Errorf("R portable service is unavailable")
+	}
 	return a.rPortableService.InstallRVersion(version)
 }
 
 func (a *App) UninstallRVersion(version string) error {
+	if a.rPortableService == nil {
+		return fmt.Errorf("R portable service is unavailable")
+	}
 	return a.rPortableService.UninstallRVersion(version)
 }
 
 func (a *App) GetRPortablePath(version string) (string, error) {
+	if a.rPortableService == nil {
+		return "", fmt.Errorf("R portable service is unavailable")
+	}
 	return a.rPortableService.GetRPath(version)
 }
 
@@ -2083,9 +2096,9 @@ func (a *App) HandleProtocolURL(url string) error {
 	return nil
 }
 
-func (a *App) ListRegistryPlugins(searchQuery string, categoryName string, authorName string, limit int, offset int) (interface{}, error) {
-	log.Printf("[App] Listing registry plugins - search: %s, category: %s, author: %s, limit: %d, offset: %d", searchQuery, categoryName, authorName, limit, offset)
-	return a.pluginRegistryService.ListPlugins(searchQuery, categoryName, authorName, limit, offset)
+func (a *App) ListRegistryPlugins(searchQuery string, categoryName string, authorName string, subcategory string, language string, tag string, limit int, offset int) (interface{}, error) {
+	log.Printf("[App] Listing registry plugins - search: %s, category: %s, author: %s, subcategory: %s, language: %s, tag: %s, limit: %d, offset: %d", searchQuery, categoryName, authorName, subcategory, language, tag, limit, offset)
+	return a.pluginRegistryService.ListPlugins(searchQuery, categoryName, authorName, subcategory, language, tag, limit, offset)
 }
 
 func (a *App) GetRegistryPlugin(pluginID string) (interface{}, error) {
@@ -2096,6 +2109,11 @@ func (a *App) GetRegistryPlugin(pluginID string) (interface{}, error) {
 func (a *App) ListRegistryCategories() (interface{}, error) {
 	log.Printf("[App] Listing registry categories")
 	return a.pluginRegistryService.ListCategories()
+}
+
+func (a *App) GetRegistryFilterOptions() (interface{}, error) {
+	log.Printf("[App] Getting registry filter options")
+	return a.pluginRegistryService.ListFilterOptions()
 }
 
 func (a *App) InstallPluginFromRegistry(pluginID string, commitHash string) error {
@@ -2429,27 +2447,42 @@ func (a *App) stagedUploadCleanupLoop() {
 // StartChunkedUpload begins or resumes a chunked upload for the calling client, returning the
 // indices of chunks already received (empty for a fresh upload).
 func (a *App) StartChunkedUpload(ctx context.Context, uploadID string, filename string, totalChunks int) ([]int, error) {
+	if a.stagedUploadService == nil {
+		return nil, fmt.Errorf("staged upload service is unavailable")
+	}
 	return a.stagedUploadService.StartChunkedUpload(clientIDFromContext(ctx), uploadID, filename, totalChunks)
 }
 
 // WriteChunk stores one chunk of an in-progress chunked upload.
 func (a *App) WriteChunk(ctx context.Context, uploadID string, chunkIndex int, data []byte) error {
+	if a.stagedUploadService == nil {
+		return fmt.Errorf("staged upload service is unavailable")
+	}
 	return a.stagedUploadService.WriteChunk(clientIDFromContext(ctx), uploadID, chunkIndex, data)
 }
 
 // GetReceivedUploadChunks reports which chunk indices are currently stored for an in-progress upload.
 func (a *App) GetReceivedUploadChunks(ctx context.Context, uploadID string) ([]int, error) {
+	if a.stagedUploadService == nil {
+		return nil, fmt.Errorf("staged upload service is unavailable")
+	}
 	return a.stagedUploadService.ReceivedChunks(clientIDFromContext(ctx), uploadID)
 }
 
 // CompleteChunkedUpload assembles all received chunks into the final staged file and returns its
 // server-local path for existing path-based methods (e.g. LoadGelImage) to consume unchanged.
 func (a *App) CompleteChunkedUpload(ctx context.Context, uploadID string) (string, error) {
+	if a.stagedUploadService == nil {
+		return "", fmt.Errorf("staged upload service is unavailable")
+	}
 	return a.stagedUploadService.CompleteChunkedUpload(clientIDFromContext(ctx), uploadID)
 }
 
 // AbortChunkedUpload discards an in-progress chunked upload session.
 func (a *App) AbortChunkedUpload(ctx context.Context, uploadID string) error {
+	if a.stagedUploadService == nil {
+		return fmt.Errorf("staged upload service is unavailable")
+	}
 	return a.stagedUploadService.AbortChunkedUpload(clientIDFromContext(ctx), uploadID)
 }
 
