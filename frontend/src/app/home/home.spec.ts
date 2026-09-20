@@ -74,7 +74,7 @@ describe('Home', () => {
     expect(el.querySelector('.debug-card')).not.toBeNull();
   });
 
-  it('does not mark itself ready before initialization has actually run', async () => {
+  it('does not mark itself ready before initialization has run', async () => {
     let resolveBackend!: () => void;
     wailsMock.waitForBackend = vi.fn().mockReturnValue(new Promise<void>(resolve => { resolveBackend = resolve; }));
     createComponent();

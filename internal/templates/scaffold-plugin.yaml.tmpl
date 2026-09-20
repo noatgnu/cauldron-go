@@ -8,8 +8,8 @@ plugin:
   icon: "analytics"
 
 runtime:
-  type: "{{ .Runtime }}"
-  script: "{{ .Script }}"
+  environments: [{{ if .HasPython }}"python"{{ end }}{{ if and .HasPython .HasR }}, {{ end }}{{ if .HasR }}"r"{{ end }}]
+  entrypoint: "{{ .Script }}"
 
 inputs:
   - name: "input_file"
