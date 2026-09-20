@@ -74,6 +74,21 @@ describe('Home', () => {
     expect(el.querySelector('.debug-card')).not.toBeNull();
   });
 
+  it('does not mark itself ready before initialization has actually run', async () => {
+    let resolveBackend!: () => void;
+    wailsMock.waitForBackend = vi.fn().mockReturnValue(new Promise<void>(resolve => { resolveBackend = resolve; }));
+    createComponent();
+    fixture.detectChanges();
+
+    expect((component as any).allLoaded()).toBe(false);
+
+    resolveBackend();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect((component as any).allLoaded()).toBe(true);
+  });
+
   it('does not loop forever reconciling the jobs list when a job update is already pending on construction', async () => {
     const job = { id: 'job-1', name: 'Test Job', type: 'pca-analysis', status: 'completed', createdAt: Date.now() };
     wailsMock.jobUpdate = signal(job);
