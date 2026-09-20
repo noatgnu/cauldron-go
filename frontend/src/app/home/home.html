@@ -1,26 +1,32 @@
-<div class="home-container">
-  <div class="jobs-content">
-    @if (debugModeEnabled()) {
-      <mat-card class="debug-card">
-        <mat-card-content class="debug-content">
-          <div class="debug-text">
-            <strong>Debug Status:</strong><br>
-            window.go: <span [style.color]="debugInfo().windowGoExists ? 'green' : 'red'">{{ debugInfo().windowGoExists ? 'EXISTS' : 'MISSING' }}</span> |
-            Wails: <span [style.color]="wails.isWails ? 'green' : 'red'">{{ wails.isWails ? 'READY' : 'NOT READY' }}</span> |
-            Jobs: {{ debugInfo().jobsLoaded }} |
-            Loading: {{ loading() ? 'YES' : 'NO' }}
-            @if (debugInfo().lastError) {
-              <br><strong class="error-text">Error:</strong> {{ debugInfo().lastError }}
-            }
-            <br><strong>Last 3 logs:</strong>
-            @for (log of debugInfo().logs.slice(-3); track $index) {
-              <br>{{ log }}
-            }
-          </div>
-        </mat-card-content>
-      </mat-card>
-    }
+<div class="home-container" [class.ready]="allLoaded()">
+  @if (debugModeEnabled()) {
+    <mat-card class="debug-card">
+      <mat-card-content class="debug-content">
+        <div class="debug-text">
+          <strong>Debug Status:</strong><br>
+          window.go: <span [style.color]="debugInfo().windowGoExists ? 'green' : 'red'">{{ debugInfo().windowGoExists ? 'EXISTS' : 'MISSING' }}</span> |
+          Wails: <span [style.color]="wails.isWails ? 'green' : 'red'">{{ wails.isWails ? 'READY' : 'NOT READY' }}</span> |
+          Jobs: {{ debugInfo().jobsLoaded }} |
+          Loading: {{ loading() ? 'YES' : 'NO' }}
+          @if (debugInfo().lastError) {
+            <br><strong class="error-text">Error:</strong> {{ debugInfo().lastError }}
+          }
+          <br><strong>Last 3 logs:</strong>
+          @for (log of debugInfo().logs.slice(-3); track $index) {
+            <br>{{ log }}
+          }
+        </div>
+      </mat-card-content>
+    </mat-card>
+  }
 
+  @if (!allLoaded()) {
+    <div class="home-loading">
+      <mat-spinner diameter="48"></mat-spinner>
+      <p>Loading dashboard...</p>
+    </div>
+  } @else {
+  <div class="jobs-content">
     <div class="jobs-section">
       <div class="jobs-header">
         <h2>Jobs</h2>
@@ -227,4 +233,5 @@
       </mat-card-content>
     </mat-card>
   </div>
+  }
 </div>
