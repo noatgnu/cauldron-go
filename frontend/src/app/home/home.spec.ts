@@ -15,7 +15,8 @@ describe('Home', () => {
       isWails: false,
       jobUpdate: () => null,
       getSettings: vi.fn().mockResolvedValue({}),
-      logToFile: vi.fn().mockResolvedValue(undefined)
+      logToFile: vi.fn().mockResolvedValue(undefined),
+      waitForBackend: vi.fn().mockResolvedValue(undefined)
     };
 
     await TestBed.configureTestingModule({

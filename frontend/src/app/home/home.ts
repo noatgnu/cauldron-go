@@ -105,6 +105,8 @@ export class Home implements OnInit {
 
     addLog('=== Home Component Initialization ===');
 
+    await this.wails.waitForBackend();
+
     const windowWailsExists = typeof window !== 'undefined' && '_wails' in window;
     const windowGoExists = typeof window !== 'undefined' && !!(window as any).go;
     const windowRuntimeExists = typeof window !== 'undefined' && !!(window as any).runtime;
