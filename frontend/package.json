@@ -10,7 +10,8 @@
     "test": "ng test",
     "e2e": "playwright test",
     "e2e:headed": "playwright test --headed",
-    "e2e:debug": "playwright test --debug"
+    "e2e:debug": "playwright test --debug",
+    "screenshots": "playwright test --config=e2e/screenshots/playwright.screenshots.config.ts"
   },
   "prettier": {
     "printWidth": 100,
