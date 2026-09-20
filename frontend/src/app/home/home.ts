@@ -44,7 +44,8 @@ export class Home implements OnInit {
   protected loading = signal(false);
   protected loadingVersions = signal(false);
   protected loadingFiles = signal(false);
-  protected allLoaded = computed(() => !this.loading() && !this.loadingVersions() && !this.loadingFiles());
+  protected initialized = signal(false);
+  protected allLoaded = computed(() => this.initialized() && !this.loading() && !this.loadingVersions() && !this.loadingFiles());
 
   protected displayedColumns: string[] = ['status', 'name', 'type', 'createdAt', 'actions'];
 
@@ -97,6 +98,7 @@ export class Home implements OnInit {
         this.loading.set(false);
         this.loadingVersions.set(false);
         this.loadingFiles.set(false);
+        this.initialized.set(true);
         if (!this.debugInfo().lastError) {
           this.debugInfo.set({ ...this.debugInfo(), lastError: 'Loading timeout - check if backend is responding' });
         }
@@ -129,6 +131,7 @@ export class Home implements OnInit {
       this.loading.set(false);
       this.loadingVersions.set(false);
       this.loadingFiles.set(false);
+      this.initialized.set(true);
       return;
     }
 
@@ -155,6 +158,7 @@ export class Home implements OnInit {
       this.debugInfo.set({ ...this.debugInfo(), lastError: errorMsg });
     } finally {
       this.loading.set(false);
+      this.initialized.set(true);
     }
 
     this.setupEventListeners();
