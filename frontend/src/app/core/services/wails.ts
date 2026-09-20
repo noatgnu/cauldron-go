@@ -117,8 +117,6 @@ export class Wails {
     this._backendReadyPromise = this.initBackend();
   }
 
-  // window._wails can still be injecting when this service constructs, so a one-shot check
-  // here would wrongly and permanently mark Wails as unavailable. Retry briefly first.
   private async initBackend(): Promise<void> {
     if (!this.isWails) {
       this.isWails = await this.waitForWailsRuntime();

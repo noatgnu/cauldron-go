@@ -3,7 +3,8 @@ import { execFile } from 'child_process';
 import { promisify } from 'util';
 import * as fs from 'fs';
 import * as path from 'path';
-import { navigate, waitForElement, waitForWindow, getUrl } from '../helpers/mcp-client';
+import * as crypto from 'crypto';
+import { navigate, waitForElement, waitForWindow, getUrl, callBoundMethod, click } from '../helpers/mcp-client';
 
 const execFileAsync = promisify(execFile);
 
@@ -15,7 +16,6 @@ interface ScreenshotTarget {
 
 const OUTPUT_DIR = path.resolve(__dirname, '../../../docs/images');
 
-// Mirrors the app's own quick-nav page list plus Plugin Registry.
 const targets: ScreenshotTarget[] = [
   { route: '/home', name: 'home', selector: '.home-container.ready' },
   { route: '/jobs', name: 'jobs', selector: '.jobs-container' },
@@ -27,12 +27,33 @@ const targets: ScreenshotTarget[] = [
   { route: '/about', name: 'about', selector: '.about-page' },
 ];
 
-async function captureDisplay(outPath: string): Promise<void> {
-  const display = process.env['SCREENSHOT_DISPLAY'] || process.env['DISPLAY'] || ':99';
-  await execFileAsync('import', ['-display', display, '-window', 'root', outPath]);
+function getDisplay(): string {
+  return process.env['SCREENSHOT_DISPLAY'] || process.env['DISPLAY'] || ':99';
 }
 
-// Closes the gap between navigate() and dom_query() actually reflecting the new route.
+let cachedWindowId: string | null = null;
+
+async function getCauldronWindowId(): Promise<string> {
+  if (cachedWindowId) return cachedWindowId;
+  const { stdout } = await execFileAsync('xwininfo', ['-root', '-tree', '-display', getDisplay()]);
+  const match = stdout.match(/^\s*(0x[0-9a-f]+)\s+"Cauldron":/m);
+  if (!match) {
+    throw new Error('Could not find the Cauldron window via xwininfo');
+  }
+  cachedWindowId = match[1];
+  return cachedWindowId;
+}
+
+async function captureDisplay(outPath: string): Promise<Buffer> {
+  const windowId = await getCauldronWindowId();
+  await execFileAsync('import', ['-display', getDisplay(), '-window', windowId, outPath]);
+  return fs.readFileSync(outPath);
+}
+
+function hash(buf: Buffer): string {
+  return crypto.createHash('sha256').update(buf).digest('hex');
+}
+
 async function waitForRoute(route: string, timeoutMs = 15000): Promise<boolean> {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
@@ -50,8 +71,17 @@ test.beforeAll(async () => {
   if (!ready) {
     throw new Error('Cauldron app window did not become visible in time');
   }
+  await callBoundMethod('main.App.SetSetting', 'autoCheckForUpdates', false);
+
+  const dialogOpen = await waitForElement('.mat-mdc-dialog-container', 5000);
+  if (dialogOpen) {
+    await click('.mat-mdc-dialog-actions button:first-child');
+  }
+
   fs.mkdirSync(OUTPUT_DIR, { recursive: true });
 });
+
+let previousHash: string | null = null;
 
 for (const target of targets) {
   test(`capture ${target.name}`, async () => {
@@ -67,8 +97,24 @@ for (const target of targets) {
       throw new Error(`Timed out waiting for "${target.selector}" on route ${target.route}`);
     }
 
-    // Let the compositor paint after the DOM check passes.
-    await new Promise(resolve => setTimeout(resolve, 500));
-    await captureDisplay(path.join(OUTPUT_DIR, `${target.name}.png`));
+    const outPath = path.join(OUTPUT_DIR, `${target.name}.png`);
+
+    let currentHash = '';
+    let lastHash: string | null = null;
+    const maxAttempts = 10;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      const buf = await captureDisplay(outPath);
+      currentHash = hash(buf);
+      const stable = currentHash === lastHash;
+      const distinct = currentHash !== previousHash;
+      lastHash = currentHash;
+      if (stable && distinct) break;
+      if (attempt === maxAttempts) {
+        throw new Error(`Screenshot for ${target.name} never stabilized to a distinct frame after ${maxAttempts} attempts`);
+      }
+    }
+
+    previousHash = currentHash;
   });
 }

@@ -53,7 +53,8 @@ jobs:
             xvfb \
             fluxbox \
             dbus-x11 \
-            imagemagick
+            imagemagick \
+            x11-utils
 
       - name: Allow unprivileged user namespaces (required by bubblewrap/WebKitGTK sandbox)
         run: |
@@ -115,7 +116,7 @@ jobs:
 
           cd ${{ github.workspace }}
 
-          dbus-run-session -- env WAILS_MCP=1 WEBKIT_DISABLE_SANDBOX=1 ./build/bin/cauldron > /tmp/cauldron-screenshots.log 2>&1 &
+          dbus-run-session -- env WAILS_MCP=1 WEBKIT_DISABLE_SANDBOX=1 WEBKIT_DISABLE_COMPOSITING_MODE=1 LIBGL_ALWAYS_SOFTWARE=1 ./build/bin/cauldron > /tmp/cauldron-screenshots.log 2>&1 &
           APP_PID=$!
 
           echo "Waiting for MCP server..."
