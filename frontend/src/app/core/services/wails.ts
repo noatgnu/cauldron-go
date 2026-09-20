@@ -114,8 +114,37 @@ export class Wails {
   bindingsUpdated: Signal<number> = this._bindingsUpdated.asReadonly();
 
   constructor() {
-    this._backendReadyPromise = this.isWails ? this.probeBackendReady() : Promise.resolve();
+    this._backendReadyPromise = this.initBackend();
+  }
+
+  // window._wails can still be injecting when this service constructs, so a one-shot check
+  // here would wrongly and permanently mark Wails as unavailable. Retry briefly first.
+  private async initBackend(): Promise<void> {
+    if (!this.isWails) {
+      this.isWails = await this.waitForWailsRuntime();
+    }
     this.setupEventListeners();
+    if (this.isWails) {
+      await this.probeBackendReady();
+    }
+  }
+
+  private waitForWailsRuntime(timeoutMs = 3000): Promise<boolean> {
+    return new Promise(resolve => {
+      const start = Date.now();
+      const check = () => {
+        if (typeof window !== 'undefined' && '_wails' in window) {
+          resolve(true);
+          return;
+        }
+        if (Date.now() - start >= timeoutMs) {
+          resolve(false);
+          return;
+        }
+        setTimeout(check, 50);
+      };
+      check();
+    });
   }
 
   // Retries instead of rejecting permanently, since a pre-login 401 in server mode would otherwise block waitForBackend() forever.
@@ -131,7 +160,7 @@ export class Wails {
     }
   }
 
-  private waitForBackend(): Promise<void> {
+  waitForBackend(): Promise<void> {
     return this._backendReadyPromise;
   }
 
