@@ -44,6 +44,7 @@ export class Home implements OnInit {
   protected loading = signal(false);
   protected loadingVersions = signal(false);
   protected loadingFiles = signal(false);
+  protected allLoaded = computed(() => !this.loading() && !this.loadingVersions() && !this.loadingFiles());
 
   protected displayedColumns: string[] = ['status', 'name', 'type', 'createdAt', 'actions'];
 

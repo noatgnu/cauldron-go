@@ -17,7 +17,7 @@ const OUTPUT_DIR = path.resolve(__dirname, '../../../docs/images');
 
 // Mirrors the app's own quick-nav page list plus Plugin Registry.
 const targets: ScreenshotTarget[] = [
-  { route: '/home', name: 'home', selector: '.home-container' },
+  { route: '/home', name: 'home', selector: '.home-container.ready' },
   { route: '/jobs', name: 'jobs', selector: '.jobs-container' },
   { route: '/plugin-registry', name: 'plugin-registry', selector: '.registry-container' },
   { route: '/settings/general', name: 'settings-general', selector: '.general-settings' },
@@ -32,10 +32,7 @@ async function captureDisplay(outPath: string): Promise<void> {
   await execFileAsync('import', ['-display', display, '-window', 'root', outPath]);
 }
 
-// dom_query's view of the page lags real navigation by roughly one MCP round trip, so
-// waitForElement() alone can return true while the webview is still painting the *previous*
-// route (observed: captured screenshots one step behind the requested route). Confirming the
-// URL actually changed first closes that race.
+// Closes the gap between navigate() and dom_query() actually reflecting the new route.
 async function waitForRoute(route: string, timeoutMs = 15000): Promise<boolean> {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
@@ -70,8 +67,8 @@ for (const target of targets) {
       throw new Error(`Timed out waiting for "${target.selector}" on route ${target.route}`);
     }
 
-    // Let async content (backend calls, change detection, compositor paint) settle.
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    // Let the compositor paint after the DOM check passes.
+    await new Promise(resolve => setTimeout(resolve, 500));
     await captureDisplay(path.join(OUTPUT_DIR, `${target.name}.png`));
   });
 }
