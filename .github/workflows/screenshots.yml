@@ -1,0 +1,168 @@
+name: Update Doc Screenshots
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  capture-screenshots:
+    name: Capture App Screenshots
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.23.1'
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            xorg-dev \
+            libpng-dev \
+            libjpeg-dev \
+            liblzma-dev \
+            libpcre2-dev \
+            libcurl4-openssl-dev \
+            libharfbuzz-dev \
+            libfribidi-dev \
+            libx11-dev \
+            libxext-dev \
+            libxrender-dev \
+            libxtst-dev \
+            libcairo2-dev \
+            libgtk-3-dev \
+            libwebkit2gtk-4.1-dev \
+            libsoup-3.0-dev \
+            libgtk-4-dev \
+            libwebkitgtk-6.0-dev \
+            xvfb \
+            fluxbox \
+            dbus-x11 \
+            imagemagick
+
+      - name: Allow unprivileged user namespaces (required by bubblewrap/WebKitGTK sandbox)
+        run: |
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+
+      - name: Make build.sh executable
+        run: chmod +x build.sh
+
+      - name: Install Wails CLI
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.15
+
+      - name: Generate Wails bindings
+        run: wails3 generate bindings -ts
+
+      - name: Build shared-lib
+        working-directory: shared-lib
+        run: |
+          npm install
+          npm run build
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm install
+
+      - name: Install Playwright browsers
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+      - name: Create dummy license files for embedding
+        run: |
+          mkdir -p resources/licenses
+          echo "[]" > resources/licenses/go-licenses.json
+          echo "[]" > resources/licenses/npm-licenses.json
+
+      - name: Build application
+        run: |
+          go build -tags mcp -o ./build/bin/cauldron .
+
+      - name: Copy plugins to build directory
+        run: |
+          cp -r plugins ./build/bin/plugins
+
+      - name: Start application and capture screenshots
+        env:
+          DISPLAY: ':99'
+          CI: 'true'
+          WAILS_MCP: '1'
+          MCP_URL: 'http://127.0.0.1:9099/mcp'
+        run: |
+          Xvfb :99 -screen 0 1920x1080x24 &
+          sleep 2
+
+          DISPLAY=:99 fluxbox &
+          sleep 2
+
+          cd ${{ github.workspace }}
+
+          dbus-run-session -- env WAILS_MCP=1 WEBKIT_DISABLE_SANDBOX=1 ./build/bin/cauldron > /tmp/cauldron-screenshots.log 2>&1 &
+          APP_PID=$!
+
+          echo "Waiting for MCP server..."
+          for i in {1..60}; do
+            if ! kill -0 $APP_PID 2>/dev/null; then
+              echo "App process exited unexpectedly while waiting for MCP server"
+              cat /tmp/cauldron-screenshots.log
+              exit 1
+            fi
+            if curl -s -X POST http://127.0.0.1:9099/mcp \
+                 -H "Content-Type: application/json" -H "Accept: application/json, text/event-stream" \
+                 -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' 2>/dev/null | grep -q '"tools"'; then
+              echo "MCP server is ready on port 9099"
+              break
+            fi
+            if [ $i -eq 60 ]; then
+              echo "Timeout waiting for MCP server"
+              cat /tmp/cauldron-screenshots.log
+              exit 1
+            fi
+            sleep 1
+          done
+
+          sleep 2
+
+          cd frontend
+          set +e
+          SCREENSHOT_DISPLAY=:99 npm run screenshots
+          CAPTURE_EXIT=$?
+          set -e
+
+          kill $APP_PID 2>/dev/null || true
+
+          echo "=== Cauldron app log ==="
+          cat /tmp/cauldron-screenshots.log || true
+
+          exit $CAPTURE_EXIT
+
+      - name: Open pull request with updated screenshots
+        uses: peter-evans/create-pull-request@v6
+        with:
+          commit-message: 'docs: update app screenshots for ${{ github.ref_name }}'
+          title: 'docs: update app screenshots for ${{ github.ref_name }}'
+          body: |
+            Automated screenshot refresh triggered by the release of `${{ github.ref_name }}`.
+
+            Please glance over the images before merging (a broken/empty-looking page usually means the capture ran before the UI finished rendering, or a route's markup changed).
+          branch: docs/screenshots-update
+          delete-branch: true
+          add-paths: docs/images/*.png
