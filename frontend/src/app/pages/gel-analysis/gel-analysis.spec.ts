@@ -2,6 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { vi, beforeAll } from 'vitest';
 import { of } from 'rxjs';
+import { ActivatedRoute, convertToParamMap } from '@angular/router';
 import { GelAnalysis } from './gel-analysis';
 import { Wails } from '../../core/services/wails';
 import { NotificationService } from '../../core/services/notification.service';
@@ -83,7 +84,8 @@ describe('GelAnalysis', () => {
         { provide: Wails, useValue: wailsMock },
         { provide: NotificationService, useValue: notificationMock },
         { provide: MatDialog, useValue: dialogMock },
-        { provide: FilePickerService, useValue: filePickerMock }
+        { provide: FilePickerService, useValue: filePickerMock },
+        { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap({}) } } }
       ]
     }).compileComponents();
 

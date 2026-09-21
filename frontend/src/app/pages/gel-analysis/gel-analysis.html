@@ -156,7 +156,7 @@
               <input matInput type="number" min="0" [(ngModel)]="expectedLaneCount">
             </mat-form-field>
             <div class="icon-button-row">
-              <button mat-icon-button (click)="runAutoDetect()" [disabled]="autoDetecting()" matTooltip="Auto-detect lanes">
+              <button mat-icon-button class="gel-auto-detect-btn" (click)="runAutoDetect()" [disabled]="autoDetecting()" matTooltip="Auto-detect lanes">
                 <mat-icon>auto_awesome</mat-icon>
               </button>
               @if (autoDetecting()) {

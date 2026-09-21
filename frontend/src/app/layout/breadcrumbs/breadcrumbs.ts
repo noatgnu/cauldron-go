@@ -54,7 +54,7 @@ export class Breadcrumbs implements OnInit {
   }
 
   private async updateBreadcrumbs() {
-    const url = this.router.url;
+    const url = this.router.url.split('?')[0];
     const paths = url.split('/').filter(p => p);
 
     const crumbs: Breadcrumb[] = [
