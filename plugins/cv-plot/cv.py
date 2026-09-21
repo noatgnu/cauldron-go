@@ -4,7 +4,6 @@ matplotlib.use('Agg')
 import re
 import click
 import numpy as np
-from scipy.stats import variation
 from glob import glob
 import os
 import pandas as pd
@@ -57,16 +56,16 @@ def main(log_file_path: str, report_pr_file_path: str, report_pg_file_path: str,
         pr_df = pr_df.melt(id_vars=[k for k in pr_df.columns if k not in samples], value_vars=samples, var_name="Sample", value_name=intensity_col)
         pr_df["Sample"] = pd.Categorical(pr_df["Sample"].values, samples)
         pr_df = pr_df.merge(annotation, on="Sample", how="left")
-        pr_df = pr_df.groupby(["Condition", "Protein.Group", "Modified.Sequence"]).apply(lambda x: variation(x[intensity_col], nan_policy="omit")).reset_index()
-        pr_df.rename(columns={0: "CV"}, inplace=True)
+        pr_grouped = pr_df.groupby(["Condition", "Protein.Group", "Modified.Sequence"])[intensity_col]
+        pr_df = (pr_grouped.std(ddof=0) / pr_grouped.mean()).reset_index(name="CV")
         draw_cv_intensity(pr_df,  os.path.join(output_folder, "pr_cv.svg"))
     if report_pg_file_path != "":
         pg_df = pd.read_csv(report_pg_file_path, sep="\t")
         pg_df = pg_df.melt(id_vars=[k for k in pg_df.columns if k not in samples], value_vars=samples, var_name="Sample", value_name=intensity_col)
         pg_df["Sample"] = pd.Categorical(pg_df["Sample"].values, samples)
         pg_df = pg_df.merge(annotation, on="Sample", how="left")
-        pg_df = pg_df.groupby(["Condition", "Protein.Group"]).apply(lambda x: variation(x[intensity_col], nan_policy="omit")).reset_index()
-        pg_df.rename(columns={0: "CV"}, inplace=True)
+        pg_grouped = pg_df.groupby(["Condition", "Protein.Group"])[intensity_col]
+        pg_df = (pg_grouped.std(ddof=0) / pg_grouped.mean()).reset_index(name="CV")
         draw_cv_intensity(pg_df, os.path.join(output_folder, "pg_cv.svg"))
     plt.close('all')
 
