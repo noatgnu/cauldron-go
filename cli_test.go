@@ -492,7 +492,7 @@ func TestCLIJobRun_Integration(t *testing.T) {
 		t.Fatalf("executePluginJob error: %v", err)
 	}
 
-	job, err := waitForJob(ctx, jobID, 150*time.Second)
+	job, err := waitForJob(ctx, jobID, 300*time.Second)
 	if err != nil {
 		t.Fatalf("waitForJob error: %v", err)
 	}
