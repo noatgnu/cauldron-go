@@ -367,6 +367,13 @@ export class Wails {
     return (result || []).filter((job): job is Job => job !== null);
   }
 
+  async getJobsPage(limit: number, offset: number): Promise<Job[]> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    const result = await WailsApp.GetJobsPage(limit, offset);
+    return (result || []).filter((job): job is Job => job !== null);
+  }
+
   async deleteJob(id: string): Promise<void> {
     if (!this.isWails) throw new Error('Wails not available');
     await this.waitForBackend();

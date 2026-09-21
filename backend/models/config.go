@@ -17,4 +17,6 @@ type Config struct {
 	AccessibilityColorblindPalette string `json:"accessibilityColorblindPalette"`
 	DebugMode                      bool   `json:"debugMode"`
 	AutoCheckForUpdates            bool   `json:"autoCheckForUpdates"`
+	MaxConcurrentJobs              int    `json:"maxConcurrentJobs"`
+	JobTimeoutMinutes              int    `json:"jobTimeoutMinutes"`
 }

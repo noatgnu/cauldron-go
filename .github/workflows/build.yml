@@ -348,7 +348,7 @@ jobs:
 
       - name: Install Python dependencies for plugins
         run: |
-          ${{ github.workspace }}/python/python/bin/pip3 install pandas numpy matplotlib seaborn scipy
+          python3 -m pip install --user --break-system-packages pandas numpy matplotlib seaborn scipy
 
       - name: Make build.sh executable
         run: chmod +x build.sh

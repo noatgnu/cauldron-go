@@ -525,7 +525,11 @@ func (a *App) GetJob(id string) (*models.Job, error) {
 }
 
 func (a *App) GetAllJobs() []*models.Job {
-	return a.jobQueue.GetAllJobs()
+	return a.jobQueue.GetAllJobs(0, 0)
+}
+
+func (a *App) GetJobsPage(limit int, offset int) []*models.Job {
+	return a.jobQueue.GetAllJobs(limit, offset)
 }
 
 func (a *App) DeleteJob(id string) error {

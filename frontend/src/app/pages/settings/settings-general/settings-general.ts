@@ -35,6 +35,8 @@ export class SettingsGeneral implements OnInit {
   protected config = signal<Partial<Config>>({});
   protected debugMode = signal(false);
   protected autoCheckForUpdates = signal(true);
+  protected maxConcurrentJobs = signal(2);
+  protected jobTimeoutMinutes = signal(0);
   protected checkingForUpdate = signal(false);
   protected forceUpdating = signal(false);
   protected forceUpdatingSingle = signal(false);
@@ -58,6 +60,8 @@ export class SettingsGeneral implements OnInit {
       this.config.set(config);
       this.debugMode.set(!!config.debugMode);
       this.autoCheckForUpdates.set(config.autoCheckForUpdates !== false);
+      this.maxConcurrentJobs.set(config.maxConcurrentJobs > 0 ? config.maxConcurrentJobs : 2);
+      this.jobTimeoutMinutes.set(config.jobTimeoutMinutes || 0);
     } catch (error) {
       await this.wails.logToFile(`[SettingsGeneral] Failed to load settings: ${error}`);
     }
@@ -71,6 +75,18 @@ export class SettingsGeneral implements OnInit {
   async setAutoCheckForUpdates(value: boolean): Promise<void> {
     this.autoCheckForUpdates.set(value);
     await this.saveSetting('autoCheckForUpdates', value);
+  }
+
+  async setMaxConcurrentJobs(value: number): Promise<void> {
+    const normalized = Math.max(1, Math.floor(value) || 1);
+    this.maxConcurrentJobs.set(normalized);
+    await this.saveSetting('maxConcurrentJobs', normalized);
+  }
+
+  async setJobTimeoutMinutes(value: number): Promise<void> {
+    const normalized = Math.max(0, Math.floor(value) || 0);
+    this.jobTimeoutMinutes.set(normalized);
+    await this.saveSetting('jobTimeoutMinutes', normalized);
   }
 
   async checkForUpdateNow(): Promise<void> {

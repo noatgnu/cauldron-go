@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 
 	"github.com/noatgnu/cauldron-go/backend/models"
 )
@@ -90,6 +91,16 @@ func (s *SettingsService) Load() error {
 	if val, ok := settings["autoCheckForUpdates"]; ok {
 		s.config.AutoCheckForUpdates = val == "true"
 	}
+	if val, ok := settings["maxConcurrentJobs"]; ok {
+		if n, err := strconv.Atoi(val); err == nil {
+			s.config.MaxConcurrentJobs = n
+		}
+	}
+	if val, ok := settings["jobTimeoutMinutes"]; ok {
+		if n, err := strconv.Atoi(val); err == nil {
+			s.config.JobTimeoutMinutes = n
+		}
+	}
 
 	return nil
 }
@@ -110,6 +121,8 @@ func (s *SettingsService) Save() error {
 	s.db.SaveSetting("accessibility.colorblindPalette", s.config.AccessibilityColorblindPalette)
 	s.db.SaveSetting("debugMode", fmt.Sprintf("%v", s.config.DebugMode))
 	s.db.SaveSetting("autoCheckForUpdates", fmt.Sprintf("%v", s.config.AutoCheckForUpdates))
+	s.db.SaveSetting("maxConcurrentJobs", fmt.Sprintf("%d", s.config.MaxConcurrentJobs))
+	s.db.SaveSetting("jobTimeoutMinutes", fmt.Sprintf("%d", s.config.JobTimeoutMinutes))
 	return nil
 }
 
@@ -145,8 +158,22 @@ func (s *SettingsService) Get(key string) interface{} {
 		return s.config.DebugMode
 	case "autoCheckForUpdates":
 		return s.config.AutoCheckForUpdates
+	case "maxConcurrentJobs":
+		return s.config.MaxConcurrentJobs
+	case "jobTimeoutMinutes":
+		return s.config.JobTimeoutMinutes
 	}
 	return nil
+}
+
+func toInt(value interface{}) (int, bool) {
+	switch v := value.(type) {
+	case int:
+		return v, true
+	case float64:
+		return int(v), true
+	}
+	return 0, false
 }
 
 func (s *SettingsService) Set(key string, value interface{}) error {
@@ -188,6 +215,14 @@ func (s *SettingsService) Set(key string, value interface{}) error {
 		s.config.DebugMode = value.(bool)
 	case "autoCheckForUpdates":
 		s.config.AutoCheckForUpdates = value.(bool)
+	case "maxConcurrentJobs":
+		if n, ok := toInt(value); ok {
+			s.config.MaxConcurrentJobs = n
+		}
+	case "jobTimeoutMinutes":
+		if n, ok := toInt(value); ok {
+			s.config.JobTimeoutMinutes = n
+		}
 	}
 	return s.Save()
 }
@@ -231,6 +266,10 @@ func (s *SettingsService) initializeDefaults() {
 	// Check the DB directly (not the in-memory config) so an explicit "false" isn't mistaken for "never set".
 	if val, _ := s.db.GetSetting("autoCheckForUpdates"); val == "" {
 		s.config.AutoCheckForUpdates = true
+	}
+
+	if s.config.MaxConcurrentJobs <= 0 {
+		s.config.MaxConcurrentJobs = 2
 	}
 }
 

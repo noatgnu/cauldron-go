@@ -21,6 +21,19 @@
   </div>
 
   <div class="form-section">
+    <h3>Job Queue</h3>
+    <p class="section-description">Control how many jobs run at once and how long a job can run before it's stopped automatically</p>
+    <mat-form-field appearance="outline" class="param-field" matTooltip="Takes effect after restarting the app">
+      <mat-label>Max concurrent jobs</mat-label>
+      <input matInput type="number" min="1" [ngModel]="maxConcurrentJobs()" (ngModelChange)="setMaxConcurrentJobs($event)">
+    </mat-form-field>
+    <mat-form-field appearance="outline" class="param-field" matTooltip="0 = no limit">
+      <mat-label>Job timeout (minutes)</mat-label>
+      <input matInput type="number" min="0" [ngModel]="jobTimeoutMinutes()" (ngModelChange)="setJobTimeoutMinutes($event)">
+    </mat-form-field>
+  </div>
+
+  <div class="form-section">
     <h3>Updates</h3>
     <p class="section-description">Control whether Cauldron checks GitHub for a newer release on startup</p>
     <mat-slide-toggle [ngModel]="autoCheckForUpdates()" (ngModelChange)="setAutoCheckForUpdates($event)">

@@ -30,8 +30,13 @@ import { Wails, Job, PythonEnvironment, REnvironment } from '../../core/services
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class Jobs implements OnInit {
+  private static readonly PAGE_SIZE = 100;
+  private loadedCount = 0;
+
   protected jobs = signal<Job[]>([]);
   protected loading = signal(false);
+  protected loadingMore = signal(false);
+  protected hasMoreJobs = signal(false);
   protected pythonEnvironments = signal<PythonEnvironment[]>([]);
   protected rEnvironments = signal<REnvironment[]>([]);
   protected jobProgress = signal<Record<string, {message: string, percentage: number}>>({});
@@ -125,12 +130,29 @@ export class Jobs implements OnInit {
   async loadJobs(): Promise<void> {
     this.loading.set(true);
     try {
-      const allJobs = await this.wails.getAllJobs();
-      this.jobs.set(allJobs);
+      const firstPage = await this.wails.getJobsPage(Jobs.PAGE_SIZE, 0);
+      this.jobs.set(firstPage);
+      this.loadedCount = firstPage.length;
+      this.hasMoreJobs.set(firstPage.length === Jobs.PAGE_SIZE);
     } catch (error: any) {
       await this.wails.logToFile(`[Jobs] Failed to load jobs: ${error?.message || String(error)}`);
     } finally {
       this.loading.set(false);
+    }
+  }
+
+  async loadMoreJobs(): Promise<void> {
+    if (this.loadingMore()) return;
+    this.loadingMore.set(true);
+    try {
+      const nextPage = await this.wails.getJobsPage(Jobs.PAGE_SIZE, this.loadedCount);
+      this.jobs.update(current => [...current, ...nextPage]);
+      this.loadedCount += nextPage.length;
+      this.hasMoreJobs.set(nextPage.length === Jobs.PAGE_SIZE);
+    } catch (error: any) {
+      await this.wails.logToFile(`[Jobs] Failed to load more jobs: ${error?.message || String(error)}`);
+    } finally {
+      this.loadingMore.set(false);
     }
   }
 

@@ -176,5 +176,16 @@
       <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
       <tr mat-row *matRowDef="let row; columns: displayedColumns;" [class.in-progress]="row.status === 'in_progress'"></tr>
     </table>
+    @if (hasMoreJobs()) {
+      <div class="load-more-container">
+        <button mat-stroked-button [disabled]="loadingMore()" (click)="loadMoreJobs()">
+          @if (loadingMore()) {
+            <span>Loading...</span>
+          } @else {
+            <span>Load more</span>
+          }
+        </button>
+      </div>
+    }
   }
 </div>

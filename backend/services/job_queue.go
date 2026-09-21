@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -57,12 +58,18 @@ func newJobQueueServiceInternal(db *DatabaseService, ctx context.Context) *JobQu
 	if ctx == nil {
 		ctx = context.Background()
 	}
+	workers := 2
+	if val, err := db.GetSetting("maxConcurrentJobs"); err == nil && val != "" {
+		if n, err := strconv.Atoi(val); err == nil && n > 0 {
+			workers = n
+		}
+	}
 	service := &JobQueueService{
 		ctx:          ctx,
 		db:           db,
 		jobs:         make(map[string]*models.Job),
 		queue:        make(chan *models.Job, 100),
-		workers:      2,
+		workers:      workers,
 		cancelFuncs:  make(map[string]context.CancelFunc),
 		shutdownChan: make(chan struct{}),
 	}
@@ -227,6 +234,12 @@ func cloneJob(job *models.Job) *models.Job {
 	return &clone
 }
 
+func classifyJobCancellation(ctxErr error, stoppedByQueue bool) (timedOut bool, wasCancelled bool) {
+	timedOut = ctxErr == context.DeadlineExceeded
+	wasCancelled = !timedOut && (ctxErr != nil || stoppedByQueue)
+	return timedOut, wasCancelled
+}
+
 func (j *JobQueueService) GetJob(id string) (*models.Job, error) {
 	j.mu.RLock()
 	job, ok := j.jobs[id]
@@ -266,7 +279,7 @@ func (j *JobQueueService) UpdateJob(id string, mutate func(job *models.Job)) (*m
 	return snapshot, nil
 }
 
-func (j *JobQueueService) GetAllJobs() []*models.Job {
+func (j *JobQueueService) GetAllJobs(limit, offset int) []*models.Job {
 	var jobs []*models.Job
 
 	if j.db == nil || j.db.GetDB() == nil {
@@ -274,8 +287,15 @@ func (j *JobQueueService) GetAllJobs() []*models.Job {
 		return jobs
 	}
 
+	if limit <= 0 {
+		limit = 100
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
 	log.Println("[GetAllJobs] Starting database query...")
-	result := j.db.GetDB().Order("created_at DESC").Limit(100).Find(&jobs)
+	result := j.db.GetDB().Order("created_at DESC").Limit(limit).Offset(offset).Find(&jobs)
 
 	if result.Error != nil {
 		log.Printf("[GetAllJobs] ERROR: Database query failed: %v\n", result.Error)
@@ -420,6 +440,8 @@ func (j *JobQueueService) processJob(job *models.Job) {
 
 	var execErr error
 	var wasCancelled bool
+	var timedOut bool
+	var timeoutMinutes int
 
 	var pluginID uint
 	var isPluginV2Job bool
@@ -465,7 +487,19 @@ func (j *JobQueueService) processJob(job *models.Job) {
 
 		log.Printf("[processJob] Created ScriptConfig with Type='%s' for plugin binding lookup", config.Type)
 
-		jobCtx, cancel := context.WithCancel(j.ctx)
+		if val, err := j.db.GetSetting("jobTimeoutMinutes"); err == nil && val != "" {
+			if n, err := strconv.Atoi(val); err == nil && n > 0 {
+				timeoutMinutes = n
+			}
+		}
+
+		var jobCtx context.Context
+		var cancel context.CancelFunc
+		if timeoutMinutes > 0 {
+			jobCtx, cancel = context.WithTimeout(j.ctx, time.Duration(timeoutMinutes)*time.Minute)
+		} else {
+			jobCtx, cancel = context.WithCancel(j.ctx)
+		}
 		defer cancel()
 		j.RegisterJobCancelFunc(job.ID, cancel)
 		defer j.UnregisterJobCancelFunc(job.ID)
@@ -504,7 +538,7 @@ func (j *JobQueueService) processJob(job *models.Job) {
 		j.mu.RLock()
 		stoppedByQueue := j.stopImmediate
 		j.mu.RUnlock()
-		wasCancelled = jobCtx.Err() != nil || stoppedByQueue
+		timedOut, wasCancelled = classifyJobCancellation(jobCtx.Err(), stoppedByQueue)
 	}
 
 	if wasCancelled {
@@ -516,7 +550,10 @@ func (j *JobQueueService) processJob(job *models.Job) {
 		completedTime := time.Now()
 		job.CompletedAt = &completedTime
 
-		if execErr != nil {
+		if timedOut {
+			job.Status = models.JobStatusFailed
+			job.Error = fmt.Sprintf("Job timed out after %d minute(s)", timeoutMinutes)
+		} else if execErr != nil {
 			job.Status = models.JobStatusFailed
 			job.Error = execErr.Error()
 		} else {
@@ -858,9 +895,8 @@ func (j *JobQueueService) StopQueueImmediate() error {
 
 		j.UpdateJob(job.ID, func(job *models.Job) {
 			job.Status = models.JobStatusPending
-			job.StartedAt = nil
 			job.CompletedAt = nil
-			job.Error = ""
+			job.Error = "Stopped by user request"
 		})
 
 		j.mu.Lock()

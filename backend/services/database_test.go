@@ -210,7 +210,7 @@ func TestJobQueueService(t *testing.T) {
 	t.Log("✓ Retrieved job successfully")
 
 	// Get all jobs
-	jobs := jobQueue.GetAllJobs()
+	jobs := jobQueue.GetAllJobs(0, 0)
 	if len(jobs) == 0 {
 		t.Error("Expected at least 1 job")
 	}

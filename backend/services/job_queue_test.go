@@ -907,12 +907,17 @@ runtime:
 	}
 
 	deadline := time.Now().Add(3 * time.Second)
+	var startedAtBeforeStop *time.Time
 	for time.Now().Before(deadline) {
 		job, err := jobQueue.GetJob(jobID)
 		if err == nil && job.Status == models.JobStatusInProgress {
+			startedAtBeforeStop = job.StartedAt
 			break
 		}
 		time.Sleep(50 * time.Millisecond)
+	}
+	if startedAtBeforeStop == nil {
+		t.Fatal("job never reached in_progress before the stop attempt")
 	}
 
 	if err := jobQueue.StopQueueImmediate(); err != nil {
@@ -926,6 +931,12 @@ runtime:
 	}
 	if job.Status != models.JobStatusPending {
 		t.Fatalf("expected job status to revert to pending after StopQueueImmediate, got: %s", job.Status)
+	}
+	if job.StartedAt == nil || !job.StartedAt.Equal(*startedAtBeforeStop) {
+		t.Errorf("expected StartedAt to be preserved after StopQueueImmediate, got: %v (was: %v)", job.StartedAt, startedAtBeforeStop)
+	}
+	if job.Error == "" {
+		t.Error("expected Error to explain the job was stopped by the user, got empty string")
 	}
 }
 
@@ -960,5 +971,126 @@ func TestGetQueueStatus_ReflectsPendingAndInProgressCounts(t *testing.T) {
 	}
 	if paused, ok := status["paused"].(bool); !ok || !paused {
 		t.Errorf("expected paused = true, got %v", status["paused"])
+	}
+}
+
+func TestClassifyJobCancellation(t *testing.T) {
+	cases := []struct {
+		name             string
+		ctxErr           error
+		stoppedByQueue   bool
+		wantTimedOut     bool
+		wantWasCancelled bool
+	}{
+		{"normal completion", nil, false, false, false},
+		{"timed out", context.DeadlineExceeded, false, true, false},
+		{"explicit cancel via context", context.Canceled, false, false, true},
+		{"stopped by queue before context observed cancel", nil, true, false, true},
+		{"stopped by queue and context already cancelled", context.Canceled, true, false, true},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			timedOut, wasCancelled := classifyJobCancellation(c.ctxErr, c.stoppedByQueue)
+			if timedOut != c.wantTimedOut {
+				t.Errorf("timedOut = %v, want %v", timedOut, c.wantTimedOut)
+			}
+			if wasCancelled != c.wantWasCancelled {
+				t.Errorf("wasCancelled = %v, want %v", wasCancelled, c.wantWasCancelled)
+			}
+		})
+	}
+}
+
+func TestNewJobQueueServiceInternal_UsesConfiguredWorkerCount(t *testing.T) {
+	tempDir := t.TempDir()
+	dbPath := filepath.Join(tempDir, "test.db")
+
+	db, err := newDatabaseServiceFromPath(dbPath)
+	if err != nil {
+		t.Fatalf("Failed to create database: %v", err)
+	}
+	defer db.Close()
+
+	if err := db.SaveSetting("maxConcurrentJobs", "5"); err != nil {
+		t.Fatalf("Failed to seed maxConcurrentJobs setting: %v", err)
+	}
+
+	jobQueue := NewJobQueueServiceV3(db, nil)
+	defer jobQueue.Shutdown()
+
+	if jobQueue.workers != 5 {
+		t.Errorf("expected workers = 5 from configured setting, got %d", jobQueue.workers)
+	}
+}
+
+func TestNewJobQueueServiceInternal_DefaultsWorkerCountWhenUnset(t *testing.T) {
+	tempDir := t.TempDir()
+	dbPath := filepath.Join(tempDir, "test.db")
+
+	db, err := newDatabaseServiceFromPath(dbPath)
+	if err != nil {
+		t.Fatalf("Failed to create database: %v", err)
+	}
+	defer db.Close()
+
+	jobQueue := NewJobQueueServiceV3(db, nil)
+	defer jobQueue.Shutdown()
+
+	if jobQueue.workers != 2 {
+		t.Errorf("expected default workers = 2, got %d", jobQueue.workers)
+	}
+}
+
+func TestGetAllJobs_Pagination(t *testing.T) {
+	tempDir := t.TempDir()
+	dbPath := filepath.Join(tempDir, "test.db")
+
+	db, err := newDatabaseServiceFromPath(dbPath)
+	if err != nil {
+		t.Fatalf("Failed to create database: %v", err)
+	}
+	defer db.Close()
+
+	jobQueue := NewJobQueueServiceV3(db, nil)
+	defer jobQueue.Shutdown()
+
+	baseTime := time.Now().Add(-1 * time.Hour)
+	for i := 0; i < 5; i++ {
+		job := &models.Job{
+			ID:        fmt.Sprintf("page-job-%d", i),
+			Type:      "test",
+			Name:      fmt.Sprintf("Page Job %d", i),
+			Status:    models.JobStatusCompleted,
+			Args:      []string{},
+			CreatedAt: baseTime.Add(time.Duration(i) * time.Minute),
+		}
+		if err := db.GetDB().Create(job).Error; err != nil {
+			t.Fatalf("failed to seed job %d: %v", i, err)
+		}
+	}
+
+	firstPage := jobQueue.GetAllJobs(2, 0)
+	if len(firstPage) != 2 {
+		t.Fatalf("expected 2 jobs in first page, got %d", len(firstPage))
+	}
+	if firstPage[0].ID != "page-job-4" || firstPage[1].ID != "page-job-3" {
+		t.Errorf("expected first page to be the 2 newest jobs in descending order, got %s, %s", firstPage[0].ID, firstPage[1].ID)
+	}
+
+	secondPage := jobQueue.GetAllJobs(2, 2)
+	if len(secondPage) != 2 {
+		t.Fatalf("expected 2 jobs in second page, got %d", len(secondPage))
+	}
+	if secondPage[0].ID != "page-job-2" || secondPage[1].ID != "page-job-1" {
+		t.Errorf("expected second page to continue in descending order, got %s, %s", secondPage[0].ID, secondPage[1].ID)
+	}
+
+	lastPage := jobQueue.GetAllJobs(2, 4)
+	if len(lastPage) != 1 {
+		t.Fatalf("expected 1 job in the final partial page, got %d", len(lastPage))
+	}
+	if lastPage[0].ID != "page-job-0" {
+		t.Errorf("expected the last page's job to be page-job-0, got %s", lastPage[0].ID)
 	}
 }

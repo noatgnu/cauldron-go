@@ -19,6 +19,7 @@ describe('Jobs', () => {
   beforeEach(async () => {
     wailsMock = {
       getAllJobs: vi.fn().mockResolvedValue([]),
+      getJobsPage: vi.fn().mockResolvedValue([]),
       getJobQueueStatus: vi.fn().mockResolvedValue({ status: 'running' }),
       queueStatus: signal({ status: 'running' }),
       jobUpdate: signal(null),
@@ -60,7 +61,7 @@ describe('Jobs', () => {
     const job = { id: 'job-1', name: 'Test Job', type: 'pca-analysis', status: 'completed', createdAt: Date.now() };
 
     beforeEach(async () => {
-      wailsMock.getAllJobs.mockResolvedValue([job]);
+      wailsMock.getJobsPage.mockResolvedValue([job]);
       await component.loadJobs();
       fixture.detectChanges();
     });
@@ -91,6 +92,7 @@ describe('Jobs', () => {
       const job = { id: 'job-1', name: 'Test Job', type: 'pca-analysis', status: 'completed', createdAt: Date.now() };
       const presetWailsMock = {
         getAllJobs: vi.fn().mockResolvedValue([job]),
+        getJobsPage: vi.fn().mockResolvedValue([job]),
         getJobQueueStatus: vi.fn().mockResolvedValue({ status: 'running' }),
         queueStatus: signal({ status: 'running' }),
         jobUpdate: signal(job),

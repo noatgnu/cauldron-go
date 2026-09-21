@@ -198,7 +198,7 @@ func TestJobQueueServiceGetAllJobs(t *testing.T) {
 	defer app.Shutdown()
 
 	// Get jobs directly from service
-	jobs := app.jobQueue.GetAllJobs()
+	jobs := app.jobQueue.GetAllJobs(0, 0)
 
 	t.Logf("JobQueue.GetAllJobs() returned: %v", jobs)
 	t.Logf("Type: %T", jobs)

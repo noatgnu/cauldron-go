@@ -924,7 +924,7 @@ func cliJobList() error {
 	}
 	defer ctx.close()
 
-	jobs := ctx.jobQueue.GetAllJobs()
+	jobs := ctx.jobQueue.GetAllJobs(0, 0)
 	if len(jobs) == 0 {
 		fmt.Println("No jobs found.")
 		return nil
