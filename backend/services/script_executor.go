@@ -515,10 +515,6 @@ func (s *ScriptExecutor) prepareDockerInputFiles(args []string, outputDir string
 }
 
 func (s *ScriptExecutor) executeCommand(ctx context.Context, jobID string, cmd *exec.Cmd, outputDir string, runtimeInfo string) error {
-	s.mu.Lock()
-	s.runningJobs[jobID] = cmd
-	s.mu.Unlock()
-
 	defer func() {
 		s.mu.Lock()
 		delete(s.runningJobs, jobID)
@@ -617,6 +613,10 @@ func (s *ScriptExecutor) executeCommand(ctx context.Context, jobID string, cmd *
 		return fmt.Errorf("failed to start command: %w", err)
 	}
 	lowerJobProcessPriorityAfterStart(cmd)
+
+	s.mu.Lock()
+	s.runningJobs[jobID] = cmd
+	s.mu.Unlock()
 
 	done := make(chan error, 1)
 	go func() {

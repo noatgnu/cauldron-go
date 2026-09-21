@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -162,23 +163,21 @@ sys.exit(0)
 		"outputDir": outputDir,
 	}
 
-	jobID, err := jobQueue.CreateJob(
+	jobID, err := jobQueue.CreateJobWithEnvironments(
 		plugin.Definition.Plugin.ID,
 		plugin.Definition.Plugin.Name,
 		"",
 		[]string{"main.py"},
+		parameters,
+		"", "", "", "", "", "",
 	)
 	if err != nil {
 		t.Fatalf("Failed to create plugin job: %v", err)
 	}
 
-	job, _ := jobQueue.GetJob(jobID)
-	job.Parameters = parameters
-	db.GetDB().Save(job)
-
 	time.Sleep(500 * time.Millisecond)
 
-	job, err = jobQueue.GetJob(jobID)
+	job, err := jobQueue.GetJob(jobID)
 	if err != nil {
 		t.Fatalf("Failed to get job: %v", err)
 	}
@@ -268,18 +267,17 @@ func TestProcessPluginV2JobContextNotNil(t *testing.T) {
 		"outputDir": filepath.Join(tempDir, "output"),
 	}
 
-	jobID, err := jobQueue.CreateJob("test-plugin", "Test Plugin Job", "", []string{"main.py", "--test"})
+	jobID, err := jobQueue.CreateJobWithEnvironments(
+		"test-plugin", "Test Plugin Job", "", []string{"main.py", "--test"},
+		parameters, "", "", "", "", "", "",
+	)
 	if err != nil {
 		t.Fatalf("Failed to create job: %v", err)
 	}
 
-	job, _ := jobQueue.GetJob(jobID)
-	job.Parameters = parameters
-	db.GetDB().Save(job)
-
 	time.Sleep(500 * time.Millisecond)
 
-	job, err = jobQueue.GetJob(jobID)
+	job, err := jobQueue.GetJob(jobID)
 	if err != nil {
 		t.Fatalf("Failed to get job: %v", err)
 	}
@@ -491,5 +489,476 @@ func TestRerunJob_UnresolvableOutputFlag_Errors(t *testing.T) {
 
 	if _, err := jobQueue.RerunJob(job.ID, true, "", ""); err == nil {
 		t.Fatal("expected RerunJob to error when it cannot locate the output directory argument, instead of silently overwriting the original run's results")
+	}
+}
+
+func TestProcessJob_FailingScriptReportsFailedStatus(t *testing.T) {
+	tempDir := t.TempDir()
+	dbPath := filepath.Join(tempDir, "test.db")
+
+	db, err := newDatabaseServiceFromPath(dbPath)
+	if err != nil {
+		t.Fatalf("Failed to create database: %v", err)
+	}
+	defer db.Close()
+
+	jobQueue := NewJobQueueServiceV3(db, nil)
+	defer jobQueue.Shutdown()
+
+	settingsService := newSettingsServiceInternal(db)
+	configurePython3ForTest(t, settingsService)
+	scriptExecutor := NewScriptExecutor(settingsService, db)
+	jobQueue.SetScriptExecutor(scriptExecutor)
+
+	pluginsDir := filepath.Join(tempDir, "plugins", "failing-plugin")
+	os.MkdirAll(pluginsDir, 0755)
+	pluginYAML := `plugin:
+  id: failing-plugin
+  name: Failing Plugin
+  version: "1.0.0"
+  description: Plugin that always fails
+
+runtime:
+  environments:
+    - python
+  entrypoint: main.py
+`
+	os.WriteFile(filepath.Join(pluginsDir, "plugin.yaml"), []byte(pluginYAML), 0644)
+	os.WriteFile(filepath.Join(pluginsDir, "main.py"), []byte("import sys\nsys.exit(1)\n"), 0644)
+
+	pluginLoader := NewPluginLoaderV2(filepath.Join(tempDir, "plugins"), db, nil)
+	if err := pluginLoader.LoadPlugins(); err != nil {
+		t.Fatalf("Failed to load plugins: %v", err)
+	}
+	jobQueue.SetPluginLoader(pluginLoader)
+
+	plugins := pluginLoader.GetAllPlugins()
+	if len(plugins) == 0 {
+		t.Fatal("No test plugin loaded")
+	}
+	plugin := plugins[0]
+
+	parameters := map[string]interface{}{"pluginId": plugin.ID}
+
+	jobID, err := jobQueue.CreateJobWithEnvironments(
+		plugin.Definition.Plugin.ID, plugin.Definition.Plugin.Name, "", []string{"main.py"},
+		parameters, "", "", "", "", "", "",
+	)
+	if err != nil {
+		t.Fatalf("Failed to create plugin job: %v", err)
+	}
+
+	time.Sleep(1000 * time.Millisecond)
+
+	job, err := jobQueue.GetJob(jobID)
+	if err != nil {
+		t.Fatalf("Failed to get job: %v", err)
+	}
+
+	if job.Status != models.JobStatusFailed {
+		t.Fatalf("expected job.Status = failed for a script that exited 1, got %q (error: %q)", job.Status, job.Error)
+	}
+	if job.Error == "" {
+		t.Error("expected job.Error to be populated for a failed script")
+	}
+}
+
+func TestGetJob_ReturnsIndependentCopy(t *testing.T) {
+	tempDir := t.TempDir()
+	dbPath := filepath.Join(tempDir, "test.db")
+
+	db, err := newDatabaseServiceFromPath(dbPath)
+	if err != nil {
+		t.Fatalf("Failed to create database: %v", err)
+	}
+	defer db.Close()
+
+	jobQueue := NewJobQueueServiceV3(db, nil)
+	defer jobQueue.Shutdown()
+
+	jobID, err := jobQueue.CreateJob("test", "Independent Copy Job", "", []string{})
+	if err != nil {
+		t.Fatalf("Failed to create job: %v", err)
+	}
+
+	time.Sleep(200 * time.Millisecond)
+
+	first, err := jobQueue.GetJob(jobID)
+	if err != nil {
+		t.Fatalf("Failed to get job: %v", err)
+	}
+
+	first.Status = "tampered"
+	first.TerminalOutput = append(first.TerminalOutput, "tampered line")
+	first.Parameters["tampered"] = true
+
+	second, err := jobQueue.GetJob(jobID)
+	if err != nil {
+		t.Fatalf("Failed to get job: %v", err)
+	}
+
+	if second.Status == "tampered" {
+		t.Error("mutating a job returned by GetJob affected a later GetJob call's Status")
+	}
+	for _, line := range second.TerminalOutput {
+		if line == "tampered line" {
+			t.Error("mutating a job returned by GetJob affected a later GetJob call's TerminalOutput")
+		}
+	}
+	if _, ok := second.Parameters["tampered"]; ok {
+		t.Error("mutating a job returned by GetJob affected a later GetJob call's Parameters")
+	}
+}
+
+func configurePython3ForTest(t *testing.T, settingsService *SettingsService) {
+	path, err := settingsService.DetectPythonPath()
+	if err != nil || path == "" {
+		t.Skip("python3 not available on this machine, skipping")
+	}
+	if err := settingsService.Set("pythonPath", path); err != nil {
+		t.Fatalf("failed to configure python path: %v", err)
+	}
+}
+
+func TestDeleteJob_CancelsInProgressJob(t *testing.T) {
+	tempDir := t.TempDir()
+	dbPath := filepath.Join(tempDir, "test.db")
+
+	db, err := newDatabaseServiceFromPath(dbPath)
+	if err != nil {
+		t.Fatalf("Failed to create database: %v", err)
+	}
+	defer db.Close()
+
+	jobQueue := NewJobQueueServiceV3(db, nil)
+	defer jobQueue.Shutdown()
+
+	settingsService := newSettingsServiceInternal(db)
+	configurePython3ForTest(t, settingsService)
+	scriptExecutor := NewScriptExecutor(settingsService, db)
+	jobQueue.SetScriptExecutor(scriptExecutor)
+
+	pluginsDir := filepath.Join(tempDir, "plugins", "slow-plugin")
+	os.MkdirAll(pluginsDir, 0755)
+	pluginYAML := `plugin:
+  id: slow-plugin
+  name: Slow Plugin
+  version: "1.0.0"
+  description: Plugin that sleeps long enough to be caught in_progress
+
+runtime:
+  environments:
+    - python
+  entrypoint: main.py
+`
+	os.WriteFile(filepath.Join(pluginsDir, "plugin.yaml"), []byte(pluginYAML), 0644)
+	os.WriteFile(filepath.Join(pluginsDir, "main.py"), []byte("import time\ntime.sleep(10)\n"), 0644)
+
+	pluginLoader := NewPluginLoaderV2(filepath.Join(tempDir, "plugins"), db, nil)
+	if err := pluginLoader.LoadPlugins(); err != nil {
+		t.Fatalf("Failed to load plugins: %v", err)
+	}
+	jobQueue.SetPluginLoader(pluginLoader)
+
+	plugins := pluginLoader.GetAllPlugins()
+	if len(plugins) == 0 {
+		t.Fatal("No test plugin loaded")
+	}
+	plugin := plugins[0]
+
+	parameters := map[string]interface{}{"pluginId": plugin.ID}
+	jobID, err := jobQueue.CreateJobWithEnvironments(
+		plugin.Definition.Plugin.ID, plugin.Definition.Plugin.Name, "", []string{"main.py"},
+		parameters, "", "", "", "", "", "",
+	)
+	if err != nil {
+		t.Fatalf("Failed to create plugin job: %v", err)
+	}
+
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		job, err := jobQueue.GetJob(jobID)
+		if err == nil && job.Status == models.JobStatusInProgress {
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	job, err := jobQueue.GetJob(jobID)
+	if err != nil || job.Status != models.JobStatusInProgress {
+		t.Fatalf("job never reached in_progress before the delete attempt (status: %v)", job)
+	}
+
+	start := time.Now()
+	if err := jobQueue.DeleteJob(jobID); err != nil {
+		t.Fatalf("DeleteJob failed: %v", err)
+	}
+
+	time.Sleep(500 * time.Millisecond)
+	if elapsed := time.Since(start); elapsed >= 9*time.Second {
+		t.Fatalf("job appears to have run to completion (10s sleep) instead of being cancelled, elapsed: %v", elapsed)
+	}
+
+	if _, err := jobQueue.GetJob(jobID); err == nil {
+		t.Error("expected the deleted job to be gone from GetJob")
+	}
+}
+
+func TestLoadFromDatabase_RequeuesPendingJobOlderThanRecentLimit(t *testing.T) {
+	tempDir := t.TempDir()
+	dbPath := filepath.Join(tempDir, "test.db")
+
+	db, err := newDatabaseServiceFromPath(dbPath)
+	if err != nil {
+		t.Fatalf("Failed to create database: %v", err)
+	}
+	defer db.Close()
+
+	baseTime := time.Now().Add(-24 * time.Hour)
+
+	oldPendingJob := &models.Job{
+		ID:        "old-pending-job",
+		Type:      "test",
+		Name:      "Old Pending Job",
+		Status:    models.JobStatusPending,
+		Command:   "",
+		Args:      []string{},
+		CreatedAt: baseTime,
+	}
+	if err := db.GetDB().Create(oldPendingJob).Error; err != nil {
+		t.Fatalf("failed to seed old pending job: %v", err)
+	}
+
+	for i := 0; i < 105; i++ {
+		newerJob := &models.Job{
+			ID:        fmt.Sprintf("filler-job-%d", i),
+			Type:      "test",
+			Name:      "Filler Job",
+			Status:    models.JobStatusCompleted,
+			Command:   "",
+			Args:      []string{},
+			CreatedAt: baseTime.Add(time.Duration(i+1) * time.Minute),
+		}
+		if err := db.GetDB().Create(newerJob).Error; err != nil {
+			t.Fatalf("failed to seed filler job %d: %v", i, err)
+		}
+	}
+
+	jobQueue := NewJobQueueServiceV3(db, nil)
+	defer jobQueue.Shutdown()
+
+	deadline := time.Now().Add(3 * time.Second)
+	var job *models.Job
+	for time.Now().Before(deadline) {
+		job, err = jobQueue.GetJob(oldPendingJob.ID)
+		if err == nil && job.Status != models.JobStatusPending {
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	if err != nil {
+		t.Fatalf("failed to get old pending job: %v", err)
+	}
+	if job.Status == models.JobStatusPending {
+		t.Fatalf("old pending job was never requeued on startup despite 105 newer jobs existing, status stuck at: %s", job.Status)
+	}
+}
+
+func TestPauseQueue_StopsProcessingUntilResumed(t *testing.T) {
+	tempDir := t.TempDir()
+	dbPath := filepath.Join(tempDir, "test.db")
+
+	db, err := newDatabaseServiceFromPath(dbPath)
+	if err != nil {
+		t.Fatalf("Failed to create database: %v", err)
+	}
+	defer db.Close()
+
+	jobQueue := NewJobQueueServiceV3(db, nil)
+	defer jobQueue.Shutdown()
+
+	if err := jobQueue.PauseQueue(); err != nil {
+		t.Fatalf("PauseQueue failed: %v", err)
+	}
+
+	jobID, err := jobQueue.CreateJob("test", "Paused Job", "", []string{})
+	if err != nil {
+		t.Fatalf("Failed to create job: %v", err)
+	}
+
+	time.Sleep(500 * time.Millisecond)
+	job, err := jobQueue.GetJob(jobID)
+	if err != nil {
+		t.Fatalf("Failed to get job: %v", err)
+	}
+	if job.Status != models.JobStatusPending {
+		t.Fatalf("expected job to remain pending while paused, got status: %s", job.Status)
+	}
+
+	if err := jobQueue.ResumeQueue(); err != nil {
+		t.Fatalf("ResumeQueue failed: %v", err)
+	}
+
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		job, err = jobQueue.GetJob(jobID)
+		if err == nil && job.Status == models.JobStatusCompleted {
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	if job.Status != models.JobStatusCompleted {
+		t.Fatalf("expected job to complete after resume, got status: %s", job.Status)
+	}
+}
+
+func TestPauseQueue_ErrorsWhenAlreadyPaused(t *testing.T) {
+	tempDir := t.TempDir()
+	dbPath := filepath.Join(tempDir, "test.db")
+
+	db, err := newDatabaseServiceFromPath(dbPath)
+	if err != nil {
+		t.Fatalf("Failed to create database: %v", err)
+	}
+	defer db.Close()
+
+	jobQueue := NewJobQueueServiceV3(db, nil)
+	defer jobQueue.Shutdown()
+
+	if err := jobQueue.PauseQueue(); err != nil {
+		t.Fatalf("first PauseQueue call failed: %v", err)
+	}
+	if err := jobQueue.PauseQueue(); err == nil {
+		t.Fatal("expected second PauseQueue call to error")
+	}
+}
+
+func TestResumeQueue_ErrorsWhenNotPaused(t *testing.T) {
+	tempDir := t.TempDir()
+	dbPath := filepath.Join(tempDir, "test.db")
+
+	db, err := newDatabaseServiceFromPath(dbPath)
+	if err != nil {
+		t.Fatalf("Failed to create database: %v", err)
+	}
+	defer db.Close()
+
+	jobQueue := NewJobQueueServiceV3(db, nil)
+	defer jobQueue.Shutdown()
+
+	if err := jobQueue.ResumeQueue(); err == nil {
+		t.Fatal("expected ResumeQueue to error when the queue isn't paused")
+	}
+}
+
+func TestStopQueueImmediate_RevertsInProgressJobToPending(t *testing.T) {
+	tempDir := t.TempDir()
+	dbPath := filepath.Join(tempDir, "test.db")
+
+	db, err := newDatabaseServiceFromPath(dbPath)
+	if err != nil {
+		t.Fatalf("Failed to create database: %v", err)
+	}
+	defer db.Close()
+
+	jobQueue := NewJobQueueServiceV3(db, nil)
+	defer jobQueue.Shutdown()
+
+	settingsService := newSettingsServiceInternal(db)
+	configurePython3ForTest(t, settingsService)
+	scriptExecutor := NewScriptExecutor(settingsService, db)
+	jobQueue.SetScriptExecutor(scriptExecutor)
+
+	pluginsDir := filepath.Join(tempDir, "plugins", "slow-plugin-2")
+	os.MkdirAll(pluginsDir, 0755)
+	pluginYAML := `plugin:
+  id: slow-plugin-2
+  name: Slow Plugin 2
+  version: "1.0.0"
+  description: Plugin that sleeps long enough to be caught in_progress
+
+runtime:
+  environments:
+    - python
+  entrypoint: main.py
+`
+	os.WriteFile(filepath.Join(pluginsDir, "plugin.yaml"), []byte(pluginYAML), 0644)
+	os.WriteFile(filepath.Join(pluginsDir, "main.py"), []byte("import time\ntime.sleep(10)\n"), 0644)
+
+	pluginLoader := NewPluginLoaderV2(filepath.Join(tempDir, "plugins"), db, nil)
+	if err := pluginLoader.LoadPlugins(); err != nil {
+		t.Fatalf("Failed to load plugins: %v", err)
+	}
+	jobQueue.SetPluginLoader(pluginLoader)
+
+	plugins := pluginLoader.GetAllPlugins()
+	if len(plugins) == 0 {
+		t.Fatal("No test plugin loaded")
+	}
+	plugin := plugins[0]
+
+	parameters := map[string]interface{}{"pluginId": plugin.ID}
+	jobID, err := jobQueue.CreateJobWithEnvironments(
+		plugin.Definition.Plugin.ID, plugin.Definition.Plugin.Name, "", []string{"main.py"},
+		parameters, "", "", "", "", "", "",
+	)
+	if err != nil {
+		t.Fatalf("Failed to create plugin job: %v", err)
+	}
+
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		job, err := jobQueue.GetJob(jobID)
+		if err == nil && job.Status == models.JobStatusInProgress {
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	if err := jobQueue.StopQueueImmediate(); err != nil {
+		t.Fatalf("StopQueueImmediate failed: %v", err)
+	}
+
+	time.Sleep(500 * time.Millisecond)
+	job, err := jobQueue.GetJob(jobID)
+	if err != nil {
+		t.Fatalf("Failed to get job: %v", err)
+	}
+	if job.Status != models.JobStatusPending {
+		t.Fatalf("expected job status to revert to pending after StopQueueImmediate, got: %s", job.Status)
+	}
+}
+
+func TestGetQueueStatus_ReflectsPendingAndInProgressCounts(t *testing.T) {
+	tempDir := t.TempDir()
+	dbPath := filepath.Join(tempDir, "test.db")
+
+	db, err := newDatabaseServiceFromPath(dbPath)
+	if err != nil {
+		t.Fatalf("Failed to create database: %v", err)
+	}
+	defer db.Close()
+
+	jobQueue := NewJobQueueServiceV3(db, nil)
+	defer jobQueue.Shutdown()
+
+	if err := jobQueue.PauseQueue(); err != nil {
+		t.Fatalf("PauseQueue failed: %v", err)
+	}
+
+	for i := 0; i < 3; i++ {
+		if _, err := jobQueue.CreateJob("test", "Status Count Job", "", []string{}); err != nil {
+			t.Fatalf("Failed to create job %d: %v", i, err)
+		}
+	}
+	time.Sleep(200 * time.Millisecond)
+
+	status := jobQueue.GetQueueStatus()
+	pendingCount, ok := status["pendingCount"].(int64)
+	if !ok || pendingCount != 3 {
+		t.Errorf("expected pendingCount = 3, got %v", status["pendingCount"])
+	}
+	if paused, ok := status["paused"].(bool); !ok || !paused {
+		t.Errorf("expected paused = true, got %v", status["paused"])
 	}
 }

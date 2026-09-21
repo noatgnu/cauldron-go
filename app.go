@@ -162,18 +162,13 @@ func (a *App) Initialize() {
 	go a.stagedUploadCleanupLoop()
 
 	a.jobOutputBatcher = services.NewJobOutputBatcher(300*time.Millisecond, func(jobID string, lines []string) {
-		job, err := a.jobQueue.GetJob(jobID)
-		if err != nil {
-			return
-		}
-
-		job.TerminalOutput = append(job.TerminalOutput, lines...)
 		maxLines := 100
-		if len(job.TerminalOutput) > maxLines {
-			job.TerminalOutput = job.TerminalOutput[len(job.TerminalOutput)-maxLines:]
-		}
-
-		if err := a.db.GetDB().Model(job).Select("*").Updates(job).Error; err != nil {
+		if _, err := a.jobQueue.UpdateJob(jobID, func(job *models.Job) {
+			job.TerminalOutput = append(job.TerminalOutput, lines...)
+			if len(job.TerminalOutput) > maxLines {
+				job.TerminalOutput = job.TerminalOutput[len(job.TerminalOutput)-maxLines:]
+			}
+		}); err != nil {
 			log.Printf("[App] Failed to save job output %s: %v", jobID, err)
 		}
 	})
@@ -182,34 +177,26 @@ func (a *App) Initialize() {
 		// Flush buffered output first so the job's final TerminalOutput is complete before this status write.
 		a.jobOutputBatcher.FlushJob(jobID)
 
-		job, err := a.jobQueue.GetJob(jobID)
-		if err != nil {
-			log.Printf("[App] Failed to get job %s: %v", jobID, err)
-			return
-		}
-
-		if update.Status != "" {
-			job.Status = update.Status
-		}
-		if update.Progress > 0 {
-			job.Progress = update.Progress
-		}
-		if update.Error != "" {
-			job.Error = update.Error
-		}
-		if update.OutputPath != "" {
-			job.OutputPath = update.OutputPath
-		}
-		if update.Status == "completed" {
-			now := time.Now()
-			job.CompletedAt = &now
-		}
-
-		if err := a.db.GetDB().Model(job).Select("*").Updates(job).Error; err != nil {
+		if _, err := a.jobQueue.UpdateJob(jobID, func(job *models.Job) {
+			if update.Status != "" {
+				job.Status = update.Status
+			}
+			if update.Progress > 0 {
+				job.Progress = update.Progress
+			}
+			if update.Error != "" {
+				job.Error = update.Error
+			}
+			if update.OutputPath != "" {
+				job.OutputPath = update.OutputPath
+			}
+			if update.Status == "completed" {
+				now := time.Now()
+				job.CompletedAt = &now
+			}
+		}); err != nil {
 			log.Printf("[App] Failed to save job %s: %v", jobID, err)
 		}
-
-		a.emitEvent("job:update", job)
 	})
 
 	a.scriptExecutor.SetOutputCallback(func(jobID string, line string) {
