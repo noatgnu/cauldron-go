@@ -153,6 +153,7 @@ plugins/phate-analysis-*/
 bin
 examples/*
 !examples/table_browser/
+!examples/gel-analysis/
 
 # Plugin-to-SPA CLI (binary only, not source)
 /plugin-to-spa
