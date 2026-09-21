@@ -28,6 +28,14 @@ jobs:
         with:
           node-version: '22.23.1'
 
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install gel-analysis Python dependencies
+        run: pip install -r scripts/gel-analysis/requirements.txt
+
       - name: Install system dependencies
         run: |
           sudo apt-get update
@@ -97,9 +105,11 @@ jobs:
         run: |
           go build -tags mcp -o ./build/bin/cauldron .
 
-      - name: Copy plugins to build directory
+      - name: Copy plugins and gel-analysis resources to build directory
         run: |
           cp -r plugins ./build/bin/plugins
+          cp -r scripts ./build/bin/scripts
+          cp -r examples ./build/bin/examples
 
       - name: Start application and capture screenshots
         env:

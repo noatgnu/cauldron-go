@@ -1,4 +1,5 @@
 import { Component, ElementRef, HostListener, OnDestroy, ViewChild, computed, effect, inject, signal } from '@angular/core';
+import { ActivatedRoute } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -81,6 +82,7 @@ export class GelAnalysis implements OnDestroy {
   private readonly filePicker = inject(FilePickerService);
   private readonly notification = inject(NotificationService);
   private readonly dialog = inject(MatDialog);
+  private readonly route = inject(ActivatedRoute);
 
   @ViewChild('imageCanvas') imageCanvasRef?: ElementRef<HTMLCanvasElement>;
   @ViewChild('overlayCanvas') overlayCanvasRef?: ElementRef<HTMLCanvasElement>;
@@ -191,6 +193,11 @@ export class GelAnalysis implements OnDestroy {
         }
       }
     });
+
+    const examplePath = this.route.snapshot.queryParamMap.get('examplePath');
+    if (examplePath) {
+      void this.loadImage(examplePath);
+    }
   }
 
   async ngOnDestroy() {
