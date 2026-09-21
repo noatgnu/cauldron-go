@@ -1049,6 +1049,12 @@ func (e *EnvironmentService) CreatePythonVirtualEnv(basePythonPath string, venvP
 		pythonExe = filepath.Join(venvPath, "bin", "python")
 	}
 
+	bootstrapCmd := exec.Command(pythonExe, "-m", "pip", "install", "--upgrade", "pip", "setuptools", "wheel")
+	hideConsoleWindow(bootstrapCmd)
+	if bootstrapOutput, err := bootstrapCmd.CombinedOutput(); err != nil {
+		log.Printf("[CreatePythonVirtualEnv] Warning: Failed to bootstrap pip/setuptools/wheel: %v\nOutput: %s\n", err, string(bootstrapOutput))
+	}
+
 	// Auto-install plugin requirements if pluginID provided
 	if pluginID != "" && pluginFolderPath != "" {
 		e.progressNotifier.EmitProgress(ProgressTypeInstall, "python-venv", "Installing plugin requirements...", 40)
