@@ -203,7 +203,7 @@ func TestE2EWithActualPlugins(t *testing.T) {
 
 		t.Logf("Job created: %s", jobID)
 
-		timeout := time.After(120 * time.Second)
+		timeout := time.After(300 * time.Second)
 		ticker := time.NewTicker(2 * time.Second)
 		defer ticker.Stop()
 

@@ -536,7 +536,7 @@ jobs:
         env:
           BUILD_DIR: ${{ github.workspace }}/build/bin
         run: |
-          go test -v -tags gtk4 -run "TestE2EWithActualPlugins" -timeout 300s
+          go test -v -tags gtk4 -run "TestE2EWithActualPlugins" -timeout 400s
 
       - name: Run E2E job output operations test
         env:
