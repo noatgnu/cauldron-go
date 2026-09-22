@@ -49,7 +49,7 @@ func (h *HTTPInstallServer) Start(ctx context.Context) error {
 	mux.HandleFunc("/health", h.handleHealth)
 
 	h.server = &http.Server{
-		Addr:    fmt.Sprintf(":%d", h.port),
+		Addr:    fmt.Sprintf("127.0.0.1:%d", h.port),
 		Handler: mux,
 	}
 
@@ -97,6 +97,11 @@ func (h *HTTPInstallServer) handleInstall(w http.ResponseWriter, r *http.Request
 
 	if repoURL == "" {
 		h.renderError(w, "Missing 'repo' parameter", "Please provide a repository URL in the 'repo' query parameter")
+		return
+	}
+
+	if err := ValidateRemoteRepoURL(repoURL, h.protocolHandler.allowedRepoHosts()); err != nil {
+		h.renderError(w, "Repository URL not allowed", "This repository URL isn't allowed. Repository links must use https:// and point to a public host, or a host on your allowed hosts list.")
 		return
 	}
 

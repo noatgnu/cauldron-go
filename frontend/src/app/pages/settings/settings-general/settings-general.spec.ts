@@ -102,4 +102,40 @@ describe('SettingsGeneral', () => {
     expect(notificationMock.showError).toHaveBeenCalled();
     expect(component['checkingForUpdate']()).toBe(false);
   });
+
+  it('loads allowed repo hosts from settings', async () => {
+    wailsMock.getSettings.mockResolvedValue({ allowedRepoHosts: ['git.internal.example'] });
+    await component.loadSettings();
+    expect(component['allowedRepoHosts']()).toEqual(['git.internal.example']);
+  });
+
+  it('adds a new allowed repo host, lowercased and trimmed', async () => {
+    component['newRepoHost'].set('  Git.Internal.Example  ');
+    await component.addAllowedRepoHost();
+    expect(component['allowedRepoHosts']()).toEqual(['git.internal.example']);
+    expect(component['newRepoHost']()).toBe('');
+    expect(wailsMock.setSetting).toHaveBeenCalledWith('allowedRepoHosts', ['git.internal.example']);
+  });
+
+  it('does not add a duplicate host', async () => {
+    component['allowedRepoHosts'].set(['git.internal.example']);
+    component['newRepoHost'].set('git.internal.example');
+    await component.addAllowedRepoHost();
+    expect(component['allowedRepoHosts']()).toEqual(['git.internal.example']);
+    expect(wailsMock.setSetting).not.toHaveBeenCalled();
+  });
+
+  it('ignores an empty host', async () => {
+    component['newRepoHost'].set('   ');
+    await component.addAllowedRepoHost();
+    expect(component['allowedRepoHosts']()).toEqual([]);
+    expect(wailsMock.setSetting).not.toHaveBeenCalled();
+  });
+
+  it('removes an allowed repo host', async () => {
+    component['allowedRepoHosts'].set(['git.internal.example', 'gitea.internal.example']);
+    await component.removeAllowedRepoHost('git.internal.example');
+    expect(component['allowedRepoHosts']()).toEqual(['gitea.internal.example']);
+    expect(wailsMock.setSetting).toHaveBeenCalledWith('allowedRepoHosts', ['gitea.internal.example']);
+  });
 });

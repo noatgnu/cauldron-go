@@ -249,7 +249,7 @@ func (a *App) Initialize() {
 	log.Println("[App.Initialize] Plugin registry service initialized")
 
 	log.Println("[App.Initialize] Initializing protocol handler...")
-	a.protocolHandler = services.NewProtocolHandlerV3(a.pluginInstaller, a.wailsApp)
+	a.protocolHandler = services.NewProtocolHandlerV3(a.pluginInstaller, a.wailsApp, a.settings)
 	if err := a.protocolHandler.RegisterProtocol(); err != nil {
 		log.Printf("[App.Initialize] Warning: Failed to register protocol handler: %v", err)
 	}

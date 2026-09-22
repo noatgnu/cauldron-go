@@ -34,6 +34,30 @@
   </div>
 
   <div class="form-section">
+    <h3>Allowed Repository Hosts</h3>
+    <p class="section-description">Self-hosted git hosts (e.g. an internal GitLab/Gitea server) to trust for plugin install links, even when they resolve to a private network address. Public HTTPS hosts are always allowed; this list is only needed for private ones.</p>
+    <mat-form-field appearance="outline" class="full-width-field">
+      <mat-label>Add host (e.g. git.internal.example)</mat-label>
+      <input matInput [value]="newRepoHost()" (input)="newRepoHost.set($any($event.target).value)" (keydown.enter)="addAllowedRepoHost()">
+      <button mat-icon-button matSuffix (click)="addAllowedRepoHost()" [disabled]="!newRepoHost().trim()" matTooltip="Add host" aria-label="Add host">
+        <mat-icon>add</mat-icon>
+      </button>
+    </mat-form-field>
+    @if (allowedRepoHosts().length > 0) {
+      <mat-chip-set aria-label="Allowed repository hosts">
+        @for (host of allowedRepoHosts(); track host) {
+          <mat-chip-row (removed)="removeAllowedRepoHost(host)">
+            {{ host }}
+            <button matChipRemove [attr.aria-label]="'Remove ' + host">
+              <mat-icon>cancel</mat-icon>
+            </button>
+          </mat-chip-row>
+        }
+      </mat-chip-set>
+    }
+  </div>
+
+  <div class="form-section">
     <h3>Updates</h3>
     <p class="section-description">Control whether Cauldron checks GitHub for a newer release on startup</p>
     <mat-slide-toggle [ngModel]="autoCheckForUpdates()" (ngModelChange)="setAutoCheckForUpdates($event)">

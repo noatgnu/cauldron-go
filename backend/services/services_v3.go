@@ -80,9 +80,10 @@ func NewPluginRegistryServiceV3(configService *SettingsService, gitAuth *GitAuth
 	}
 }
 
-func NewProtocolHandlerV3(installer *PluginInstaller, wailsApp *application.App) *ProtocolHandler {
+func NewProtocolHandlerV3(installer *PluginInstaller, wailsApp *application.App, settings *SettingsService) *ProtocolHandler {
 	return &ProtocolHandler{
-		installer: installer,
-		wailsApp:  wailsApp,
+		pluginInstaller: installer,
+		wailsApp:        wailsApp,
+		settings:        settings,
 	}
 }

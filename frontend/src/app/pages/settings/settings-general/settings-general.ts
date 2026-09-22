@@ -7,6 +7,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
+import { MatChipsModule } from '@angular/material/chips';
 import { MatDialog } from '@angular/material/dialog';
 import { FormsModule } from '@angular/forms';
 import { Wails, Config } from '../../../core/services/wails';
@@ -25,6 +26,7 @@ import { UpdateAvailableDialog } from '../../../components/update-available-dial
     MatTooltipModule,
     MatSelectModule,
     MatSlideToggleModule,
+    MatChipsModule,
     FormsModule
   ],
   templateUrl: './settings-general.html',
@@ -37,6 +39,8 @@ export class SettingsGeneral implements OnInit {
   protected autoCheckForUpdates = signal(true);
   protected maxConcurrentJobs = signal(2);
   protected jobTimeoutMinutes = signal(0);
+  protected allowedRepoHosts = signal<string[]>([]);
+  protected newRepoHost = signal('');
   protected checkingForUpdate = signal(false);
   protected forceUpdating = signal(false);
   protected forceUpdatingSingle = signal(false);
@@ -62,6 +66,7 @@ export class SettingsGeneral implements OnInit {
       this.autoCheckForUpdates.set(config.autoCheckForUpdates !== false);
       this.maxConcurrentJobs.set(config.maxConcurrentJobs > 0 ? config.maxConcurrentJobs : 2);
       this.jobTimeoutMinutes.set(config.jobTimeoutMinutes || 0);
+      this.allowedRepoHosts.set(config.allowedRepoHosts || []);
     } catch (error) {
       await this.wails.logToFile(`[SettingsGeneral] Failed to load settings: ${error}`);
     }
@@ -87,6 +92,27 @@ export class SettingsGeneral implements OnInit {
     const normalized = Math.max(0, Math.floor(value) || 0);
     this.jobTimeoutMinutes.set(normalized);
     await this.saveSetting('jobTimeoutMinutes', normalized);
+  }
+
+  async addAllowedRepoHost(): Promise<void> {
+    const host = this.newRepoHost().trim().toLowerCase();
+    if (!host) {
+      return;
+    }
+    if (this.allowedRepoHosts().includes(host)) {
+      this.newRepoHost.set('');
+      return;
+    }
+    const updated = [...this.allowedRepoHosts(), host];
+    this.allowedRepoHosts.set(updated);
+    this.newRepoHost.set('');
+    await this.saveSetting('allowedRepoHosts', updated);
+  }
+
+  async removeAllowedRepoHost(host: string): Promise<void> {
+    const updated = this.allowedRepoHosts().filter(h => h !== host);
+    this.allowedRepoHosts.set(updated);
+    await this.saveSetting('allowedRepoHosts', updated);
   }
 
   async checkForUpdateNow(): Promise<void> {

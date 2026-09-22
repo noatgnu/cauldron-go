@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strconv"
+	"strings"
 
 	"github.com/noatgnu/cauldron-go/backend/models"
 )
@@ -101,6 +102,9 @@ func (s *SettingsService) Load() error {
 			s.config.JobTimeoutMinutes = n
 		}
 	}
+	if val, ok := settings["allowedRepoHosts"]; ok {
+		s.config.AllowedRepoHosts = parseHostList(val)
+	}
 
 	return nil
 }
@@ -123,6 +127,7 @@ func (s *SettingsService) Save() error {
 	s.db.SaveSetting("autoCheckForUpdates", fmt.Sprintf("%v", s.config.AutoCheckForUpdates))
 	s.db.SaveSetting("maxConcurrentJobs", fmt.Sprintf("%d", s.config.MaxConcurrentJobs))
 	s.db.SaveSetting("jobTimeoutMinutes", fmt.Sprintf("%d", s.config.JobTimeoutMinutes))
+	s.db.SaveSetting("allowedRepoHosts", strings.Join(s.config.AllowedRepoHosts, ","))
 	return nil
 }
 
@@ -162,6 +167,8 @@ func (s *SettingsService) Get(key string) interface{} {
 		return s.config.MaxConcurrentJobs
 	case "jobTimeoutMinutes":
 		return s.config.JobTimeoutMinutes
+	case "allowedRepoHosts":
+		return s.config.AllowedRepoHosts
 	}
 	return nil
 }
@@ -174,6 +181,39 @@ func toInt(value interface{}) (int, bool) {
 		return int(v), true
 	}
 	return 0, false
+}
+
+func parseHostList(value string) []string {
+	if value == "" {
+		return nil
+	}
+	parts := strings.Split(value, ",")
+	hosts := make([]string, 0, len(parts))
+	for _, p := range parts {
+		p = strings.ToLower(strings.TrimSpace(p))
+		if p != "" {
+			hosts = append(hosts, p)
+		}
+	}
+	return hosts
+}
+
+func toStringSlice(value interface{}) []string {
+	switch v := value.(type) {
+	case []string:
+		return parseHostList(strings.Join(v, ","))
+	case []interface{}:
+		parts := make([]string, 0, len(v))
+		for _, item := range v {
+			if s, ok := item.(string); ok {
+				parts = append(parts, s)
+			}
+		}
+		return parseHostList(strings.Join(parts, ","))
+	case string:
+		return parseHostList(v)
+	}
+	return nil
 }
 
 func (s *SettingsService) Set(key string, value interface{}) error {
@@ -223,6 +263,8 @@ func (s *SettingsService) Set(key string, value interface{}) error {
 		if n, ok := toInt(value); ok {
 			s.config.JobTimeoutMinutes = n
 		}
+	case "allowedRepoHosts":
+		s.config.AllowedRepoHosts = toStringSlice(value)
 	}
 	return s.Save()
 }

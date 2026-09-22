@@ -15,14 +15,15 @@ import (
 
 type ProtocolHandler struct {
 	pluginInstaller *PluginInstaller
-	installer       *PluginInstaller
+	settings        *SettingsService
 	ctx             context.Context
 	wailsApp        *application.App
 }
 
-func NewProtocolHandler(installer *PluginInstaller) *ProtocolHandler {
+func NewProtocolHandler(installer *PluginInstaller, settings *SettingsService) *ProtocolHandler {
 	return &ProtocolHandler{
 		pluginInstaller: installer,
+		settings:        settings,
 	}
 }
 
@@ -34,6 +35,13 @@ func (ph *ProtocolHandler) emitEvent(name string, data interface{}) {
 	if ph.wailsApp != nil && ph.wailsApp.Event != nil {
 		ph.wailsApp.Event.Emit(name, data)
 	}
+}
+
+func (ph *ProtocolHandler) allowedRepoHosts() []string {
+	if ph.settings == nil {
+		return nil
+	}
+	return ph.settings.GetConfig().AllowedRepoHosts
 }
 
 func (ph *ProtocolHandler) RegisterProtocol() error {
@@ -116,6 +124,15 @@ func (ph *ProtocolHandler) handleInstall(parsedURL *url.URL) error {
 
 	if repoURL == "" {
 		return fmt.Errorf("missing 'repo' parameter")
+	}
+
+	if err := ValidateRemoteRepoURL(repoURL, ph.allowedRepoHosts()); err != nil {
+		ph.emitEvent("plugin:install:error", map[string]interface{}{
+			"repo":  repoURL,
+			"ref":   ref,
+			"error": "This repository URL isn't allowed. Repository links must use https:// and point to a public host, or a host on your allowed hosts list.",
+		})
+		return fmt.Errorf("repository url not allowed: %w", err)
 	}
 
 	if registryURL != "" {
