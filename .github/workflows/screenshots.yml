@@ -175,5 +175,6 @@ jobs:
 
             Please glance over the images before merging (a broken/empty-looking page usually means the capture ran before the UI finished rendering, or a route's markup changed).
           branch: docs/screenshots-update
+          base: master
           delete-branch: true
           add-paths: docs/images/*.png
