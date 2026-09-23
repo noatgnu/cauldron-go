@@ -4,6 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Plugin Documentation</title>
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        mermaid.initialize({ startOnLoad: true, theme: 'default' });
+    </script>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -67,7 +71,44 @@
         }
         table {
             border-collapse: collapse;
-            width: 100%!;(string=<h1 id="msqrob2-ptm-dia-analysis">MSqRob2 PTM DIA Analysis</h1>
+            width: 100%;
+            margin: 15px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #2196f3;
+            color: white;
+            font-weight: 600;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        ul, ol {
+            padding-left: 25px;
+        }
+        li {
+            margin: 5px 0;
+        }
+        strong {
+            font-weight: 600;
+            color: #1976d2;
+        }
+        .mermaid {
+            text-align: center;
+            margin: 20px 0;
+            background: #f9f9f9;
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+        }
+    </style>
+</head>
+<body>
+<h1 id="msqrob2-ptm-dia-analysis">MSqRob2 PTM DIA Analysis</h1>
 <p><strong>ID</strong>: <code>msqrob2-ptm-dia</code><br>
 <strong>Version</strong>: 1.0.0<br>
 <strong>Category</strong>: statistics<br>
@@ -76,8 +117,12 @@
 <p>Differential abundance and usage analysis for PTM data from DIA/label-free experiments using msqrob2PTM</p>
 <h2 id="runtime">Runtime</h2>
 <ul>
-<li><strong>Type</strong>: <code>r</code></li>
-<li><strong>Script</strong>: <code>msqrob2ptm_dia.R</code></li>
+<li>
+<p><strong>Environments</strong>: <code>r</code></p>
+</li>
+<li>
+<p><strong>Entrypoint</strong>: <code>msqrob2ptm_dia.R</code></p>
+</li>
 </ul>
 <h2 id="inputs">Inputs</h2>
 <table>
@@ -197,6 +242,38 @@
 <td>Always visible</td>
 </tr>
 <tr>
+<td><code>col_filter</code></td>
+<td>Column Completeness Threshold</td>
+<td>number (min: 0, max: 1, step: 0.05)</td>
+<td>No</td>
+<td>0.7</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>row_filter</code></td>
+<td>Row Completeness Threshold</td>
+<td>number (min: 0, max: 1, step: 0.05)</td>
+<td>No</td>
+<td>0.7</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>impute_order</code></td>
+<td>Imputation Order</td>
+<td>select (before, after)</td>
+<td>No</td>
+<td>before</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>impute</code></td>
+<td>Imputation Method</td>
+<td>select (none, knn, MinDet, MinProb, min, zero, mixed, nbavg, with, QRILC, MLE, bpca)</td>
+<td>No</td>
+<td>none</td>
+<td>Always visible</td>
+</tr>
+<tr>
 <td><code>normalize_method</code></td>
 <td>Normalization Method</td>
 <td>select (none, center.median, center.mean, quantiles, quantiles.robust, vsn)</td>
@@ -223,7 +300,7 @@
 <tr>
 <td><code>ridge_penalty</code></td>
 <td>Ridge Penalty</td>
-<td>number (min: 0, max: 1, step: 0)</td>
+<td>number (min: 0, max: 1, step: 0.01)</td>
 <td>No</td>
 <td>0</td>
 <td>Always visible</td>
@@ -247,7 +324,7 @@
 <tr>
 <td><code>alpha</code></td>
 <td>Significance Level</td>
-<td>number (min: 0, max: 0, step: 0)</td>
+<td>number (min: 0.001, max: 0.2, step: 0.001)</td>
 <td>No</td>
 <td>0.05</td>
 <td>Always visible</td>
@@ -255,7 +332,7 @@
 <tr>
 <td><code>lfc_threshold</code></td>
 <td>Log2 Fold Change Threshold</td>
-<td>number (min: 0, max: 5, step: 0)</td>
+<td>number (min: 0, max: 5, step: 0.1)</td>
 <td>No</td>
 <td>0</td>
 <td>Always visible</td>
@@ -304,6 +381,20 @@
 <p>Minimum number of PTM sites required</p>
 <h4 id="minimum-identifications-per-feature-filter-min-identified">Minimum Identifications per Feature (<code>filter_min_identified</code>)</h4>
 <p>Minimum number of non-missing values required per peptidoform</p>
+<h4 id="column-completeness-threshold-col-filter">Column Completeness Threshold (<code>col_filter</code>)</h4>
+<p>Maximum proportion of missing values allowed in columns (samples). Default 0.7 means keep columns with &lt;70% missing (≥30% data present). Lower values are more stringent.</p>
+<h4 id="row-completeness-threshold-row-filter">Row Completeness Threshold (<code>row_filter</code>)</h4>
+<p>Maximum proportion of missing values allowed in rows (features). Default 0.7 means keep rows with &lt;70% missing (≥30% data present). Lower values are more stringent.</p>
+<h4 id="imputation-order-impute-order">Imputation Order (<code>impute_order</code>)</h4>
+<p>When to perform imputation relative to normalization (before or after normalization)</p>
+<ul>
+<li><strong>Options</strong>: <code>before</code>, <code>after</code></li>
+</ul>
+<h4 id="imputation-method-impute">Imputation Method (<code>impute</code>)</h4>
+<p>Imputation method for missing values (select 'none' to skip imputation)</p>
+<ul>
+<li><strong>Options</strong>: <code>none</code>, <code>knn</code>, <code>MinDet</code>, <code>MinProb</code>, <code>min</code>, <code>zero</code>, <code>mixed</code>, <code>nbavg</code>, <code>with</code>, <code>QRILC</code>, <code>MLE</code>, <code>bpca</code></li>
+</ul>
 <h4 id="normalization-method-normalize-method">Normalization Method (<code>normalize_method</code>)</h4>
 <p>Normalization method for peptide intensities</p>
 <ul>
@@ -370,6 +461,13 @@
 <td>Normalized peptidoform intensities</td>
 </tr>
 <tr>
+<td><code>imputed_peptides</code></td>
+<td><code>imputed_peptides.txt</code></td>
+<td>data</td>
+<td>tsv</td>
+<td>Imputed peptide intensities</td>
+</tr>
+<tr>
 <td><code>protein_intensities</code></td>
 <td><code>protein_intensities.txt</code></td>
 <td>data</td>
@@ -396,22 +494,25 @@
 <li><code>msqrob2</code></li>
 <li><code>limma</code></li>
 <li><code>MsCoreUtils</code></li>
+<li><code>impute</code></li>
 </ul>
 <blockquote>
 <p><strong>Note</strong>: When you create a custom environment for this plugin, these dependencies will be automatically installed.</p>
 </blockquote>
 <h2 id="example-data">Example Data</h2>
 <p>This plugin includes example data for testing:</p>
-<pre><code class="language-yaml">  robust_regression: true
-  input_file: diann/Reports.pr_matrix.tsv
+<pre><code class="language-yaml">  input_file: diann/Reports.pr_matrix.tsv
   annotation_file: diann/annotation_msqrob2.txt
   peptide_col: Stripped.Sequence
-  log2_transform: true
-  protein_aggregation: robust
-  protein_col: Protein.Group
   ptm_col: Modified.Sequence
+  log2_transform: true
+  impute: knn
+  impute_order: before
+  protein_col: Protein.Group
   analysis_type: both
   normalize_method: center.median
+  protein_aggregation: robust
+  robust_regression: true
 </code></pre>
 <p>Load example data by clicking the <strong>Load Example</strong> button in the UI.</p>
 <h2 id="usage">Usage</h2>
@@ -426,35 +527,6 @@
   // Add parameters here
 });
 </code></pre>
-)
-            margin: 15px 0;
-        }
-        th, td {
-            border: 1px solid #ddd;
-            padding: 12px;
-            text-align: left;
-        }
-        th {
-            background-color: #2196f3;
-            color: white;
-            font-weight: 600;
-        }
-        tr:nth-child(even) {
-            background-color: #f9f9f9;
-        }
-        ul, ol {
-            padding-left: 25px;
-        }
-        li {
-            margin: 5px 0;
-        }
-        strong {
-            font-weight: 600;
-            color: #1976d2;
-        }
-    </style>
-</head>
-<body>
-%!s(MISSING)
+
 </body>
 </html>

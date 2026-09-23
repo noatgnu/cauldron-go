@@ -121,7 +121,7 @@
 <p><strong>Environments</strong>: <code>python, r</code></p>
 </li>
 <li>
-<p><strong>Script</strong>: <code>alphapept_process.py</code></p>
+<p><strong>Entrypoint</strong>: <code>alphapept_process.py</code></p>
 </li>
 </ul>
 <h2 id="inputs">Inputs</h2>
@@ -204,7 +204,7 @@
 <tr>
 <td><code>data_completeness</code></td>
 <td>Data Completeness Threshold</td>
-<td>number (min: 0, max: 1, step: 0)</td>
+<td>number (min: 0, max: 1, step: 0.1)</td>
 <td>No</td>
 <td>0.3</td>
 <td>Always visible</td>
@@ -332,19 +332,19 @@
 </blockquote>
 <h2 id="example-data">Example Data</h2>
 <p>This plugin includes example data for testing:</p>
-<pre><code class="language-yaml">  index_col: Precursor.Id
+<pre><code class="language-yaml">  input_file: diann/imputed.data.txt
   merge_columns_list: [Protein.Ids Genes]
-  normalization: quantile
   data_completeness: 0.3
+  batch_correction: false
   comparisons: differential_analysis/comparison.bca.txt
   metadata_file: differential_analysis/annotation.txt
+  engine: generic
+  index_col: Precursor.Id
   merge_columns_list_source: diann/imputed.data.txt
   method: welch-ttest
   imputation: knn
+  normalization: quantile
   log2: true
-  batch_correction: false
-  input_file: diann/imputed.data.txt
-  engine: generic
 </code></pre>
 <p>Load example data by clicking the <strong>Load Example</strong> button in the UI.</p>
 <h2 id="usage">Usage</h2>

@@ -108,20 +108,42 @@
     </style>
 </head>
 <body>
-<h1 id="msqrob2-dia-analysis">MSqRob2 DIA Analysis</h1>
-<p><strong>ID</strong>: <code>msqrob2-dia</code><br>
+<h1 id="msqrob2-maxquant-ptm-tmt-analysis">MSqRob2 MaxQuant PTM TMT Analysis</h1>
+<p><strong>ID</strong>: <code>msqrob2-maxquant-ptm-tmt</code><br>
 <strong>Version</strong>: 1.0.0<br>
 <strong>Category</strong>: statistics<br>
 <strong>Author</strong>: CauldronGO Team</p>
 <h2 id="description">Description</h2>
-<p>Robust statistical inference for quantitative DIA proteomics using msqrob2</p>
+<p>Differential abundance and usage analysis for PTM data from MaxQuant with TMT labeling using msqrob2</p>
+<h2 id="workflow-diagram">Workflow Diagram</h2>
+<pre class="mermaid">flowchart TD
+    Start([Start]) --&gt; step1
+    step1[&quot;Reading data...&quot;]
+    step1 --&gt; step2
+    step2[&quot;Reading annotation...&quot;]
+    step2 --&gt; step3
+    step3[&quot;Creating QFeatures object...&quot;]
+    step3 --&gt; step4
+    step4[&quot;Filtering and aggregating PSMs to Peptidoforms...&quot;]
+    step4 --&gt; step5
+    step5[&quot;Processing PTM peptidoform data...&quot;]
+    step5 --&gt; step6
+    step6[&quot;Processing global protein data...&quot;]
+    step6 --&gt; step7
+    step7[&quot;Fitting statistical models...&quot;]
+    step7 --&gt; step8
+    step8[&quot;Hypothesis testing...&quot;]
+    step8 --&gt; step9
+    step9[&quot;Generating quality control and volcano plots...&quot;]
+    step9 --&gt; End([End])
+</pre>
 <h2 id="runtime">Runtime</h2>
 <ul>
 <li>
 <p><strong>Environments</strong>: <code>r</code></p>
 </li>
 <li>
-<p><strong>Entrypoint</strong>: <code>msqrob2.R</code></p>
+<p><strong>Entrypoint</strong>: <code>msqrob2_maxquant_ptm_tmt_modular.R</code></p>
 </li>
 </ul>
 <h2 id="inputs">Inputs</h2>
@@ -139,23 +161,31 @@
 <tbody>
 <tr>
 <td><code>input_file</code></td>
-<td>Peptide Intensity File</td>
+<td>PTM Evidence File</td>
 <td>file</td>
 <td>Yes</td>
+<td>-</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>fasta_file</code></td>
+<td>FASTA File</td>
+<td>file</td>
+<td>No</td>
 <td>-</td>
 <td>Always visible</td>
 </tr>
 <tr>
 <td><code>annotation_file</code></td>
-<td>Sample Annotation File</td>
+<td>PTM Annotation File</td>
 <td>file</td>
 <td>Yes</td>
 <td>-</td>
 <td>Always visible</td>
 </tr>
 <tr>
-<td><code>comparison_file</code></td>
-<td>Comparison Matrix File</td>
+<td><code>annotation_protein_file</code></td>
+<td>Protein Annotation File</td>
 <td>file</td>
 <td>No</td>
 <td>-</td>
@@ -163,17 +193,73 @@
 </tr>
 <tr>
 <td><code>feature_id_col</code></td>
-<td>Feature ID Column</td>
-<td>column-selector (single)</td>
+<td>PTM Feature ID Column</td>
+<td>text</td>
 <td>Yes</td>
-<td>-</td>
+<td>Sequence</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>site_col</code></td>
+<td>PTM Site Column</td>
+<td>text</td>
+<td>Yes</td>
+<td>Modified sequence</td>
 <td>Always visible</td>
 </tr>
 <tr>
 <td><code>protein_col</code></td>
-<td>Protein Column</td>
-<td>column-selector (single)</td>
+<td>PTM Protein Column</td>
+<td>text</td>
 <td>Yes</td>
+<td>Proteins</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>probability_col</code></td>
+<td>PTM Probability Column</td>
+<td>text</td>
+<td>No</td>
+<td>Phospho (STY) Probabilities</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>min_probability</code></td>
+<td>Minimum Localization Probability</td>
+<td>number (min: 0, max: 1, step: 0.05)</td>
+<td>No</td>
+<td>0.75</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>protein_file</code></td>
+<td>Protein Evidence File</td>
+<td>file</td>
+<td>No</td>
+<td>-</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>protein_feature_id_col</code></td>
+<td>Protein Feature ID Column</td>
+<td>text</td>
+<td>No</td>
+<td>Sequence</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>protein_id_col</code></td>
+<td>Protein ID Column</td>
+<td>text</td>
+<td>No</td>
+<td>Proteins</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>comparison_file</code></td>
+<td>Comparison Matrix File</td>
+<td>file</td>
+<td>No</td>
 <td>-</td>
 <td>Always visible</td>
 </tr>
@@ -186,11 +272,11 @@
 <td>Always visible</td>
 </tr>
 <tr>
-<td><code>filter_min_identified</code></td>
-<td>Minimum Identifications</td>
-<td>number</td>
+<td><code>analysis_type</code></td>
+<td>Analysis Type</td>
+<td>select (DPA, DPU, both)</td>
 <td>No</td>
-<td>2</td>
+<td>both</td>
 <td>Always visible</td>
 </tr>
 <tr>
@@ -238,12 +324,12 @@
 <td>Imputation Method</td>
 <td>select (none, knn, MinDet, MinProb, min, zero, mixed, nbavg, with, QRILC, MLE, bpca)</td>
 <td>No</td>
-<td>none</td>
+<td>knn</td>
 <td>Always visible</td>
 </tr>
 <tr>
 <td><code>normalize_method</code></td>
-<td>Normalization</td>
+<td>Normalization Method</td>
 <td>select (none, center.median, center.mean, quantiles, quantiles.robust, vsn)</td>
 <td>No</td>
 <td>center.median</td>
@@ -258,11 +344,51 @@
 <td>Always visible</td>
 </tr>
 <tr>
-<td><code>aggregation_method</code></td>
-<td>Protein Aggregation Method</td>
-<td>select (robust, sum, mean, median, iPQF)</td>
+<td><code>summarization_method</code></td>
+<td>Protein Summarization Method</td>
+<td>select (robust, sum, mean, median)</td>
 <td>No</td>
 <td>robust</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>remove_shared_peptides</code></td>
+<td>Remove Shared Peptides</td>
+<td>boolean</td>
+<td>No</td>
+<td>true</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>filter_min_peptides</code></td>
+<td>Minimum Peptides per Protein</td>
+<td>number (min: 1, max: 10, step: 1)</td>
+<td>No</td>
+<td>2</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>filter_min_ptm_sites</code></td>
+<td>Minimum PTM Sites</td>
+<td>number</td>
+<td>No</td>
+<td>1</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>model_run_effect</code></td>
+<td>Model Run Effect</td>
+<td>boolean</td>
+<td>No</td>
+<td>false</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>robust_regression</code></td>
+<td>Use Robust Regression</td>
+<td>boolean</td>
+<td>No</td>
+<td>false</td>
 <td>Always visible</td>
 </tr>
 <tr>
@@ -271,14 +397,6 @@
 <td>number (min: 0, max: 1, step: 0.01)</td>
 <td>No</td>
 <td>0</td>
-<td>Always visible</td>
-</tr>
-<tr>
-<td><code>robust_regression</code></td>
-<td>Use Robust Regression</td>
-<td>boolean</td>
-<td>No</td>
-<td>true</td>
 <td>Always visible</td>
 </tr>
 <tr>
@@ -316,10 +434,12 @@
 </tbody>
 </table>
 <h3 id="input-details">Input Details</h3>
-<h4 id="peptide-intensity-file-input-file">Peptide Intensity File (<code>input_file</code>)</h4>
-<p>DIA peptide-level intensity data (columns: feature identifiers + sample intensities)</p>
-<h4 id="sample-annotation-file-annotation-file">Sample Annotation File (<code>annotation_file</code>)</h4>
-<p>Sample annotation with columns: Sample (matching sample column names in data), Condition, BioReplicate</p>
+<h4 id="ptm-evidence-file-input-file">PTM Evidence File (<code>input_file</code>)</h4>
+<p>MaxQuant evidence.txt file with PTM data</p>
+<h4 id="fasta-file-fasta-file">FASTA File (<code>fasta_file</code>)</h4>
+<p>Protein database FASTA file for site mapping</p>
+<h4 id="ptm-annotation-file-annotation-file">PTM Annotation File (<code>annotation_file</code>)</h4>
+<p>Annotation file for PTM data (columns: Sample, Condition, BioReplicate)</p>
 <ul>
 <li><strong>Table Editor</strong>: Enabled with 3 columns
 <ul>
@@ -327,7 +447,7 @@
 <ul>
 <li><code>Sample</code>: Sample (required)
 <ul>
-<li>Sample identifier matching column names in data</li>
+<li>Sample identifier matching column names in data (e.g. Reporter intensity corrected 1)</li>
 </ul>
 </li>
 <li><code>Condition</code>: Condition (required)
@@ -345,41 +465,77 @@
 </ul>
 </li>
 </ul>
+<h4 id="protein-annotation-file-annotation-protein-file">Protein Annotation File (<code>annotation_protein_file</code>)</h4>
+<p>Annotation file for Protein data (columns: Sample, Condition, BioReplicate)</p>
+<ul>
+<li><strong>Table Editor</strong>: Enabled with 3 columns
+<ul>
+<li><strong>Columns</strong>:
+<ul>
+<li><code>Sample</code>: Sample (required)
+<ul>
+<li>Sample identifier matching column names in protein file</li>
+</ul>
+</li>
+<li><code>Condition</code>: Condition (required)
+<ul>
+<li>Experimental condition/group name</li>
+</ul>
+</li>
+<li><code>BioReplicate</code>: BioReplicate (required)
+<ul>
+<li>Biological replicate number</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<h4 id="ptm-feature-id-column-feature-id-col">PTM Feature ID Column (<code>feature_id_col</code>)</h4>
+<p>Column name for feature identifiers in PTM file (stripped sequence)</p>
+<h4 id="ptm-site-column-site-col">PTM Site Column (<code>site_col</code>)</h4>
+<p>Column name for PTM site information (modified sequence)</p>
+<h4 id="ptm-protein-column-protein-col">PTM Protein Column (<code>protein_col</code>)</h4>
+<p>Column name for protein identifiers in PTM file</p>
+<h4 id="ptm-probability-column-probability-col">PTM Probability Column (<code>probability_col</code>)</h4>
+<p>Column name for site localization probabilities (e.g., Phospho (STY) Probabilities)</p>
+<h4 id="minimum-localization-probability-min-probability">Minimum Localization Probability (<code>min_probability</code>)</h4>
+<p>Minimum probability score for valid PTM sites (0-1)</p>
+<h4 id="protein-evidence-file-protein-file">Protein Evidence File (<code>protein_file</code>)</h4>
+<p>MaxQuant evidence.txt file for protein-level data (optional)</p>
+<h4 id="protein-feature-id-column-protein-feature-id-col">Protein Feature ID Column (<code>protein_feature_id_col</code>)</h4>
+<p>Column name for feature identifiers in protein file</p>
+<h4 id="protein-id-column-protein-id-col">Protein ID Column (<code>protein_id_col</code>)</h4>
+<p>Column name for protein identifiers in protein file</p>
 <h4 id="comparison-matrix-file-comparison-file">Comparison Matrix File (<code>comparison_file</code>)</h4>
 <p>Pairwise comparisons (columns: comparison_label, condition_A, condition_B)</p>
-<h4 id="feature-id-column-feature-id-col">Feature ID Column (<code>feature_id_col</code>)</h4>
-<p>Column name for peptide/feature identifiers</p>
-<ul>
-<li><strong>Column Source</strong>: <code>input_file</code></li>
-</ul>
-<h4 id="protein-column-protein-col">Protein Column (<code>protein_col</code>)</h4>
-<p>Column name containing protein identifiers</p>
-<ul>
-<li><strong>Column Source</strong>: <code>input_file</code></li>
-</ul>
 <h4 id="apply-log2-transformation-log2-transform">Apply Log2 Transformation (<code>log2_transform</code>)</h4>
 <p>Apply log2 transformation to intensities</p>
-<h4 id="minimum-identifications-filter-min-identified">Minimum Identifications (<code>filter_min_identified</code>)</h4>
-<p>Minimum number of identified samples required per feature</p>
+<h4 id="analysis-type-analysis-type">Analysis Type (<code>analysis_type</code>)</h4>
+<p>DPA = Differential Peptide Abundance, DPU = Differential Peptide Usage</p>
+<ul>
+<li><strong>Options</strong>: <code>DPA</code>, <code>DPU</code>, <code>both</code></li>
+</ul>
 <h4 id="exclude-conditions-comma-separated-exclude-conditions">Exclude Conditions (comma-separated) (<code>exclude_conditions</code>)</h4>
 <p>Comma-separated list of conditions to exclude from analysis (e.g., 'Norm,Empty'). These channels will be filtered out before statistical testing.</p>
 <h4 id="remove-norm-channel-remove-norm-channel">Remove 'Norm' Channel (<code>remove_norm_channel</code>)</h4>
 <p>Automatically remove samples with condition 'Norm'</p>
 <h4 id="column-completeness-threshold-col-filter">Column Completeness Threshold (<code>col_filter</code>)</h4>
-<p>Maximum proportion of missing values allowed in columns (samples). Default 0.7 = keep samples with ≥30% valid measurements. Lower values are more stringent.</p>
+<p>Maximum proportion of missing values allowed per sample. Default 0.7 = keep samples with ≥30% valid measurements.</p>
 <h4 id="row-completeness-threshold-row-filter">Row Completeness Threshold (<code>row_filter</code>)</h4>
-<p>Maximum proportion of missing values allowed in rows (features). Default 0.7 = keep features with ≥30% valid measurements. Lower values are more stringent.</p>
+<p>Maximum proportion of missing values allowed per feature. Default 0.7 = keep features with ≥30% valid measurements.</p>
 <h4 id="imputation-order-impute-order">Imputation Order (<code>impute_order</code>)</h4>
-<p>When to perform imputation relative to normalization (before or after normalization)</p>
+<p>When to impute missing values relative to normalization. 'after': normalize then impute. 'before': impute then normalize.</p>
 <ul>
 <li><strong>Options</strong>: <code>before</code>, <code>after</code></li>
 </ul>
 <h4 id="imputation-method-impute">Imputation Method (<code>impute</code>)</h4>
-<p>Imputation method for missing values (select 'none' to skip imputation)</p>
+<p>Imputation method for missing values</p>
 <ul>
 <li><strong>Options</strong>: <code>none</code>, <code>knn</code>, <code>MinDet</code>, <code>MinProb</code>, <code>min</code>, <code>zero</code>, <code>mixed</code>, <code>nbavg</code>, <code>with</code>, <code>QRILC</code>, <code>MLE</code>, <code>bpca</code></li>
 </ul>
-<h4 id="normalization-normalize-method">Normalization (<code>normalize_method</code>)</h4>
+<h4 id="normalization-method-normalize-method">Normalization Method (<code>normalize_method</code>)</h4>
 <p>Normalization method to apply</p>
 <ul>
 <li><strong>Options</strong>: <code>none</code>, <code>center.median</code>, <code>center.mean</code>, <code>quantiles</code>, <code>quantiles.robust</code>, <code>vsn</code></li>
@@ -389,26 +545,34 @@
 <ul>
 <li><strong>Options</strong>: <code>before</code>, <code>after</code></li>
 </ul>
-<h4 id="protein-aggregation-method-aggregation-method">Protein Aggregation Method (<code>aggregation_method</code>)</h4>
-<p>Method for aggregating peptides to proteins (robust = msqrobAggregate)</p>
+<h4 id="protein-summarization-method-summarization-method">Protein Summarization Method (<code>summarization_method</code>)</h4>
+<p>Method for combining feature intensities. 'robust': Tukey's median polish. 'median': median. 'mean': arithmetic mean. 'sum': sum.</p>
 <ul>
-<li><strong>Options</strong>: <code>robust</code>, <code>sum</code>, <code>mean</code>, <code>median</code>, <code>iPQF</code></li>
+<li><strong>Options</strong>: <code>robust</code>, <code>sum</code>, <code>mean</code>, <code>median</code></li>
 </ul>
-<h4 id="ridge-penalty-ridge-penalty">Ridge Penalty (<code>ridge_penalty</code>)</h4>
-<p>Ridge penalty for regularization (0 = no penalty)</p>
+<h4 id="remove-shared-peptides-remove-shared-peptides">Remove Shared Peptides (<code>remove_shared_peptides</code>)</h4>
+<p>Remove peptides mapping to multiple proteins</p>
+<h4 id="minimum-peptides-per-protein-filter-min-peptides">Minimum Peptides per Protein (<code>filter_min_peptides</code>)</h4>
+<p>Minimum number of peptides required per protein</p>
+<h4 id="minimum-ptm-sites-filter-min-ptm-sites">Minimum PTM Sites (<code>filter_min_ptm_sites</code>)</h4>
+<p>Minimum number of PTM sites required</p>
+<h4 id="model-run-effect-model-run-effect">Model Run Effect (<code>model_run_effect</code>)</h4>
+<p>Include TMT run as random effect in the model. Requires 'Run' column in annotation file with multiple run values.</p>
 <h4 id="use-robust-regression-robust-regression">Use Robust Regression (<code>robust_regression</code>)</h4>
-<p>Use robust regression (M-estimation)</p>
+<p>Use robust M-estimation for model fitting. May fail with sparse PTM data; use FALSE if you encounter convergence issues.</p>
+<h4 id="ridge-penalty-ridge-penalty">Ridge Penalty (<code>ridge_penalty</code>)</h4>
+<p>L2 regularization penalty for model fitting. 0 = no penalty.</p>
 <h4 id="maximum-iterations-max-iterations">Maximum Iterations (<code>max_iterations</code>)</h4>
-<p>Maximum iterations for model fitting</p>
+<p>Maximum iterations for robust regression convergence.</p>
 <h4 id="p-value-adjustment-method-adjust-method">P-value Adjustment Method (<code>adjust_method</code>)</h4>
 <p>Method for multiple testing correction</p>
 <ul>
 <li><strong>Options</strong>: <code>BH</code>, <code>bonferroni</code>, <code>holm</code>, <code>hochberg</code>, <code>BY</code>, <code>none</code></li>
 </ul>
 <h4 id="significance-level-alpha">Significance Level (<code>alpha</code>)</h4>
-<p>Significance threshold for hypothesis testing</p>
+<p>Adjusted p-value threshold for significance.</p>
 <h4 id="log2-fold-change-threshold-lfc-threshold">Log2 Fold Change Threshold (<code>lfc_threshold</code>)</h4>
-<p>Minimum log2 fold change threshold for significance (0 = no threshold)</p>
+<p>Minimum absolute log2 fold-change threshold. 0 = no fold-change filter.</p>
 <h2 id="outputs">Outputs</h2>
 <table>
 <thead>
@@ -422,32 +586,67 @@
 </thead>
 <tbody>
 <tr>
-<td><code>differential_results</code></td>
+<td><code>dpa_results</code></td>
+<td><code>dpa_results.txt</code></td>
+<td>data</td>
+<td>tsv</td>
+<td>Differential peptide abundance (DPA) results</td>
+</tr>
+<tr>
+<td><code>dpu_results</code></td>
+<td><code>dpu_results.txt</code></td>
+<td>data</td>
+<td>tsv</td>
+<td>Differential peptide usage (DPU) results</td>
+</tr>
+<tr>
+<td><code>protein_results</code></td>
 <td><code>protein_results.txt</code></td>
 <td>data</td>
 <td>tsv</td>
-<td>Differential expression analysis results</td>
+<td>Protein-level differential abundance results</td>
 </tr>
 <tr>
-<td><code>protein_intensity</code></td>
-<td><code>protein_intensity.txt</code></td>
+<td><code>protein_intensities</code></td>
+<td><code>protein_intensities.txt</code></td>
 <td>data</td>
 <td>tsv</td>
-<td>Aggregated protein-level intensities</td>
+<td>Summarized protein-level intensities</td>
+</tr>
+<tr>
+<td><code>normalized_peptides</code></td>
+<td><code>peptidoform_intensities.txt</code></td>
+<td>data</td>
+<td>tsv</td>
+<td>Normalized peptide-level intensities</td>
 </tr>
 <tr>
 <td><code>protein_qc_plots</code></td>
 <td><code>protein_qc_plots.pdf</code></td>
 <td>plot</td>
 <td>pdf</td>
-<td>Quality control plots (PCA, boxplots)</td>
+<td>Quality control plots for global protein data (boxplots, PCA)</td>
 </tr>
 <tr>
 <td><code>protein_volcano_plots</code></td>
 <td><code>protein_volcano_plots.pdf</code></td>
 <td>plot</td>
 <td>pdf</td>
-<td>Volcano plots for each comparison</td>
+<td>Volcano plots for global protein data</td>
+</tr>
+<tr>
+<td><code>ptm_qc_plots</code></td>
+<td><code>ptm_qc_plots.pdf</code></td>
+<td>plot</td>
+<td>pdf</td>
+<td>Quality control plots for PTM data (boxplots, PCA)</td>
+</tr>
+<tr>
+<td><code>ptm_volcano_plots</code></td>
+<td><code>ptm_volcano_plots.pdf</code></td>
+<td>plot</td>
+<td>pdf</td>
+<td>Volcano plots for PTM data (DPA and DPU)</td>
 </tr>
 </tbody>
 </table>
@@ -462,6 +661,7 @@
 <li><code>msqrob2</code></li>
 <li><code>limma</code></li>
 <li><code>MsCoreUtils</code></li>
+<li><code>Biostrings</code></li>
 <li><code>impute</code></li>
 <li><code>ggplot2</code></li>
 <li><code>reshape2</code></li>
@@ -471,30 +671,43 @@
 </blockquote>
 <h2 id="example-data">Example Data</h2>
 <p>This plugin includes example data for testing:</p>
-<pre><code class="language-yaml">  robust_regression: true
-  input_file: diann/Reports.pr_matrix.tsv
-  feature_id_col: Precursor.Id
-  log2_transform: true
+<pre><code class="language-yaml">  site_col: Modified sequence
+  protein_col: Proteins
+  protein_feature_id_col: Sequence
+  protein_id_col: Proteins
+  remove_norm_channel: true
+  filter_min_peptides: 2
+  protein_file: maxquant-tmt/evidence_protein.txt
+  analysis_type: both
+  remove_shared_peptides: true
+  filter_min_ptm_sites: 1
   impute: knn
   normalize_method: center.median
-  aggregation_order: after
-  annotation_file: diann/annotation_msqrob2.txt
-  protein_col: Protein.Group
-  remove_norm_channel: true
+  summarization_method: robust
+  model_run_effect: false
+  feature_id_col: Sequence
   exclude_conditions: Norm
+  aggregation_order: after
+  fasta_file: maxquant-tmt/uniprot_human.fasta
+  annotation_file: maxquant-tmt/annotation_ptm_msqrob2.txt
+  probability_col: Phospho (STY) Probabilities
+  min_probability: 0.75
+  log2_transform: true
   impute_order: after
-  aggregation_method: robust
+  robust_regression: false
+  input_file: maxquant-tmt/evidence_ptm.txt
+  annotation_protein_file: maxquant-tmt/annotation_protein_msqrob2.txt
 </code></pre>
 <p>Load example data by clicking the <strong>Load Example</strong> button in the UI.</p>
 <h2 id="usage">Usage</h2>
 <h3 id="via-ui">Via UI</h3>
 <ol>
-<li>Navigate to <strong>statistics</strong> → <strong>MSqRob2 DIA Analysis</strong></li>
+<li>Navigate to <strong>statistics</strong> → <strong>MSqRob2 MaxQuant PTM TMT Analysis</strong></li>
 <li>Fill in the required inputs</li>
 <li>Click <strong>Run Analysis</strong></li>
 </ol>
 <h3 id="via-plugin-system">Via Plugin System</h3>
-<pre><code class="language-typescript">const jobId = await pluginService.executePlugin('msqrob2-dia', {
+<pre><code class="language-typescript">const jobId = await pluginService.executePlugin('msqrob2-maxquant-ptm-tmt', {
   // Add parameters here
 });
 </code></pre>

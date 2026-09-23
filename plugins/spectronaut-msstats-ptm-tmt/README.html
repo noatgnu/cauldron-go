@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plugin Documentation</title>
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        mermaid.initialize({ startOnLoad: true, theme: 'default' });
+    </script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            max-width: 900px;
+            margin: 50px auto;
+            padding: 20px;
+            line-height: 1.6;
+            color: #333;
+        }
+        h1 {
+            border-bottom: 2px solid #2196f3;
+            padding-bottom: 10px;
+            color: #1976d2;
+        }
+        h2 {
+            margin-top: 30px;
+            color: #1976d2;
+            border-bottom: 1px solid #e0e0e0;
+            padding-bottom: 5px;
+        }
+        h3 {
+            margin-top: 20px;
+            color: #424242;
+        }
+        h4 {
+            color: #616161;
+        }
+        a {
+            color: #2196f3;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        code {
+            background: #f5f5f5;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+        pre {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        pre code {
+            background: none;
+            padding: 0;
+        }
+        blockquote {
+            border-left: 4px solid #2196f3;
+            margin: 0;
+            padding-left: 15px;
+            color: #666;
+            background: #f5f9fc;
+            padding: 10px 15px;
+            border-radius: 4px;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 15px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #2196f3;
+            color: white;
+            font-weight: 600;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        ul, ol {
+            padding-left: 25px;
+        }
+        li {
+            margin: 5px 0;
+        }
+        strong {
+            font-weight: 600;
+            color: #1976d2;
+        }
+        .mermaid {
+            text-align: center;
+            margin: 20px 0;
+            background: #f9f9f9;
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+        }
+    </style>
+</head>
+<body>
+<h1 id="spectronaut-msstatsptm-tmt-analysis">Spectronaut MSstatsPTM TMT Analysis</h1>
+<p><strong>ID</strong>: <code>spectronaut-msstats-ptm-tmt</code><br>
+<strong>Version</strong>: 1.0.0<br>
+<strong>Category</strong>: statistics<br>
+<strong>Author</strong>: CauldronGO Team</p>
+<h2 id="description">Description</h2>
+<p>Statistical analysis of TMT-labeled post-translational modifications from Spectronaut data using MSstatsPTM package</p>
+<h2 id="runtime">Runtime</h2>
+<ul>
+<li>
+<p><strong>Environments</strong>: <code>r</code></p>
+</li>
+<li>
+<p><strong>Entrypoint</strong>: <code>msstatsptm_tmt.R</code></p>
+</li>
+</ul>
+<h2 id="inputs">Inputs</h2>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Label</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Visibility</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>input_file</code></td>
+<td>PTM Report File</td>
+<td>file</td>
+<td>Yes</td>
+<td>-</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>annotation_file</code></td>
+<td>PTM Annotation File</td>
+<td>file</td>
+<td>Yes</td>
+<td>-</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>input_protein_file</code></td>
+<td>Protein Report File</td>
+<td>file</td>
+<td>No</td>
+<td>-</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>annotation_protein_file</code></td>
+<td>Protein Annotation File</td>
+<td>file</td>
+<td>No</td>
+<td>-</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>fasta_file</code></td>
+<td>FASTA File</td>
+<td>file</td>
+<td>No</td>
+<td>-</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>fasta_protein_name</code></td>
+<td>FASTA Protein Name Column</td>
+<td>text</td>
+<td>No</td>
+<td>uniprot_iso</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>mod_id</code></td>
+<td>PTM Modification ID</td>
+<td>text</td>
+<td>No</td>
+<td>[Phospho (STY)]</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>use_unmod_peptides</code></td>
+<td>Use Unmodified Peptides from PTM File</td>
+<td>boolean</td>
+<td>No</td>
+<td>false</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>remove_other_mods</code></td>
+<td>Remove Other Modifications</td>
+<td>boolean</td>
+<td>No</td>
+<td>true</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>intensity</code></td>
+<td>Intensity Column</td>
+<td>select (PeakArea, NormalizedPeakArea, TotalPeakArea)</td>
+<td>No</td>
+<td>PeakArea</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>filter_with_Qvalue</code></td>
+<td>Filter with Q-value</td>
+<td>boolean</td>
+<td>No</td>
+<td>false</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>qvalue_cutoff</code></td>
+<td>Q-value Cutoff</td>
+<td>number (min: 0, max: 1, step: 0.001)</td>
+<td>No</td>
+<td>0.01</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>useUniquePeptide</code></td>
+<td>Use Unique Peptides Only</td>
+<td>boolean</td>
+<td>No</td>
+<td>true</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>removeFewMeasurements</code></td>
+<td>Remove Few Measurements</td>
+<td>boolean</td>
+<td>No</td>
+<td>true</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>removeProtein_with1Feature</code></td>
+<td>Remove Proteins with Single Feature</td>
+<td>boolean</td>
+<td>No</td>
+<td>false</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>summarization_method</code></td>
+<td>Summarization Method</td>
+<td>select (msstats, MedianPolish, Median)</td>
+<td>No</td>
+<td>msstats</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>global_norm</code></td>
+<td>Global Normalization (Protein)</td>
+<td>boolean</td>
+<td>No</td>
+<td>true</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>global_norm_PTM</code></td>
+<td>Global Normalization (PTM)</td>
+<td>boolean</td>
+<td>No</td>
+<td>true</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>reference_norm</code></td>
+<td>Reference Channel Normalization (Protein)</td>
+<td>boolean</td>
+<td>No</td>
+<td>true</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>reference_norm_PTM</code></td>
+<td>Reference Channel Normalization (PTM)</td>
+<td>boolean</td>
+<td>No</td>
+<td>true</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>remove_norm_channel</code></td>
+<td>Remove Normalization Channel</td>
+<td>boolean</td>
+<td>No</td>
+<td>true</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>remove_empty_channel</code></td>
+<td>Remove Empty Channels</td>
+<td>boolean</td>
+<td>No</td>
+<td>true</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>MBimpute</code></td>
+<td>MBimpute for Protein</td>
+<td>boolean</td>
+<td>No</td>
+<td>true</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>MBimpute_PTM</code></td>
+<td>MBimpute for PTM</td>
+<td>boolean</td>
+<td>No</td>
+<td>true</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>maxQuantileforCensored</code></td>
+<td>Max Quantile for Censored</td>
+<td>number (min: 0.9, max: 1, step: 0.001)</td>
+<td>No</td>
+<td>-</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>comparison_matrix_file</code></td>
+<td>Comparison Matrix File</td>
+<td>file</td>
+<td>No</td>
+<td>-</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>moderated</code></td>
+<td>Moderated T-Statistic</td>
+<td>boolean</td>
+<td>No</td>
+<td>false</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>adj_method</code></td>
+<td>Multiple Testing Adjustment</td>
+<td>select (BH, bonferroni, holm, hochberg, BY, none)</td>
+<td>No</td>
+<td>BH</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>log_base</code></td>
+<td>Log Base for Fold Change</td>
+<td>select (2, 10)</td>
+<td>No</td>
+<td>2</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>save_fitted_models</code></td>
+<td>Save Fitted Models</td>
+<td>boolean</td>
+<td>No</td>
+<td>false</td>
+<td>Always visible</td>
+</tr>
+</tbody>
+</table>
+<h3 id="input-details">Input Details</h3>
+<h4 id="ptm-report-file-input-file">PTM Report File (<code>input_file</code>)</h4>
+<p>Spectronaut PTM report file (usually *_Report.txt or *_Report.csv)</p>
+<h4 id="ptm-annotation-file-annotation-file">PTM Annotation File (<code>annotation_file</code>)</h4>
+<p>TMT annotation file for PTM data (columns: Run, Channel, Condition, Mixture, TechRepMixture, Fraction, BioReplicate)</p>
+<ul>
+<li><strong>Table Editor</strong>: Enabled with 7 columns
+<ul>
+<li><strong>Columns</strong>:
+<ul>
+<li><code>Run</code>: Run (required)
+<ul>
+<li>Run identifier from Spectronaut</li>
+</ul>
+</li>
+<li><code>Channel</code>: Channel (required)
+<ul>
+<li>TMT channel (e.g., channel1, channel2, ..., channel16)</li>
+</ul>
+</li>
+<li><code>Condition</code>: Condition (required)
+<ul>
+<li>Experimental condition/group name</li>
+</ul>
+</li>
+<li><code>Mixture</code>: Mixture (required)
+<ul>
+<li>TMT plex identifier (e.g., mixture1)</li>
+</ul>
+</li>
+<li><code>TechRepMixture</code>: TechRepMixture (required)
+<ul>
+<li>Technical replicate mixture identifier (usually 1)</li>
+</ul>
+</li>
+<li><code>Fraction</code>: Fraction (required)
+<ul>
+<li>Fraction number identifying which fraction this run represents</li>
+</ul>
+</li>
+<li><code>BioReplicate</code>: BioReplicate (required)
+<ul>
+<li>Biological replicate number</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<h4 id="protein-report-file-input-protein-file">Protein Report File (<code>input_protein_file</code>)</h4>
+<p>Spectronaut report file for protein-level data (optional but recommended)</p>
+<h4 id="protein-annotation-file-annotation-protein-file">Protein Annotation File (<code>annotation_protein_file</code>)</h4>
+<p>TMT annotation file for protein data (same structure as PTM annotation)</p>
+<ul>
+<li><strong>Table Editor</strong>: Enabled with 7 columns
+<ul>
+<li><strong>Columns</strong>:
+<ul>
+<li><code>Run</code>: Run (required)
+<ul>
+<li>Run identifier from Spectronaut</li>
+</ul>
+</li>
+<li><code>Channel</code>: Channel (required)
+<ul>
+<li>TMT channel (e.g., channel1, channel2, ..., channel16)</li>
+</ul>
+</li>
+<li><code>Condition</code>: Condition (required)
+<ul>
+<li>Experimental condition/group name</li>
+</ul>
+</li>
+<li><code>Mixture</code>: Mixture (required)
+<ul>
+<li>TMT plex identifier (e.g., mixture1)</li>
+</ul>
+</li>
+<li><code>TechRepMixture</code>: TechRepMixture (required)
+<ul>
+<li>Technical replicate mixture identifier (usually 1)</li>
+</ul>
+</li>
+<li><code>Fraction</code>: Fraction (required)
+<ul>
+<li>Fraction number identifying which fraction this run represents</li>
+</ul>
+</li>
+<li><code>BioReplicate</code>: BioReplicate (required)
+<ul>
+<li>Biological replicate number</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<h4 id="fasta-file-fasta-file">FASTA File (<code>fasta_file</code>)</h4>
+<p>FASTA file for protein database (recommended for accurate PTM site localization)</p>
+<h4 id="fasta-protein-name-column-fasta-protein-name">FASTA Protein Name Column (<code>fasta_protein_name</code>)</h4>
+<p>Column name in FASTA for protein identifier</p>
+<h4 id="ptm-modification-id-mod-id">PTM Modification ID (<code>mod_id</code>)</h4>
+<p>Modification identifier pattern for PTMs (e.g., [Phospho (STY)], [Acetyl (K)])</p>
+<h4 id="use-unmodified-peptides-from-ptm-file-use-unmod-peptides">Use Unmodified Peptides from PTM File (<code>use_unmod_peptides</code>)</h4>
+<p>Extract unmodified peptides from PTM file for protein quantification (if no separate protein file provided)</p>
+<h4 id="remove-other-modifications-remove-other-mods">Remove Other Modifications (<code>remove_other_mods</code>)</h4>
+<p>Remove peptides with modifications other than the target PTM</p>
+<h4 id="intensity-column-intensity">Intensity Column (<code>intensity</code>)</h4>
+<p>Which intensity column to use from Spectronaut output</p>
+<ul>
+<li><strong>Options</strong>: <code>PeakArea</code>, <code>NormalizedPeakArea</code>, <code>TotalPeakArea</code></li>
+</ul>
+<h4 id="filter-with-q-value-filter-with-qvalue">Filter with Q-value (<code>filter_with_Qvalue</code>)</h4>
+<p>Filter features by Q-value threshold</p>
+<h4 id="q-value-cutoff-qvalue-cutoff">Q-value Cutoff (<code>qvalue_cutoff</code>)</h4>
+<p>Q-value threshold for filtering (only used if Filter with Q-value is enabled)</p>
+<h4 id="use-unique-peptides-only-useuniquepeptide">Use Unique Peptides Only (<code>useUniquePeptide</code>)</h4>
+<p>Use only unique peptides for protein quantification</p>
+<h4 id="remove-few-measurements-removefewmeasurements">Remove Few Measurements (<code>removeFewMeasurements</code>)</h4>
+<p>Remove features with too few measurements</p>
+<h4 id="remove-proteins-with-single-feature-removeprotein-with1feature">Remove Proteins with Single Feature (<code>removeProtein_with1Feature</code>)</h4>
+<p>Remove proteins identified by only one feature</p>
+<h4 id="summarization-method-summarization-method">Summarization Method (<code>summarization_method</code>)</h4>
+<p>Method for summarizing TMT reporter intensities</p>
+<ul>
+<li><strong>Options</strong>: <code>msstats</code>, <code>MedianPolish</code>, <code>Median</code></li>
+</ul>
+<h4 id="global-normalization-protein-global-norm">Global Normalization (Protein) (<code>global_norm</code>)</h4>
+<p>Apply global normalization to protein data</p>
+<h4 id="global-normalization-ptm-global-norm-ptm">Global Normalization (PTM) (<code>global_norm_PTM</code>)</h4>
+<p>Apply global normalization to PTM data</p>
+<h4 id="reference-channel-normalization-protein-reference-norm">Reference Channel Normalization (Protein) (<code>reference_norm</code>)</h4>
+<p>Apply reference channel normalization to protein data (TMT-specific)</p>
+<h4 id="reference-channel-normalization-ptm-reference-norm-ptm">Reference Channel Normalization (PTM) (<code>reference_norm_PTM</code>)</h4>
+<p>Apply reference channel normalization to PTM data (TMT-specific)</p>
+<h4 id="remove-normalization-channel-remove-norm-channel">Remove Normalization Channel (<code>remove_norm_channel</code>)</h4>
+<p>Remove normalization channel from final output</p>
+<h4 id="remove-empty-channels-remove-empty-channel">Remove Empty Channels (<code>remove_empty_channel</code>)</h4>
+<p>Remove empty TMT channels from output</p>
+<h4 id="mbimpute-for-protein-mbimpute">MBimpute for Protein (<code>MBimpute</code>)</h4>
+<p>Use model-based imputation for missing values in protein data</p>
+<h4 id="mbimpute-for-ptm-mbimpute-ptm">MBimpute for PTM (<code>MBimpute_PTM</code>)</h4>
+<p>Use model-based imputation for missing values in PTM data</p>
+<h4 id="max-quantile-for-censored-maxquantileforcensored">Max Quantile for Censored (<code>maxQuantileforCensored</code>)</h4>
+<p>Maximum quantile for determining censored missing values (leave empty for automatic)</p>
+<h4 id="comparison-matrix-file-comparison-matrix-file">Comparison Matrix File (<code>comparison_matrix_file</code>)</h4>
+<p>Custom comparison matrix file (if not provided, all pairwise comparisons will be performed)</p>
+<h4 id="moderated-t-statistic-moderated">Moderated T-Statistic (<code>moderated</code>)</h4>
+<p>Use moderated t-statistic (empirical Bayes, not typically used for TMT)</p>
+<h4 id="multiple-testing-adjustment-adj-method">Multiple Testing Adjustment (<code>adj_method</code>)</h4>
+<p>Method for multiple testing correction</p>
+<ul>
+<li><strong>Options</strong>: <code>BH</code>, <code>bonferroni</code>, <code>holm</code>, <code>hochberg</code>, <code>BY</code>, <code>none</code></li>
+</ul>
+<h4 id="log-base-for-fold-change-log-base">Log Base for Fold Change (<code>log_base</code>)</h4>
+<p>Base of logarithm for reporting fold changes</p>
+<ul>
+<li><strong>Options</strong>: <code>2</code>, <code>10</code></li>
+</ul>
+<h4 id="save-fitted-models-save-fitted-models">Save Fitted Models (<code>save_fitted_models</code>)</h4>
+<p>Save fitted statistical models in the output (can be memory intensive)</p>
+<h2 id="outputs">Outputs</h2>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>File</th>
+<th>Type</th>
+<th>Format</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>group_comparison_ptm</code></td>
+<td><code>group_comparison_ptm.txt</code></td>
+<td>data</td>
+<td>tsv</td>
+<td>PTM-level differential analysis results</td>
+</tr>
+<tr>
+<td><code>group_comparison_protein</code></td>
+<td><code>group_comparison_protein.txt</code></td>
+<td>data</td>
+<td>tsv</td>
+<td>Protein-level differential analysis results</td>
+</tr>
+<tr>
+<td><code>group_comparison_adjusted</code></td>
+<td><code>group_comparison_adjusted.txt</code></td>
+<td>data</td>
+<td>tsv</td>
+<td>PTM results adjusted for protein abundance changes (recommended for interpretation)</td>
+</tr>
+<tr>
+<td><code>peptide_intensities_wide</code></td>
+<td><code>peptide_intensities_wide.txt</code></td>
+<td>data</td>
+<td>tsv</td>
+<td>Peptide-level summarized intensities in wide format (can be joined with PTM and adjusted results)</td>
+</tr>
+<tr>
+<td><code>protein_intensities_wide</code></td>
+<td><code>protein_intensities_wide.txt</code></td>
+<td>data</td>
+<td>tsv</td>
+<td>Protein-level summarized intensities in wide format (can be joined with protein results)</td>
+</tr>
+</tbody>
+</table>
+<h2 id="requirements">Requirements</h2>
+<ul>
+<li><strong>R Version</strong>: &gt;=4.0</li>
+</ul>
+<h3 id="package-dependencies-inline">Package Dependencies (Inline)</h3>
+<p>Packages are defined inline in the plugin configuration:</p>
+<ul>
+<li><code>MSstatsPTM</code></li>
+<li><code>MSstatsTMT</code></li>
+<li><code>tidyverse</code></li>
+</ul>
+<blockquote>
+<p><strong>Note</strong>: When you create a custom environment for this plugin, these dependencies will be automatically installed.</p>
+</blockquote>
+<h2 id="usage">Usage</h2>
+<h3 id="via-ui">Via UI</h3>
+<ol>
+<li>Navigate to <strong>statistics</strong> → <strong>Spectronaut MSstatsPTM TMT Analysis</strong></li>
+<li>Fill in the required inputs</li>
+<li>Click <strong>Run Analysis</strong></li>
+</ol>
+<h3 id="via-plugin-system">Via Plugin System</h3>
+<pre><code class="language-typescript">const jobId = await pluginService.executePlugin('spectronaut-msstats-ptm-tmt', {
+  // Add parameters here
+});
+</code></pre>
+
+</body>
+</html>

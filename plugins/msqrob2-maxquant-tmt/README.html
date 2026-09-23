@@ -71,7 +71,44 @@
         }
         table {
             border-collapse: collapse;
-            width: 100%!;(string=<h1 id="msqrob2-maxquant-tmt-analysis">MSqRob2 MaxQuant TMT Analysis</h1>
+            width: 100%;
+            margin: 15px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #2196f3;
+            color: white;
+            font-weight: 600;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        ul, ol {
+            padding-left: 25px;
+        }
+        li {
+            margin: 5px 0;
+        }
+        strong {
+            font-weight: 600;
+            color: #1976d2;
+        }
+        .mermaid {
+            text-align: center;
+            margin: 20px 0;
+            background: #f9f9f9;
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+        }
+    </style>
+</head>
+<body>
+<h1 id="msqrob2-maxquant-tmt-analysis">MSqRob2 MaxQuant TMT Analysis</h1>
 <p><strong>ID</strong>: <code>msqrob2-maxquant-tmt</code><br>
 <strong>Version</strong>: 1.0.0<br>
 <strong>Category</strong>: statistics<br>
@@ -81,25 +118,29 @@
 <h2 id="workflow-diagram">Workflow Diagram</h2>
 <pre class="mermaid">flowchart TD
     Start([Start]) --&gt; step1
-    step1[Reading data...]
+    step1[&quot;Reading data...&quot;]
     step1 --&gt; step2
-    step2[Reading annotation...]
+    step2[&quot;Reading annotation...&quot;]
     step2 --&gt; step3
-    step3[Creating QFeatures object...]
+    step3[&quot;Creating QFeatures object...&quot;]
     step3 --&gt; step4
-    step4[Filtering...]
+    step4[&quot;Filtering...&quot;]
     step4 --&gt; step5
-    step5[Processing...]
+    step5[&quot;Processing...&quot;]
     step5 --&gt; step6
-    step6[Model fitting...]
+    step6[&quot;Model fitting...&quot;]
     step6 --&gt; step7
-    step7[Hypothesis testing...]
+    step7[&quot;Hypothesis testing...&quot;]
     step7 --&gt; End([End])
 </pre>
 <h2 id="runtime">Runtime</h2>
 <ul>
-<li><strong>Type</strong>: <code>r</code></li>
-<li><strong>Script</strong>: <code>msqrob2_maxquant_tmt.R</code></li>
+<li>
+<p><strong>Environments</strong>: <code>r</code></p>
+</li>
+<li>
+<p><strong>Entrypoint</strong>: <code>msqrob2_maxquant_tmt.R</code></p>
+</li>
 </ul>
 <h2 id="inputs">Inputs</h2>
 <table>
@@ -197,7 +238,7 @@
 <tr>
 <td><code>col_filter</code></td>
 <td>Column Completeness Threshold</td>
-<td>number (min: 0, max: 1, step: 0)</td>
+<td>number (min: 0, max: 1, step: 0.05)</td>
 <td>No</td>
 <td>0.7</td>
 <td>Always visible</td>
@@ -205,7 +246,7 @@
 <tr>
 <td><code>row_filter</code></td>
 <td>Row Completeness Threshold</td>
-<td>number (min: 0, max: 1, step: 0)</td>
+<td>number (min: 0, max: 1, step: 0.05)</td>
 <td>No</td>
 <td>0.7</td>
 <td>Always visible</td>
@@ -269,7 +310,7 @@
 <tr>
 <td><code>ridge_penalty</code></td>
 <td>Ridge Penalty</td>
-<td>number (min: 0, max: 1, step: 0)</td>
+<td>number (min: 0, max: 1, step: 0.01)</td>
 <td>No</td>
 <td>0</td>
 <td>Always visible</td>
@@ -293,7 +334,7 @@
 <tr>
 <td><code>alpha</code></td>
 <td>Significance Level</td>
-<td>number (min: 0, max: 0, step: 0)</td>
+<td>number (min: 0.001, max: 0.2, step: 0.001)</td>
 <td>No</td>
 <td>0.05</td>
 <td>Always visible</td>
@@ -301,7 +342,7 @@
 <tr>
 <td><code>lfc_threshold</code></td>
 <td>Log2 Fold Change Threshold</td>
-<td>number (min: 0, max: 5, step: 0)</td>
+<td>number (min: 0, max: 5, step: 0.1)</td>
 <td>No</td>
 <td>0</td>
 <td>Always visible</td>
@@ -428,6 +469,7 @@
 <li><code>msqrob2</code></li>
 <li><code>limma</code></li>
 <li><code>MsCoreUtils</code></li>
+<li><code>impute</code></li>
 <li><code>ggplot2</code></li>
 <li><code>reshape2</code></li>
 </ul>
@@ -436,21 +478,21 @@
 </blockquote>
 <h2 id="example-data">Example Data</h2>
 <p>This plugin includes example data for testing:</p>
-<pre><code class="language-yaml">  impute_order: after
-  summarization_method: robust
-  input_file: maxquant-tmt/evidence_protein.txt
-  protein_col: Proteins
+<pre><code class="language-yaml">  annotation_file: maxquant-tmt/annotation_protein_msqrob2.txt
+  feature_id_col: Modified sequence
   remove_shared_peptides: false
-  impute: knn
-  aggregation_order: after
+  normalize_method: center.median
   model_run_effect: false
   robust_regression: true
+  impute: knn
+  aggregation_order: after
+  input_file: maxquant-tmt/evidence_protein.txt
   remove_norm_channel: true
-  filter_min_peptides: 2
-  normalize_method: center.median
-  annotation_file: maxquant-tmt/annotation_protein_msqrob2.txt
-  feature_id_col: Modified sequence
+  protein_col: Proteins
   log2_transform: true
+  filter_min_peptides: 2
+  impute_order: after
+  summarization_method: robust
 </code></pre>
 <p>Load example data by clicking the <strong>Load Example</strong> button in the UI.</p>
 <h2 id="usage">Usage</h2>
@@ -465,43 +507,6 @@
   // Add parameters here
 });
 </code></pre>
-)
-            margin: 15px 0;
-        }
-        th, td {
-            border: 1px solid #ddd;
-            padding: 12px;
-            text-align: left;
-        }
-        th {
-            background-color: #2196f3;
-            color: white;
-            font-weight: 600;
-        }
-        tr:nth-child(even) {
-            background-color: #f9f9f9;
-        }
-        ul, ol {
-            padding-left: 25px;
-        }
-        li {
-            margin: 5px 0;
-        }
-        strong {
-            font-weight: 600;
-            color: #1976d2;
-        }
-        .mermaid {
-            text-align: center;
-            margin: 20px 0;
-            background: #f9f9f9;
-            padding: 20px;
-            border-radius: 8px;
-            border: 1px solid #e0e0e0;
-        }
-    </style>
-</head>
-<body>
-%!s(MISSING)
+
 </body>
 </html>

@@ -16,6 +16,32 @@ func writeScript(t *testing.T, dir, name, content string) string {
 	return path
 }
 
+func TestFormatType_NumberPreservesFractionalStep(t *testing.T) {
+	step := 0.001
+	min := 0.0
+	max := 1.0
+	input := PluginInput{Type: "number", Min: &min, Max: &max, Step: &step}
+
+	got := formatType(input)
+	want := "number (min: 0, max: 1, step: 0.001)"
+	if got != want {
+		t.Errorf("formatType() = %q, want %q", got, want)
+	}
+}
+
+func TestFormatType_NumberIntegerBoundsStayWhole(t *testing.T) {
+	min := 0.0
+	max := 10.0
+	step := 1.0
+	input := PluginInput{Type: "number", Min: &min, Max: &max, Step: &step}
+
+	got := formatType(input)
+	want := "number (min: 0, max: 10, step: 1)"
+	if got != want {
+		t.Errorf("formatType() = %q, want %q", got, want)
+	}
+}
+
 func TestParseRScript_StepMarkers(t *testing.T) {
 	dir := t.TempDir()
 	path := writeScript(t, dir, "run.R", `

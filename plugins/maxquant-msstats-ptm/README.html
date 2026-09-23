@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plugin Documentation</title>
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        mermaid.initialize({ startOnLoad: true, theme: 'default' });
+    </script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            max-width: 900px;
+            margin: 50px auto;
+            padding: 20px;
+            line-height: 1.6;
+            color: #333;
+        }
+        h1 {
+            border-bottom: 2px solid #2196f3;
+            padding-bottom: 10px;
+            color: #1976d2;
+        }
+        h2 {
+            margin-top: 30px;
+            color: #1976d2;
+            border-bottom: 1px solid #e0e0e0;
+            padding-bottom: 5px;
+        }
+        h3 {
+            margin-top: 20px;
+            color: #424242;
+        }
+        h4 {
+            color: #616161;
+        }
+        a {
+            color: #2196f3;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        code {
+            background: #f5f5f5;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+        pre {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        pre code {
+            background: none;
+            padding: 0;
+        }
+        blockquote {
+            border-left: 4px solid #2196f3;
+            margin: 0;
+            padding-left: 15px;
+            color: #666;
+            background: #f5f9fc;
+            padding: 10px 15px;
+            border-radius: 4px;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 15px 0;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #2196f3;
+            color: white;
+            font-weight: 600;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        ul, ol {
+            padding-left: 25px;
+        }
+        li {
+            margin: 5px 0;
+        }
+        strong {
+            font-weight: 600;
+            color: #1976d2;
+        }
+        .mermaid {
+            text-align: center;
+            margin: 20px 0;
+            background: #f9f9f9;
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+        }
+    </style>
+</head>
+<body>
+<h1 id="maxquant-msstatsptm-analysis">MaxQuant MSstatsPTM Analysis</h1>
+<p><strong>ID</strong>: <code>maxquant-msstats-ptm</code><br>
+<strong>Version</strong>: 1.0.0<br>
+<strong>Category</strong>: statistics<br>
+<strong>Author</strong>: CauldronGO Team</p>
+<h2 id="description">Description</h2>
+<p>Statistical analysis of post-translational modifications (PTMs) from MaxQuant data using MSstatsPTM package</p>
+<h2 id="runtime">Runtime</h2>
+<ul>
+<li>
+<p><strong>Environments</strong>: <code>r</code></p>
+</li>
+<li>
+<p><strong>Entrypoint</strong>: <code>msstatsptm.R</code></p>
+</li>
+</ul>
+<h2 id="inputs">Inputs</h2>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Label</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Visibility</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>input_file</code></td>
+<td>PTM Evidence File</td>
+<td>file</td>
+<td>Yes</td>
+<td>-</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>annotation_file</code></td>
+<td>PTM Annotation File</td>
+<td>file</td>
+<td>Yes</td>
+<td>-</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>input_protein_file</code></td>
+<td>Protein Groups File</td>
+<td>file</td>
+<td>No</td>
+<td>-</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>annotation_protein_file</code></td>
+<td>Protein Annotation File</td>
+<td>file</td>
+<td>No</td>
+<td>-</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>fasta_file</code></td>
+<td>FASTA File</td>
+<td>file</td>
+<td>No</td>
+<td>-</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>fasta_protein_name</code></td>
+<td>FASTA Protein Name Column</td>
+<td>text</td>
+<td>No</td>
+<td>uniprot_ac</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>mod_id</code></td>
+<td>PTM Modification ID</td>
+<td>text</td>
+<td>No</td>
+<td>(ph)</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>localization_cutoff</code></td>
+<td>Localization Score Cutoff</td>
+<td>number (min: 0, max: 1, step: 0.05)</td>
+<td>No</td>
+<td>0.75</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>useUniquePeptide</code></td>
+<td>Use Unique Peptides Only</td>
+<td>boolean</td>
+<td>No</td>
+<td>true</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>removeFewMeasurements</code></td>
+<td>Remove Features with Few Measurements</td>
+<td>boolean</td>
+<td>No</td>
+<td>true</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>removeOxidationMpeptides</code></td>
+<td>Remove Oxidation M Peptides</td>
+<td>boolean</td>
+<td>No</td>
+<td>true</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>RemoveProtein_with1Feature</code></td>
+<td>Remove Proteins with 1 Feature</td>
+<td>boolean</td>
+<td>No</td>
+<td>false</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>logTrans</code></td>
+<td>Log Transformation Base</td>
+<td>select (2, 10)</td>
+<td>No</td>
+<td>2</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>normalization</code></td>
+<td>Protein Normalization Method</td>
+<td>select (equalizeMedians, quantile, globalStandards, false)</td>
+<td>No</td>
+<td>equalizeMedians</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>normalization_PTM</code></td>
+<td>PTM Normalization Method</td>
+<td>select (equalizeMedians, quantile, globalStandards, false)</td>
+<td>No</td>
+<td>equalizeMedians</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>featureSubset</code></td>
+<td>Protein Feature Subset</td>
+<td>select (all, top3, topN, highQuality)</td>
+<td>No</td>
+<td>all</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>featureSubset_PTM</code></td>
+<td>PTM Feature Subset</td>
+<td>select (all, top3, topN, highQuality)</td>
+<td>No</td>
+<td>all</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>remove_uninformative_feature_outlier</code></td>
+<td>Remove Uninformative Features (Protein)</td>
+<td>boolean</td>
+<td>No</td>
+<td>false</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>remove_uninformative_feature_outlier_PTM</code></td>
+<td>Remove Uninformative Features (PTM)</td>
+<td>boolean</td>
+<td>No</td>
+<td>false</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>min_feature_count</code></td>
+<td>Minimum Feature Count (Protein)</td>
+<td>number (min: 1, max: 10, step: 1)</td>
+<td>No</td>
+<td>2</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>min_feature_count_PTM</code></td>
+<td>Minimum Feature Count (PTM)</td>
+<td>number (min: 1, max: 10, step: 1)</td>
+<td>No</td>
+<td>1</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>n_top_feature</code></td>
+<td>Number of Top Features (Protein)</td>
+<td>number (min: 1, max: 10, step: 1)</td>
+<td>No</td>
+<td>3</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>n_top_feature_PTM</code></td>
+<td>Number of Top Features (PTM)</td>
+<td>number (min: 1, max: 10, step: 1)</td>
+<td>No</td>
+<td>3</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>summaryMethod</code></td>
+<td>Summarization Method</td>
+<td>select (TMP, linear, logOfSum)</td>
+<td>No</td>
+<td>TMP</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>equalFeatureVar</code></td>
+<td>Equal Feature Variance</td>
+<td>boolean</td>
+<td>No</td>
+<td>true</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>censoredInt</code></td>
+<td>Censored Intensity Value</td>
+<td>text</td>
+<td>No</td>
+<td>NA</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>MBimpute</code></td>
+<td>MBimpute for Protein</td>
+<td>boolean</td>
+<td>No</td>
+<td>true</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>MBimpute_PTM</code></td>
+<td>MBimpute for PTM</td>
+<td>boolean</td>
+<td>No</td>
+<td>true</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>maxQuantileforCensored</code></td>
+<td>Max Quantile for Censored</td>
+<td>number (min: 0.9, max: 1, step: 0.001)</td>
+<td>No</td>
+<td>0.999</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>comparison_matrix_file</code></td>
+<td>Comparison Matrix File</td>
+<td>file</td>
+<td>No</td>
+<td>-</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>moderated</code></td>
+<td>Moderated T-Statistic</td>
+<td>boolean</td>
+<td>No</td>
+<td>true</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>adj_method</code></td>
+<td>Multiple Testing Adjustment</td>
+<td>select (BH, bonferroni, holm, hochberg, BY, none)</td>
+<td>No</td>
+<td>BH</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>log_base</code></td>
+<td>Log Base for Fold Change</td>
+<td>select (2, 10)</td>
+<td>No</td>
+<td>2</td>
+<td>Always visible</td>
+</tr>
+<tr>
+<td><code>save_fitted_models</code></td>
+<td>Save Fitted Models</td>
+<td>boolean</td>
+<td>No</td>
+<td>true</td>
+<td>Always visible</td>
+</tr>
+</tbody>
+</table>
+<h3 id="input-details">Input Details</h3>
+<h4 id="ptm-evidence-file-input-file">PTM Evidence File (<code>input_file</code>)</h4>
+<p>MaxQuant evidence.txt file with PTM data</p>
+<h4 id="ptm-annotation-file-annotation-file">PTM Annotation File (<code>annotation_file</code>)</h4>
+<p>Annotation file mapping runs to conditions for PTM data (columns: Run, Condition, BioReplicate)</p>
+<h4 id="protein-groups-file-input-protein-file">Protein Groups File (<code>input_protein_file</code>)</h4>
+<p>MaxQuant proteinGroups.txt file (optional but recommended for protein abundance adjustment)</p>
+<h4 id="protein-annotation-file-annotation-protein-file">Protein Annotation File (<code>annotation_protein_file</code>)</h4>
+<p>Annotation file for protein data (columns: Run, Condition, BioReplicate)</p>
+<h4 id="fasta-file-fasta-file">FASTA File (<code>fasta_file</code>)</h4>
+<p>FASTA file for matching PTM peptides and determining specific modified amino acids</p>
+<h4 id="fasta-protein-name-column-fasta-protein-name">FASTA Protein Name Column (<code>fasta_protein_name</code>)</h4>
+<p>Column name in FASTA for protein identifier</p>
+<h4 id="ptm-modification-id-mod-id">PTM Modification ID (<code>mod_id</code>)</h4>
+<p>Modification identifier in MaxQuant (default: (ph) for phosphorylation)</p>
+<h4 id="localization-score-cutoff-localization-cutoff">Localization Score Cutoff (<code>localization_cutoff</code>)</h4>
+<p>Minimum PTM localization confidence score (0-1, default 0.75)</p>
+<h4 id="use-unique-peptides-only-useuniquepeptide">Use Unique Peptides Only (<code>useUniquePeptide</code>)</h4>
+<p>Use only peptides unique to a single protein</p>
+<h4 id="remove-features-with-few-measurements-removefewmeasurements">Remove Features with Few Measurements (<code>removeFewMeasurements</code>)</h4>
+<p>Remove features with insufficient measurements across samples</p>
+<h4 id="remove-oxidation-m-peptides-removeoxidationmpeptides">Remove Oxidation M Peptides (<code>removeOxidationMpeptides</code>)</h4>
+<p>Remove peptides with oxidation on methionine (common artifact)</p>
+<h4 id="remove-proteins-with-1-feature-removeprotein-with1feature">Remove Proteins with 1 Feature (<code>RemoveProtein_with1Feature</code>)</h4>
+<p>Remove proteins with only one peptide and charge combination</p>
+<h4 id="log-transformation-base-logtrans">Log Transformation Base (<code>logTrans</code>)</h4>
+<p>Logarithm transformation base for intensities</p>
+<ul>
+<li><strong>Options</strong>: <code>2</code>, <code>10</code></li>
+</ul>
+<h4 id="protein-normalization-method-normalization">Protein Normalization Method (<code>normalization</code>)</h4>
+<p>Normalization method for protein-level data</p>
+<ul>
+<li><strong>Options</strong>: <code>equalizeMedians</code>, <code>quantile</code>, <code>globalStandards</code>, <code>false</code></li>
+</ul>
+<h4 id="ptm-normalization-method-normalization-ptm">PTM Normalization Method (<code>normalization_PTM</code>)</h4>
+<p>Normalization method for PTM-level data</p>
+<ul>
+<li><strong>Options</strong>: <code>equalizeMedians</code>, <code>quantile</code>, <code>globalStandards</code>, <code>false</code></li>
+</ul>
+<h4 id="protein-feature-subset-featuresubset">Protein Feature Subset (<code>featureSubset</code>)</h4>
+<p>Feature subset selection for protein summarization</p>
+<ul>
+<li><strong>Options</strong>: <code>all</code>, <code>top3</code>, <code>topN</code>, <code>highQuality</code></li>
+</ul>
+<h4 id="ptm-feature-subset-featuresubset-ptm">PTM Feature Subset (<code>featureSubset_PTM</code>)</h4>
+<p>Feature subset selection for PTM summarization</p>
+<ul>
+<li><strong>Options</strong>: <code>all</code>, <code>top3</code>, <code>topN</code>, <code>highQuality</code></li>
+</ul>
+<h4 id="remove-uninformative-features-protein-remove-uninformative-feature-outlier">Remove Uninformative Features (Protein) (<code>remove_uninformative_feature_outlier</code>)</h4>
+<p>Remove uninformative features and outliers from protein data</p>
+<h4 id="remove-uninformative-features-ptm-remove-uninformative-feature-outlier-ptm">Remove Uninformative Features (PTM) (<code>remove_uninformative_feature_outlier_PTM</code>)</h4>
+<p>Remove uninformative features and outliers from PTM data</p>
+<h4 id="minimum-feature-count-protein-min-feature-count">Minimum Feature Count (Protein) (<code>min_feature_count</code>)</h4>
+<p>Minimum number of features required per protein</p>
+<h4 id="minimum-feature-count-ptm-min-feature-count-ptm">Minimum Feature Count (PTM) (<code>min_feature_count_PTM</code>)</h4>
+<p>Minimum number of features required per PTM site</p>
+<h4 id="number-of-top-features-protein-n-top-feature">Number of Top Features (Protein) (<code>n_top_feature</code>)</h4>
+<p>Number of top features to use when featureSubset is topN</p>
+<h4 id="number-of-top-features-ptm-n-top-feature-ptm">Number of Top Features (PTM) (<code>n_top_feature_PTM</code>)</h4>
+<p>Number of top features to use for PTM when featureSubset is topN</p>
+<h4 id="summarization-method-summarymethod">Summarization Method (<code>summaryMethod</code>)</h4>
+<p>Method for summarizing features to protein/peptide level</p>
+<ul>
+<li><strong>Options</strong>: <code>TMP</code>, <code>linear</code>, <code>logOfSum</code></li>
+</ul>
+<h4 id="equal-feature-variance-equalfeaturevar">Equal Feature Variance (<code>equalFeatureVar</code>)</h4>
+<p>Assume equal variance across features in linear model</p>
+<h4 id="censored-intensity-value-censoredint">Censored Intensity Value (<code>censoredInt</code>)</h4>
+<p>How to handle censored missing values (NA, 0, or NULL)</p>
+<h4 id="mbimpute-for-protein-mbimpute">MBimpute for Protein (<code>MBimpute</code>)</h4>
+<p>Use model-based imputation for missing values in protein data</p>
+<h4 id="mbimpute-for-ptm-mbimpute-ptm">MBimpute for PTM (<code>MBimpute_PTM</code>)</h4>
+<p>Use model-based imputation for missing values in PTM data</p>
+<h4 id="max-quantile-for-censored-maxquantileforcensored">Max Quantile for Censored (<code>maxQuantileforCensored</code>)</h4>
+<p>Maximum quantile for determining censored missing values</p>
+<h4 id="comparison-matrix-file-comparison-matrix-file">Comparison Matrix File (<code>comparison_matrix_file</code>)</h4>
+<p>Custom comparison matrix file (if not provided, all pairwise comparisons will be performed)</p>
+<h4 id="moderated-t-statistic-moderated">Moderated T-Statistic (<code>moderated</code>)</h4>
+<p>Use moderated t-statistic (limma approach)</p>
+<h4 id="multiple-testing-adjustment-adj-method">Multiple Testing Adjustment (<code>adj_method</code>)</h4>
+<p>Method for multiple testing correction</p>
+<ul>
+<li><strong>Options</strong>: <code>BH</code>, <code>bonferroni</code>, <code>holm</code>, <code>hochberg</code>, <code>BY</code>, <code>none</code></li>
+</ul>
+<h4 id="log-base-for-fold-change-log-base">Log Base for Fold Change (<code>log_base</code>)</h4>
+<p>Base of logarithm for reporting fold changes</p>
+<ul>
+<li><strong>Options</strong>: <code>2</code>, <code>10</code></li>
+</ul>
+<h4 id="save-fitted-models-save-fitted-models">Save Fitted Models (<code>save_fitted_models</code>)</h4>
+<p>Save fitted statistical models in the output</p>
+<h2 id="outputs">Outputs</h2>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>File</th>
+<th>Type</th>
+<th>Format</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>group_comparison_ptm</code></td>
+<td><code>group_comparison_ptm.txt</code></td>
+<td>data</td>
+<td>tsv</td>
+<td>PTM-level differential analysis results</td>
+</tr>
+<tr>
+<td><code>group_comparison_protein</code></td>
+<td><code>group_comparison_protein.txt</code></td>
+<td>data</td>
+<td>tsv</td>
+<td>Protein-level differential analysis results</td>
+</tr>
+<tr>
+<td><code>group_comparison_adjusted</code></td>
+<td><code>group_comparison_adjusted.txt</code></td>
+<td>data</td>
+<td>tsv</td>
+<td>PTM results adjusted for protein abundance changes</td>
+</tr>
+<tr>
+<td><code>peptide_intensities_wide</code></td>
+<td><code>peptide_intensities_wide.txt</code></td>
+<td>data</td>
+<td>tsv</td>
+<td>Peptide-level summarized intensities in wide format (can be joined with PTM and adjusted results)</td>
+</tr>
+<tr>
+<td><code>protein_intensities_wide</code></td>
+<td><code>protein_intensities_wide.txt</code></td>
+<td>data</td>
+<td>tsv</td>
+<td>Protein-level summarized intensities in wide format (can be joined with protein results)</td>
+</tr>
+</tbody>
+</table>
+<h2 id="requirements">Requirements</h2>
+<ul>
+<li><strong>R Version</strong>: &gt;=4.0</li>
+</ul>
+<h3 id="package-dependencies-inline">Package Dependencies (Inline)</h3>
+<p>Packages are defined inline in the plugin configuration:</p>
+<ul>
+<li><code>MSstatsPTM</code></li>
+<li><code>tidyverse</code></li>
+</ul>
+<blockquote>
+<p><strong>Note</strong>: When you create a custom environment for this plugin, these dependencies will be automatically installed.</p>
+</blockquote>
+<h2 id="example-data">Example Data</h2>
+<p>This plugin includes example data for testing:</p>
+<pre><code class="language-yaml">  moderated: true
+  input_protein_file: maxquant/proteinGroups.txt
+  mod_id: \(ph\)
+  localization_cutoff: 0.75
+  useUniquePeptide: true
+  normalization: equalizeMedians
+  fasta_file: maxquant/uniprot.fasta
+  removeFewMeasurements: true
+  normalization_PTM: equalizeMedians
+  input_file: maxquant/evidence.txt
+  annotation_file: maxquant/annotation.txt
+  adj_method: BH
+  annotation_protein_file: maxquant/annotation.txt
+  removeOxidationMpeptides: true
+  RemoveProtein_with1Feature: false
+  logTrans: 2
+</code></pre>
+<p>Load example data by clicking the <strong>Load Example</strong> button in the UI.</p>
+<h2 id="usage">Usage</h2>
+<h3 id="via-ui">Via UI</h3>
+<ol>
+<li>Navigate to <strong>statistics</strong> → <strong>MaxQuant MSstatsPTM Analysis</strong></li>
+<li>Fill in the required inputs</li>
+<li>Click <strong>Run Analysis</strong></li>
+</ol>
+<h3 id="via-plugin-system">Via Plugin System</h3>
+<pre><code class="language-typescript">const jobId = await pluginService.executePlugin('maxquant-msstats-ptm', {
+  // Add parameters here
+});
+</code></pre>
+
+</body>
+</html>

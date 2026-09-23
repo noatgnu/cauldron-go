@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -211,18 +212,22 @@ type PluginConfig struct {
 	Citation   *CitationConfig   `yaml:"citation,omitempty"`
 }
 
+func formatNum(f float64) string {
+	return strconv.FormatFloat(f, 'f', -1, 64)
+}
+
 func formatType(input PluginInput) string {
 	switch input.Type {
 	case "number":
 		parts := []string{}
 		if input.Min != nil {
-			parts = append(parts, fmt.Sprintf("min: %.0f", *input.Min))
+			parts = append(parts, fmt.Sprintf("min: %s", formatNum(*input.Min)))
 		}
 		if input.Max != nil {
-			parts = append(parts, fmt.Sprintf("max: %.0f", *input.Max))
+			parts = append(parts, fmt.Sprintf("max: %s", formatNum(*input.Max)))
 		}
 		if input.Step != nil {
-			parts = append(parts, fmt.Sprintf("step: %.0f", *input.Step))
+			parts = append(parts, fmt.Sprintf("step: %s", formatNum(*input.Step)))
 		}
 		if len(parts) > 0 {
 			return fmt.Sprintf("number (%s)", strings.Join(parts, ", "))
