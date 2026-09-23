@@ -44,6 +44,13 @@ func (ph *ProtocolHandler) allowedRepoHosts() []string {
 	return ph.settings.GetConfig().AllowedRepoHosts
 }
 
+func (ph *ProtocolHandler) restrictRepoHostsToAllowlist() bool {
+	if ph.settings == nil {
+		return false
+	}
+	return ph.settings.GetConfig().RestrictRepoHostsToAllowlist
+}
+
 func (ph *ProtocolHandler) RegisterProtocol() error {
 	if goruntime.GOOS != "windows" {
 		log.Printf("[ProtocolHandler] Protocol registration only supported on Windows")
@@ -126,7 +133,7 @@ func (ph *ProtocolHandler) handleInstall(parsedURL *url.URL) error {
 		return fmt.Errorf("missing 'repo' parameter")
 	}
 
-	if err := ValidateRemoteRepoURL(repoURL, ph.allowedRepoHosts()); err != nil {
+	if err := ValidateRemoteRepoURL(repoURL, ph.allowedRepoHosts(), ph.restrictRepoHostsToAllowlist()); err != nil {
 		ph.emitEvent("plugin:install:error", map[string]interface{}{
 			"repo":  repoURL,
 			"ref":   ref,

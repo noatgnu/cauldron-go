@@ -20,4 +20,5 @@ type Config struct {
 	MaxConcurrentJobs              int      `json:"maxConcurrentJobs"`
 	JobTimeoutMinutes              int      `json:"jobTimeoutMinutes"`
 	AllowedRepoHosts               []string `json:"allowedRepoHosts"`
+	RestrictRepoHostsToAllowlist   bool     `json:"restrictRepoHostsToAllowlist"`
 }

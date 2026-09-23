@@ -100,7 +100,7 @@ func (h *HTTPInstallServer) handleInstall(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	if err := ValidateRemoteRepoURL(repoURL, h.protocolHandler.allowedRepoHosts()); err != nil {
+	if err := ValidateRemoteRepoURL(repoURL, h.protocolHandler.allowedRepoHosts(), h.protocolHandler.restrictRepoHostsToAllowlist()); err != nil {
 		h.renderError(w, "Repository URL not allowed", "This repository URL isn't allowed. Repository links must use https:// and point to a public host, or a host on your allowed hosts list.")
 		return
 	}

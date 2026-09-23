@@ -138,4 +138,21 @@ describe('SettingsGeneral', () => {
     expect(component['allowedRepoHosts']()).toEqual(['gitea.internal.example']);
     expect(wailsMock.setSetting).toHaveBeenCalledWith('allowedRepoHosts', ['gitea.internal.example']);
   });
+
+  it('defaults restrict-to-allowlist to off when not set', async () => {
+    await component.loadSettings();
+    expect(component['restrictRepoHostsToAllowlist']()).toBe(false);
+  });
+
+  it('loads restrict-to-allowlist from settings', async () => {
+    wailsMock.getSettings.mockResolvedValue({ restrictRepoHostsToAllowlist: true });
+    await component.loadSettings();
+    expect(component['restrictRepoHostsToAllowlist']()).toBe(true);
+  });
+
+  it('persists restrict-to-allowlist changes', async () => {
+    await component.setRestrictRepoHostsToAllowlist(true);
+    expect(component['restrictRepoHostsToAllowlist']()).toBe(true);
+    expect(wailsMock.setSetting).toHaveBeenCalledWith('restrictRepoHostsToAllowlist', true);
+  });
 });

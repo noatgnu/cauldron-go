@@ -41,6 +41,7 @@ export class SettingsGeneral implements OnInit {
   protected jobTimeoutMinutes = signal(0);
   protected allowedRepoHosts = signal<string[]>([]);
   protected newRepoHost = signal('');
+  protected restrictRepoHostsToAllowlist = signal(false);
   protected checkingForUpdate = signal(false);
   protected forceUpdating = signal(false);
   protected forceUpdatingSingle = signal(false);
@@ -67,6 +68,7 @@ export class SettingsGeneral implements OnInit {
       this.maxConcurrentJobs.set(config.maxConcurrentJobs > 0 ? config.maxConcurrentJobs : 2);
       this.jobTimeoutMinutes.set(config.jobTimeoutMinutes || 0);
       this.allowedRepoHosts.set(config.allowedRepoHosts || []);
+      this.restrictRepoHostsToAllowlist.set(!!config.restrictRepoHostsToAllowlist);
     } catch (error) {
       await this.wails.logToFile(`[SettingsGeneral] Failed to load settings: ${error}`);
     }
@@ -113,6 +115,11 @@ export class SettingsGeneral implements OnInit {
     const updated = this.allowedRepoHosts().filter(h => h !== host);
     this.allowedRepoHosts.set(updated);
     await this.saveSetting('allowedRepoHosts', updated);
+  }
+
+  async setRestrictRepoHostsToAllowlist(value: boolean): Promise<void> {
+    this.restrictRepoHostsToAllowlist.set(value);
+    await this.saveSetting('restrictRepoHostsToAllowlist', value);
   }
 
   async checkForUpdateNow(): Promise<void> {

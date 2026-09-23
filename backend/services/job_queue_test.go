@@ -1042,6 +1042,93 @@ func TestNewJobQueueServiceInternal_DefaultsWorkerCountWhenUnset(t *testing.T) {
 	}
 }
 
+func TestJobQueue_RunsMultipleJobsConcurrently(t *testing.T) {
+	tempDir := t.TempDir()
+	dbPath := filepath.Join(tempDir, "test.db")
+
+	db, err := newDatabaseServiceFromPath(dbPath)
+	if err != nil {
+		t.Fatalf("Failed to create database: %v", err)
+	}
+	defer db.Close()
+
+	jobQueue := NewJobQueueServiceV3(db, nil)
+	defer jobQueue.Shutdown()
+
+	if jobQueue.workers < 2 {
+		t.Fatalf("expected at least 2 workers by default, got %d", jobQueue.workers)
+	}
+
+	settingsService := newSettingsServiceInternal(db)
+	configurePython3ForTest(t, settingsService)
+	scriptExecutor := NewScriptExecutor(settingsService, db)
+	jobQueue.SetScriptExecutor(scriptExecutor)
+
+	pluginsDir := filepath.Join(tempDir, "plugins", "slow-plugin")
+	os.MkdirAll(pluginsDir, 0755)
+	pluginYAML := `plugin:
+  id: slow-plugin
+  name: Slow Plugin
+  version: "1.0.0"
+  description: Plugin that sleeps before exiting, to observe overlap
+
+runtime:
+  environments:
+    - python
+  entrypoint: main.py
+`
+	os.WriteFile(filepath.Join(pluginsDir, "plugin.yaml"), []byte(pluginYAML), 0644)
+	os.WriteFile(filepath.Join(pluginsDir, "main.py"), []byte("import time\ntime.sleep(1.5)\n"), 0644)
+
+	pluginLoader := NewPluginLoaderV2(filepath.Join(tempDir, "plugins"), db, nil)
+	if err := pluginLoader.LoadPlugins(); err != nil {
+		t.Fatalf("Failed to load plugins: %v", err)
+	}
+	jobQueue.SetPluginLoader(pluginLoader)
+
+	plugins := pluginLoader.GetAllPlugins()
+	if len(plugins) == 0 {
+		t.Fatal("No test plugin loaded")
+	}
+	plugin := plugins[0]
+
+	var jobIDs []string
+	for i := 0; i < 2; i++ {
+		jobID, err := jobQueue.CreateJobWithEnvironments(
+			plugin.Definition.Plugin.ID, plugin.Definition.Plugin.Name, "", []string{"main.py"},
+			map[string]interface{}{"pluginId": plugin.ID, "index": i}, "", "", "", "", "", "",
+		)
+		if err != nil {
+			t.Fatalf("Failed to create job %d: %v", i, err)
+		}
+		jobIDs = append(jobIDs, jobID)
+	}
+
+	time.Sleep(700 * time.Millisecond)
+
+	for _, jobID := range jobIDs {
+		job, err := jobQueue.GetJob(jobID)
+		if err != nil {
+			t.Fatalf("Failed to get job %s: %v", jobID, err)
+		}
+		if job.Status != models.JobStatusInProgress {
+			t.Errorf("expected job %s to be in_progress while both jobs run concurrently, got %q", jobID, job.Status)
+		}
+	}
+
+	time.Sleep(2000 * time.Millisecond)
+
+	for _, jobID := range jobIDs {
+		job, err := jobQueue.GetJob(jobID)
+		if err != nil {
+			t.Fatalf("Failed to get job %s: %v", jobID, err)
+		}
+		if job.Status != models.JobStatusCompleted {
+			t.Errorf("expected job %s to complete, got %q (error: %q)", jobID, job.Status, job.Error)
+		}
+	}
+}
+
 func TestGetAllJobs_Pagination(t *testing.T) {
 	tempDir := t.TempDir()
 	dbPath := filepath.Join(tempDir, "test.db")

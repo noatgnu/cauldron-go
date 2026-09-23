@@ -105,6 +105,9 @@ func (s *SettingsService) Load() error {
 	if val, ok := settings["allowedRepoHosts"]; ok {
 		s.config.AllowedRepoHosts = parseHostList(val)
 	}
+	if val, ok := settings["restrictRepoHostsToAllowlist"]; ok {
+		s.config.RestrictRepoHostsToAllowlist = val == "true"
+	}
 
 	return nil
 }
@@ -128,6 +131,7 @@ func (s *SettingsService) Save() error {
 	s.db.SaveSetting("maxConcurrentJobs", fmt.Sprintf("%d", s.config.MaxConcurrentJobs))
 	s.db.SaveSetting("jobTimeoutMinutes", fmt.Sprintf("%d", s.config.JobTimeoutMinutes))
 	s.db.SaveSetting("allowedRepoHosts", strings.Join(s.config.AllowedRepoHosts, ","))
+	s.db.SaveSetting("restrictRepoHostsToAllowlist", fmt.Sprintf("%v", s.config.RestrictRepoHostsToAllowlist))
 	return nil
 }
 
@@ -169,6 +173,8 @@ func (s *SettingsService) Get(key string) interface{} {
 		return s.config.JobTimeoutMinutes
 	case "allowedRepoHosts":
 		return s.config.AllowedRepoHosts
+	case "restrictRepoHostsToAllowlist":
+		return s.config.RestrictRepoHostsToAllowlist
 	}
 	return nil
 }
@@ -265,6 +271,10 @@ func (s *SettingsService) Set(key string, value interface{}) error {
 		}
 	case "allowedRepoHosts":
 		s.config.AllowedRepoHosts = toStringSlice(value)
+	case "restrictRepoHostsToAllowlist":
+		if b, ok := value.(bool); ok {
+			s.config.RestrictRepoHostsToAllowlist = b
+		}
 	}
 	return s.Save()
 }

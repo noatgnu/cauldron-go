@@ -55,6 +55,19 @@
         }
       </mat-chip-set>
     }
+
+    <mat-slide-toggle
+      style="margin-top: 12px;"
+      [ngModel]="restrictRepoHostsToAllowlist()"
+      (ngModelChange)="setRestrictRepoHostsToAllowlist($event)">
+      Only allow hosts on this list
+    </mat-slide-toggle>
+    @if (restrictRepoHostsToAllowlist()) {
+      <div class="warning-box" style="margin-top: 8px;">
+        <mat-icon>warning</mat-icon>
+        <div>Plugin install links from any host not on this list will be rejected, including public hosts like GitHub. Manual install (pasting a URL in the app) and the CLI are unaffected.</div>
+      </div>
+    }
   </div>
 
   <div class="form-section">

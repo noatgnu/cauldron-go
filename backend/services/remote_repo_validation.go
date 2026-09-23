@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-func ValidateRemoteRepoURL(repoURL string, allowedHosts []string) error {
+func ValidateRemoteRepoURL(repoURL string, allowedHosts []string, restrictToAllowedHosts bool) error {
 	parsed, err := url.Parse(repoURL)
 	if err != nil {
 		return fmt.Errorf("invalid repository URL")
@@ -26,6 +26,10 @@ func ValidateRemoteRepoURL(repoURL string, allowedHosts []string) error {
 		if strings.EqualFold(host, allowed) {
 			return nil
 		}
+	}
+
+	if restrictToAllowedHosts {
+		return fmt.Errorf("repository host is not on the allowed hosts list")
 	}
 
 	ips, err := net.LookupIP(host)
