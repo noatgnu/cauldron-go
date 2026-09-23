@@ -41,4 +41,25 @@ describe('Breadcrumbs', () => {
   it('should create', () => {
     expect(component).toBeTruthy();
   });
+
+  it('shows only Home for the home page, not a duplicate crumb', async () => {
+    routerMock.url = '/home';
+    await component['updateBreadcrumbs']();
+    expect(component['breadcrumbs']()).toEqual([{ label: 'Home', url: '/' }]);
+  });
+
+  it('shows only Home for the root path', async () => {
+    routerMock.url = '/';
+    await component['updateBreadcrumbs']();
+    expect(component['breadcrumbs']()).toEqual([{ label: 'Home', url: '/' }]);
+  });
+
+  it('still builds crumbs for other routes', async () => {
+    routerMock.url = '/jobs';
+    await component['updateBreadcrumbs']();
+    expect(component['breadcrumbs']()).toEqual([
+      { label: 'Home', url: '/' },
+      { label: 'Jobs', url: '/jobs' }
+    ]);
+  });
 });

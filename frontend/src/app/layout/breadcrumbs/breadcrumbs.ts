@@ -68,6 +68,10 @@ export class Breadcrumbs implements OnInit {
       const prevPath = i > 0 ? paths[i - 1] : null;
       currentUrl += `/${path}`;
 
+      if (path === 'home' && i === 0) {
+        continue;
+      }
+
       const config = this.routeConfig[path];
 
       if (!config) {
