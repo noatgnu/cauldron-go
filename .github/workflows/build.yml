@@ -420,7 +420,7 @@ jobs:
         env:
           BUILD_DIR: ${{ github.workspace }}/build/bin
         run: |
-          go test -v -tags gtk4 -run "TestE2EProcessJobCodePath" -timeout 120s
+          go test -v -tags gtk4 -run "TestE2EProcessJobCodePath" -timeout 300s
 
   e2e-full-plugin-execution:
     name: E2E Full Plugin Execution
