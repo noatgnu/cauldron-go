@@ -119,6 +119,39 @@ export async function callBoundMethod(name: string, ...args: any[]): Promise<any
   return callTool('call_bound_method', { name, args });
 }
 
+export async function clickTabByLabel(text: string, timeoutMs = 15000): Promise<boolean> {
+  const js = `
+    const label = Array.from(document.querySelectorAll('.mdc-tab__text-label'))
+      .find(e => e.textContent.trim() === ${JSON.stringify(text)});
+    const tab = label && label.closest('.mat-mdc-tab');
+    if (!tab) return false;
+    tab.click();
+    return true;
+  `;
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    if (await callTool('js_eval', { js })) return true;
+    await new Promise(r => setTimeout(r, 300));
+  }
+  return false;
+}
+
+export async function clickOptionByText(text: string, timeoutMs = 15000): Promise<boolean> {
+  const js = `
+    const opt = Array.from(document.querySelectorAll('mat-option'))
+      .find(e => e.textContent.trim() === ${JSON.stringify(text)});
+    if (!opt) return false;
+    opt.click();
+    return true;
+  `;
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    if (await callTool('js_eval', { js })) return true;
+    await new Promise(r => setTimeout(r, 300));
+  }
+  return false;
+}
+
 export async function waitForEvent(name: string, timeoutMs = 30000): Promise<any> {
   return callTool('wait_for_event', { name, timeout_ms: timeoutMs });
 }

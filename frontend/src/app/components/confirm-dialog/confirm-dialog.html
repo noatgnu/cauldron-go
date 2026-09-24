@@ -3,6 +3,6 @@
   <p style="white-space: pre-line;">{{ data.message }}</p>
 </mat-dialog-content>
 <mat-dialog-actions align="end">
-  <button mat-button (click)="onCancel()">{{ data.cancelText }}</button>
-  <button mat-raised-button color="warn" (click)="onConfirm()">{{ data.confirmText }}</button>
+  <button class="confirm-dialog-cancel-btn" mat-button (click)="onCancel()">{{ data.cancelText }}</button>
+  <button class="confirm-dialog-confirm-btn" mat-raised-button color="warn" (click)="onConfirm()">{{ data.confirmText }}</button>
 </mat-dialog-actions>
