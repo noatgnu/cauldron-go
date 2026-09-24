@@ -73,7 +73,6 @@ func TestWailsBindings(t *testing.T) {
 	})
 
 	t.Run("CreateAndGetJob", func(t *testing.T) {
-		// Get PCA plugin ID
 		plugins := app.GetPluginsV2()
 		var pcaPluginID uint
 		for _, p := range plugins {
@@ -86,11 +85,12 @@ func TestWailsBindings(t *testing.T) {
 			t.Skip("PCA plugin not installed, skipping test")
 		}
 
-		// Create a job using Plugin V2
 		req := models.PluginExecutionRequestV2{
 			PluginID: pcaPluginID,
 			Parameters: map[string]interface{}{
-				"n_components": 2,
+				"input_file":   "/tmp/dummy_pca_input.csv",
+				"columns_name": []interface{}{"sample1", "sample2"},
+				"n_components": float64(2),
 			},
 		}
 
@@ -116,11 +116,11 @@ func TestWailsBindings(t *testing.T) {
 		if job.ID != jobID {
 			t.Errorf("Job ID mismatch: expected %s, got %s", jobID, job.ID)
 		}
-		if job.Name != "Integration Test Job" {
-			t.Errorf("Job name mismatch: expected 'Integration Test Job', got '%s'", job.Name)
+		if job.Name != "PCA Analysis" {
+			t.Errorf("Job name mismatch: expected 'PCA Analysis', got '%s'", job.Name)
 		}
-		if job.Type != "pca" {
-			t.Errorf("Job type mismatch: expected 'pca', got '%s'", job.Type)
+		if job.Type != "pca-analysis" {
+			t.Errorf("Job type mismatch: expected 'pca-analysis', got '%s'", job.Type)
 		}
 
 		// Check that Args serializes properly (should be array, not null)

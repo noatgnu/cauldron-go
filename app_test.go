@@ -69,7 +69,9 @@ func TestJobLifecycle(t *testing.T) {
 	req := models.PluginExecutionRequestV2{
 		PluginID: pcaPluginID,
 		Parameters: map[string]interface{}{
-			"n_components": 2,
+			"input_file":   "/tmp/dummy_pca_input.csv",
+			"columns_name": []interface{}{"sample1", "sample2"},
+			"n_components": float64(2),
 		},
 	}
 
@@ -86,12 +88,12 @@ func TestJobLifecycle(t *testing.T) {
 		t.Fatalf("Failed to get job: %v", err)
 	}
 
-	if job.Name != "Test PCA Job" {
-		t.Errorf("Expected job name 'Test PCA Job', got '%s'", job.Name)
+	if job.Name != "PCA Analysis" {
+		t.Errorf("Expected job name 'PCA Analysis', got '%s'", job.Name)
 	}
 
-	if job.Type != "pca" {
-		t.Errorf("Expected job type 'pca', got '%s'", job.Type)
+	if job.Type != "pca-analysis" {
+		t.Errorf("Expected job type 'pca-analysis', got '%s'", job.Type)
 	}
 
 	t.Log("✓ Retrieved job successfully")
@@ -177,7 +179,9 @@ func TestDatabasePersistence(t *testing.T) {
 	req := models.PluginExecutionRequestV2{
 		PluginID: normPluginID,
 		Parameters: map[string]interface{}{
-			"scaler_type": "minmax",
+			"input_file":   "/tmp/dummy_normalization_input.csv",
+			"columns_name": []interface{}{"sample1", "sample2"},
+			"scaler_type":  "minmax",
 		},
 	}
 
@@ -200,8 +204,8 @@ func TestDatabasePersistence(t *testing.T) {
 		t.Fatalf("Failed to retrieve job in second instance: %v", err)
 	}
 
-	if job.Name != "Test Persistence Job" {
-		t.Errorf("Job name mismatch. Expected 'Test Persistence Job', got '%s'", job.Name)
+	if job.Name != "Data Normalization" {
+		t.Errorf("Job name mismatch. Expected 'Data Normalization', got '%s'", job.Name)
 	}
 
 	t.Log("✓ Job persisted across app restart")

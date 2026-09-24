@@ -20,7 +20,7 @@
 
     @for (input of plugin.definition.inputs; track input.name) {
       @if (isInputVisible(input)) {
-        <div class="form-field">
+        <div class="form-field" [attr.data-field]="input.name">
           @switch (getInputType(input)) {
           @case ('file') {
             <mat-form-field appearance="outline" class="full-width">

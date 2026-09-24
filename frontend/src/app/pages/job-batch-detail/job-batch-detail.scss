@@ -1,0 +1,19 @@
+.job-batch-detail-container {
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.header-card {
+  .summary-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+}
+
+.jobs-table {
+  width: 100%;
+}

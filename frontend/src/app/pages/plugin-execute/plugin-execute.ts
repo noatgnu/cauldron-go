@@ -9,6 +9,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatTabsModule } from '@angular/material/tabs';
 import { DynamicFormComponent } from '../../components/dynamic-form/dynamic-form';
+import { BatchJobBuilder } from '../../components/batch-job-builder/batch-job-builder';
 import { PluginV2Service } from '../../core/services/plugin-v2';
 import { NotificationService } from '../../core/services/notification.service';
 import * as models from '../../../../bindings/github.com/noatgnu/cauldron-go/backend/models/models';
@@ -26,6 +27,7 @@ import { Wails } from '../../core/services/wails';
     MatTooltipModule,
     MatTabsModule,
     DynamicFormComponent,
+    BatchJobBuilder,
     EnvironmentIndicator
   ],
   templateUrl: './plugin-execute.html',
@@ -45,6 +47,10 @@ export class PluginExecute implements OnInit, OnDestroy {
   bindingTooltip = signal('');
   pythonBound = signal(false);
   rBound = signal(false);
+
+  hasFileInput(): boolean {
+    return this.plugin()?.definition.inputs.some(i => i.type === 'file') ?? false;
+  }
 
   constructor(
     private route: ActivatedRoute,

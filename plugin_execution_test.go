@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/noatgnu/cauldron-go/backend/models"
+	"github.com/noatgnu/cauldron-go/backend/services"
 )
 
 func TestPluginExecutionE2E(t *testing.T) {
@@ -177,26 +178,69 @@ func TestPluginValidation(t *testing.T) {
 	})
 }
 
+func loadThrowawayTestPlugin(t *testing.T, app *App, pluginID string) *models.PluginV2 {
+	t.Helper()
+
+	pythonPath, err := app.settings.DetectPythonPath()
+	if err != nil || pythonPath == "" {
+		t.Skip("python3 not available on this machine, skipping")
+	}
+	if err := app.settings.Set("pythonPath", pythonPath); err != nil {
+		t.Fatalf("failed to configure python path: %v", err)
+	}
+
+	tempDir := t.TempDir()
+	pluginDir := filepath.Join(tempDir, pluginID)
+	if err := os.MkdirAll(pluginDir, 0755); err != nil {
+		t.Fatalf("failed to create plugin dir: %v", err)
+	}
+	pluginYAML := "plugin:\n" +
+		"  id: " + pluginID + "\n" +
+		"  name: Throwaway Test Plugin\n" +
+		"  version: \"1.0.0\"\n" +
+		"  description: Minimal plugin used by an integration test\n" +
+		"\n" +
+		"runtime:\n" +
+		"  environments:\n" +
+		"    - python\n" +
+		"  entrypoint: main.py\n"
+	if err := os.WriteFile(filepath.Join(pluginDir, "plugin.yaml"), []byte(pluginYAML), 0644); err != nil {
+		t.Fatalf("failed to write plugin.yaml: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(pluginDir, "main.py"), []byte("import sys\nsys.exit(0)\n"), 0644); err != nil {
+		t.Fatalf("failed to write entrypoint: %v", err)
+	}
+
+	pluginLoader := services.NewPluginLoaderV2(tempDir, app.db, nil)
+	if err := pluginLoader.LoadPlugins(); err != nil {
+		t.Fatalf("failed to load test plugin: %v", err)
+	}
+	app.pluginLoaderV2 = pluginLoader
+	app.jobQueue.SetPluginLoader(pluginLoader)
+
+	plugins := app.GetPluginsV2()
+	if len(plugins) == 0 {
+		t.Fatal("expected the test plugin to load")
+	}
+	return plugins[0]
+}
+
 func TestJobQueueIntegration(t *testing.T) {
 	app := NewApp()
 	app.Initialize()
 	defer app.Shutdown()
 
 	t.Run("Queue multiple jobs and verify ordering", func(t *testing.T) {
-		plugins := app.GetPluginsV2()
-		if len(plugins) == 0 {
-			t.Skip("No plugins available")
-		}
+		plugin := loadThrowawayTestPlugin(t, app, "queue-order-test-plugin")
 
-		err := app.PauseJobQueue()
-		if err != nil {
+		if err := app.PauseJobQueue(); err != nil {
 			t.Fatalf("Failed to pause queue: %v", err)
 		}
 
 		var jobIDs []string
 		for i := 0; i < 3; i++ {
 			req := models.PluginExecutionRequestV2{
-				PluginID: plugins[0].ID,
+				PluginID: plugin.ID,
 				Parameters: map[string]interface{}{
 					"test_index": i,
 				},
@@ -211,20 +255,35 @@ func TestJobQueueIntegration(t *testing.T) {
 		}
 
 		status := app.GetJobQueueStatus()
-		t.Logf("Queue status while paused: %+v", status)
+		if pendingCount, ok := status["pendingCount"].(int64); !ok || pendingCount < 3 {
+			t.Errorf("expected at least 3 pending jobs while the queue is paused, got %v (status: %+v)", status["pendingCount"], status)
+		}
 
-		err = app.ResumeJobQueue()
-		if err != nil {
+		if err := app.ResumeJobQueue(); err != nil {
 			t.Fatalf("Failed to resume queue: %v", err)
 		}
 
+		deadline := time.Now().Add(10 * time.Second)
 		for _, jobID := range jobIDs {
-			job, err := app.GetJob(jobID)
-			if err != nil {
-				t.Errorf("Failed to get job %s: %v", jobID, err)
-				continue
+			for {
+				job, err := app.GetJob(jobID)
+				if err != nil {
+					t.Errorf("Failed to get job %s: %v", jobID, err)
+					break
+				}
+				if job.Status == models.JobStatusCompleted {
+					break
+				}
+				if job.Status == models.JobStatusFailed {
+					t.Errorf("job %s failed: %s", jobID, job.Error)
+					break
+				}
+				if time.Now().After(deadline) {
+					t.Errorf("job %s did not complete within 10s, status=%s", jobID, job.Status)
+					break
+				}
+				time.Sleep(50 * time.Millisecond)
 			}
-			t.Logf("Job %s status: %s", jobID, job.Status)
 		}
 
 		for _, jobID := range jobIDs {
@@ -276,13 +335,10 @@ func TestPluginParameterSerialization(t *testing.T) {
 	defer app.Shutdown()
 
 	t.Run("Job parameters serialize correctly", func(t *testing.T) {
-		plugins := app.GetPluginsV2()
-		if len(plugins) == 0 {
-			t.Skip("No plugins available")
-		}
+		plugin := loadThrowawayTestPlugin(t, app, "param-serialization-test-plugin")
 
 		req := models.PluginExecutionRequestV2{
-			PluginID: plugins[0].ID,
+			PluginID: plugin.ID,
 			Parameters: map[string]interface{}{
 				"string_param": "test value",
 				"int_param":    42,

@@ -1181,3 +1181,116 @@ func TestGetAllJobs_Pagination(t *testing.T) {
 		t.Errorf("expected the last page's job to be page-job-0, got %s", lastPage[0].ID)
 	}
 }
+
+func TestCreateJobWithEnvironmentsAndBatch_SetsBatchID(t *testing.T) {
+	tempDir := t.TempDir()
+	dbPath := filepath.Join(tempDir, "test.db")
+
+	db, err := newDatabaseServiceFromPath(dbPath)
+	if err != nil {
+		t.Fatalf("Failed to create database: %v", err)
+	}
+	defer db.Close()
+
+	jobQueue := NewJobQueueServiceV3(db, nil)
+	defer jobQueue.Shutdown()
+
+	jobID, err := jobQueue.CreateJobWithEnvironmentsAndBatch(
+		"test-type", "Test Job", "", []string{}, map[string]interface{}{}, "", "", "", "", "", "", "batch-123",
+	)
+	if err != nil {
+		t.Fatalf("CreateJobWithEnvironmentsAndBatch failed: %v", err)
+	}
+
+	job, err := jobQueue.GetJob(jobID)
+	if err != nil {
+		t.Fatalf("Failed to get job: %v", err)
+	}
+	if job.BatchID != "batch-123" {
+		t.Errorf("expected job.BatchID = %q, got %q", "batch-123", job.BatchID)
+	}
+}
+
+func TestCreateJobWithEnvironments_LeavesBatchIDEmpty(t *testing.T) {
+	tempDir := t.TempDir()
+	dbPath := filepath.Join(tempDir, "test.db")
+
+	db, err := newDatabaseServiceFromPath(dbPath)
+	if err != nil {
+		t.Fatalf("Failed to create database: %v", err)
+	}
+	defer db.Close()
+
+	jobQueue := NewJobQueueServiceV3(db, nil)
+	defer jobQueue.Shutdown()
+
+	jobID, err := jobQueue.CreateJobWithEnvironments(
+		"test-type", "Test Job", "", []string{}, map[string]interface{}{}, "", "", "", "", "", "",
+	)
+	if err != nil {
+		t.Fatalf("CreateJobWithEnvironments failed: %v", err)
+	}
+
+	job, err := jobQueue.GetJob(jobID)
+	if err != nil {
+		t.Fatalf("Failed to get job: %v", err)
+	}
+	if job.BatchID != "" {
+		t.Errorf("expected job.BatchID = \"\" for a non-batch job, got %q", job.BatchID)
+	}
+}
+
+func TestGetJobsByBatchID_FiltersCorrectly(t *testing.T) {
+	tempDir := t.TempDir()
+	dbPath := filepath.Join(tempDir, "test.db")
+
+	db, err := newDatabaseServiceFromPath(dbPath)
+	if err != nil {
+		t.Fatalf("Failed to create database: %v", err)
+	}
+	defer db.Close()
+
+	jobQueue := NewJobQueueServiceV3(db, nil)
+	defer jobQueue.Shutdown()
+
+	for i := 0; i < 2; i++ {
+		if _, err := jobQueue.CreateJobWithEnvironmentsAndBatch(
+			"test-type", "Batch A Job", "", []string{}, map[string]interface{}{}, "", "", "", "", "", "", "batch-a",
+		); err != nil {
+			t.Fatalf("Failed to create batch-a job %d: %v", i, err)
+		}
+	}
+	if _, err := jobQueue.CreateJobWithEnvironmentsAndBatch(
+		"test-type", "Batch B Job", "", []string{}, map[string]interface{}{}, "", "", "", "", "", "", "batch-b",
+	); err != nil {
+		t.Fatalf("Failed to create batch-b job: %v", err)
+	}
+	if _, err := jobQueue.CreateJobWithEnvironments(
+		"test-type", "No Batch Job", "", []string{}, map[string]interface{}{}, "", "", "", "", "", "",
+	); err != nil {
+		t.Fatalf("Failed to create non-batch job: %v", err)
+	}
+
+	batchAJobs := jobQueue.GetJobsByBatchID("batch-a")
+	if len(batchAJobs) != 2 {
+		t.Fatalf("expected 2 jobs in batch-a, got %d", len(batchAJobs))
+	}
+	for _, j := range batchAJobs {
+		if j.BatchID != "batch-a" {
+			t.Errorf("expected all returned jobs to have BatchID = batch-a, got %q", j.BatchID)
+		}
+	}
+
+	batchBJobs := jobQueue.GetJobsByBatchID("batch-b")
+	if len(batchBJobs) != 1 {
+		t.Fatalf("expected 1 job in batch-b, got %d", len(batchBJobs))
+	}
+
+	noBatchJobs := jobQueue.GetJobsByBatchID("")
+	if len(noBatchJobs) != 1 {
+		t.Fatalf("expected exactly 1 job with empty BatchID, got %d", len(noBatchJobs))
+	}
+	if noBatchJobs[0].Name != "No Batch Job" {
+		t.Errorf("expected the empty-BatchID job to be %q, got %q", "No Batch Job", noBatchJobs[0].Name)
+	}
+}

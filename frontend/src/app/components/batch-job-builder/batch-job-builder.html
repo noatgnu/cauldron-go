@@ -1,0 +1,94 @@
+<div class="batch-builder">
+  <div class="form-section">
+    <h3>Add Jobs</h3>
+    <p class="section-description">Pick files to add as jobs, or add an empty job and fill it in yourself.</p>
+
+    @if (fileInputs().length > 1) {
+      <mat-form-field appearance="outline" class="param-field">
+        <mat-label>File input to add from files</mat-label>
+        <mat-select [value]="targetFileInputName()" (selectionChange)="targetFileInputName.set($event.value)">
+          @for (input of fileInputs(); track input.name) {
+            <mat-option [value]="input.name">{{ input.label }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+    }
+
+    <div class="button-row">
+      <button class="add-files-btn" mat-stroked-button type="button" (click)="addRowsFromFiles()" [disabled]="!targetFileInputName()">
+        <mat-icon>upload_file</mat-icon>
+        Add Jobs from Files
+      </button>
+      <button class="add-empty-job-btn" mat-stroked-button type="button" (click)="addEmptyRow()">
+        <mat-icon>add</mat-icon>
+        Add Empty Job
+      </button>
+    </div>
+  </div>
+
+  <div class="form-section">
+    <h3>Bulk-Apply a Field</h3>
+    <p class="section-description">Push one setting into every job below at once. Each job can still be edited individually afterward.</p>
+
+    <mat-form-field appearance="outline" class="param-field">
+      <mat-label>Field</mat-label>
+      <mat-select class="bulk-field-select" [value]="bulkFieldName()" (selectionChange)="onBulkFieldChange($event.value)">
+        @for (input of plugin.definition.inputs; track input.name) {
+          <mat-option [value]="input.name">{{ input.label }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    @if (bulkApplyPlugin(); as stubPlugin) {
+      <div class="bulk-field-value">
+        <app-dynamic-form [plugin]="stubPlugin" (formChange)="onBulkFormChange($event)"></app-dynamic-form>
+      </div>
+      <button class="apply-bulk-btn" mat-stroked-button type="button" (click)="applyBulkValue()" matTooltip="Push this value into every job below">
+        Apply to All Jobs
+      </button>
+    }
+  </div>
+
+  <div class="form-section">
+    <h3>Jobs ({{ rows().length }})</h3>
+
+    <table mat-table [dataSource]="rows()" class="rows-table">
+      <ng-container matColumnDef="summary">
+        <th mat-header-cell *matHeaderCellDef>Job</th>
+        <td mat-cell *matCellDef="let row">{{ rowSummary(row) }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="actions">
+        <th mat-header-cell *matHeaderCellDef></th>
+        <td mat-cell *matCellDef="let row">
+          <button class="edit-row-btn" mat-icon-button type="button" (click)="editRow(row.id)" matTooltip="Edit this job">
+            <mat-icon>edit</mat-icon>
+          </button>
+          <button class="duplicate-row-btn" mat-icon-button type="button" (click)="duplicateRow(row.id)" matTooltip="Duplicate this job">
+            <mat-icon>content_copy</mat-icon>
+          </button>
+          <button class="remove-row-btn" mat-icon-button type="button" (click)="removeRow(row.id)" matTooltip="Remove this job">
+            <mat-icon>delete</mat-icon>
+          </button>
+        </td>
+      </ng-container>
+
+      <tr mat-header-row *matHeaderRowDef="columns"></tr>
+      <tr mat-row *matRowDef="let row; columns: columns;"></tr>
+    </table>
+
+    @if (rows().length === 0) {
+      <p class="empty-state">No jobs yet. Add jobs from files or add an empty job to get started.</p>
+    }
+  </div>
+
+  <div class="submit-row">
+    <button class="create-batch-btn" mat-raised-button color="primary" type="button" (click)="createBatch()" [disabled]="creating() || rows().length === 0">
+      @if (creating()) {
+        Creating Batch...
+      } @else {
+        Create Batch ({{ rows().length }} job{{ rows().length === 1 ? '' : 's' }})
+      }
+    </button>
+  </div>
+</div>

@@ -53,6 +53,10 @@ func NewJobQueueServiceV3(db *DatabaseService, wailsApp *application.App) *JobQu
 	return service
 }
 
+func NewBatchServiceV3(db *DatabaseService, jobQueue *JobQueueService) *BatchService {
+	return NewBatchService(db, jobQueue)
+}
+
 type ProgressNotifierV3 struct {
 	wailsApp *application.App
 }

@@ -97,11 +97,8 @@ func TestE2EAngularWailsCommunication(t *testing.T) {
 	})
 
 	t.Run("E2E: User Creates a Job", func(t *testing.T) {
-		// This simulates what happens when user clicks "Run Analysis" in Angular
-
 		t.Log("\n=== Simulating User Creating PCA Job ===")
 
-		// Get PCA plugin ID
 		plugins := app.GetPluginsV2()
 		var pcaPluginID uint
 		for _, p := range plugins {
@@ -114,12 +111,13 @@ func TestE2EAngularWailsCommunication(t *testing.T) {
 			t.Skip("PCA plugin not installed, skipping test")
 		}
 
-		// User fills out PCA form and clicks submit
-		// Angular creates PluginExecutionRequestV2 object
+		t.Log("User fills out PCA form and clicks submit")
 		jobReq := models.PluginExecutionRequestV2{
 			PluginID: pcaPluginID,
 			Parameters: map[string]interface{}{
-				"n_components": 2,
+				"input_file":   "/tmp/dummy_pca_input.csv",
+				"columns_name": []interface{}{"sample1", "sample2"},
+				"n_components": float64(2),
 			},
 		}
 

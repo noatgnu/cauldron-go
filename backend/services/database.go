@@ -187,6 +187,7 @@ func (d *DatabaseService) autoMigrate() error {
 		&GitAuthConfig{},
 		&PluginDockerImage{},
 		&models.Job{},
+		&models.JobBatch{},
 		&models.PluginRegistry{},
 		&models.GelAnalysisSession{},
 	); err != nil {

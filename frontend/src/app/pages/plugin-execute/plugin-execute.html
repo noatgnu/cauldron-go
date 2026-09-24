@@ -11,118 +11,146 @@
     </div>
   } @else if (plugin()) {
     <mat-tab-group>
-      <mat-tab label="Execute">
+      <mat-tab label="Single Run">
         <div class="tab-content">
           <mat-card class="plugin-card">
-      <mat-card-header>
-        <mat-icon mat-card-avatar>{{ plugin()!.definition.plugin.icon || 'extension' }}</mat-icon>
-        <mat-card-title>
-          {{ plugin()!.definition.plugin.name }}
-          @if (hasCustomBinding()) {
-            <mat-icon class="binding-indicator" [matTooltip]="bindingTooltip()" color="accent">link</mat-icon>
-          }
-        </mat-card-title>
-        <mat-card-subtitle>
-          {{ plugin()!.definition.plugin.description }}
-        </mat-card-subtitle>
-      </mat-card-header>
+            <mat-card-header>
+              <mat-icon mat-card-avatar>{{ plugin()!.definition.plugin.icon || 'extension' }}</mat-icon>
+              <mat-card-title>
+                {{ plugin()!.definition.plugin.name }}
+                @if (hasCustomBinding()) {
+                  <mat-icon class="binding-indicator" [matTooltip]="bindingTooltip()" color="accent">link</mat-icon>
+                }
+              </mat-card-title>
+              <mat-card-subtitle>
+                {{ plugin()!.definition.plugin.description }}
+              </mat-card-subtitle>
+            </mat-card-header>
 
-      <app-environment-indicator
-        [python]="getRuntimeIndicator(plugin()!).python"
-        [r]="getRuntimeIndicator(plugin()!).r"
-        [direct]="getRuntimeIndicator(plugin()!).direct"
-        [pythonBound]="pythonBound()"
-        [rBound]="rBound()">
-      </app-environment-indicator>
+            <app-environment-indicator
+              [python]="getRuntimeIndicator(plugin()!).python"
+              [r]="getRuntimeIndicator(plugin()!).r"
+              [direct]="getRuntimeIndicator(plugin()!).direct"
+              [pythonBound]="pythonBound()"
+              [rBound]="rBound()">
+            </app-environment-indicator>
 
-      <mat-card-content>
-        @for (p of [plugin()!]; track p.definition.plugin.id) {
-          <app-dynamic-form
-            [plugin]="p"
-            [disabled]="executing()"
-            (formSubmit)="onExecute($event)">
-          </app-dynamic-form>
-        }
-      </mat-card-content>
+            <mat-card-content>
+              @for (p of [plugin()!]; track p.definition.plugin.id) {
+                <app-dynamic-form
+                  [plugin]="p"
+                  [disabled]="executing()"
+                  (formSubmit)="onExecute($event)">
+                </app-dynamic-form>
+              }
+            </mat-card-content>
 
-      <mat-card-actions>
-        @if (plugin()!.definition.example?.enabled) {
-          <button mat-button (click)="loadExample()" [disabled]="executing() || loading()">
-            Load Example
-          </button>
-        }
-        <button mat-button (click)="reset()" [disabled]="executing()">
-          Reset
-        </button>
-        <button mat-raised-button color="primary" (click)="dynamicForm?.submit()" [disabled]="executing() || loading()">
-          @if (executing()) {
-            <mat-spinner diameter="16"></mat-spinner>
-            Running...
-          } @else {
-            Run Analysis
-          }
-        </button>
-        @if (createdJobId()) {
-          <button mat-raised-button color="accent" (click)="viewJob()">
-            View Job
-          </button>
-        }
-      </mat-card-actions>
-    </mat-card>
+            <mat-card-actions>
+              @if (plugin()!.definition.example?.enabled) {
+                <button mat-button (click)="loadExample()" [disabled]="executing() || loading()">
+                  Load Example
+                </button>
+              }
+              <button mat-button (click)="reset()" [disabled]="executing()">
+                Reset
+              </button>
+              <button mat-raised-button color="primary" (click)="dynamicForm?.submit()" [disabled]="executing() || loading()">
+                @if (executing()) {
+                  <mat-spinner diameter="16"></mat-spinner>
+                  Running...
+                } @else {
+                  Run Analysis
+                }
+              </button>
+              @if (createdJobId()) {
+                <button mat-raised-button color="accent" (click)="viewJob()">
+                  View Job
+                </button>
+              }
+            </mat-card-actions>
+          </mat-card>
 
-    <mat-card class="info-card">
-      <mat-card-header>
-        <mat-card-title>Plugin Information</mat-card-title>
-      </mat-card-header>
-      <mat-card-content>
-        <div class="info-grid">
-          <div class="info-item">
-            <strong>Version:</strong>
-            <span>{{ plugin()!.definition.plugin.version }}</span>
-          </div>
-          @if (plugin()!.definition.plugin.author) {
-            <div class="info-item">
-              <strong>Author:</strong>
-              <span>{{ plugin()!.definition.plugin.author }}</span>
-            </div>
-          }
-          <div class="info-item">
-            <strong>Category:</strong>
-            <span>{{ plugin()!.definition.plugin.category }}</span>
-          </div>
-          <div class="info-item">
-            <strong>Runtime:</strong>
-            <span>{{ getRuntimeLabel(plugin()!) }}</span>
-          </div>
-          <div class="info-item">
-            <strong>Inputs:</strong>
-            <span>{{ plugin()!.definition.inputs.length }}</span>
-          </div>
-          <div class="info-item">
-            <strong>Outputs:</strong>
-            <span>{{ plugin()!.definition.outputs?.length || 0 }}</span>
-          </div>
-          <div class="info-item">
-            <strong>Install Source:</strong>
-            <span>{{ plugin()!.installSource | titlecase }}</span>
-          </div>
-          @if (plugin()!.installSource === 'remote' && plugin()!.commitHash) {
-            <div class="info-item full-width">
-              <strong>Commit Hash:</strong>
-              <span class="commit-hash">{{ plugin()!.commitHash }}</span>
-            </div>
-          }
-          @if (plugin()!.repository) {
-            <div class="info-item full-width">
-              <strong>Repository:</strong>
-              <span class="repo-text">{{ plugin()!.repository }}</span>
-            </div>
-          }
-        </div>
-      </mat-card-content>
-    </mat-card>
+          <mat-card class="info-card">
+            <mat-card-header>
+              <mat-card-title>Plugin Information</mat-card-title>
+            </mat-card-header>
+            <mat-card-content>
+              <div class="info-grid">
+                <div class="info-item">
+                  <strong>Version:</strong>
+                  <span>{{ plugin()!.definition.plugin.version }}</span>
+                </div>
+                @if (plugin()!.definition.plugin.author) {
+                  <div class="info-item">
+                    <strong>Author:</strong>
+                    <span>{{ plugin()!.definition.plugin.author }}</span>
+                  </div>
+                }
+                <div class="info-item">
+                  <strong>Category:</strong>
+                  <span>{{ plugin()!.definition.plugin.category }}</span>
+                </div>
+                <div class="info-item">
+                  <strong>Runtime:</strong>
+                  <span>{{ getRuntimeLabel(plugin()!) }}</span>
+                </div>
+                <div class="info-item">
+                  <strong>Inputs:</strong>
+                  <span>{{ plugin()!.definition.inputs.length }}</span>
+                </div>
+                <div class="info-item">
+                  <strong>Outputs:</strong>
+                  <span>{{ plugin()!.definition.outputs?.length || 0 }}</span>
+                </div>
+                <div class="info-item">
+                  <strong>Install Source:</strong>
+                  <span>{{ plugin()!.installSource | titlecase }}</span>
+                </div>
+                @if (plugin()!.installSource === 'remote' && plugin()!.commitHash) {
+                  <div class="info-item full-width">
+                    <strong>Commit Hash:</strong>
+                    <span class="commit-hash">{{ plugin()!.commitHash }}</span>
+                  </div>
+                }
+                @if (plugin()!.repository) {
+                  <div class="info-item full-width">
+                    <strong>Repository:</strong>
+                    <span class="repo-text">{{ plugin()!.repository }}</span>
+                  </div>
+                }
+              </div>
+            </mat-card-content>
+          </mat-card>
         </div>
       </mat-tab>
+
+      @if (hasFileInput()) {
+        <mat-tab label="Batch">
+          <div class="tab-content">
+            <mat-card class="plugin-card">
+              <mat-card-header>
+                <mat-icon mat-card-avatar>{{ plugin()!.definition.plugin.icon || 'extension' }}</mat-icon>
+                <mat-card-title>{{ plugin()!.definition.plugin.name }}</mat-card-title>
+                <mat-card-subtitle>{{ plugin()!.definition.plugin.description }}</mat-card-subtitle>
+              </mat-card-header>
+
+              <app-environment-indicator
+                [python]="getRuntimeIndicator(plugin()!).python"
+                [r]="getRuntimeIndicator(plugin()!).r"
+                [direct]="getRuntimeIndicator(plugin()!).direct"
+                [pythonBound]="pythonBound()"
+                [rBound]="rBound()">
+              </app-environment-indicator>
+
+              <mat-card-content>
+                @for (p of [plugin()!]; track p.definition.plugin.id) {
+                  <app-batch-job-builder [plugin]="p"></app-batch-job-builder>
+                }
+              </mat-card-content>
+            </mat-card>
+          </div>
+        </mat-tab>
+      }
 
       @if (plugin()!.definition.outputs && plugin()!.definition.outputs!.length > 0) {
         <mat-tab label="Output Files ({{ plugin()!.definition.outputs!.length }})">

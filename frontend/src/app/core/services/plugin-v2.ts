@@ -1,5 +1,5 @@
 import { Injectable, signal } from '@angular/core';
-import { GetPluginsV2, GetPluginV2, ExecutePluginV2, ReloadPluginsV2 } from '../../../../bindings/github.com/noatgnu/cauldron-go/app';
+import { GetPluginsV2, GetPluginV2, ExecutePluginV2, ExecutePluginBatchV2, ReloadPluginsV2 } from '../../../../bindings/github.com/noatgnu/cauldron-go/app';
 import * as models from '../../../../bindings/github.com/noatgnu/cauldron-go/backend/models/models';
 
 @Injectable({
@@ -43,6 +43,29 @@ export class PluginV2Service {
       parameters: convertedParameters
     });
     return ExecutePluginV2(request);
+  }
+
+  async executeBatch(pluginId: number, label: string, jobs: Record<string, any>[]): Promise<string> {
+    const plugin = await this.getPlugin(pluginId);
+    const convertedJobs = jobs.map(parameters => {
+      const converted = { ...parameters };
+      for (const input of plugin.definition.inputs) {
+        if (input.type === 'file' && converted[input.name]) {
+          const value = converted[input.name];
+          if (typeof value === 'string') {
+            converted[input.name] = value.replace(/\\/g, '/');
+          }
+        }
+      }
+      return converted;
+    });
+
+    const request = new models.PluginBatchExecutionRequestV2({
+      pluginId,
+      label,
+      jobs: convertedJobs
+    });
+    return ExecutePluginBatchV2(request);
   }
 
   async reloadPlugins(): Promise<void> {

@@ -74,6 +74,17 @@ func (f *FileService) OpenFileDialog(title string, filters []application.FileFil
 	return path, err
 }
 
+func (f *FileService) OpenMultipleFilesDialog(title string, filters []application.FileFilter) ([]string, error) {
+	if f.wailsApp == nil {
+		return nil, fmt.Errorf("wails app not initialized")
+	}
+	dialog := f.wailsApp.Dialog.OpenFile().SetTitle(title)
+	for _, filter := range filters {
+		dialog.AddFilter(filter.DisplayName, filter.Pattern)
+	}
+	return dialog.PromptForMultipleSelection()
+}
+
 func (f *FileService) OpenDirectoryDialog(title string) (string, error) {
 	if f.wailsApp == nil {
 		return "", fmt.Errorf("wails app not initialized")

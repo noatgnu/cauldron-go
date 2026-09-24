@@ -487,7 +487,7 @@ func TestCLIJobRun_Integration(t *testing.T) {
 		t.Fatalf("coercePluginParams error: %v", err)
 	}
 
-	jobID, err := executePluginJob(ctx.pluginExecutor, ctx.jobQueue, ctx.settings, plugin, params)
+	jobID, err := executePluginJob(ctx.pluginExecutor, ctx.jobQueue, ctx.settings, plugin, params, "")
 	if err != nil {
 		t.Fatalf("executePluginJob error: %v", err)
 	}

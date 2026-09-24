@@ -153,7 +153,7 @@ func (j *JobQueueService) CreateJob(jobType string, name string, command string,
 	return j.CreateJobWithParameters(jobType, name, command, args, make(map[string]interface{}), "", "")
 }
 
-func (j *JobQueueService) CreateJobWithEnvironments(jobType string, name string, command string, args []string, parameters map[string]interface{}, pluginVersion string, pluginCommitHash string, pythonPath string, pythonEnvType string, rPath string, rEnvType string) (string, error) {
+func (j *JobQueueService) createJob(jobType string, name string, command string, args []string, parameters map[string]interface{}, pluginVersion string, pluginCommitHash string, pythonPath string, pythonEnvType string, rPath string, rEnvType string, batchID string) (string, error) {
 	job := &models.Job{
 		ID:               uuid.New().String(),
 		Type:             jobType,
@@ -170,6 +170,7 @@ func (j *JobQueueService) CreateJobWithEnvironments(jobType string, name string,
 		TerminalOutput:   []string{},
 		PluginVersion:    pluginVersion,
 		PluginCommitHash: pluginCommitHash,
+		BatchID:          batchID,
 		CreatedAt:        time.Now(),
 	}
 
@@ -188,12 +189,15 @@ func (j *JobQueueService) CreateJobWithEnvironments(jobType string, name string,
 	return job.ID, nil
 }
 
-func (j *JobQueueService) CreateJobWithParameters(jobType string, name string, command string, args []string, parameters map[string]interface{}, pluginVersion string, pluginCommitHash string) (string, error) {
-	pythonPath := ""
-	pythonEnvType := ""
-	rPath := ""
-	rEnvType := ""
+func (j *JobQueueService) CreateJobWithEnvironments(jobType string, name string, command string, args []string, parameters map[string]interface{}, pluginVersion string, pluginCommitHash string, pythonPath string, pythonEnvType string, rPath string, rEnvType string) (string, error) {
+	return j.createJob(jobType, name, command, args, parameters, pluginVersion, pluginCommitHash, pythonPath, pythonEnvType, rPath, rEnvType, "")
+}
 
+func (j *JobQueueService) CreateJobWithEnvironmentsAndBatch(jobType string, name string, command string, args []string, parameters map[string]interface{}, pluginVersion string, pluginCommitHash string, pythonPath string, pythonEnvType string, rPath string, rEnvType string, batchID string) (string, error) {
+	return j.createJob(jobType, name, command, args, parameters, pluginVersion, pluginCommitHash, pythonPath, pythonEnvType, rPath, rEnvType, batchID)
+}
+
+func (j *JobQueueService) resolveEnvironments(command string) (pythonPath string, pythonEnvType string, rPath string, rEnvType string) {
 	if command == "python" {
 		pythonEnv, err := j.db.GetActivePythonEnvironment()
 		if err == nil && pythonEnv != nil {
@@ -220,13 +224,25 @@ func (j *JobQueueService) CreateJobWithParameters(jobType string, name string, c
 		}
 	}
 
+	return pythonPath, pythonEnvType, rPath, rEnvType
+}
+
+func (j *JobQueueService) CreateJobWithParameters(jobType string, name string, command string, args []string, parameters map[string]interface{}, pluginVersion string, pluginCommitHash string) (string, error) {
+	pythonPath, pythonEnvType, rPath, rEnvType := j.resolveEnvironments(command)
 	return j.CreateJobWithEnvironments(jobType, name, command, args, parameters, pluginVersion, pluginCommitHash, pythonPath, pythonEnvType, rPath, rEnvType)
+}
+
+func (j *JobQueueService) CreateJobWithParametersAndBatch(jobType string, name string, command string, args []string, parameters map[string]interface{}, pluginVersion string, pluginCommitHash string, batchID string) (string, error) {
+	pythonPath, pythonEnvType, rPath, rEnvType := j.resolveEnvironments(command)
+	return j.CreateJobWithEnvironmentsAndBatch(jobType, name, command, args, parameters, pluginVersion, pluginCommitHash, pythonPath, pythonEnvType, rPath, rEnvType, batchID)
 }
 
 func cloneJob(job *models.Job) *models.Job {
 	clone := *job
-	clone.Args = append(models.StringArray(nil), job.Args...)
-	clone.TerminalOutput = append(models.StringArray(nil), job.TerminalOutput...)
+	clone.Args = make(models.StringArray, len(job.Args))
+	copy(clone.Args, job.Args)
+	clone.TerminalOutput = make(models.StringArray, len(job.TerminalOutput))
+	copy(clone.TerminalOutput, job.TerminalOutput)
 	clone.Parameters = make(models.JSONMap, len(job.Parameters))
 	for k, v := range job.Parameters {
 		clone.Parameters[k] = v
@@ -824,6 +840,12 @@ func (j *JobQueueService) CompleteJob(id string, outputPath string) error {
 func (j *JobQueueService) GetJobsByStatus(status models.JobStatus) []*models.Job {
 	var jobs []*models.Job
 	j.db.GetDB().Where("status = ?", status).Order("created_at DESC").Find(&jobs)
+	return jobs
+}
+
+func (j *JobQueueService) GetJobsByBatchID(batchID string) []*models.Job {
+	var jobs []*models.Job
+	j.db.GetDB().Where("batch_id = ?", batchID).Order("created_at ASC").Find(&jobs)
 	return jobs
 }
 
