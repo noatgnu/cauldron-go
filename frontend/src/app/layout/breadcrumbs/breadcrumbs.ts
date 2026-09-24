@@ -4,6 +4,7 @@ import { Router, NavigationEnd, ActivatedRoute } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { filter } from 'rxjs/operators';
 import { PluginV2Service } from '../../core/services/plugin-v2';
+import { JobBatchService } from '../../core/services/job-batch';
 
 interface Breadcrumb {
   label: string;
@@ -30,6 +31,8 @@ export class Breadcrumbs implements OnInit {
     'settings': { label: 'Settings' },
     'jobs': { label: 'Jobs' },
     'job': { label: 'Jobs', listRoute: '/jobs' },
+    'job-batches': { label: 'Job Batches' },
+    'job-batch': { label: 'Job Batches', listRoute: '/job-batches' },
     'plugin': { label: 'Plugins', listRoute: '/plugin-list' },
     'plugin-list': { label: 'Plugin List' },
     'plugins': { label: 'Plugin Management' },
@@ -40,7 +43,8 @@ export class Breadcrumbs implements OnInit {
   constructor(
     private router: Router,
     private activatedRoute: ActivatedRoute,
-    private pluginService: PluginV2Service
+    private pluginService: PluginV2Service,
+    private jobBatchService: JobBatchService
   ) {}
 
   ngOnInit() {
@@ -116,6 +120,15 @@ export class Breadcrumbs implements OnInit {
 
     if (parentRoute === 'job' && this.isUUID(id)) {
       return `Job ${id.substring(0, 8)}...`;
+    }
+
+    if (parentRoute === 'job-batch' && this.isUUID(id)) {
+      try {
+        const batch = await this.jobBatchService.getBatch(id);
+        return batch.label;
+      } catch (err) {
+        return `Batch ${id.substring(0, 8)}...`;
+      }
     }
 
     return id;

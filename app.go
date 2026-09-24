@@ -36,6 +36,7 @@ type App struct {
 	settings               *services.SettingsService
 	fileService            *services.FileService
 	jobQueue               *services.JobQueueService
+	batchService           *services.BatchService
 	envService             *services.EnvironmentService
 	scriptExecutor         *services.ScriptExecutor
 	portableEnvService     *services.PortableEnvService
@@ -150,6 +151,7 @@ func (a *App) Initialize() {
 
 	log.Println("[App.Initialize] Initializing job queue...")
 	a.jobQueue = services.NewJobQueueServiceV3(db, a.wailsApp)
+	a.batchService = services.NewBatchServiceV3(db, a.jobQueue)
 	log.Println("[App.Initialize] Setting job queue runners...")
 
 	log.Println("[App.Initialize] Initializing script executor...")
@@ -325,6 +327,10 @@ func (a *App) DetectRPath() (string, error) {
 
 func (a *App) OpenFile(title string) (string, error) {
 	return a.fileService.OpenFileDialog(title, nil)
+}
+
+func (a *App) OpenMultipleFiles(title string) ([]string, error) {
+	return a.fileService.OpenMultipleFilesDialog(title, nil)
 }
 
 func (a *App) OpenDirectory(title string) (string, error) {
@@ -1376,7 +1382,7 @@ func (a *App) ExecutePluginV2(req models.PluginExecutionRequestV2) (string, erro
 	log.Printf("[ExecutePluginV2] Plugin loaded: %s [ID:%d] (%s), Environments: %v",
 		plugin.Definition.Plugin.Name, plugin.ID, plugin.Definition.Plugin.ID, plugin.Definition.Runtime.GetEnvironments())
 
-	jobID, err := executePluginJob(a.pluginExecutor, a.jobQueue, a.settings, plugin, req.Parameters)
+	jobID, err := executePluginJob(a.pluginExecutor, a.jobQueue, a.settings, plugin, req.Parameters, "")
 	if err != nil {
 		return "", err
 	}
@@ -1385,8 +1391,72 @@ func (a *App) ExecutePluginV2(req models.PluginExecutionRequestV2) (string, erro
 	return jobID, nil
 }
 
+// ExecutePluginBatchV2 creates one job per entry in req.Jobs, all tagged with a shared
+// JobBatch. Each entry is a fully-resolved parameter map, built by the frontend the same
+// way a single ExecutePluginV2 call's Parameters would be. A failure creating one job is
+// logged and skipped rather than aborting the rest of the batch.
+func (a *App) ExecutePluginBatchV2(req models.PluginBatchExecutionRequestV2) (string, error) {
+	if len(req.Jobs) == 0 {
+		return "", fmt.Errorf("no jobs provided for batch")
+	}
+
+	plugin, err := a.pluginLoaderV2.GetPlugin(req.PluginID)
+	if err != nil {
+		log.Printf("[ExecutePluginBatchV2] Failed to get plugin: %v", err)
+		return "", err
+	}
+
+	label := req.Label
+	if label == "" {
+		label = plugin.Definition.Plugin.Name
+	}
+
+	batch, err := a.batchService.CreateBatch(label, plugin.Definition.Plugin.ID, plugin.Definition.Plugin.Version, len(req.Jobs))
+	if err != nil {
+		return "", fmt.Errorf("failed to create batch: %w", err)
+	}
+
+	created := 0
+	var firstErr error
+	for i, jobParams := range req.Jobs {
+		if _, err := executePluginJob(a.pluginExecutor, a.jobQueue, a.settings, plugin, jobParams, batch.ID); err != nil {
+			log.Printf("[ExecutePluginBatchV2] Failed to create job %d in batch %s: %v", i, batch.ID, err)
+			if firstErr == nil {
+				firstErr = err
+			}
+			continue
+		}
+		created++
+	}
+
+	if created == 0 {
+		_ = a.batchService.DeleteBatch(batch.ID)
+		return "", fmt.Errorf("failed to create any jobs for batch: %w", firstErr)
+	}
+
+	log.Printf("[ExecutePluginBatchV2] Created batch %s with %d/%d jobs", batch.ID, created, len(req.Jobs))
+	return batch.ID, nil
+}
+
+func (a *App) GetJobBatch(id string) (*models.JobBatch, error) {
+	return a.batchService.GetBatch(id)
+}
+
+func (a *App) GetJobBatchStatus(id string) (*services.BatchStatus, error) {
+	return a.batchService.GetBatchStatus(id)
+}
+
+func (a *App) GetAllJobBatches(limit int, offset int) ([]*models.JobBatch, error) {
+	return a.batchService.GetAllBatches(limit, offset)
+}
+
+func (a *App) DeleteJobBatch(id string) error {
+	return a.batchService.DeleteBatch(id)
+}
+
 // executePluginJob validates, builds args, and enqueues a job; shared between App.ExecutePluginV2 (GUI) and the CLI's "job run" so both stay identical.
-func executePluginJob(pluginExecutor *services.PluginExecutor, jobQueue *services.JobQueueService, settings *services.SettingsService, plugin *models.PluginV2, parameters map[string]interface{}) (string, error) {
+// batchID is "" for a normal single-run job, or a JobBatch's ID when created as part of a batch.
+func executePluginJob(pluginExecutor *services.PluginExecutor, jobQueue *services.JobQueueService, settings *services.SettingsService, plugin *models.PluginV2, parameters map[string]interface{}, batchID string) (string, error) {
 	if err := pluginExecutor.ValidateParameters(plugin, parameters); err != nil {
 		return "", fmt.Errorf("parameter validation failed: %w", err)
 	}
@@ -1424,7 +1494,7 @@ func executePluginJob(pluginExecutor *services.PluginExecutor, jobQueue *service
 		runtimeTypeForJob = envs[0]
 	}
 
-	return jobQueue.CreateJobWithParameters(
+	return jobQueue.CreateJobWithParametersAndBatch(
 		plugin.Definition.Plugin.ID,
 		plugin.Definition.Plugin.Name,
 		runtimeTypeForJob,
@@ -1432,6 +1502,7 @@ func executePluginJob(pluginExecutor *services.PluginExecutor, jobQueue *service
 		params,
 		plugin.Definition.Plugin.Version,
 		plugin.CommitHash,
+		batchID,
 	)
 }
 

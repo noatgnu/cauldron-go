@@ -3,6 +3,8 @@ import { Home } from './home/home';
 import { Settings } from './pages/settings/settings';
 import { Jobs } from './pages/jobs/jobs';
 import { JobDetail } from './pages/job-detail/job-detail';
+import { JobBatches } from './pages/job-batches/job-batches';
+import { JobBatchDetail } from './pages/job-batch-detail/job-batch-detail';
 import { Plugins } from './pages/plugins/plugins';
 import { PluginList } from './pages/plugin-list/plugin-list';
 import { PluginExecute } from './pages/plugin-execute/plugin-execute';
@@ -27,6 +29,8 @@ export const routes: Routes = [
       { path: 'jobs', component: Jobs },
       { path: 'jobs/:id', component: JobDetail },
       { path: 'job/:id', component: JobDetail },
+      { path: 'job-batches', component: JobBatches },
+      { path: 'job-batch/:id', component: JobBatchDetail },
       { path: 'plugins', component: Plugins },
       { path: 'plugin-list', component: PluginList },
       { path: 'plugin-registry', component: PluginRegistry },

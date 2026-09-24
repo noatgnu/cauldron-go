@@ -164,21 +164,10 @@ func TestWailsJobLifecycle(t *testing.T) {
 	defer app.Shutdown()
 
 	t.Run("Job Lifecycle: Create, Get, Delete", func(t *testing.T) {
-		plugins := app.GetPluginsV2()
-		var testPluginID uint
-		for _, p := range plugins {
-			if p.Definition.Plugin.ID != "" {
-				testPluginID = p.ID
-				break
-			}
-		}
-
-		if testPluginID == 0 {
-			t.Skip("No plugins available for testing")
-		}
+		plugin := loadThrowawayTestPlugin(t, app, "job-lifecycle-test-plugin")
 
 		req := models.PluginExecutionRequestV2{
-			PluginID: testPluginID,
+			PluginID: plugin.ID,
 			Parameters: map[string]interface{}{
 				"test_param": "test_value",
 			},

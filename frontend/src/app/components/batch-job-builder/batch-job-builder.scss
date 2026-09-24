@@ -1,0 +1,93 @@
+:host {
+  display: block;
+  width: 100%;
+}
+
+.batch-builder {
+  width: 100%;
+}
+
+.form-section {
+  width: 100%;
+  margin-bottom: 24px;
+
+  h3 {
+    font-size: 16px;
+    font-weight: 500;
+    margin: 0 0 16px 0;
+    color: var(--on-surface);
+  }
+
+  .section-description {
+    margin: 0 0 16px 0;
+    font-size: 14px;
+    color: var(--on-surface-variant);
+    line-height: 1.5;
+  }
+}
+
+.param-field {
+  width: 260px;
+  margin-right: 16px;
+}
+
+.button-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.bulk-field-value {
+  display: inline-block;
+  min-width: 200px;
+  vertical-align: top;
+  margin-right: 16px;
+}
+
+.rows-table {
+  width: 100%;
+  font-size: 13px;
+
+  th {
+    font-weight: 500;
+    font-size: 12px;
+    color: var(--on-surface-variant);
+  }
+
+  td, th {
+    padding: 8px 12px;
+  }
+
+  tr.mat-mdc-row:hover {
+    background-color: var(--hover);
+  }
+
+  td.mat-column-actions {
+    width: 1%;
+    white-space: nowrap;
+  }
+
+  button {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+
+    mat-icon {
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+      line-height: 18px;
+    }
+  }
+}
+
+.empty-state {
+  color: var(--on-surface-variant);
+  font-size: 0.9em;
+  padding: 8px 0;
+}
+
+.submit-row {
+  display: flex;
+  justify-content: flex-end;
+}

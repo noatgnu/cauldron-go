@@ -767,7 +767,7 @@ func cliJobRun(args []string) error {
 			return fmt.Errorf("plugin %q: %w", spec.Plugin, err)
 		}
 
-		jobID, err := executePluginJob(ctx.pluginExecutor, ctx.jobQueue, ctx.settings, plugin, coerced)
+		jobID, err := executePluginJob(ctx.pluginExecutor, ctx.jobQueue, ctx.settings, plugin, coerced, "")
 		if err != nil {
 			return fmt.Errorf("failed to start job for plugin %q: %w", spec.Plugin, err)
 		}

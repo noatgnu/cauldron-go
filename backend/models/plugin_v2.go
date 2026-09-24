@@ -270,3 +270,9 @@ type PluginExecutionRequestV2 struct {
 	PluginID   uint                   `json:"pluginId"`
 	Parameters map[string]interface{} `json:"parameters"`
 }
+
+type PluginBatchExecutionRequestV2 struct {
+	PluginID uint                     `json:"pluginId"`
+	Label    string                   `json:"label"`
+	Jobs     []map[string]interface{} `json:"jobs"`
+}

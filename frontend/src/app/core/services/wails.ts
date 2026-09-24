@@ -15,6 +15,8 @@ declare global {
 
 export type Config = models.Config;
 export type Job = models.Job;
+export type JobBatch = models.JobBatch;
+export type BatchStatus = services.BatchStatus;
 export type PythonEnvironment = services.PythonEnvironment;
 export type REnvironment = services.REnvironment;
 export type DataFilePreview = services.DataFilePreview;
@@ -270,6 +272,12 @@ export class Wails {
     return this.openFile(title);
   }
 
+  async openMultipleFilesDialog(title: string): Promise<string[]> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.OpenMultipleFiles(title);
+  }
+
   async openDirectoryDialog(title: string): Promise<string> {
     if (!this.isWails) throw new Error('Wails not available');
     await this.waitForBackend();
@@ -384,6 +392,35 @@ export class Wails {
     if (!this.isWails) throw new Error('Wails not available');
     await this.waitForBackend();
     return WailsApp.RerunJob(jobID, useSameEnvironment, pythonEnvPath, rEnvPath);
+  }
+
+  async getAllJobBatches(limit: number, offset: number): Promise<JobBatch[]> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    const result = await WailsApp.GetAllJobBatches(limit, offset);
+    return (result || []).filter((batch): batch is JobBatch => batch !== null);
+  }
+
+  async getJobBatch(id: string): Promise<JobBatch> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    const result = await WailsApp.GetJobBatch(id);
+    if (!result) throw new Error(`Batch not found: ${id}`);
+    return result;
+  }
+
+  async getJobBatchStatus(id: string): Promise<BatchStatus> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    const result = await WailsApp.GetJobBatchStatus(id);
+    if (!result) throw new Error(`Batch not found: ${id}`);
+    return result;
+  }
+
+  async deleteJobBatch(id: string): Promise<void> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.DeleteJobBatch(id);
   }
 
   async getPythonVersion(): Promise<string> {

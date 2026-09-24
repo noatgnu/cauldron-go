@@ -1,0 +1,10 @@
+<h2 mat-dialog-title>{{ data.plugin.definition.plugin.name }}</h2>
+
+<mat-dialog-content>
+  <app-dynamic-form [plugin]="data.plugin" (formSubmit)="onFormSubmit($event)"></app-dynamic-form>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button class="cancel-btn" mat-button type="button" (click)="cancel()">Cancel</button>
+  <button class="save-btn" mat-raised-button color="primary" type="button" (click)="save()">Save</button>
+</mat-dialog-actions>
