@@ -446,6 +446,45 @@ func TestCLIJobRun_UsageErrors(t *testing.T) {
 	}
 }
 
+func TestCLIJobRun_BatchRequiresFile(t *testing.T) {
+	err := cliJobRun([]string{"--batch", "my-batch", "--param", "x=1", "cv-plot"})
+	if err == nil {
+		t.Fatal("expected error when --batch is used without --file, got nil")
+	}
+	if !strings.Contains(err.Error(), "--batch requires --file") {
+		t.Errorf("expected a --batch/--file hint in the error, got: %v", err)
+	}
+}
+
+func TestCLIJobRun_BatchMismatchedPlugins(t *testing.T) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("os.Getwd error: %v", err)
+	}
+	t.Setenv("CAULDRON_PLUGINS_DIR", filepath.Join(cwd, "plugins"))
+
+	specs := []jobSpec{
+		{Plugin: "cv-plot", Params: map[string]interface{}{}},
+		{Plugin: "pca-analysis", Params: map[string]interface{}{}},
+	}
+	data, err := json.Marshal(specs)
+	if err != nil {
+		t.Fatalf("json.Marshal error: %v", err)
+	}
+	specPath := filepath.Join(t.TempDir(), "specs.json")
+	if err := os.WriteFile(specPath, data, 0644); err != nil {
+		t.Fatalf("os.WriteFile error: %v", err)
+	}
+
+	err = cliJobRun([]string{"--file", specPath, "--batch", "mixed-batch"})
+	if err == nil {
+		t.Fatal("expected error for mismatched plugins in a batch, got nil")
+	}
+	if !strings.Contains(err.Error(), "same plugin") {
+		t.Errorf("expected a same-plugin hint in the error, got: %v", err)
+	}
+}
+
 func TestCLIJobList(t *testing.T) {
 	if err := cliJobList(); err != nil {
 		t.Fatalf("cliJobList error: %v", err)
@@ -506,6 +545,78 @@ func TestCLIJobRun_Integration(t *testing.T) {
 
 	if err := cliJobStatus([]string{jobID}); err != nil {
 		t.Errorf("cliJobStatus error: %v", err)
+	}
+}
+
+// TestCLIJobRun_BatchIntegration exercises the --batch path's underlying pieces end to end:
+// creating a JobBatch, running several jobs tagged with its id through the same executePluginJob
+// helper the CLI uses, and confirming BatchService derives the right aggregate counts.
+func TestCLIJobRun_BatchIntegration(t *testing.T) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("os.Getwd error: %v", err)
+	}
+
+	ctx, err := newCLIContextWithPluginsDir(filepath.Join(cwd, "plugins"))
+	if err != nil {
+		t.Fatalf("newCLIContextWithPluginsDir error: %v", err)
+	}
+	defer ctx.close()
+
+	plugin, err := findPlugin(ctx.pluginLoaderV2, "cv-plot")
+	if err != nil {
+		t.Fatalf("findPlugin error: %v", err)
+	}
+
+	baseParams := map[string]interface{}{
+		"annotation_file":     filepath.Join(cwd, "examples", "diann", "annotation.txt"),
+		"log_file_path":       filepath.Join(cwd, "examples", "diann", "Reports.log.txt"),
+		"report_pr_file_path": filepath.Join(cwd, "examples", "diann", "Reports.pr_matrix.tsv"),
+		"report_pg_file_path": filepath.Join(cwd, "examples", "diann", "Reports.pg_matrix.tsv"),
+		"intensity_col":       "Intensity",
+	}
+
+	batch, err := ctx.batchService.CreateBatch("cli-batch-integration", plugin.Definition.Plugin.ID, plugin.Definition.Plugin.Version, 2)
+	if err != nil {
+		t.Fatalf("CreateBatch error: %v", err)
+	}
+	defer ctx.batchService.DeleteBatch(batch.ID)
+
+	var jobIDs []string
+	for i := 0; i < 2; i++ {
+		params, err := coercePluginParams(plugin, baseParams)
+		if err != nil {
+			t.Fatalf("coercePluginParams error: %v", err)
+		}
+		jobID, err := executePluginJob(ctx.pluginExecutor, ctx.jobQueue, ctx.settings, plugin, params, batch.ID)
+		if err != nil {
+			t.Fatalf("executePluginJob error: %v", err)
+		}
+		jobIDs = append(jobIDs, jobID)
+	}
+
+	for _, jobID := range jobIDs {
+		job, err := waitForJob(ctx, jobID, 300*time.Second)
+		if err != nil {
+			t.Fatalf("waitForJob error: %v", err)
+		}
+		if job.OutputPath != "" {
+			defer os.RemoveAll(job.OutputPath)
+		}
+		if job.Status != models.JobStatusCompleted {
+			t.Errorf("expected job %s to complete, got status=%s error=%q", jobID, job.Status, job.Error)
+		}
+	}
+
+	status, err := ctx.batchService.GetBatchStatus(batch.ID)
+	if err != nil {
+		t.Fatalf("GetBatchStatus error: %v", err)
+	}
+	if status.TotalJobs != 2 {
+		t.Errorf("expected TotalJobs=2, got %d", status.TotalJobs)
+	}
+	if status.CompletedCount != 2 {
+		t.Errorf("expected CompletedCount=2, got %d (failed=%d)", status.CompletedCount, status.FailedCount)
 	}
 }
 

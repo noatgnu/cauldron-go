@@ -127,6 +127,7 @@ type cliContext struct {
 	pluginExecutor     *services.PluginExecutor
 	jobQueue           *services.JobQueueService
 	backupService      *services.BackupService
+	batchService       *services.BatchService
 }
 
 // close shuts down the job queue (killing any in-flight subprocess first, same as App.Shutdown) before closing the database.
@@ -225,6 +226,7 @@ func newCLIContextWithPluginsDir(pluginsDir string) (*cliContext, error) {
 		pluginExecutor:     pluginExecutor,
 		jobQueue:           jobQueue,
 		backupService:      services.NewBackupService(db),
+		batchService:       services.NewBatchServiceV3(db, jobQueue),
 	}, nil
 }
 
@@ -685,7 +687,7 @@ func (s *stringSliceFlag) Set(v string) error {
 
 func cliJob(args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("usage: cauldron job run [--param key=value]... <plugin-id> | cauldron job run --file <path> | cauldron job list | cauldron job status <job-id>")
+		return fmt.Errorf("usage: cauldron job run [--param key=value]... <plugin-id> | cauldron job run --file <path> [--batch <label>] | cauldron job list | cauldron job status <job-id>")
 	}
 
 	switch args[0] {
@@ -706,9 +708,14 @@ func cliJobRun(args []string) error {
 	fs.Var(&paramFlags, "param", "a key=value parameter (repeatable); coerced to the plugin input's declared type")
 	paramsJSON := fs.String("params-json", "", "parameters as a raw JSON object")
 	file := fs.String("file", "", "path to a JSON array of {\"plugin\":..., \"params\":{...}} job specs, for batch processing")
+	batchLabel := fs.String("batch", "", "group the job specs from --file into a trackable JobBatch with this label, visible in the GUI's Job Batches page (requires --file; every spec must target the same plugin)")
 	timeout := fs.Duration("timeout", 30*time.Minute, "max time to wait for each job to finish")
 	if err := fs.Parse(args); err != nil {
 		return err
+	}
+
+	if *batchLabel != "" && *file == "" {
+		return fmt.Errorf("--batch requires --file (a batch groups multiple job specs from a file)")
 	}
 
 	var specs []jobSpec
@@ -755,24 +762,78 @@ func cliJobRun(args []string) error {
 	}
 	defer ctx.close()
 
-	var jobIDs []string
-	for _, spec := range specs {
-		plugin, err := findPlugin(ctx.pluginLoaderV2, spec.Plugin)
+	pluginCache := map[string]*models.PluginV2{}
+	resolvePlugin := func(ref string) (*models.PluginV2, error) {
+		if p, ok := pluginCache[ref]; ok {
+			return p, nil
+		}
+		p, err := findPlugin(ctx.pluginLoaderV2, ref)
 		if err != nil {
+			return nil, err
+		}
+		pluginCache[ref] = p
+		return p, nil
+	}
+
+	var batchID string
+	if *batchLabel != "" {
+		firstPlugin, err := resolvePlugin(specs[0].Plugin)
+		if err != nil {
+			return fmt.Errorf("plugin %q: %w", specs[0].Plugin, err)
+		}
+		for _, spec := range specs[1:] {
+			p, err := resolvePlugin(spec.Plugin)
+			if err != nil {
+				return fmt.Errorf("plugin %q: %w", spec.Plugin, err)
+			}
+			if p.Definition.Plugin.ID != firstPlugin.Definition.Plugin.ID {
+				return fmt.Errorf("--batch requires every job spec to target the same plugin, got %q and %q", firstPlugin.Definition.Plugin.ID, p.Definition.Plugin.ID)
+			}
+		}
+
+		batch, err := ctx.batchService.CreateBatch(*batchLabel, firstPlugin.Definition.Plugin.ID, firstPlugin.Definition.Plugin.Version, len(specs))
+		if err != nil {
+			return fmt.Errorf("failed to create batch: %w", err)
+		}
+		batchID = batch.ID
+		fmt.Printf("Created batch %s (%s)\n", batch.ID, *batchLabel)
+	}
+
+	var jobIDs []string
+	for i, spec := range specs {
+		plugin, err := resolvePlugin(spec.Plugin)
+		if err != nil {
+			if batchID != "" {
+				fmt.Fprintf(os.Stderr, "  job %d: plugin %q: %v\n", i, spec.Plugin, err)
+				continue
+			}
 			return fmt.Errorf("plugin %q: %w", spec.Plugin, err)
 		}
 
 		coerced, err := coercePluginParams(plugin, spec.Params)
 		if err != nil {
+			if batchID != "" {
+				fmt.Fprintf(os.Stderr, "  job %d: plugin %q: %v\n", i, spec.Plugin, err)
+				continue
+			}
 			return fmt.Errorf("plugin %q: %w", spec.Plugin, err)
 		}
 
-		jobID, err := executePluginJob(ctx.pluginExecutor, ctx.jobQueue, ctx.settings, plugin, coerced, "")
+		jobID, err := executePluginJob(ctx.pluginExecutor, ctx.jobQueue, ctx.settings, plugin, coerced, batchID)
 		if err != nil {
+			if batchID != "" {
+				fmt.Fprintf(os.Stderr, "  job %d: failed to start job for plugin %q: %v\n", i, spec.Plugin, err)
+				continue
+			}
 			return fmt.Errorf("failed to start job for plugin %q: %w", spec.Plugin, err)
 		}
 		fmt.Printf("Queued job %s for plugin %s (%s)\n", jobID, plugin.Definition.Plugin.ID, plugin.Definition.Plugin.Name)
 		jobIDs = append(jobIDs, jobID)
+	}
+
+	if batchID != "" && len(jobIDs) == 0 {
+		_ = ctx.batchService.DeleteBatch(batchID)
+		return fmt.Errorf("failed to create any jobs for batch %q", *batchLabel)
 	}
 
 	failed := 0
@@ -794,6 +855,10 @@ func cliJobRun(args []string) error {
 			}
 			failed++
 		}
+	}
+
+	if batchID != "" {
+		fmt.Printf("Batch %s: %d/%d job(s) completed successfully\n", batchID, len(jobIDs)-failed, len(jobIDs))
 	}
 
 	if failed > 0 {
