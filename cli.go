@@ -175,7 +175,7 @@ func newCLIContextWithPluginsDir(pluginsDir string) (*cliContext, error) {
 	pluginExecutor := services.NewPluginExecutor()
 
 	jobQueue := services.NewJobQueueServiceV3(db, nil)
-	scriptExecutor := services.NewScriptExecutor(settings, db)
+	scriptExecutor := services.NewScriptExecutor(settings, db, appVersion)
 	scriptExecutor.SetUpdateCallback(func(jobID string, update models.Job) {
 		job, err := jobQueue.GetJob(jobID)
 		if err != nil {

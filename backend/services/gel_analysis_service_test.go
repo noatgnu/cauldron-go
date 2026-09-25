@@ -21,7 +21,7 @@ func newTestGelAnalysisService(t *testing.T) (*GelAnalysisService, *DatabaseServ
 	db := createTestDB(t)
 	ctx := context.WithValue(context.Background(), "wails-test", true)
 	settings := NewSettingsService(ctx, db)
-	scriptExecutor := NewScriptExecutor(settings, db)
+	scriptExecutor := NewScriptExecutor(settings, db, "test")
 	progress := NewProgressNotifier(context.Background())
 	envService := NewEnvironmentService(ctx, db, settings, progress)
 	return NewGelAnalysisService(db, scriptExecutor, progress, envService, "v0.0.0-test"), db

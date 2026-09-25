@@ -16,8 +16,9 @@ import (
 )
 
 type DatabaseService struct {
-	ctx context.Context
-	db  *gorm.DB
+	ctx     context.Context
+	db      *gorm.DB
+	dataDir string
 }
 
 type Setting struct {
@@ -161,7 +162,8 @@ func newDatabaseServiceFromPath(dbDir string) (*DatabaseService, error) {
 	log.Println("[Database] Connection pool configured")
 
 	service := &DatabaseService{
-		db: db,
+		db:      db,
+		dataDir: dbDir,
 	}
 
 	log.Println("[Database] Running auto-migration...")
@@ -203,6 +205,10 @@ func (d *DatabaseService) autoMigrate() error {
 
 func (d *DatabaseService) GetDB() *gorm.DB {
 	return d.db
+}
+
+func (d *DatabaseService) GetDataDir() string {
+	return d.dataDir
 }
 
 func (d *DatabaseService) Close() error {

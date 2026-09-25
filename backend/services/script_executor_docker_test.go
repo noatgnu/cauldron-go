@@ -73,7 +73,7 @@ func loadDockerTestPlugin(t *testing.T, yamlContent, pluginID string) (*ScriptEx
 
 	ctx := context.WithValue(context.Background(), "wails-test", true)
 	settings := NewSettingsService(ctx, db)
-	executor := NewScriptExecutor(settings, db)
+	executor := NewScriptExecutor(settings, db, "test")
 	executor.SetPluginLoader(loader)
 
 	plugins := loader.GetAllPlugins()

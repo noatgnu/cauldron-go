@@ -492,13 +492,14 @@ func (j *JobQueueService) processJob(job *models.Job) {
 		}
 
 		config := ScriptConfig{
-			PluginID:     pluginID,
-			Type:         plugin.Definition.Plugin.ID,
-			Environments: plugin.Definition.Runtime.GetEnvironments(),
-			ScriptName:   getScriptName(plugin),
-			Args:         job.Args[1:],
-			OutputDir:    outputDir,
-			FolderPath:   plugin.FolderPath,
+			PluginID:      pluginID,
+			Type:          plugin.Definition.Plugin.ID,
+			PluginVersion: plugin.Definition.Plugin.Version,
+			Environments:  plugin.Definition.Runtime.GetEnvironments(),
+			ScriptName:    getScriptName(plugin),
+			Args:          job.Args[1:],
+			OutputDir:     outputDir,
+			FolderPath:    plugin.FolderPath,
 		}
 
 		log.Printf("[processJob] Created ScriptConfig with Type='%s' for plugin binding lookup", config.Type)

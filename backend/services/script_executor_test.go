@@ -12,7 +12,7 @@ func createTestScriptExecutor(t *testing.T) (*ScriptExecutor, *DatabaseService) 
 	db := createTestDB(t)
 	ctx := context.WithValue(context.Background(), "wails-test", true)
 	settings := NewSettingsService(ctx, db)
-	return NewScriptExecutor(settings, db), db
+	return NewScriptExecutor(settings, db, "test"), db
 }
 
 func createFakeExecutable(t *testing.T, name string) string {
@@ -157,7 +157,7 @@ func TestPrepareDockerEnv_ExcludesHostEnvironment(t *testing.T) {
 	const hostOnlyVar = "CAULDRON_TEST_HOST_ONLY_VAR"
 	t.Setenv(hostOnlyVar, "should-not-leak-into-container")
 
-	env := executor.prepareDockerEnv(0)
+	env := executor.prepareDockerEnv(ScriptConfig{PluginID: 0})
 
 	for _, e := range env {
 		if strings.HasPrefix(e, hostOnlyVar+"=") {
@@ -176,13 +176,89 @@ func TestPrepareDockerEnv_IncludesConfiguredCustomVars(t *testing.T) {
 		t.Fatalf("failed to save plugin-specific custom env var: %v", err)
 	}
 
-	env := executor.prepareDockerEnv(42)
+	env := executor.prepareDockerEnv(ScriptConfig{PluginID: 42})
 
 	if !containsEnvVar(env, "GLOBAL_VAR=global-value") {
 		t.Errorf("expected prepareDockerEnv to include the configured global var, got: %v", env)
 	}
 	if !containsEnvVar(env, "PLUGIN_VAR=plugin-value") {
 		t.Errorf("expected prepareDockerEnv to include the configured plugin-specific var, got: %v", env)
+	}
+}
+
+func TestPrepareEnv_IncludesCauldronPathVars(t *testing.T) {
+	executor, _ := createTestScriptExecutor(t)
+
+	pluginDir := filepath.Join(t.TempDir(), "plugins", "my-plugin")
+	if err := os.MkdirAll(pluginDir, 0755); err != nil {
+		t.Fatalf("failed to create plugin dir: %v", err)
+	}
+
+	config := ScriptConfig{
+		PluginID:      7,
+		Type:          "my-plugin",
+		PluginVersion: "2.3.4",
+		FolderPath:    pluginDir,
+	}
+
+	env := executor.prepareEnv(config)
+
+	if !containsEnvVar(env, "CAULDRON_VERSION=test") {
+		t.Errorf("expected CAULDRON_VERSION=test, got: %v", env)
+	}
+	if !containsEnvVar(env, "CAULDRON_PLUGINS_DIR="+filepath.Dir(pluginDir)) {
+		t.Errorf("expected CAULDRON_PLUGINS_DIR=%s, got: %v", filepath.Dir(pluginDir), env)
+	}
+	if !containsEnvVar(env, "CAULDRON_PLUGIN_DIR="+pluginDir) {
+		t.Errorf("expected CAULDRON_PLUGIN_DIR=%s, got: %v", pluginDir, env)
+	}
+	if !containsEnvVar(env, "CAULDRON_PLUGIN_ID=my-plugin") {
+		t.Errorf("expected CAULDRON_PLUGIN_ID=my-plugin, got: %v", env)
+	}
+	if !containsEnvVar(env, "CAULDRON_PLUGIN_VERSION=2.3.4") {
+		t.Errorf("expected CAULDRON_PLUGIN_VERSION=2.3.4, got: %v", env)
+	}
+
+	hasAppDataDir := false
+	for _, e := range env {
+		if strings.HasPrefix(e, "CAULDRON_APP_DATA_DIR=") {
+			hasAppDataDir = true
+			break
+		}
+	}
+	if !hasAppDataDir {
+		t.Errorf("expected a CAULDRON_APP_DATA_DIR entry, got: %v", env)
+	}
+}
+
+func TestPrepareDockerEnv_OmitsHostPaths(t *testing.T) {
+	executor, _ := createTestScriptExecutor(t)
+
+	config := ScriptConfig{
+		PluginID:      7,
+		Type:          "my-plugin",
+		PluginVersion: "2.3.4",
+		FolderPath:    filepath.Join(t.TempDir(), "plugins", "my-plugin"),
+	}
+
+	env := executor.prepareDockerEnv(config)
+
+	if !containsEnvVar(env, "CAULDRON_VERSION=test") {
+		t.Errorf("expected CAULDRON_VERSION=test, got: %v", env)
+	}
+	if !containsEnvVar(env, "CAULDRON_PLUGIN_ID=my-plugin") {
+		t.Errorf("expected CAULDRON_PLUGIN_ID=my-plugin, got: %v", env)
+	}
+	if !containsEnvVar(env, "CAULDRON_PLUGIN_VERSION=2.3.4") {
+		t.Errorf("expected CAULDRON_PLUGIN_VERSION=2.3.4, got: %v", env)
+	}
+
+	for _, e := range env {
+		if strings.HasPrefix(e, "CAULDRON_APP_DATA_DIR=") ||
+			strings.HasPrefix(e, "CAULDRON_PLUGINS_DIR=") ||
+			strings.HasPrefix(e, "CAULDRON_PLUGIN_DIR=") {
+			t.Errorf("expected prepareDockerEnv to omit host path vars, but found: %q", e)
+		}
 	}
 }
 

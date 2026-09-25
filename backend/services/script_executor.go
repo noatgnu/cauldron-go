@@ -20,6 +20,7 @@ import (
 type ScriptExecutor struct {
 	settingsService *SettingsService
 	db              *DatabaseService
+	appVersion      string
 	pluginLoader    *PluginLoaderV2
 	runningJobs     map[string]*exec.Cmd
 	mu              sync.RWMutex
@@ -27,10 +28,11 @@ type ScriptExecutor struct {
 	outputCallback  func(string, string)
 }
 
-func NewScriptExecutor(settingsService *SettingsService, db *DatabaseService) *ScriptExecutor {
+func NewScriptExecutor(settingsService *SettingsService, db *DatabaseService, appVersion string) *ScriptExecutor {
 	return &ScriptExecutor{
 		settingsService: settingsService,
 		db:              db,
+		appVersion:      appVersion,
 		runningJobs:     make(map[string]*exec.Cmd),
 	}
 }
@@ -47,10 +49,9 @@ func (s *ScriptExecutor) SetOutputCallback(callback func(string, string)) {
 	s.outputCallback = callback
 }
 
-func (s *ScriptExecutor) prepareEnv(pluginID uint) []string {
+func (s *ScriptExecutor) prepareEnv(config ScriptConfig) []string {
 	env := os.Environ()
 
-	// 1. Load global custom env vars (pluginID 0)
 	globals, err := s.db.GetGlobalCustomEnvVars()
 	if err == nil {
 		for _, v := range globals {
@@ -58,9 +59,8 @@ func (s *ScriptExecutor) prepareEnv(pluginID uint) []string {
 		}
 	}
 
-	// 2. Load plugin-specific custom env vars (overrides global)
-	if pluginID != 0 {
-		locals, err := s.db.GetCustomEnvVars(pluginID)
+	if config.PluginID != 0 {
+		locals, err := s.db.GetCustomEnvVars(config.PluginID)
 		if err == nil {
 			for _, v := range locals {
 				env = append(env, fmt.Sprintf("%s=%s", v.Key, v.Value))
@@ -68,10 +68,19 @@ func (s *ScriptExecutor) prepareEnv(pluginID uint) []string {
 		}
 	}
 
+	env = append(env, fmt.Sprintf("CAULDRON_VERSION=%s", s.appVersion))
+	env = append(env, fmt.Sprintf("CAULDRON_APP_DATA_DIR=%s", s.db.GetDataDir()))
+	if config.FolderPath != "" {
+		env = append(env, fmt.Sprintf("CAULDRON_PLUGINS_DIR=%s", filepath.Dir(config.FolderPath)))
+		env = append(env, fmt.Sprintf("CAULDRON_PLUGIN_DIR=%s", config.FolderPath))
+	}
+	env = append(env, fmt.Sprintf("CAULDRON_PLUGIN_ID=%s", config.Type))
+	env = append(env, fmt.Sprintf("CAULDRON_PLUGIN_VERSION=%s", config.PluginVersion))
+
 	return env
 }
 
-func (s *ScriptExecutor) prepareDockerEnv(pluginID uint) []string {
+func (s *ScriptExecutor) prepareDockerEnv(config ScriptConfig) []string {
 	var env []string
 
 	globals, err := s.db.GetGlobalCustomEnvVars()
@@ -81,8 +90,8 @@ func (s *ScriptExecutor) prepareDockerEnv(pluginID uint) []string {
 		}
 	}
 
-	if pluginID != 0 {
-		locals, err := s.db.GetCustomEnvVars(pluginID)
+	if config.PluginID != 0 {
+		locals, err := s.db.GetCustomEnvVars(config.PluginID)
 		if err == nil {
 			for _, v := range locals {
 				env = append(env, fmt.Sprintf("%s=%s", v.Key, v.Value))
@@ -90,17 +99,22 @@ func (s *ScriptExecutor) prepareDockerEnv(pluginID uint) []string {
 		}
 	}
 
+	env = append(env, fmt.Sprintf("CAULDRON_VERSION=%s", s.appVersion))
+	env = append(env, fmt.Sprintf("CAULDRON_PLUGIN_ID=%s", config.Type))
+	env = append(env, fmt.Sprintf("CAULDRON_PLUGIN_VERSION=%s", config.PluginVersion))
+
 	return env
 }
 
 type ScriptConfig struct {
-	PluginID     uint
-	Type         string
-	Environments []string
-	ScriptName   string
-	Args         []string
-	OutputDir    string
-	FolderPath   string
+	PluginID      uint
+	Type          string
+	PluginVersion string
+	Environments  []string
+	ScriptName    string
+	Args          []string
+	OutputDir     string
+	FolderPath    string
 }
 
 func (s *ScriptExecutor) ExecutePythonScript(ctx context.Context, jobID string, config ScriptConfig) error {
@@ -176,7 +190,7 @@ func (s *ScriptExecutor) ExecutePythonScript(ctx context.Context, jobID string, 
 	log.Printf("[ExecutePythonScript] Working directory: %s", cmd.Dir)
 	log.Printf("[ExecutePythonScript] Script name: %s", config.ScriptName)
 
-	env := s.prepareEnv(config.PluginID)
+	env := s.prepareEnv(config)
 	env = append(env, "PYTHONUNBUFFERED=1")
 
 	hasR := false
@@ -324,7 +338,7 @@ source('%s')
 		hideConsoleWindow(cmd)
 		setProcessGroup(cmd)
 
-		env := s.prepareEnv(config.PluginID)
+		env := s.prepareEnv(config)
 		env = append(env, "R_DEFAULT_DEVICE=null")
 		env = append(env, fmt.Sprintf("RENV_PROJECT=%s", renvProjectPath))
 		cmd.Env = env
@@ -338,7 +352,7 @@ source('%s')
 		hideConsoleWindow(cmd)
 		setProcessGroup(cmd)
 
-		env := s.prepareEnv(config.PluginID)
+		env := s.prepareEnv(config)
 		env = append(env, "R_DEFAULT_DEVICE=null")
 		cmd.Env = env
 	}
@@ -383,7 +397,7 @@ func (s *ScriptExecutor) ExecuteDirectScript(ctx context.Context, jobID string, 
 
 	cmd.Dir = pluginDir
 
-	env := s.prepareEnv(config.PluginID)
+	env := s.prepareEnv(config)
 	cmd.Env = env
 
 	envInfo := fmt.Sprintf("Direct execution: %s", executablePath)
@@ -459,7 +473,7 @@ func (s *ScriptExecutor) ExecuteDockerScript(ctx context.Context, jobID string, 
 
 	log.Printf("[ExecuteDockerScript] Volume mounts: /output <- %s", outputDir)
 
-	env := s.prepareDockerEnv(config.PluginID)
+	env := s.prepareDockerEnv(config)
 	for _, e := range env {
 		parts := strings.SplitN(e, "=", 2)
 		if len(parts) == 2 && parts[0] != "" && !strings.HasPrefix(parts[0], "=") {

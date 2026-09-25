@@ -155,7 +155,7 @@ func (a *App) Initialize() {
 	log.Println("[App.Initialize] Setting job queue runners...")
 
 	log.Println("[App.Initialize] Initializing script executor...")
-	a.scriptExecutor = services.NewScriptExecutor(a.settings, a.db)
+	a.scriptExecutor = services.NewScriptExecutor(a.settings, a.db, a.appVersion)
 	a.gelAnalysisService = services.NewGelAnalysisService(a.db, a.scriptExecutor, services.NewProgressNotifierV3(a.wailsApp), a.envService, a.appVersion)
 	a.stagedUploadService, err = services.NewStagedUploadService(userDataPath, services.DefaultStagedUploadTTL)
 	if err != nil {

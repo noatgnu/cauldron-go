@@ -74,7 +74,7 @@ func TestProcessJobWithNilWailsApp(t *testing.T) {
 	defer jobQueue.Shutdown()
 
 	settingsService := newSettingsServiceInternal(db)
-	scriptExecutor := NewScriptExecutor(settingsService, db)
+	scriptExecutor := NewScriptExecutor(settingsService, db, "test")
 	jobQueue.SetScriptExecutor(scriptExecutor)
 
 	jobID, err := jobQueue.CreateJob("test", "Test Job", "", []string{})
@@ -110,7 +110,7 @@ func TestProcessPluginJobWithContext(t *testing.T) {
 	defer jobQueue.Shutdown()
 
 	settingsService := newSettingsServiceInternal(db)
-	scriptExecutor := NewScriptExecutor(settingsService, db)
+	scriptExecutor := NewScriptExecutor(settingsService, db, "test")
 	jobQueue.SetScriptExecutor(scriptExecutor)
 
 	pluginsDir := filepath.Join(tempDir, "plugins", "test-plugin")
@@ -256,7 +256,7 @@ func TestProcessPluginV2JobContextNotNil(t *testing.T) {
 	defer jobQueue.Shutdown()
 
 	settingsService := newSettingsServiceInternal(db)
-	scriptExecutor := NewScriptExecutor(settingsService, db)
+	scriptExecutor := NewScriptExecutor(settingsService, db, "test")
 	jobQueue.SetScriptExecutor(scriptExecutor)
 
 	pluginLoader := NewPluginLoaderV2(filepath.Join(tempDir, "plugins"), db, nil)
@@ -507,7 +507,7 @@ func TestProcessJob_FailingScriptReportsFailedStatus(t *testing.T) {
 
 	settingsService := newSettingsServiceInternal(db)
 	configurePython3ForTest(t, settingsService)
-	scriptExecutor := NewScriptExecutor(settingsService, db)
+	scriptExecutor := NewScriptExecutor(settingsService, db, "test")
 	jobQueue.SetScriptExecutor(scriptExecutor)
 
 	pluginsDir := filepath.Join(tempDir, "plugins", "failing-plugin")
@@ -635,7 +635,7 @@ func TestDeleteJob_CancelsInProgressJob(t *testing.T) {
 
 	settingsService := newSettingsServiceInternal(db)
 	configurePython3ForTest(t, settingsService)
-	scriptExecutor := NewScriptExecutor(settingsService, db)
+	scriptExecutor := NewScriptExecutor(settingsService, db, "test")
 	jobQueue.SetScriptExecutor(scriptExecutor)
 
 	pluginsDir := filepath.Join(tempDir, "plugins", "slow-plugin")
@@ -866,7 +866,7 @@ func TestStopQueueImmediate_RevertsInProgressJobToPending(t *testing.T) {
 
 	settingsService := newSettingsServiceInternal(db)
 	configurePython3ForTest(t, settingsService)
-	scriptExecutor := NewScriptExecutor(settingsService, db)
+	scriptExecutor := NewScriptExecutor(settingsService, db, "test")
 	jobQueue.SetScriptExecutor(scriptExecutor)
 
 	pluginsDir := filepath.Join(tempDir, "plugins", "slow-plugin-2")
@@ -1061,7 +1061,7 @@ func TestJobQueue_RunsMultipleJobsConcurrently(t *testing.T) {
 
 	settingsService := newSettingsServiceInternal(db)
 	configurePython3ForTest(t, settingsService)
-	scriptExecutor := NewScriptExecutor(settingsService, db)
+	scriptExecutor := NewScriptExecutor(settingsService, db, "test")
 	jobQueue.SetScriptExecutor(scriptExecutor)
 
 	pluginsDir := filepath.Join(tempDir, "plugins", "slow-plugin")
