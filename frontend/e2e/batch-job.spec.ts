@@ -51,15 +51,6 @@ async function waitForRoute(fragment: string, timeoutMs = 15000): Promise<boolea
   return false;
 }
 
-async function waitUntilGone(selector: string, timeoutMs = 5000): Promise<boolean> {
-  const start = Date.now();
-  while (Date.now() - start < timeoutMs) {
-    if (!(await mcp.elementExists(selector))) return true;
-    await new Promise(r => setTimeout(r, 200));
-  }
-  return false;
-}
-
 async function ensurePythonConfigured(): Promise<boolean> {
   const settings = await mcp.callBoundMethod('main.App.GetSettings');
   if (settings?.pythonPath) return true;
@@ -126,8 +117,7 @@ test.describe.serial('Batch Job UI lifecycle', () => {
     const rows = await mcp.domQuery('.rows-table tbody tr, .rows-table tr[mat-row]', 10);
     expect(rows.count).toBe(3);
 
-    await mcp.click('.bulk-field-select');
-    expect(await mcp.waitForElement('mat-option')).toBe(true);
+    expect(await mcp.clickAndWaitFor('.bulk-field-select', 'mat-option')).toBe(true);
     expect(await mcp.clickOptionByText('Label')).toBe(true);
 
     expect(await mcp.waitForElement('.bulk-field-value .form-field[data-field="label"] input')).toBe(true);
@@ -137,14 +127,12 @@ test.describe.serial('Batch Job UI lifecycle', () => {
   });
 
   test('edits one row through the dynamic-form dialog', async () => {
-    await mcp.click('.rows-table .edit-row-btn');
-    expect(await mcp.waitForElement('.mat-mdc-dialog-container')).toBe(true);
+    expect(await mcp.clickAndWaitFor('.rows-table .edit-row-btn', '.mat-mdc-dialog-container')).toBe(true);
     expect(await mcp.waitForElement('.mat-mdc-dialog-container .form-field[data-field="threshold"] input')).toBe(true);
 
     await mcp.fill('.mat-mdc-dialog-container .form-field[data-field="threshold"] input', '42');
-    await mcp.click('.mat-mdc-dialog-container .save-btn');
 
-    expect(await waitUntilGone('.mat-mdc-dialog-container')).toBe(true);
+    expect(await mcp.clickAndWaitForGone('.mat-mdc-dialog-container .save-btn', '.mat-mdc-dialog-container')).toBe(true);
   });
 
   test('creates the batch and tracks jobs to completion', async () => {
@@ -186,8 +174,7 @@ test.describe.serial('Batch Job UI lifecycle', () => {
   });
 
   test('deletes the batch and confirms cascading removal', async () => {
-    await mcp.click('.delete-batch-btn');
-    expect(await mcp.waitForElement('.confirm-dialog-confirm-btn')).toBe(true);
+    expect(await mcp.clickAndWaitFor('.delete-batch-btn', '.confirm-dialog-confirm-btn')).toBe(true);
     await mcp.click('.confirm-dialog-confirm-btn');
 
     expect(await waitForRoute('/job-batches')).toBe(true);

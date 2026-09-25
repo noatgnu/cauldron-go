@@ -136,6 +136,30 @@ export async function clickTabByLabel(text: string, timeoutMs = 15000): Promise<
   return false;
 }
 
+export async function clickAndWaitFor(clickSelector: string, waitSelector: string, timeoutMs = 15000): Promise<boolean> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    try {
+      await click(clickSelector);
+    } catch {}
+    if (await elementExists(waitSelector)) return true;
+    await new Promise(r => setTimeout(r, 300));
+  }
+  return false;
+}
+
+export async function clickAndWaitForGone(clickSelector: string, waitSelector: string, timeoutMs = 15000): Promise<boolean> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    if (!(await elementExists(waitSelector))) return true;
+    try {
+      await click(clickSelector);
+    } catch {}
+    await new Promise(r => setTimeout(r, 300));
+  }
+  return !(await elementExists(waitSelector));
+}
+
 export async function clickOptionByText(text: string, timeoutMs = 15000): Promise<boolean> {
   const js = `
     const opt = Array.from(document.querySelectorAll('mat-option'))
