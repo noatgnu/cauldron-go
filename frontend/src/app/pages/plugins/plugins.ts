@@ -19,6 +19,7 @@ import { Plugin, PluginInput, PluginExecutionRequest } from '../../core/models/p
 import { EnvironmentIndicator } from '../../components/environment-indicator/environment-indicator';
 import { InstallPluginDialog, InstallPluginResult } from '../../components/install-plugin-dialog/install-plugin-dialog';
 import { PluginInstallProgress } from '../../components/plugin-install-progress/plugin-install-progress';
+import { ConfirmDialogComponent } from '../../components/confirm-dialog/confirm-dialog';
 
 @Component({
   selector: 'app-plugins',
@@ -252,25 +253,43 @@ export class Plugins implements OnInit {
 
     dialogRef.afterClosed().subscribe((result: InstallPluginResult) => {
       if (result && result.repoURL) {
-        const progressRef = this.dialog.open(PluginInstallProgress, {
-          data: {
-            repoURL: result.repoURL,
-            commitHash: result.commitHash,
-            sshKeyPath: result.sshKeyPath,
-            passphrase: result.passphrase
-          },
-          disableClose: true,
-          width: '500px'
-        });
+        this.confirmUntrustedInstall(result.repoURL).subscribe(confirmed => {
+          if (!confirmed) return;
 
-        progressRef.afterClosed().subscribe(completed => {
-          if (completed) {
-            this.loadPlugins();
-            this.pluginService.notifyPluginListChanged();
-          }
+          const progressRef = this.dialog.open(PluginInstallProgress, {
+            data: {
+              repoURL: result.repoURL,
+              commitHash: result.commitHash,
+              sshKeyPath: result.sshKeyPath,
+              passphrase: result.passphrase
+            },
+            disableClose: true,
+            width: '500px'
+          });
+
+          progressRef.afterClosed().subscribe(completed => {
+            if (completed) {
+              this.loadPlugins();
+              this.pluginService.notifyPluginListChanged();
+            }
+          });
         });
       }
     });
+  }
+
+  private confirmUntrustedInstall(repoURL: string) {
+    const dialogRef = this.dialog.open(ConfirmDialogComponent, {
+      width: '480px',
+      disableClose: true,
+      data: {
+        title: 'Install plugin from this source?',
+        message: `This clones and can execute arbitrary code from ${repoURL} with this application's full privileges. Only install plugins from sources you trust.`,
+        confirmText: 'Install',
+        cancelText: 'Cancel'
+      }
+    });
+    return dialogRef.afterClosed();
   }
 
   isBound(pluginId: string, runtime: string): boolean {

@@ -27,7 +27,7 @@
       <mat-label>Max concurrent jobs</mat-label>
       <input matInput type="number" min="1" [ngModel]="maxConcurrentJobs()" (ngModelChange)="setMaxConcurrentJobs($event)">
     </mat-form-field>
-    <mat-form-field appearance="outline" class="param-field" matTooltip="0 = no limit">
+    <mat-form-field appearance="outline" class="param-field" matTooltip="0 = no limit. A limit protects against a hung or runaway plugin.">
       <mat-label>Job timeout (minutes)</mat-label>
       <input matInput type="number" min="0" [ngModel]="jobTimeoutMinutes()" (ngModelChange)="setJobTimeoutMinutes($event)">
     </mat-form-field>

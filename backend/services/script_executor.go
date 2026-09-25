@@ -71,6 +71,28 @@ func (s *ScriptExecutor) prepareEnv(pluginID uint) []string {
 	return env
 }
 
+func (s *ScriptExecutor) prepareDockerEnv(pluginID uint) []string {
+	var env []string
+
+	globals, err := s.db.GetGlobalCustomEnvVars()
+	if err == nil {
+		for _, v := range globals {
+			env = append(env, fmt.Sprintf("%s=%s", v.Key, v.Value))
+		}
+	}
+
+	if pluginID != 0 {
+		locals, err := s.db.GetCustomEnvVars(pluginID)
+		if err == nil {
+			for _, v := range locals {
+				env = append(env, fmt.Sprintf("%s=%s", v.Key, v.Value))
+			}
+		}
+	}
+
+	return env
+}
+
 type ScriptConfig struct {
 	PluginID     uint
 	Type         string
@@ -148,6 +170,7 @@ func (s *ScriptExecutor) ExecutePythonScript(ctx context.Context, jobID string, 
 
 	cmd := exec.CommandContext(ctx, pythonPath, args...)
 	hideConsoleWindow(cmd)
+	setProcessGroup(cmd)
 
 	cmd.Dir = pluginDir
 	log.Printf("[ExecutePythonScript] Working directory: %s", cmd.Dir)
@@ -299,6 +322,7 @@ source('%s')
 
 		cmd = exec.CommandContext(ctx, rPath, args...)
 		hideConsoleWindow(cmd)
+		setProcessGroup(cmd)
 
 		env := s.prepareEnv(config.PluginID)
 		env = append(env, "R_DEFAULT_DEVICE=null")
@@ -312,6 +336,7 @@ source('%s')
 
 		cmd = exec.CommandContext(ctx, rPath, args...)
 		hideConsoleWindow(cmd)
+		setProcessGroup(cmd)
 
 		env := s.prepareEnv(config.PluginID)
 		env = append(env, "R_DEFAULT_DEVICE=null")
@@ -354,6 +379,7 @@ func (s *ScriptExecutor) ExecuteDirectScript(ctx context.Context, jobID string, 
 
 	cmd := exec.CommandContext(ctx, executablePath, config.Args...)
 	hideConsoleWindow(cmd)
+	setProcessGroup(cmd)
 
 	cmd.Dir = pluginDir
 
@@ -405,12 +431,35 @@ func (s *ScriptExecutor) ExecuteDockerScript(ctx context.Context, jobID string, 
 
 	args := []string{"run"}
 	args = append(args, "--rm")
+	args = append(args, "--cap-drop=ALL")
+	args = append(args, "--cap-add=CHOWN")
+	args = append(args, "--cap-add=DAC_OVERRIDE")
+	args = append(args, "--cap-add=FOWNER")
+	args = append(args, "--security-opt=no-new-privileges")
+
+	network := plugin.Definition.Runtime.Docker.Network
+	if network == "" {
+		network = "none"
+	}
+	args = append(args, "--network", network)
+
+	memory := plugin.Definition.Runtime.Docker.Memory
+	if memory == "" {
+		memory = "4g"
+	}
+	args = append(args, "--memory", memory)
+
+	cpus := plugin.Definition.Runtime.Docker.CPUs
+	if cpus == "" {
+		cpus = "4"
+	}
+	args = append(args, "--cpus", cpus)
 
 	args = append(args, "-v", fmt.Sprintf("%s:/output", outputDir))
 
 	log.Printf("[ExecuteDockerScript] Volume mounts: /output <- %s", outputDir)
 
-	env := s.prepareEnv(config.PluginID)
+	env := s.prepareDockerEnv(config.PluginID)
 	for _, e := range env {
 		parts := strings.SplitN(e, "=", 2)
 		if len(parts) == 2 && parts[0] != "" && !strings.HasPrefix(parts[0], "=") {
@@ -458,6 +507,7 @@ func (s *ScriptExecutor) ExecuteDockerScript(ctx context.Context, jobID string, 
 
 	cmd := exec.CommandContext(ctx, "docker", args...)
 	hideConsoleWindow(cmd)
+	setProcessGroup(cmd)
 
 	cmd.Dir = pluginDir
 	cmd.Env = os.Environ()
@@ -713,9 +763,13 @@ func (s *ScriptExecutor) killProcessTree(cmd *exec.Cmd) error {
 		}
 		log.Printf("[ScriptExecutor] Successfully killed process tree for PID %d", pid)
 		return nil
-	} else {
+	}
+
+	if err := killProcessGroup(cmd); err != nil {
+		log.Printf("[ScriptExecutor] Failed to kill process group for PID %d: %v", pid, err)
 		return cmd.Process.Kill()
 	}
+	return nil
 }
 
 func (s *ScriptExecutor) CancelJob(jobID string) error {

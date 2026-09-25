@@ -21,6 +21,13 @@ func hideConsoleWindow(cmd *exec.Cmd) {
 	}
 }
 
+func setProcessGroup(cmd *exec.Cmd) {
+}
+
+func killProcessGroup(cmd *exec.Cmd) error {
+	return nil
+}
+
 // Windows has no post-start priority API without a process handle, so this sets it pre-start via CreationFlags.
 func lowerJobProcessPriority(cmd *exec.Cmd) {
 	if cmd.SysProcAttr == nil {

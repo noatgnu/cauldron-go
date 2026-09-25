@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -148,4 +149,48 @@ func TestResolveRExecutable_FallsBackWhenBoundInterpreterMissing(t *testing.T) {
 	if renvProjectPath != saved.ProjectPath {
 		t.Errorf("expected the renv library to still be activated at %q, got %q", saved.ProjectPath, renvProjectPath)
 	}
+}
+
+func TestPrepareDockerEnv_ExcludesHostEnvironment(t *testing.T) {
+	executor, _ := createTestScriptExecutor(t)
+
+	const hostOnlyVar = "CAULDRON_TEST_HOST_ONLY_VAR"
+	t.Setenv(hostOnlyVar, "should-not-leak-into-container")
+
+	env := executor.prepareDockerEnv(0)
+
+	for _, e := range env {
+		if strings.HasPrefix(e, hostOnlyVar+"=") {
+			t.Errorf("expected prepareDockerEnv to exclude host-only env var %q, but found it: %q", hostOnlyVar, e)
+		}
+	}
+}
+
+func TestPrepareDockerEnv_IncludesConfiguredCustomVars(t *testing.T) {
+	executor, db := createTestScriptExecutor(t)
+
+	if err := db.SaveCustomEnvVar(CustomEnvVar{PluginID: 0, Key: "GLOBAL_VAR", Value: "global-value"}); err != nil {
+		t.Fatalf("failed to save global custom env var: %v", err)
+	}
+	if err := db.SaveCustomEnvVar(CustomEnvVar{PluginID: 42, Key: "PLUGIN_VAR", Value: "plugin-value"}); err != nil {
+		t.Fatalf("failed to save plugin-specific custom env var: %v", err)
+	}
+
+	env := executor.prepareDockerEnv(42)
+
+	if !containsEnvVar(env, "GLOBAL_VAR=global-value") {
+		t.Errorf("expected prepareDockerEnv to include the configured global var, got: %v", env)
+	}
+	if !containsEnvVar(env, "PLUGIN_VAR=plugin-value") {
+		t.Errorf("expected prepareDockerEnv to include the configured plugin-specific var, got: %v", env)
+	}
+}
+
+func containsEnvVar(env []string, want string) bool {
+	for _, e := range env {
+		if e == want {
+			return true
+		}
+	}
+	return false
 }

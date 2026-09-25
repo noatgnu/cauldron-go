@@ -142,6 +142,21 @@
               "description": "Build arguments for Dockerfile (optional)",
               "additionalProperties": {"type": "string"},
               "examples": [{"PYTHON_VERSION": "3.11", "BASE_IMAGE": "ubuntu:22.04"}]
+            },
+            "network": {
+              "type": "string",
+              "description": "Docker network mode; omit for no network access (default), set to 'bridge' to allow outbound network",
+              "examples": ["bridge", "host"]
+            },
+            "memory": {
+              "type": "string",
+              "description": "Container memory limit passed to 'docker run --memory' (optional; a conservative default is applied if omitted)",
+              "examples": ["4g", "512m"]
+            },
+            "cpus": {
+              "type": "string",
+              "description": "Container CPU limit passed to 'docker run --cpus' (optional; a conservative default is applied if omitted)",
+              "examples": ["4", "2.5"]
             }
           },
           "oneOf": [
