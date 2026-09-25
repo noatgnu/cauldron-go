@@ -167,6 +167,9 @@ type DockerConfig struct {
 	Dockerfile string            `yaml:"dockerfile,omitempty" json:"dockerfile,omitempty"`
 	Platform   string            `yaml:"platform,omitempty" json:"platform,omitempty"`
 	BuildArgs  map[string]string `yaml:"buildArgs,omitempty" json:"buildArgs,omitempty"`
+	Network    string            `yaml:"network,omitempty" json:"network,omitempty"`
+	Memory     string            `yaml:"memory,omitempty" json:"memory,omitempty"`
+	CPUs       string            `yaml:"cpus,omitempty" json:"cpus,omitempty"`
 }
 
 type PluginRuntimeV2 struct {

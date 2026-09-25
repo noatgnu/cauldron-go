@@ -81,7 +81,7 @@ func createApplicationMenu(app *App) *application.Menu {
 				app.wailsApp.Event.Emit("menu:view-table-browser", nil)
 			}
 		})
-	viewMenu.Add("Gel Analysis").
+	viewMenu.Add("Gel Analysis (experimental)").
 		SetAccelerator("CmdOrCtrl+5").
 		OnClick(func(ctx *application.Context) {
 			if app.wailsApp != nil {
