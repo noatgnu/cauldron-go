@@ -4,6 +4,7 @@ import * as WailsApp from '../../../../bindings/github.com/noatgnu/cauldron-go/a
 import { Events } from '@wailsio/runtime';
 import * as models from '../../../../bindings/github.com/noatgnu/cauldron-go/backend/models/models';
 import * as services from '../../../../bindings/github.com/noatgnu/cauldron-go/backend/services/models';
+import * as appModels from '../../../../bindings/github.com/noatgnu/cauldron-go/models';
 import * as rversion from '../../../../bindings/github.com/noatgnu/cookeR/rversion/models';
 
 declare global {
@@ -17,6 +18,16 @@ export type Config = models.Config;
 export type Job = models.Job;
 export type JobBatch = models.JobBatch;
 export type BatchStatus = services.BatchStatus;
+export type Recipe = models.Recipe;
+export type RecipeStage = models.RecipeStage;
+export type RecipeStageBinding = models.RecipeStageBinding;
+export type JobChain = models.JobChain;
+export type ChainStatus = services.ChainStatus;
+export type ChainStageStatus = services.ChainStageStatus;
+export type CompatibilityReport = services.CompatibilityReport;
+export type StageCompatibility = services.StageCompatibility;
+export type RecipeImportResult = services.RecipeImportResult;
+export type RecipeStageRequest = appModels.RecipeStageRequestV2;
 export type PythonEnvironment = services.PythonEnvironment;
 export type REnvironment = services.REnvironment;
 export type DataFilePreview = services.DataFilePreview;
@@ -421,6 +432,108 @@ export class Wails {
     if (!this.isWails) throw new Error('Wails not available');
     await this.waitForBackend();
     return WailsApp.DeleteJobBatch(id);
+  }
+
+  async saveRecipe(req: { label: string; description: string; stages: appModels.RecipeStageRequestV2[] }): Promise<Recipe> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    const result = await WailsApp.SaveRecipe(new appModels.RecipeSaveRequestV2(req));
+    if (!result) throw new Error('Failed to save recipe');
+    return result;
+  }
+
+  async updateRecipe(id: string, req: { label: string; description: string; stages: appModels.RecipeStageRequestV2[] }): Promise<Recipe> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    const result = await WailsApp.UpdateRecipe(id, new appModels.RecipeSaveRequestV2(req));
+    if (!result) throw new Error('Failed to update recipe');
+    return result;
+  }
+
+  async getRecipe(id: string): Promise<Recipe> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    const result = await WailsApp.GetRecipe(id);
+    if (!result) throw new Error(`Recipe not found: ${id}`);
+    return result;
+  }
+
+  async getRecipeStages(id: string): Promise<RecipeStage[]> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.GetRecipeStages(id);
+  }
+
+  async getAllRecipes(limit: number, offset: number): Promise<Recipe[]> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    const result = await WailsApp.GetAllRecipes(limit, offset);
+    return (result || []).filter((recipe): recipe is Recipe => recipe !== null);
+  }
+
+  async deleteRecipe(id: string): Promise<void> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.DeleteRecipe(id);
+  }
+
+  async exportRecipe(id: string, path: string): Promise<void> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.ExportRecipe(id, path);
+  }
+
+  async importRecipeFromFile(path: string): Promise<RecipeImportResult> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    const result = await WailsApp.ImportRecipeFromFile(path);
+    if (!result) throw new Error('Failed to import recipe');
+    return result;
+  }
+
+  async checkRecipeCompatibility(id: string): Promise<CompatibilityReport> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    const result = await WailsApp.CheckRecipeCompatibility(id);
+    if (!result) throw new Error(`Recipe not found: ${id}`);
+    return result;
+  }
+
+  async runRecipe(id: string): Promise<JobChain> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    const result = await WailsApp.RunRecipe(id);
+    if (!result) throw new Error('Failed to run recipe');
+    return result;
+  }
+
+  async getJobChain(id: string): Promise<JobChain> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    const result = await WailsApp.GetJobChain(id);
+    if (!result) throw new Error(`Chain not found: ${id}`);
+    return result;
+  }
+
+  async getJobChainStatus(id: string): Promise<ChainStatus> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    const result = await WailsApp.GetJobChainStatus(id);
+    if (!result) throw new Error(`Chain not found: ${id}`);
+    return result;
+  }
+
+  async getAllJobChains(limit: number, offset: number): Promise<JobChain[]> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    const result = await WailsApp.GetAllJobChains(limit, offset);
+    return (result || []).filter((chain): chain is JobChain => chain !== null);
+  }
+
+  async deleteJobChain(id: string): Promise<void> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.DeleteJobChain(id);
   }
 
   async getPythonVersion(): Promise<string> {

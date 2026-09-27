@@ -37,6 +37,8 @@ type App struct {
 	fileService            *services.FileService
 	jobQueue               *services.JobQueueService
 	batchService           *services.BatchService
+	chainService           *services.ChainService
+	recipeService          *services.RecipeService
 	envService             *services.EnvironmentService
 	scriptExecutor         *services.ScriptExecutor
 	portableEnvService     *services.PortableEnvService
@@ -236,6 +238,10 @@ func (a *App) Initialize() {
 	a.scriptExecutor.SetPluginLoader(a.pluginLoaderV2)
 	a.jobQueue.SetScriptExecutor(a.scriptExecutor)
 	a.jobQueue.SetPluginLoader(a.pluginLoaderV2)
+
+	a.chainService = services.NewChainService(a.db, a.jobQueue, a.pluginLoaderV2, a.pluginExecutor, a.settings)
+	a.jobQueue.SetChainService(a.chainService)
+	a.recipeService = services.NewRecipeService(a.db, a.pluginLoaderV2, a.chainService)
 
 	log.Println("[App.Initialize] Initializing Git authentication service...")
 	a.gitAuthService = services.NewGitAuthService(a.db)
@@ -1382,7 +1388,7 @@ func (a *App) ExecutePluginV2(req models.PluginExecutionRequestV2) (string, erro
 	log.Printf("[ExecutePluginV2] Plugin loaded: %s [ID:%d] (%s), Environments: %v",
 		plugin.Definition.Plugin.Name, plugin.ID, plugin.Definition.Plugin.ID, plugin.Definition.Runtime.GetEnvironments())
 
-	jobID, err := executePluginJob(a.pluginExecutor, a.jobQueue, a.settings, plugin, req.Parameters, "")
+	jobID, err := services.ExecutePluginJob(a.pluginExecutor, a.jobQueue, a.settings, plugin, req.Parameters, "", "", 0)
 	if err != nil {
 		return "", err
 	}
@@ -1419,7 +1425,7 @@ func (a *App) ExecutePluginBatchV2(req models.PluginBatchExecutionRequestV2) (st
 	created := 0
 	var firstErr error
 	for i, jobParams := range req.Jobs {
-		if _, err := executePluginJob(a.pluginExecutor, a.jobQueue, a.settings, plugin, jobParams, batch.ID); err != nil {
+		if _, err := services.ExecutePluginJob(a.pluginExecutor, a.jobQueue, a.settings, plugin, jobParams, batch.ID, "", 0); err != nil {
 			log.Printf("[ExecutePluginBatchV2] Failed to create job %d in batch %s: %v", i, batch.ID, err)
 			if firstErr == nil {
 				firstErr = err
@@ -1454,56 +1460,86 @@ func (a *App) DeleteJobBatch(id string) error {
 	return a.batchService.DeleteBatch(id)
 }
 
-// executePluginJob validates, builds args, and enqueues a job; shared between App.ExecutePluginV2 (GUI) and the CLI's "job run" so both stay identical.
-// batchID is "" for a normal single-run job, or a JobBatch's ID when created as part of a batch.
-func executePluginJob(pluginExecutor *services.PluginExecutor, jobQueue *services.JobQueueService, settings *services.SettingsService, plugin *models.PluginV2, parameters map[string]interface{}, batchID string) (string, error) {
-	if err := pluginExecutor.ValidateParameters(plugin, parameters); err != nil {
-		return "", fmt.Errorf("parameter validation failed: %w", err)
+type RecipeStageRequestV2 struct {
+	PluginID      string                               `json:"pluginId"`
+	PluginVersion string                               `json:"pluginVersion"`
+	Params        map[string]interface{}               `json:"params"`
+	Bindings      map[string]models.RecipeStageBinding `json:"bindings"`
+}
+
+type RecipeSaveRequestV2 struct {
+	Label       string                 `json:"label"`
+	Description string                 `json:"description"`
+	Stages      []RecipeStageRequestV2 `json:"stages"`
+}
+
+func recipeStageSpecsFromRequest(stages []RecipeStageRequestV2) []services.RecipeStageSpec {
+	specs := make([]services.RecipeStageSpec, len(stages))
+	for i, s := range stages {
+		specs[i] = services.RecipeStageSpec{
+			PluginID:      s.PluginID,
+			PluginVersion: s.PluginVersion,
+			Params:        s.Params,
+			Bindings:      s.Bindings,
+		}
 	}
+	return specs
+}
 
-	args, err := pluginExecutor.BuildArguments(plugin, parameters)
-	if err != nil {
-		return "", fmt.Errorf("failed to build arguments: %w", err)
-	}
+func (a *App) SaveRecipe(req RecipeSaveRequestV2) (*models.Recipe, error) {
+	return a.recipeService.SaveRecipe(req.Label, req.Description, recipeStageSpecsFromRequest(req.Stages))
+}
 
-	cfg := settings.GetConfig()
-	baseOutputDir := cfg.OutputDirectory
-	if baseOutputDir == "" {
-		baseOutputDir = "outputs"
-	}
+func (a *App) UpdateRecipe(id string, req RecipeSaveRequestV2) (*models.Recipe, error) {
+	return a.recipeService.UpdateRecipe(id, req.Label, req.Description, recipeStageSpecsFromRequest(req.Stages))
+}
 
-	outputDir := services.GenerateJobOutputDir(baseOutputDir, plugin.Definition.Plugin.ID)
-	os.MkdirAll(outputDir, 0755)
+func (a *App) GetRecipe(id string) (*models.Recipe, error) {
+	return a.recipeService.GetRecipe(id)
+}
 
-	if plugin.Definition.Execution.OutputDir != "" {
-		args = append(args, plugin.Definition.Execution.OutputDir, outputDir)
-	}
+func (a *App) GetRecipeStages(id string) ([]models.RecipeStage, error) {
+	return a.recipeService.GetRecipeStages(id)
+}
 
-	params := make(map[string]interface{}, len(parameters)+2)
-	for k, v := range parameters {
-		params[k] = v
-	}
-	params["outputDir"] = outputDir
-	params["pluginId"] = plugin.ID
+func (a *App) GetAllRecipes(limit int, offset int) ([]*models.Recipe, error) {
+	return a.recipeService.GetAllRecipes(limit, offset)
+}
 
-	envs := plugin.Definition.Runtime.GetEnvironments()
-	runtimeTypeForJob := ""
-	if len(envs) > 1 && plugin.Definition.Runtime.HasEnvironment("python") && plugin.Definition.Runtime.HasEnvironment("r") {
-		runtimeTypeForJob = "python+r"
-	} else if len(envs) > 0 {
-		runtimeTypeForJob = envs[0]
-	}
+func (a *App) DeleteRecipe(id string) error {
+	return a.recipeService.DeleteRecipe(id)
+}
 
-	return jobQueue.CreateJobWithParametersAndBatch(
-		plugin.Definition.Plugin.ID,
-		plugin.Definition.Plugin.Name,
-		runtimeTypeForJob,
-		args,
-		params,
-		plugin.Definition.Plugin.Version,
-		plugin.CommitHash,
-		batchID,
-	)
+func (a *App) ExportRecipe(id string, path string) error {
+	return a.recipeService.ExportRecipe(id, path)
+}
+
+func (a *App) ImportRecipeFromFile(path string) (*services.RecipeImportResult, error) {
+	return a.recipeService.ImportRecipeFromFile(path)
+}
+
+func (a *App) CheckRecipeCompatibility(id string) (*services.CompatibilityReport, error) {
+	return a.recipeService.CheckCompatibility(id)
+}
+
+func (a *App) RunRecipe(id string) (*models.JobChain, error) {
+	return a.recipeService.InstantiateChain(id, nil)
+}
+
+func (a *App) GetJobChain(id string) (*models.JobChain, error) {
+	return a.chainService.GetChain(id)
+}
+
+func (a *App) GetJobChainStatus(id string) (*services.ChainStatus, error) {
+	return a.chainService.GetChainStatus(id)
+}
+
+func (a *App) GetAllJobChains(limit int, offset int) ([]*models.JobChain, error) {
+	return a.chainService.GetAllChains(limit, offset)
+}
+
+func (a *App) DeleteJobChain(id string) error {
+	return a.chainService.DeleteChain(id)
 }
 
 func (a *App) ReloadPluginsV2() error {

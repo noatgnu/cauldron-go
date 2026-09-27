@@ -1,0 +1,47 @@
+<h2 mat-dialog-title>{{ data.plugin.definition.plugin.name }}</h2>
+
+<mat-dialog-content>
+  @if (fileInputs().length > 0 && data.earlierStages.length > 0) {
+    <div class="binding-section">
+      <h3>File Inputs</h3>
+      @for (input of fileInputs(); track input.name) {
+        <div class="binding-row">
+          <span class="binding-label">{{ input.label }}</span>
+          <mat-button-toggle-group class="binding-mode-toggle" [value]="isBound(input.name) ? 'bound' : 'file'"
+                                    (change)="setMode(input.name, $event.value)">
+            <mat-button-toggle value="file">Pick a file</mat-button-toggle>
+            <mat-button-toggle value="bound">Use output from an earlier stage</mat-button-toggle>
+          </mat-button-toggle-group>
+
+          @if (isBound(input.name)) {
+            <div class="binding-source">
+              <mat-form-field appearance="outline" class="binding-field">
+                <mat-label>Stage</mat-label>
+                <mat-select [value]="bindingFor(input.name)?.stageIndex" (selectionChange)="setBindingStage(input.name, $event.value)">
+                  @for (stage of data.earlierStages; track stage.index) {
+                    <mat-option [value]="stage.index">{{ stage.label }}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+              <mat-form-field appearance="outline" class="binding-field">
+                <mat-label>Output</mat-label>
+                <mat-select [value]="bindingFor(input.name)?.outputName" (selectionChange)="setBindingOutput(input.name, $event.value)">
+                  @for (output of outputsForStage(bindingFor(input.name)?.stageIndex ?? -1); track output.name) {
+                    <mat-option [value]="output.name">{{ output.name }}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+            </div>
+          }
+        </div>
+      }
+    </div>
+  }
+
+  <app-dynamic-form [plugin]="formPlugin()" (formSubmit)="onFormSubmit($event)"></app-dynamic-form>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button class="cancel-btn" mat-button type="button" (click)="cancel()">Cancel</button>
+  <button class="save-btn" mat-raised-button color="primary" type="button" (click)="save()">Save</button>
+</mat-dialog-actions>

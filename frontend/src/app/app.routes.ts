@@ -5,6 +5,10 @@ import { Jobs } from './pages/jobs/jobs';
 import { JobDetail } from './pages/job-detail/job-detail';
 import { JobBatches } from './pages/job-batches/job-batches';
 import { JobBatchDetail } from './pages/job-batch-detail/job-batch-detail';
+import { Recipes } from './pages/recipes/recipes';
+import { RecipeEditorPage } from './pages/recipe-editor-page/recipe-editor-page';
+import { JobChains } from './pages/job-chains/job-chains';
+import { JobChainDetail } from './pages/job-chain-detail/job-chain-detail';
 import { Plugins } from './pages/plugins/plugins';
 import { PluginList } from './pages/plugin-list/plugin-list';
 import { PluginExecute } from './pages/plugin-execute/plugin-execute';
@@ -31,6 +35,11 @@ export const routes: Routes = [
       { path: 'job/:id', component: JobDetail },
       { path: 'job-batches', component: JobBatches },
       { path: 'job-batch/:id', component: JobBatchDetail },
+      { path: 'recipes', component: Recipes },
+      { path: 'recipe/new', component: RecipeEditorPage },
+      { path: 'recipe/:id', component: RecipeEditorPage },
+      { path: 'job-chains', component: JobChains },
+      { path: 'job-chain/:id', component: JobChainDetail },
       { path: 'plugins', component: Plugins },
       { path: 'plugin-list', component: PluginList },
       { path: 'plugin-registry', component: PluginRegistry },

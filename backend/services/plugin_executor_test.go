@@ -243,3 +243,87 @@ func TestBuildArgumentsColorMapTransform(t *testing.T) {
 
 	t.Log("✓ Color-map transform correctly formats key:color pairs")
 }
+
+func TestBuildArgumentsMapTransform(t *testing.T) {
+	executor := NewPluginExecutor()
+
+	plugin := &models.PluginV2{
+		ScriptPath: "/path/to/script.py",
+		Definition: models.PluginDefinition{
+			Inputs: []models.PluginInputV2{
+				{Name: "delimiter", Type: models.PluginInputTypeSelect},
+			},
+			Execution: models.PluginExecution{
+				ArgsMapping: map[string]interface{}{
+					"delimiter": map[string]interface{}{
+						"flag":      "--delimiter",
+						"transform": "map",
+						"values": map[string]interface{}{
+							"tab":       "\t",
+							"comma":     ",",
+							"semicolon": ";",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	args, err := executor.BuildArguments(plugin, map[string]interface{}{"delimiter": "tab"})
+	if err != nil {
+		t.Fatalf("BuildArguments failed: %v", err)
+	}
+
+	expectedArgs := []string{"/path/to/script.py", "--delimiter", "\t"}
+	if len(args) != len(expectedArgs) {
+		t.Fatalf("Expected %d arguments, got %d: %v", len(expectedArgs), len(args), args)
+	}
+	for i, expected := range expectedArgs {
+		if args[i] != expected {
+			t.Errorf("Position %d: expected %q, got %q", i, expected, args[i])
+		}
+	}
+
+	t.Log("✓ Map transform correctly resolves the raw value through the lookup table")
+}
+
+func TestBuildArgumentsMapTransformFallsBackToRawValueWhenUnmapped(t *testing.T) {
+	executor := NewPluginExecutor()
+
+	plugin := &models.PluginV2{
+		ScriptPath: "/path/to/script.py",
+		Definition: models.PluginDefinition{
+			Inputs: []models.PluginInputV2{
+				{Name: "delimiter", Type: models.PluginInputTypeSelect},
+			},
+			Execution: models.PluginExecution{
+				ArgsMapping: map[string]interface{}{
+					"delimiter": map[string]interface{}{
+						"flag":      "--delimiter",
+						"transform": "map",
+						"values": map[string]interface{}{
+							"tab": "\t",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	args, err := executor.BuildArguments(plugin, map[string]interface{}{"delimiter": "|"})
+	if err != nil {
+		t.Fatalf("BuildArguments failed: %v", err)
+	}
+
+	expectedArgs := []string{"/path/to/script.py", "--delimiter", "|"}
+	if len(args) != len(expectedArgs) {
+		t.Fatalf("Expected %d arguments, got %d: %v", len(expectedArgs), len(args), args)
+	}
+	for i, expected := range expectedArgs {
+		if args[i] != expected {
+			t.Errorf("Position %d: expected %q, got %q", i, expected, args[i])
+		}
+	}
+
+	t.Log("✓ Map transform passes the raw value through when it has no entry in the lookup table")
+}

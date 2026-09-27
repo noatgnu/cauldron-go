@@ -1,0 +1,83 @@
+<div class="recipe-editor">
+  @if (loading()) {
+    <p>Loading...</p>
+  } @else {
+    <div class="form-section">
+      <h3>Recipe Details</h3>
+      @if (compatibility(); as report) {
+        <app-compatibility-badge [report]="report"></app-compatibility-badge>
+      }
+      <mat-form-field appearance="outline" class="full-width-field">
+        <mat-label>Label</mat-label>
+        <input matInput [ngModel]="label()" (ngModelChange)="label.set($event)">
+      </mat-form-field>
+      <mat-form-field appearance="outline" class="full-width-field">
+        <mat-label>Description</mat-label>
+        <textarea matInput rows="2" [ngModel]="description()" (ngModelChange)="description.set($event)"></textarea>
+      </mat-form-field>
+    </div>
+
+    <div class="form-section">
+      <h3>Add Stage</h3>
+      <p class="section-description">Add a plugin as the next stage. Its file inputs can be bound to an earlier stage's output once added.</p>
+      <mat-form-field appearance="outline" class="param-field">
+        <mat-label>Plugin</mat-label>
+        <mat-select [value]="selectedNewPluginId()" (selectionChange)="selectedNewPluginId.set($event.value)">
+          @for (plugin of availablePlugins(); track plugin.definition.plugin.id) {
+            <mat-option [value]="plugin.definition.plugin.id">{{ plugin.definition.plugin.name }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+      <button class="add-stage-btn" mat-stroked-button type="button" (click)="addStage()" [disabled]="!selectedNewPluginId()">
+        <mat-icon>add</mat-icon>
+        Add Stage
+      </button>
+    </div>
+
+    <div class="form-section">
+      <h3>Stages ({{ stages().length }})</h3>
+
+      <table mat-table [dataSource]="stages()" class="rows-table">
+        <ng-container matColumnDef="summary">
+          <th mat-header-cell *matHeaderCellDef>Stage</th>
+          <td mat-cell *matCellDef="let row">
+            <div class="stage-summary">
+              <strong>{{ stageLabel(row) }}</strong>
+              @for (line of bindingSummaryLines(row); track line) {
+                <div class="binding-line">{{ line }}</div>
+              }
+            </div>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="actions">
+          <th mat-header-cell *matHeaderCellDef></th>
+          <td mat-cell *matCellDef="let row">
+            <button class="edit-stage-btn" mat-icon-button type="button" (click)="editStage(row.id)" matTooltip="Edit this stage">
+              <mat-icon>edit</mat-icon>
+            </button>
+            <button class="remove-stage-btn" mat-icon-button type="button" (click)="removeStage(row.id)" matTooltip="Remove this stage">
+              <mat-icon>delete</mat-icon>
+            </button>
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="columns"></tr>
+        <tr mat-row *matRowDef="let row; columns: columns;"></tr>
+      </table>
+
+      @if (stages().length === 0) {
+        <p class="empty-state">No stages yet. Pick a plugin above and add it as the first stage.</p>
+      }
+    </div>
+
+    <div class="submit-row">
+      <button class="save-recipe-btn" mat-stroked-button type="button" (click)="saveRecipe()" [disabled]="saving() || running()">
+        @if (saving()) { Saving... } @else { Save Recipe }
+      </button>
+      <button class="run-recipe-btn" mat-raised-button color="primary" type="button" (click)="runNow()" [disabled]="saving() || running()">
+        @if (running()) { Starting... } @else { Run Now }
+      </button>
+    </div>
+  }
+</div>

@@ -190,6 +190,10 @@ func (d *DatabaseService) autoMigrate() error {
 		&PluginDockerImage{},
 		&models.Job{},
 		&models.JobBatch{},
+		&models.Recipe{},
+		&models.RecipeStage{},
+		&models.JobChain{},
+		&models.JobChainStage{},
 		&models.PluginRegistry{},
 		&models.GelAnalysisSession{},
 	); err != nil {

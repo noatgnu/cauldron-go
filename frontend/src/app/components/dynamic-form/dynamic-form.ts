@@ -47,6 +47,7 @@ export class DynamicFormComponent implements OnInit, OnChanges, OnDestroy {
   columnOptions = new Map<string, string[]>();
   selectOptions = new Map<string, models.SelectOption[]>();
   groupedOptions = new Map<string, models.FieldGroup[]>();
+  freeTextColumnValues = new Map<string, string>();
   loading = signal(false);
   formValues = signal<Record<string, any>>({});
   validationErrors = signal<string[]>([]);
@@ -83,6 +84,7 @@ export class DynamicFormComponent implements OnInit, OnChanges, OnDestroy {
     this.selectOptions.clear();
     this.groupedOptions.clear();
     this.lastSelectedIndex.clear();
+    this.freeTextColumnValues.clear();
     this.validationErrors.set([]);
 
     this.buildForm();
@@ -229,6 +231,27 @@ export class DynamicFormComponent implements OnInit, OnChanges, OnDestroy {
 
   getColumns(inputName: string): string[] {
     return this.columnOptions.get(inputName) || [];
+  }
+
+  hasSourceFileInput(input: models.PluginInputV2): boolean {
+    if (!input.sourceFile) return true;
+    return this.plugin.definition.inputs.some(i => i.name === input.sourceFile);
+  }
+
+  getFreeTextColumnsValue(inputName: string): string {
+    if (this.freeTextColumnValues.has(inputName)) {
+      return this.freeTextColumnValues.get(inputName)!;
+    }
+    const value = this.form.get(inputName)?.value;
+    const display = Array.isArray(value) ? value.join(', ') : (value || '');
+    this.freeTextColumnValues.set(inputName, display);
+    return display;
+  }
+
+  onFreeTextColumnsInput(inputName: string, raw: string) {
+    this.freeTextColumnValues.set(inputName, raw);
+    const values = raw.split(',').map(s => s.trim()).filter(s => s.length > 0);
+    this.form.get(inputName)?.setValue(values);
   }
 
   getInputType(input: models.PluginInputV2): string {

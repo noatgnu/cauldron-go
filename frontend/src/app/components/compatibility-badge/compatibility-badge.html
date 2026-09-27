@@ -1,0 +1,9 @@
+<mat-chip class="compatibility-badge"
+          [class.level-ok]="level() === 'ok'"
+          [class.level-warn]="level() === 'warn'"
+          [class.level-error]="level() === 'error'"
+          [class.level-unknown]="level() === 'unknown'"
+          [matTooltip]="tooltip()">
+  <mat-icon matChipAvatar>{{ icon() }}</mat-icon>
+  {{ label() }}
+</mat-chip>

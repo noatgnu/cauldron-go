@@ -27,6 +27,7 @@ type JobQueueService struct {
 	scriptExecutor *ScriptExecutor
 	pluginLoader   *PluginLoaderV2
 	settingsServ   *SettingsService
+	chainService   *ChainService
 	paused         bool
 	stopImmediate  bool
 	currentJobID   string
@@ -92,6 +93,10 @@ func (j *JobQueueService) SetPluginLoader(pluginLoader *PluginLoaderV2) {
 	j.pluginLoader = pluginLoader
 }
 
+func (j *JobQueueService) SetChainService(chainService *ChainService) {
+	j.chainService = chainService
+}
+
 func (j *JobQueueService) worker() {
 	defer j.wg.Done()
 
@@ -153,7 +158,7 @@ func (j *JobQueueService) CreateJob(jobType string, name string, command string,
 	return j.CreateJobWithParameters(jobType, name, command, args, make(map[string]interface{}), "", "")
 }
 
-func (j *JobQueueService) createJob(jobType string, name string, command string, args []string, parameters map[string]interface{}, pluginVersion string, pluginCommitHash string, pythonPath string, pythonEnvType string, rPath string, rEnvType string, batchID string) (string, error) {
+func (j *JobQueueService) createJob(jobType string, name string, command string, args []string, parameters map[string]interface{}, pluginVersion string, pluginCommitHash string, pythonPath string, pythonEnvType string, rPath string, rEnvType string, batchID string, chainID string, chainStageIndex int) (string, error) {
 	job := &models.Job{
 		ID:               uuid.New().String(),
 		Type:             jobType,
@@ -171,6 +176,8 @@ func (j *JobQueueService) createJob(jobType string, name string, command string,
 		PluginVersion:    pluginVersion,
 		PluginCommitHash: pluginCommitHash,
 		BatchID:          batchID,
+		ChainID:          chainID,
+		ChainStageIndex:  chainStageIndex,
 		CreatedAt:        time.Now(),
 	}
 
@@ -190,11 +197,15 @@ func (j *JobQueueService) createJob(jobType string, name string, command string,
 }
 
 func (j *JobQueueService) CreateJobWithEnvironments(jobType string, name string, command string, args []string, parameters map[string]interface{}, pluginVersion string, pluginCommitHash string, pythonPath string, pythonEnvType string, rPath string, rEnvType string) (string, error) {
-	return j.createJob(jobType, name, command, args, parameters, pluginVersion, pluginCommitHash, pythonPath, pythonEnvType, rPath, rEnvType, "")
+	return j.createJob(jobType, name, command, args, parameters, pluginVersion, pluginCommitHash, pythonPath, pythonEnvType, rPath, rEnvType, "", "", 0)
 }
 
 func (j *JobQueueService) CreateJobWithEnvironmentsAndBatch(jobType string, name string, command string, args []string, parameters map[string]interface{}, pluginVersion string, pluginCommitHash string, pythonPath string, pythonEnvType string, rPath string, rEnvType string, batchID string) (string, error) {
-	return j.createJob(jobType, name, command, args, parameters, pluginVersion, pluginCommitHash, pythonPath, pythonEnvType, rPath, rEnvType, batchID)
+	return j.createJob(jobType, name, command, args, parameters, pluginVersion, pluginCommitHash, pythonPath, pythonEnvType, rPath, rEnvType, batchID, "", 0)
+}
+
+func (j *JobQueueService) CreateJobWithEnvironmentsAndChain(jobType string, name string, command string, args []string, parameters map[string]interface{}, pluginVersion string, pluginCommitHash string, pythonPath string, pythonEnvType string, rPath string, rEnvType string, chainID string, chainStageIndex int) (string, error) {
+	return j.createJob(jobType, name, command, args, parameters, pluginVersion, pluginCommitHash, pythonPath, pythonEnvType, rPath, rEnvType, "", chainID, chainStageIndex)
 }
 
 func (j *JobQueueService) resolveEnvironments(command string) (pythonPath string, pythonEnvType string, rPath string, rEnvType string) {
@@ -235,6 +246,11 @@ func (j *JobQueueService) CreateJobWithParameters(jobType string, name string, c
 func (j *JobQueueService) CreateJobWithParametersAndBatch(jobType string, name string, command string, args []string, parameters map[string]interface{}, pluginVersion string, pluginCommitHash string, batchID string) (string, error) {
 	pythonPath, pythonEnvType, rPath, rEnvType := j.resolveEnvironments(command)
 	return j.CreateJobWithEnvironmentsAndBatch(jobType, name, command, args, parameters, pluginVersion, pluginCommitHash, pythonPath, pythonEnvType, rPath, rEnvType, batchID)
+}
+
+func (j *JobQueueService) CreateJobWithParametersAndChain(jobType string, name string, command string, args []string, parameters map[string]interface{}, pluginVersion string, pluginCommitHash string, chainID string, chainStageIndex int) (string, error) {
+	pythonPath, pythonEnvType, rPath, rEnvType := j.resolveEnvironments(command)
+	return j.CreateJobWithEnvironmentsAndChain(jobType, name, command, args, parameters, pluginVersion, pluginCommitHash, pythonPath, pythonEnvType, rPath, rEnvType, chainID, chainStageIndex)
 }
 
 func cloneJob(job *models.Job) *models.Job {
@@ -292,6 +308,12 @@ func (j *JobQueueService) UpdateJob(id string, mutate func(job *models.Job)) (*m
 	j.mu.Unlock()
 
 	j.emitJobUpdate(snapshot)
+
+	if j.chainService != nil && snapshot.ChainID != "" &&
+		(snapshot.Status == models.JobStatusCompleted || snapshot.Status == models.JobStatusFailed) {
+		go j.chainService.OnJobTerminal(snapshot)
+	}
+
 	return snapshot, nil
 }
 
@@ -847,6 +869,12 @@ func (j *JobQueueService) GetJobsByStatus(status models.JobStatus) []*models.Job
 func (j *JobQueueService) GetJobsByBatchID(batchID string) []*models.Job {
 	var jobs []*models.Job
 	j.db.GetDB().Where("batch_id = ?", batchID).Order("created_at ASC").Find(&jobs)
+	return jobs
+}
+
+func (j *JobQueueService) GetJobsByChainID(chainID string) []*models.Job {
+	var jobs []*models.Job
+	j.db.GetDB().Where("chain_id = ?", chainID).Order("chain_stage_index ASC").Find(&jobs)
 	return jobs
 }
 

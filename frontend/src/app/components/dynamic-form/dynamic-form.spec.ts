@@ -64,4 +64,71 @@ describe('DynamicFormComponent', () => {
   it('should build empty form when no inputs', () => {
     expect(component.form).toBeDefined();
   });
+
+  describe('column-selector with a bound (filtered-out) sourceFile', () => {
+    const boundPlugin = {
+      ...mockPlugin,
+      definition: {
+        ...mockPlugin.definition,
+        inputs: [
+          { name: 'id_vars', label: 'ID Columns', type: 'column-selector', multiple: true, sourceFile: 'input_file', required: true },
+          { name: 'names_from', label: 'Names From Column', type: 'column-selector', multiple: false, sourceFile: 'input_file', required: true }
+        ]
+      }
+    };
+
+    beforeEach(async () => {
+      component.plugin = boundPlugin as any;
+      await (component as any).initializeForm();
+      fixture.detectChanges();
+    });
+
+    it('reports no source file input present', () => {
+      expect(component.hasSourceFileInput(boundPlugin.definition.inputs[0] as any)).toBe(false);
+    });
+
+    it('parses comma-separated free text into an array for a multiple column-selector', () => {
+      component.onFreeTextColumnsInput('id_vars', 'Protein.Group, Genes');
+      expect(component.form.get('id_vars')?.value).toEqual(['Protein.Group', 'Genes']);
+    });
+
+    it('trims and drops empty entries from free text input', () => {
+      component.onFreeTextColumnsInput('id_vars', ' Protein.Group ,, Genes ,');
+      expect(component.form.get('id_vars')?.value).toEqual(['Protein.Group', 'Genes']);
+    });
+
+    it('preserves raw in-progress text for display without collapsing a trailing comma', () => {
+      component.onFreeTextColumnsInput('id_vars', 'Protein.Group,');
+      expect(component.getFreeTextColumnsValue('id_vars')).toBe('Protein.Group,');
+      expect(component.form.get('id_vars')?.value).toEqual(['Protein.Group']);
+    });
+
+    it('accepts a plain string via formControlName for a non-multiple bound column-selector', () => {
+      component.form.get('names_from')?.setValue('Sample');
+      expect(component.form.get('names_from')?.value).toBe('Sample');
+    });
+  });
+
+  describe('column-selector with its sourceFile input present', () => {
+    const unboundPlugin = {
+      ...mockPlugin,
+      definition: {
+        ...mockPlugin.definition,
+        inputs: [
+          { name: 'input_file', label: 'Input File', type: 'file', required: true },
+          { name: 'id_vars', label: 'ID Columns', type: 'column-selector', multiple: true, sourceFile: 'input_file', required: true }
+        ]
+      }
+    };
+
+    beforeEach(async () => {
+      component.plugin = unboundPlugin as any;
+      await (component as any).initializeForm();
+      fixture.detectChanges();
+    });
+
+    it('reports the source file input as present', () => {
+      expect(component.hasSourceFileInput(unboundPlugin.definition.inputs[1] as any)).toBe(true);
+    });
+  });
 });

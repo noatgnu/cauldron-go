@@ -156,28 +156,47 @@
             </mat-form-field>
           }
           @case ('column-selector') {
-            <mat-form-field appearance="outline" class="full-width">
-              <mat-label>{{ input.label }}</mat-label>
-              <mat-select [formControlName]="input.name" [multiple]="input.multiple" [disabled]="getColumns(input.name).length === 0 || disabled">
-                @if (getColumns(input.name).length === 0) {
-                  <mat-option disabled>Select {{ input.sourceFile }} file first</mat-option>
-                } @else {
-                  @for (col of getColumns(input.name); track col; let idx = $index) {
-                    <mat-option
-                      [value]="col"
-                      (click)="input.multiple ? handleOptionClick($event, input.name, col, getColumns(input.name)) : null">
-                      {{ col }}
-                    </mat-option>
+            @if (hasSourceFileInput(input)) {
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>{{ input.label }}</mat-label>
+                <mat-select [formControlName]="input.name" [multiple]="input.multiple" [disabled]="getColumns(input.name).length === 0 || disabled">
+                  @if (getColumns(input.name).length === 0) {
+                    <mat-option disabled>Select {{ input.sourceFile }} file first</mat-option>
+                  } @else {
+                    @for (col of getColumns(input.name); track col; let idx = $index) {
+                      <mat-option
+                        [value]="col"
+                        (click)="input.multiple ? handleOptionClick($event, input.name, col, getColumns(input.name)) : null">
+                        {{ col }}
+                      </mat-option>
+                    }
                   }
+                </mat-select>
+                @if (input.description) {
+                  <mat-hint>{{ input.description }}</mat-hint>
                 }
-              </mat-select>
-              @if (input.description) {
-                <mat-hint>{{ input.description }}</mat-hint>
-              }
-              @if (form.get(input.name)?.hasError('required')) {
-                <mat-error>{{ input.label }} is required</mat-error>
-              }
-            </mat-form-field>
+                @if (form.get(input.name)?.hasError('required')) {
+                  <mat-error>{{ input.label }} is required</mat-error>
+                }
+              </mat-form-field>
+            } @else {
+              <mat-form-field appearance="outline" class="full-width">
+                <mat-label>{{ input.label }}</mat-label>
+                @if (input.multiple) {
+                  <input matInput
+                         [value]="getFreeTextColumnsValue(input.name)"
+                         (input)="onFreeTextColumnsInput(input.name, $any($event.target).value)"
+                         placeholder="Comma-separated column names"
+                         [disabled]="disabled">
+                } @else {
+                  <input matInput [formControlName]="input.name" placeholder="Column name" [disabled]="disabled">
+                }
+                <mat-hint>{{ input.sourceFile }} comes from an earlier stage; type the column name{{ input.multiple ? 's' : '' }} it will produce.</mat-hint>
+                @if (form.get(input.name)?.hasError('required')) {
+                  <mat-error>{{ input.label }} is required</mat-error>
+                }
+              </mat-form-field>
+            }
           }
           }
         </div>

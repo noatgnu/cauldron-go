@@ -526,7 +526,7 @@ func TestCLIJobRun_Integration(t *testing.T) {
 		t.Fatalf("coercePluginParams error: %v", err)
 	}
 
-	jobID, err := executePluginJob(ctx.pluginExecutor, ctx.jobQueue, ctx.settings, plugin, params, "")
+	jobID, err := services.ExecutePluginJob(ctx.pluginExecutor, ctx.jobQueue, ctx.settings, plugin, params, "", "", 0)
 	if err != nil {
 		t.Fatalf("executePluginJob error: %v", err)
 	}
@@ -588,7 +588,7 @@ func TestCLIJobRun_BatchIntegration(t *testing.T) {
 		if err != nil {
 			t.Fatalf("coercePluginParams error: %v", err)
 		}
-		jobID, err := executePluginJob(ctx.pluginExecutor, ctx.jobQueue, ctx.settings, plugin, params, batch.ID)
+		jobID, err := services.ExecutePluginJob(ctx.pluginExecutor, ctx.jobQueue, ctx.settings, plugin, params, batch.ID, "", 0)
 		if err != nil {
 			t.Fatalf("executePluginJob error: %v", err)
 		}
