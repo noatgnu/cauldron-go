@@ -96,7 +96,20 @@ export class Recipes implements OnInit {
       const defaultName = `${row.recipe.label.replace(/[^a-z0-9-_]+/gi, '_')}.json`;
       const path = await this.wails.saveFileDialog('Export Recipe', defaultName);
       if (!path) return;
-      await this.recipeService.exportRecipe(row.recipe.id, path);
+
+      const dialogRef = this.dialog.open(ConfirmDialogComponent, {
+        width: '480px',
+        disableClose: true,
+        data: {
+          title: 'Include plugin install info?',
+          message: 'Embedding each plugin\'s repository, commit, and dependency requirements lets someone reinstall exactly these plugins if they\'re missing on their machine, but it puts those source repository URLs in the exported file.',
+          confirmText: 'Include install info',
+          cancelText: 'Export without it'
+        }
+      });
+      const includeInstallInfo = await firstValueFrom(dialogRef.afterClosed());
+
+      await this.recipeService.exportRecipe(row.recipe.id, path, !!includeInstallInfo);
     } catch (error: any) {
       await this.wails.logToFile(`[Recipes] Failed to export recipe: ${error?.message || String(error)}`);
     }

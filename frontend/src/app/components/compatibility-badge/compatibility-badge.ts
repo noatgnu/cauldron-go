@@ -53,6 +53,10 @@ export class CompatibilityBadge {
       if (!stage || stage.status === 'compatible') continue;
       if (stage.status === 'missing') {
         lines.push(`Stage ${stage.stageIndex + 1}: plugin "${stage.pluginId}" is not installed`);
+        if (stage.repository) {
+          const ref = stage.commitHash ? ` --ref ${stage.commitHash}` : '';
+          lines.push(`  install with: cauldron plugin install ${stage.repository}${ref}`);
+        }
       } else if (stage.status === 'compatible_version_differs') {
         lines.push(`Stage ${stage.stageIndex + 1}: recorded against v${stage.recordedVersion}, installed v${stage.installedVersion}`);
       } else if (stage.status === 'incompatible') {

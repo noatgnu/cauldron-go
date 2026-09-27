@@ -31,8 +31,8 @@ export class RecipeService {
     return this.wails.deleteRecipe(id);
   }
 
-  async exportRecipe(id: string, path: string): Promise<void> {
-    return this.wails.exportRecipe(id, path);
+  async exportRecipe(id: string, path: string, includeInstallInfo: boolean): Promise<void> {
+    return this.wails.exportRecipe(id, path, includeInstallInfo);
   }
 
   async importRecipeFromFile(path: string): Promise<RecipeImportResult> {

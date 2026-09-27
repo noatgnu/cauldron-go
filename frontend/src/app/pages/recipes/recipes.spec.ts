@@ -77,11 +77,19 @@ describe('Recipes', () => {
     expect(routerMock.navigate).toHaveBeenCalledWith(['/job-chain', 'chain-1']);
   });
 
-  it('exports a recipe to a chosen file', async () => {
+  it('exports a recipe with install info when the user confirms it', async () => {
+    dialogMock.open.mockReturnValue({ afterClosed: () => of(true) });
     await component.loadRecipes();
     await component.exportRecipe(new Event('click'), component['rows']()[0]);
     expect(wailsMock.saveFileDialog).toHaveBeenCalled();
-    expect(recipeServiceMock.exportRecipe).toHaveBeenCalledWith('recipe-1', '/tmp/recipe.json');
+    expect(recipeServiceMock.exportRecipe).toHaveBeenCalledWith('recipe-1', '/tmp/recipe.json', true);
+  });
+
+  it('exports a recipe without install info when the user declines it', async () => {
+    dialogMock.open.mockReturnValue({ afterClosed: () => of(false) });
+    await component.loadRecipes();
+    await component.exportRecipe(new Event('click'), component['rows']()[0]);
+    expect(recipeServiceMock.exportRecipe).toHaveBeenCalledWith('recipe-1', '/tmp/recipe.json', false);
   });
 
   it('imports a recipe and navigates to its editor', async () => {

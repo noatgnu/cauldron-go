@@ -65,4 +65,22 @@ describe('CompatibilityBadge', () => {
     expect(component.level()).toBe('error');
     expect(component.tooltip()).toContain('not installed');
   });
+
+  it('includes a reinstall hint when a missing stage carries repository info', () => {
+    component.report = {
+      recipeId: 'r1',
+      allOk: false,
+      stages: [{ stageIndex: 0, pluginId: 'c', status: 'missing' as any, repository: 'github.com/example/plugin', commitHash: 'abc123' }]
+    } as CompatibilityReport;
+    expect(component.tooltip()).toContain('cauldron plugin install github.com/example/plugin --ref abc123');
+  });
+
+  it('omits the reinstall hint when a missing stage has no repository info', () => {
+    component.report = {
+      recipeId: 'r1',
+      allOk: false,
+      stages: [{ stageIndex: 0, pluginId: 'c', status: 'missing' as any }]
+    } as CompatibilityReport;
+    expect(component.tooltip()).not.toContain('install with');
+  });
 });

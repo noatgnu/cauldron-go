@@ -87,6 +87,24 @@ func runCLI(args []string) bool {
 			os.Exit(1)
 		}
 		return true
+	case "recipe":
+		if !verbose {
+			log.SetOutput(io.Discard)
+		}
+		if err := cliRecipe(filtered[1:]); err != nil {
+			fmt.Fprintln(os.Stderr, "Error:", err)
+			os.Exit(1)
+		}
+		return true
+	case "chain":
+		if !verbose {
+			log.SetOutput(io.Discard)
+		}
+		if err := cliChain(filtered[1:]); err != nil {
+			fmt.Fprintln(os.Stderr, "Error:", err)
+			os.Exit(1)
+		}
+		return true
 	default:
 		return false
 	}
@@ -128,6 +146,8 @@ type cliContext struct {
 	jobQueue           *services.JobQueueService
 	backupService      *services.BackupService
 	batchService       *services.BatchService
+	chainService       *services.ChainService
+	recipeService      *services.RecipeService
 }
 
 // close shuts down the job queue (killing any in-flight subprocess first, same as App.Shutdown) before closing the database.
@@ -215,6 +235,10 @@ func newCLIContextWithPluginsDir(pluginsDir string) (*cliContext, error) {
 	jobQueue.SetScriptExecutor(scriptExecutor)
 	jobQueue.SetPluginLoader(pluginLoaderV2)
 
+	chainService := services.NewChainService(db, jobQueue, pluginLoaderV2, pluginExecutor, settings)
+	jobQueue.SetChainService(chainService)
+	recipeService := services.NewRecipeService(db, pluginLoaderV2, chainService)
+
 	return &cliContext{
 		db:                 db,
 		settings:           settings,
@@ -227,6 +251,8 @@ func newCLIContextWithPluginsDir(pluginsDir string) (*cliContext, error) {
 		jobQueue:           jobQueue,
 		backupService:      services.NewBackupService(db),
 		batchService:       services.NewBatchServiceV3(db, jobQueue),
+		chainService:       chainService,
+		recipeService:      recipeService,
 	}, nil
 }
 
@@ -1031,6 +1057,378 @@ func cliJobStatus(args []string) error {
 		fmt.Println("Output log:")
 		for _, line := range job.TerminalOutput {
 			fmt.Println("  " + line)
+		}
+	}
+	return nil
+}
+
+// findRecipe resolves a CLI-supplied recipe reference: its UUID id, or an exact match on its label. Recipe labels aren't required to be unique, so an ambiguous label match is an error naming the candidate ids instead of guessing.
+func findRecipe(recipeService *services.RecipeService, ref string) (*models.Recipe, error) {
+	if recipe, err := recipeService.GetRecipe(ref); err == nil {
+		return recipe, nil
+	}
+
+	recipes, err := recipeService.GetAllRecipes(1000, 0)
+	if err != nil {
+		return nil, fmt.Errorf("failed to search recipes: %w", err)
+	}
+
+	var matches []*models.Recipe
+	for _, r := range recipes {
+		if r.Label == ref {
+			matches = append(matches, r)
+		}
+	}
+	switch len(matches) {
+	case 0:
+		return nil, fmt.Errorf("no recipe found matching %q", ref)
+	case 1:
+		return matches[0], nil
+	default:
+		ids := make([]string, len(matches))
+		for i, m := range matches {
+			ids[i] = m.ID
+		}
+		return nil, fmt.Errorf("multiple recipes are labeled %q, specify one by id instead: %s", ref, strings.Join(ids, ", "))
+	}
+}
+
+// waitForChain polls a chain until it reaches a terminal status, streaming the currently active stage's job output the same way waitForJob streams a single job, and printing a summary line as each stage finishes.
+func waitForChain(ctx *cliContext, chainID string, timeout time.Duration) (*services.ChainStatus, error) {
+	deadline := time.Now().Add(timeout)
+	reportedDone := map[int]bool{}
+	currentStage := -1
+	var lastPrinted string
+	printedAny := false
+
+	for {
+		status, err := ctx.chainService.GetChainStatus(chainID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to look up chain: %w", err)
+		}
+
+		for _, s := range status.Stages {
+			if s.Job == nil {
+				continue
+			}
+			if s.StageIndex != currentStage {
+				currentStage = s.StageIndex
+				lastPrinted = ""
+				printedAny = false
+				fmt.Printf("-- stage %d: %s --\n", s.StageIndex, s.Job.Name)
+			}
+
+			newLines, truncated := newTerminalOutputLines(s.Job.TerminalOutput, lastPrinted, printedAny)
+			if truncated {
+				fmt.Println("    ... (earlier output omitted; job exceeded the retained line buffer) ...")
+			}
+			for _, line := range newLines {
+				fmt.Println("   ", line)
+			}
+			if len(s.Job.TerminalOutput) > 0 {
+				lastPrinted = s.Job.TerminalOutput[len(s.Job.TerminalOutput)-1]
+				printedAny = true
+			}
+
+			if (s.Status == "completed" || s.Status == "failed") && !reportedDone[s.StageIndex] {
+				reportedDone[s.StageIndex] = true
+				fmt.Printf("  stage %d: %s", s.StageIndex, s.Status)
+				if s.Job.OutputPath != "" {
+					fmt.Printf(" (output: %s)", s.Job.OutputPath)
+				}
+				fmt.Println()
+				if s.Job.Error != "" {
+					fmt.Fprintf(os.Stderr, "    error: %s\n", s.Job.Error)
+				}
+			}
+		}
+
+		if status.Status == "completed" || status.Status == "failed" {
+			return status, nil
+		}
+
+		if time.Now().After(deadline) {
+			return status, fmt.Errorf("timed out waiting for chain to finish (status: %s)", status.Status)
+		}
+
+		time.Sleep(500 * time.Millisecond)
+	}
+}
+
+func cliRecipe(args []string) error {
+	if len(args) == 0 {
+		return fmt.Errorf("usage: cauldron recipe list | cauldron recipe run <id-or-label> | cauldron recipe compat <id-or-label> | cauldron recipe export <id-or-label> <path> | cauldron recipe import <path> | cauldron recipe delete <id-or-label>")
+	}
+
+	switch args[0] {
+	case "list":
+		return cliRecipeList()
+	case "run":
+		return cliRecipeRun(args[1:])
+	case "compat":
+		return cliRecipeCompat(args[1:])
+	case "export":
+		return cliRecipeExport(args[1:])
+	case "import":
+		return cliRecipeImport(args[1:])
+	case "delete":
+		return cliRecipeDelete(args[1:])
+	default:
+		return fmt.Errorf("unknown recipe subcommand: %s", args[0])
+	}
+}
+
+func cliRecipeList() error {
+	ctx, err := newCLIContext()
+	if err != nil {
+		return fmt.Errorf("failed to initialize: %w", err)
+	}
+	defer ctx.close()
+
+	recipes, err := ctx.recipeService.GetAllRecipes(1000, 0)
+	if err != nil {
+		return fmt.Errorf("failed to list recipes: %w", err)
+	}
+	if len(recipes) == 0 {
+		fmt.Println("No recipes found.")
+		return nil
+	}
+	for _, r := range recipes {
+		fmt.Printf("%-38s %-30s %s\n", r.ID, r.Label, r.CreatedAt.Format(time.RFC3339))
+	}
+	return nil
+}
+
+func cliRecipeRun(args []string) error {
+	fs := flag.NewFlagSet("recipe run", flag.ContinueOnError)
+	timeout := fs.Duration("timeout", 30*time.Minute, "max time to wait for the chain to finish")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if fs.NArg() != 1 {
+		return fmt.Errorf("usage: cauldron recipe run [--timeout 30m] <id-or-label>")
+	}
+
+	ctx, err := newCLIContext()
+	if err != nil {
+		return fmt.Errorf("failed to initialize: %w", err)
+	}
+	defer ctx.close()
+
+	recipe, err := findRecipe(ctx.recipeService, fs.Arg(0))
+	if err != nil {
+		return err
+	}
+
+	chain, err := ctx.recipeService.InstantiateChain(recipe.ID, nil)
+	if err != nil {
+		return fmt.Errorf("failed to run recipe %q: %w", recipe.Label, err)
+	}
+	fmt.Printf("Started chain %s from recipe %q\n", chain.ID, recipe.Label)
+
+	status, err := waitForChain(ctx, chain.ID, *timeout)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Chain %s: %s\n", chain.ID, status.Status)
+	if status.Status != "completed" {
+		return fmt.Errorf("chain did not complete successfully")
+	}
+	return nil
+}
+
+func cliRecipeCompat(args []string) error {
+	if len(args) == 0 {
+		return fmt.Errorf("usage: cauldron recipe compat <id-or-label>")
+	}
+
+	ctx, err := newCLIContext()
+	if err != nil {
+		return fmt.Errorf("failed to initialize: %w", err)
+	}
+	defer ctx.close()
+
+	recipe, err := findRecipe(ctx.recipeService, args[0])
+	if err != nil {
+		return err
+	}
+
+	report, err := ctx.recipeService.CheckCompatibility(recipe.ID)
+	if err != nil {
+		return fmt.Errorf("failed to check compatibility: %w", err)
+	}
+
+	fmt.Printf("Recipe %s (%s)\n", recipe.Label, recipe.ID)
+	for _, s := range report.Stages {
+		fmt.Printf("  stage %d: %s -- %s", s.StageIndex, s.PluginID, s.Status)
+		if s.RecordedVersion != "" || s.InstalledVersion != "" {
+			fmt.Printf(" (recorded %s, installed %s)", s.RecordedVersion, s.InstalledVersion)
+		}
+		fmt.Println()
+		for _, m := range s.MissingInputs {
+			fmt.Printf("    missing input: %s\n", m)
+		}
+		for _, m := range s.MissingOutputs {
+			fmt.Printf("    missing output: %s\n", m)
+		}
+		if s.Status == services.CompatibilityMissing && s.Repository != "" {
+			if s.CommitHash != "" {
+				fmt.Printf("    install with: cauldron plugin install %s --ref %s\n", s.Repository, s.CommitHash)
+			} else {
+				fmt.Printf("    install with: cauldron plugin install %s\n", s.Repository)
+			}
+		}
+	}
+
+	if !report.AllOK {
+		return fmt.Errorf("recipe is not fully compatible with installed plugins")
+	}
+	fmt.Println("All stages compatible.")
+	return nil
+}
+
+func cliRecipeExport(args []string) error {
+	fs := flag.NewFlagSet("recipe export", flag.ContinueOnError)
+	withInstallInfo := fs.Bool("with-install-info", false, "embed each plugin's repository, commit, and dependency requirements, so a missing plugin can be reinstalled from the exported file")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if fs.NArg() != 2 {
+		return fmt.Errorf("usage: cauldron recipe export [--with-install-info] <id-or-label> <path>")
+	}
+
+	ctx, err := newCLIContext()
+	if err != nil {
+		return fmt.Errorf("failed to initialize: %w", err)
+	}
+	defer ctx.close()
+
+	recipe, err := findRecipe(ctx.recipeService, fs.Arg(0))
+	if err != nil {
+		return err
+	}
+	if err := ctx.recipeService.ExportRecipe(recipe.ID, fs.Arg(1), *withInstallInfo); err != nil {
+		return fmt.Errorf("failed to export recipe: %w", err)
+	}
+	fmt.Printf("Exported recipe %q to %s\n", recipe.Label, fs.Arg(1))
+	return nil
+}
+
+func cliRecipeImport(args []string) error {
+	if len(args) != 1 {
+		return fmt.Errorf("usage: cauldron recipe import <path>")
+	}
+
+	ctx, err := newCLIContext()
+	if err != nil {
+		return fmt.Errorf("failed to initialize: %w", err)
+	}
+	defer ctx.close()
+
+	result, err := ctx.recipeService.ImportRecipeFromFile(args[0])
+	if err != nil {
+		return fmt.Errorf("failed to import recipe: %w", err)
+	}
+	fmt.Printf("Imported recipe %q (%s)\n", result.Recipe.Label, result.Recipe.ID)
+	if !result.Compatibility.AllOK {
+		fmt.Println("Warning: recipe is not fully compatible with installed plugins:")
+		for _, s := range result.Compatibility.Stages {
+			if s.Status != services.CompatibilityCompatible {
+				fmt.Printf("  stage %d: %s -- %s\n", s.StageIndex, s.PluginID, s.Status)
+			}
+		}
+	}
+	return nil
+}
+
+func cliRecipeDelete(args []string) error {
+	if len(args) != 1 {
+		return fmt.Errorf("usage: cauldron recipe delete <id-or-label>")
+	}
+
+	ctx, err := newCLIContext()
+	if err != nil {
+		return fmt.Errorf("failed to initialize: %w", err)
+	}
+	defer ctx.close()
+
+	recipe, err := findRecipe(ctx.recipeService, args[0])
+	if err != nil {
+		return err
+	}
+	if err := ctx.recipeService.DeleteRecipe(recipe.ID); err != nil {
+		return fmt.Errorf("failed to delete recipe: %w", err)
+	}
+	fmt.Printf("Deleted recipe %q (%s)\n", recipe.Label, recipe.ID)
+	return nil
+}
+
+func cliChain(args []string) error {
+	if len(args) == 0 {
+		return fmt.Errorf("usage: cauldron chain list | cauldron chain status <id>")
+	}
+
+	switch args[0] {
+	case "list":
+		return cliChainList()
+	case "status":
+		return cliChainStatus(args[1:])
+	default:
+		return fmt.Errorf("unknown chain subcommand: %s", args[0])
+	}
+}
+
+func cliChainList() error {
+	ctx, err := newCLIContext()
+	if err != nil {
+		return fmt.Errorf("failed to initialize: %w", err)
+	}
+	defer ctx.close()
+
+	chains, err := ctx.chainService.GetAllChains(1000, 0)
+	if err != nil {
+		return fmt.Errorf("failed to list chains: %w", err)
+	}
+	if len(chains) == 0 {
+		fmt.Println("No job chains found.")
+		return nil
+	}
+	for _, c := range chains {
+		fmt.Printf("%-38s %-30s %s\n", c.ID, c.Label, c.CreatedAt.Format(time.RFC3339))
+	}
+	return nil
+}
+
+func cliChainStatus(args []string) error {
+	if len(args) == 0 {
+		return fmt.Errorf("usage: cauldron chain status <id>")
+	}
+
+	ctx, err := newCLIContext()
+	if err != nil {
+		return fmt.Errorf("failed to initialize: %w", err)
+	}
+	defer ctx.close()
+
+	status, err := ctx.chainService.GetChainStatus(args[0])
+	if err != nil {
+		return fmt.Errorf("chain not found: %w", err)
+	}
+
+	fmt.Printf("ID:      %s\n", status.ChainID)
+	fmt.Printf("Label:   %s\n", status.Label)
+	fmt.Printf("Status:  %s\n", status.Status)
+	fmt.Printf("Created: %s\n", status.CreatedAt.Format(time.RFC3339))
+	for _, s := range status.Stages {
+		fmt.Printf("  stage %d: %s\n", s.StageIndex, s.Status)
+		if s.Job != nil {
+			if s.Job.OutputPath != "" {
+				fmt.Printf("    output: %s\n", s.Job.OutputPath)
+			}
+			if s.Job.Error != "" {
+				fmt.Printf("    error:  %s\n", s.Job.Error)
+			}
 		}
 	}
 	return nil

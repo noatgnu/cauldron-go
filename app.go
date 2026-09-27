@@ -1465,6 +1465,9 @@ type RecipeStageRequestV2 struct {
 	PluginVersion string                               `json:"pluginVersion"`
 	Params        map[string]interface{}               `json:"params"`
 	Bindings      map[string]models.RecipeStageBinding `json:"bindings"`
+	Repository    string                               `json:"repository,omitempty"`
+	CommitHash    string                               `json:"commitHash,omitempty"`
+	Requirements  *models.Requirements                 `json:"requirements,omitempty"`
 }
 
 type RecipeSaveRequestV2 struct {
@@ -1481,6 +1484,9 @@ func recipeStageSpecsFromRequest(stages []RecipeStageRequestV2) []services.Recip
 			PluginVersion: s.PluginVersion,
 			Params:        s.Params,
 			Bindings:      s.Bindings,
+			Repository:    s.Repository,
+			CommitHash:    s.CommitHash,
+			Requirements:  s.Requirements,
 		}
 	}
 	return specs
@@ -1510,8 +1516,8 @@ func (a *App) DeleteRecipe(id string) error {
 	return a.recipeService.DeleteRecipe(id)
 }
 
-func (a *App) ExportRecipe(id string, path string) error {
-	return a.recipeService.ExportRecipe(id, path)
+func (a *App) ExportRecipe(id string, path string, includeInstallInfo bool) error {
+	return a.recipeService.ExportRecipe(id, path, includeInstallInfo)
 }
 
 func (a *App) ImportRecipeFromFile(path string) (*services.RecipeImportResult, error) {

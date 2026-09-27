@@ -18,6 +18,10 @@ type RecipeStage struct {
 	PluginVersion string  `json:"pluginVersion,omitempty"`
 	Params        JSONMap `gorm:"type:text" json:"params"`
 	Bindings      JSONMap `gorm:"type:text" json:"bindings"`
+
+	Repository   string  `json:"repository,omitempty"`
+	CommitHash   string  `json:"commitHash,omitempty"`
+	Requirements JSONMap `gorm:"type:text" json:"requirements,omitempty"`
 }
 
 type RecipeStageBinding struct {

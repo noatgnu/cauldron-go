@@ -1,8 +1,10 @@
 package services
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/noatgnu/cauldron-go/backend/models"
@@ -84,7 +86,7 @@ func TestRecipeService_ExportImportRoundTrip(t *testing.T) {
 	}
 
 	exportPath := filepath.Join(tempDir, "recipe.json")
-	if err := recipeService.ExportRecipe(recipe.ID, exportPath); err != nil {
+	if err := recipeService.ExportRecipe(recipe.ID, exportPath, false); err != nil {
 		t.Fatalf("ExportRecipe failed: %v", err)
 	}
 	if _, err := os.Stat(exportPath); err != nil {
@@ -221,6 +223,183 @@ func TestRecipeService_CheckCompatibility_IncompatibleMissingInput(t *testing.T)
 	}
 	if !found {
 		t.Errorf("expected missing input %q to be reported, got: %v", "no_longer_exists", report.Stages[1].MissingInputs)
+	}
+}
+
+const recipeTestInstallableYAML = `plugin:
+  id: recipe-installable
+  name: Recipe Installable
+  version: "1.0.0"
+  description: has repository and requirements set
+  repository: https://github.com/example/recipe-installable
+
+runtime:
+  environments: ["python"]
+  entrypoint: main.py
+
+execution:
+  requirements:
+    packages: ["numpy", "pandas"]
+`
+
+func TestRecipeService_ExportRecipe_OmitsInstallInfoByDefault(t *testing.T) {
+	tempDir := t.TempDir()
+	_, recipeService, _ := setupRecipeTestServices(t)
+
+	recipe, err := recipeService.SaveRecipe("No Install Info", "", testRecipeStages())
+	if err != nil {
+		t.Fatalf("SaveRecipe failed: %v", err)
+	}
+
+	exportPath := filepath.Join(tempDir, "recipe.json")
+	if err := recipeService.ExportRecipe(recipe.ID, exportPath, false); err != nil {
+		t.Fatalf("ExportRecipe failed: %v", err)
+	}
+
+	raw, err := os.ReadFile(exportPath)
+	if err != nil {
+		t.Fatalf("failed to read export file: %v", err)
+	}
+	if strings.Contains(string(raw), "repository") || strings.Contains(string(raw), "commitHash") {
+		t.Errorf("expected no install info fields in export, got: %s", raw)
+	}
+}
+
+func TestRecipeService_ExportRecipe_IncludesLiveInstallInfoWhenRequested(t *testing.T) {
+	tempDir := t.TempDir()
+	db, err := newDatabaseServiceFromPath(filepath.Join(tempDir, "test.db"))
+	if err != nil {
+		t.Fatalf("Failed to create database: %v", err)
+	}
+	t.Cleanup(func() { db.Close() })
+
+	pluginsRoot := filepath.Join(tempDir, "plugins")
+	writeChainTestPlugin(t, pluginsRoot, "recipe-installable", recipeTestInstallableYAML)
+	pluginLoader := NewPluginLoaderV2(pluginsRoot, db, nil)
+	if err := pluginLoader.LoadPlugins(); err != nil {
+		t.Fatalf("LoadPlugins failed: %v", err)
+	}
+	recipeService := NewRecipeService(db, pluginLoader, nil)
+
+	recipe, err := recipeService.SaveRecipe("Installable Recipe", "", []RecipeStageSpec{
+		{PluginID: "recipe-installable", PluginVersion: "1.0.0", Params: map[string]interface{}{}, Bindings: map[string]models.RecipeStageBinding{}},
+	})
+	if err != nil {
+		t.Fatalf("SaveRecipe failed: %v", err)
+	}
+
+	exportPath := filepath.Join(tempDir, "recipe.json")
+	if err := recipeService.ExportRecipe(recipe.ID, exportPath, true); err != nil {
+		t.Fatalf("ExportRecipe failed: %v", err)
+	}
+
+	var data RecipeData
+	raw, err := os.ReadFile(exportPath)
+	if err != nil {
+		t.Fatalf("failed to read export file: %v", err)
+	}
+	if err := json.Unmarshal(raw, &data); err != nil {
+		t.Fatalf("failed to parse export file: %v", err)
+	}
+	if len(data.Stages) != 1 {
+		t.Fatalf("expected 1 stage, got %d", len(data.Stages))
+	}
+	if data.Stages[0].Repository != "https://github.com/example/recipe-installable" {
+		t.Errorf("expected repository to be carried through, got %q", data.Stages[0].Repository)
+	}
+	if data.Stages[0].Requirements == nil || len(data.Stages[0].Requirements.Packages) != 2 {
+		t.Errorf("expected requirements to be carried through, got %+v", data.Stages[0].Requirements)
+	}
+}
+
+func TestRecipeService_ExportRecipe_FallsBackToStoredInstallInfoWhenPluginMissing(t *testing.T) {
+	tempDir := t.TempDir()
+	_, recipeService, _ := setupRecipeTestServices(t)
+
+	recipe, err := recipeService.SaveRecipe("Missing Plugin Recipe", "", []RecipeStageSpec{
+		{
+			PluginID:      "totally-not-installed",
+			PluginVersion: "2.0.0",
+			Params:        map[string]interface{}{},
+			Bindings:      map[string]models.RecipeStageBinding{},
+			Repository:    "https://github.com/example/missing-plugin",
+			CommitHash:    "deadbeef",
+			Requirements:  &models.Requirements{Packages: []string{"scipy"}},
+		},
+	})
+	if err != nil {
+		t.Fatalf("SaveRecipe failed: %v", err)
+	}
+
+	exportPath := filepath.Join(tempDir, "recipe.json")
+	if err := recipeService.ExportRecipe(recipe.ID, exportPath, true); err != nil {
+		t.Fatalf("ExportRecipe failed: %v", err)
+	}
+
+	var data RecipeData
+	raw, err := os.ReadFile(exportPath)
+	if err != nil {
+		t.Fatalf("failed to read export file: %v", err)
+	}
+	if err := json.Unmarshal(raw, &data); err != nil {
+		t.Fatalf("failed to parse export file: %v", err)
+	}
+	if data.Stages[0].Repository != "https://github.com/example/missing-plugin" {
+		t.Errorf("expected stored repository to survive export, got %q", data.Stages[0].Repository)
+	}
+	if data.Stages[0].CommitHash != "deadbeef" {
+		t.Errorf("expected stored commit hash to survive export, got %q", data.Stages[0].CommitHash)
+	}
+	if data.Stages[0].Requirements == nil || len(data.Stages[0].Requirements.Packages) != 1 || data.Stages[0].Requirements.Packages[0] != "scipy" {
+		t.Errorf("expected stored requirements to survive export, got %+v", data.Stages[0].Requirements)
+	}
+}
+
+func TestRecipeService_ImportRecipeFromFile_PersistsInstallInfoAndSurfacesItOnMissingCompatibility(t *testing.T) {
+	tempDir := t.TempDir()
+	_, recipeService, _ := setupRecipeTestServices(t)
+
+	source, err := recipeService.SaveRecipe("Source Recipe", "", []RecipeStageSpec{
+		{
+			PluginID:      "still-not-installed",
+			PluginVersion: "3.0.0",
+			Params:        map[string]interface{}{},
+			Bindings:      map[string]models.RecipeStageBinding{},
+			Repository:    "https://github.com/example/still-not-installed",
+			CommitHash:    "cafebabe",
+		},
+	})
+	if err != nil {
+		t.Fatalf("SaveRecipe failed: %v", err)
+	}
+
+	exportPath := filepath.Join(tempDir, "recipe.json")
+	if err := recipeService.ExportRecipe(source.ID, exportPath, true); err != nil {
+		t.Fatalf("ExportRecipe failed: %v", err)
+	}
+
+	result, err := recipeService.ImportRecipeFromFile(exportPath)
+	if err != nil {
+		t.Fatalf("ImportRecipeFromFile failed: %v", err)
+	}
+
+	stages, err := recipeService.GetRecipeStages(result.Recipe.ID)
+	if err != nil {
+		t.Fatalf("GetRecipeStages failed: %v", err)
+	}
+	if stages[0].Repository != "https://github.com/example/still-not-installed" || stages[0].CommitHash != "cafebabe" {
+		t.Errorf("expected imported stage to persist install info, got repository=%q commitHash=%q", stages[0].Repository, stages[0].CommitHash)
+	}
+
+	if result.Compatibility.AllOK {
+		t.Fatal("expected the imported recipe to be incompatible since its plugin isn't installed")
+	}
+	missing := result.Compatibility.Stages[0]
+	if missing.Status != CompatibilityMissing {
+		t.Fatalf("expected stage 0 status %q, got %q", CompatibilityMissing, missing.Status)
+	}
+	if missing.Repository != "https://github.com/example/still-not-installed" || missing.CommitHash != "cafebabe" {
+		t.Errorf("expected CheckCompatibility to surface the stored install info on a missing stage, got repository=%q commitHash=%q", missing.Repository, missing.CommitHash)
 	}
 }
 

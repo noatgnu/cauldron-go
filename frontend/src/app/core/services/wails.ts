@@ -477,10 +477,10 @@ export class Wails {
     return WailsApp.DeleteRecipe(id);
   }
 
-  async exportRecipe(id: string, path: string): Promise<void> {
+  async exportRecipe(id: string, path: string, includeInstallInfo: boolean): Promise<void> {
     if (!this.isWails) throw new Error('Wails not available');
     await this.waitForBackend();
-    return WailsApp.ExportRecipe(id, path);
+    return WailsApp.ExportRecipe(id, path, includeInstallInfo);
   }
 
   async importRecipeFromFile(path: string): Promise<RecipeImportResult> {

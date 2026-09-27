@@ -17,6 +17,10 @@ type RecipeStageSpec struct {
 	PluginVersion string
 	Params        map[string]interface{}
 	Bindings      map[string]models.RecipeStageBinding
+
+	Repository   string
+	CommitHash   string
+	Requirements *models.Requirements
 }
 
 type RecipeData struct {
@@ -31,6 +35,10 @@ type RecipeStageData struct {
 	PluginVersion string                               `json:"pluginVersion,omitempty"`
 	Params        map[string]interface{}               `json:"params"`
 	Bindings      map[string]models.RecipeStageBinding `json:"bindings"`
+
+	Repository   string               `json:"repository,omitempty"`
+	CommitHash   string               `json:"commitHash,omitempty"`
+	Requirements *models.Requirements `json:"requirements,omitempty"`
 }
 
 type CompatibilityStatus string
@@ -50,6 +58,9 @@ type StageCompatibility struct {
 	Status           CompatibilityStatus `json:"status"`
 	MissingInputs    []string            `json:"missingInputs,omitempty"`
 	MissingOutputs   []string            `json:"missingOutputs,omitempty"`
+
+	Repository string `json:"repository,omitempty"`
+	CommitHash string `json:"commitHash,omitempty"`
 }
 
 type CompatibilityReport struct {
@@ -100,6 +111,10 @@ func (r *RecipeService) saveStages(recipeID string, stages []RecipeStageSpec) er
 		for inputName, b := range spec.Bindings {
 			bindings[inputName] = map[string]interface{}{"stage": b.Stage, "output": b.Output}
 		}
+		requirements, err := requirementsToJSONMap(spec.Requirements)
+		if err != nil {
+			return fmt.Errorf("failed to encode requirements for stage %d: %w", i, err)
+		}
 		stageRow := &models.RecipeStage{
 			RecipeID:      recipeID,
 			StageIndex:    i,
@@ -107,12 +122,53 @@ func (r *RecipeService) saveStages(recipeID string, stages []RecipeStageSpec) er
 			PluginVersion: spec.PluginVersion,
 			Params:        spec.Params,
 			Bindings:      bindings,
+			Repository:    spec.Repository,
+			CommitHash:    spec.CommitHash,
+			Requirements:  requirements,
 		}
 		if err := r.db.GetDB().Create(stageRow).Error; err != nil {
 			return fmt.Errorf("failed to create stage %d: %w", i, err)
 		}
 	}
 	return nil
+}
+
+func requirementsToJSONMap(reqs *models.Requirements) (models.JSONMap, error) {
+	if reqs == nil {
+		return nil, nil
+	}
+	raw, err := json.Marshal(reqs)
+	if err != nil {
+		return nil, err
+	}
+	var m models.JSONMap
+	if err := json.Unmarshal(raw, &m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+func requirementsEmpty(reqs *models.Requirements) bool {
+	if reqs == nil {
+		return true
+	}
+	return reqs.Python == "" && reqs.R == "" && len(reqs.Packages) == 0 &&
+		reqs.PythonRequirementsFile == "" && reqs.RPackagesFile == ""
+}
+
+func jsonMapToRequirements(m models.JSONMap) (*models.Requirements, error) {
+	if len(m) == 0 {
+		return nil, nil
+	}
+	raw, err := json.Marshal(m)
+	if err != nil {
+		return nil, err
+	}
+	var reqs models.Requirements
+	if err := json.Unmarshal(raw, &reqs); err != nil {
+		return nil, err
+	}
+	return &reqs, nil
 }
 
 func (r *RecipeService) UpdateRecipe(id, label, description string, stages []RecipeStageSpec) (*models.Recipe, error) {
@@ -171,7 +227,7 @@ func (r *RecipeService) DeleteRecipe(id string) error {
 	return r.db.GetDB().Delete(&models.Recipe{}, "id = ?", id).Error
 }
 
-func (r *RecipeService) ExportRecipe(id, path string) error {
+func (r *RecipeService) ExportRecipe(id, path string, includeInstallInfo bool) error {
 	recipe, err := r.GetRecipe(id)
 	if err != nil {
 		return err
@@ -197,12 +253,35 @@ func (r *RecipeService) ExportRecipe(id, path string) error {
 			outputName, _ := bindingMap["output"].(string)
 			bindings[inputName] = models.RecipeStageBinding{Stage: int(stageIdx), Output: outputName}
 		}
-		data.Stages = append(data.Stages, RecipeStageData{
+
+		stageData := RecipeStageData{
 			PluginID:      s.PluginID,
 			PluginVersion: s.PluginVersion,
 			Params:        s.Params,
 			Bindings:      bindings,
-		})
+		}
+
+		if includeInstallInfo {
+			repository, commitHash := s.Repository, s.CommitHash
+			var reqs *models.Requirements
+			if installed, err := r.pluginLoader.GetPluginByStringID(s.PluginID); err == nil {
+				repository = installed.Repository
+				commitHash = installed.CommitHash
+				reqs = &installed.Definition.Execution.Requirements
+			} else {
+				reqs, err = jsonMapToRequirements(s.Requirements)
+				if err != nil {
+					return fmt.Errorf("failed to decode stored requirements for stage %d: %w", s.StageIndex, err)
+				}
+			}
+			stageData.Repository = repository
+			stageData.CommitHash = commitHash
+			if !requirementsEmpty(reqs) {
+				stageData.Requirements = reqs
+			}
+		}
+
+		data.Stages = append(data.Stages, stageData)
 	}
 
 	raw, err := json.MarshalIndent(data, "", "  ")
@@ -238,6 +317,9 @@ func (r *RecipeService) ImportRecipeFromFile(path string) (*RecipeImportResult, 
 			PluginVersion: s.PluginVersion,
 			Params:        s.Params,
 			Bindings:      s.Bindings,
+			Repository:    s.Repository,
+			CommitHash:    s.CommitHash,
+			Requirements:  s.Requirements,
 		}
 	}
 
@@ -272,6 +354,8 @@ func (r *RecipeService) CheckCompatibility(recipeID string) (*CompatibilityRepor
 		installed, err := r.pluginLoader.GetPluginByStringID(stage.PluginID)
 		if err != nil {
 			result.Status = CompatibilityMissing
+			result.Repository = stage.Repository
+			result.CommitHash = stage.CommitHash
 			report.AllOK = false
 			report.Stages = append(report.Stages, result)
 			continue
