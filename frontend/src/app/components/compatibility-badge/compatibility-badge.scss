@@ -1,0 +1,29 @@
+.compatibility-badge {
+  font-size: 12px;
+
+  mat-icon {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+  }
+
+  &.level-ok {
+    background-color: var(--success-container);
+    color: var(--success);
+  }
+
+  &.level-warn {
+    background-color: var(--warning-container, #fff3cd);
+    color: var(--warning, #7a5c00);
+  }
+
+  &.level-error {
+    background-color: var(--error-container);
+    color: var(--error);
+  }
+
+  &.level-unknown {
+    background-color: var(--surface-variant);
+    color: var(--on-surface-variant);
+  }
+}

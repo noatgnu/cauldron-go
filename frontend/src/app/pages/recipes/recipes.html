@@ -1,0 +1,62 @@
+<div class="recipes-container">
+  <mat-card>
+    <mat-card-header>
+      <mat-card-title>Recipes</mat-card-title>
+    </mat-card-header>
+    <mat-card-content>
+      <div class="toolbar">
+        <button class="new-recipe-btn" mat-raised-button color="primary" type="button" (click)="newRecipe()">
+          <mat-icon>add</mat-icon>
+          New Recipe
+        </button>
+        <button class="import-recipe-btn" mat-stroked-button type="button" (click)="importRecipe()">
+          <mat-icon>upload_file</mat-icon>
+          Import Recipe
+        </button>
+      </div>
+
+      @if (loading()) {
+        <p>Loading...</p>
+      } @else if (rows().length === 0) {
+        <p class="empty-state">No recipes yet. Create one to chain several plugins together.</p>
+      } @else {
+        <table mat-table [dataSource]="rows()" class="recipes-table">
+          <ng-container matColumnDef="label">
+            <th mat-header-cell *matHeaderCellDef>Label</th>
+            <td mat-cell *matCellDef="let row">{{ row.recipe.label }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="compatibility">
+            <th mat-header-cell *matHeaderCellDef>Compatibility</th>
+            <td mat-cell *matCellDef="let row">
+              <app-compatibility-badge [report]="row.compatibility"></app-compatibility-badge>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="createdAt">
+            <th mat-header-cell *matHeaderCellDef>Created</th>
+            <td mat-cell *matCellDef="let row">{{ row.recipe.createdAt | date: 'short' }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="actions">
+            <th mat-header-cell *matHeaderCellDef></th>
+            <td mat-cell *matCellDef="let row">
+              <button class="run-recipe-btn" mat-icon-button (click)="runRecipe($event, row.recipe.id)" matTooltip="Run this recipe">
+                <mat-icon>play_arrow</mat-icon>
+              </button>
+              <button class="export-recipe-btn" mat-icon-button (click)="exportRecipe($event, row)" matTooltip="Export to a file">
+                <mat-icon>download</mat-icon>
+              </button>
+              <button class="delete-recipe-btn" mat-icon-button (click)="deleteRecipe($event, row.recipe.id)" matTooltip="Delete recipe">
+                <mat-icon>delete</mat-icon>
+              </button>
+            </td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+          <tr mat-row *matRowDef="let row; columns: displayedColumns;" (click)="editRecipe(row.recipe.id)" class="clickable-row" [attr.data-recipe-id]="row.recipe.id"></tr>
+        </table>
+      }
+    </mat-card-content>
+  </mat-card>
+</div>

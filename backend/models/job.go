@@ -81,6 +81,8 @@ type Job struct {
 	PluginVersion    string      `json:"pluginVersion,omitempty"`
 	PluginCommitHash string      `json:"pluginCommitHash,omitempty"`
 	BatchID          string      `gorm:"index" json:"batchId,omitempty"`
+	ChainID          string      `gorm:"index" json:"chainId,omitempty"`
+	ChainStageIndex  int         `json:"chainStageIndex,omitempty"`
 	CreatedAt        time.Time   `gorm:"not null" json:"createdAt"`
 	StartedAt        *time.Time  `json:"startedAt,omitempty"`
 	CompletedAt      *time.Time  `json:"completedAt,omitempty"`

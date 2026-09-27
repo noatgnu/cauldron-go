@@ -519,7 +519,7 @@
         "transform": {
           "type": "string",
           "description": "Value transformation",
-          "enum": ["comma-join", "space-join", "json-encode", "color-map"]
+          "enum": ["comma-join", "space-join", "json-encode", "color-map", "map"]
         },
         "when": {
           "type": "string",
@@ -528,6 +528,13 @@
         "value": {
           "type": "string",
           "description": "Value to pass instead of actual value"
+        },
+        "values": {
+          "type": "object",
+          "description": "Lookup table used when transform is 'map': keys are the input's raw values, values are what gets passed on the command line",
+          "additionalProperties": {
+            "type": "string"
+          }
         },
         "passAsValue": {
           "type": "boolean",

@@ -1,0 +1,26 @@
+.recipes-container {
+  padding: 8px;
+}
+
+.toolbar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.recipes-table {
+  width: 100%;
+}
+
+.clickable-row {
+  cursor: pointer;
+}
+
+.clickable-row:hover {
+  background: var(--mat-sys-surface-container-highest, rgba(0, 0, 0, 0.04));
+}
+
+.empty-state {
+  color: var(--mat-sys-on-surface-variant, #666);
+  font-size: 0.9em;
+}

@@ -1,0 +1,10 @@
+<div class="recipe-editor-page-container">
+  <mat-card>
+    <mat-card-header>
+      <mat-card-title>{{ recipeId() ? 'Edit Recipe' : 'New Recipe' }}</mat-card-title>
+    </mat-card-header>
+    <mat-card-content>
+      <app-recipe-editor [recipeId]="recipeId()"></app-recipe-editor>
+    </mat-card-content>
+  </mat-card>
+</div>

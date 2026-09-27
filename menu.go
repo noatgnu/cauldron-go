@@ -89,6 +89,21 @@ func createApplicationMenu(app *App) *application.Menu {
 			}
 		})
 
+	viewMenu.Add("Recipes").
+		SetAccelerator("CmdOrCtrl+6").
+		OnClick(func(ctx *application.Context) {
+			if app.wailsApp != nil {
+				app.wailsApp.Event.Emit("menu:view-recipes", nil)
+			}
+		})
+	viewMenu.Add("Job Chains").
+		SetAccelerator("CmdOrCtrl+7").
+		OnClick(func(ctx *application.Context) {
+			if app.wailsApp != nil {
+				app.wailsApp.Event.Emit("menu:view-job-chains", nil)
+			}
+		})
+
 	windowMenu := menu.AddSubmenu("Window")
 	windowMenu.Add("Minimize").
 		SetAccelerator("CmdOrCtrl+M").

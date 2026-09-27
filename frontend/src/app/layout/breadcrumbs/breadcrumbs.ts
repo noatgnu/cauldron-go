@@ -5,6 +5,8 @@ import { MatIconModule } from '@angular/material/icon';
 import { filter } from 'rxjs/operators';
 import { PluginV2Service } from '../../core/services/plugin-v2';
 import { JobBatchService } from '../../core/services/job-batch';
+import { RecipeService } from '../../core/services/recipe';
+import { JobChainService } from '../../core/services/job-chain';
 
 interface Breadcrumb {
   label: string;
@@ -33,6 +35,10 @@ export class Breadcrumbs implements OnInit {
     'job': { label: 'Jobs', listRoute: '/jobs' },
     'job-batches': { label: 'Job Batches' },
     'job-batch': { label: 'Job Batches', listRoute: '/job-batches' },
+    'recipes': { label: 'Recipes' },
+    'recipe': { label: 'Recipes', listRoute: '/recipes' },
+    'job-chains': { label: 'Job Chains' },
+    'job-chain': { label: 'Job Chains', listRoute: '/job-chains' },
     'plugin': { label: 'Plugins', listRoute: '/plugin-list' },
     'plugin-list': { label: 'Plugin List' },
     'plugins': { label: 'Plugin Management' },
@@ -44,7 +50,9 @@ export class Breadcrumbs implements OnInit {
     private router: Router,
     private activatedRoute: ActivatedRoute,
     private pluginService: PluginV2Service,
-    private jobBatchService: JobBatchService
+    private jobBatchService: JobBatchService,
+    private recipeService: RecipeService,
+    private jobChainService: JobChainService
   ) {}
 
   ngOnInit() {
@@ -79,7 +87,9 @@ export class Breadcrumbs implements OnInit {
       const config = this.routeConfig[path];
 
       if (!config) {
-        if (this.isUUID(path) || this.isNumeric(path)) {
+        if (path === 'new' && prevPath === 'recipe') {
+          crumbs.push({ label: 'New Recipe', url: currentUrl });
+        } else if (this.isUUID(path) || this.isNumeric(path)) {
           const label = await this.getDetailLabel(prevPath, path);
           crumbs.push({ label, url: currentUrl });
         } else {
@@ -128,6 +138,24 @@ export class Breadcrumbs implements OnInit {
         return batch.label;
       } catch (err) {
         return `Batch ${id.substring(0, 8)}...`;
+      }
+    }
+
+    if (parentRoute === 'recipe' && this.isUUID(id)) {
+      try {
+        const recipe = await this.recipeService.getRecipe(id);
+        return recipe.label;
+      } catch (err) {
+        return `Recipe ${id.substring(0, 8)}...`;
+      }
+    }
+
+    if (parentRoute === 'job-chain' && this.isUUID(id)) {
+      try {
+        const chain = await this.jobChainService.getChain(id);
+        return chain.label;
+      } catch (err) {
+        return `Chain ${id.substring(0, 8)}...`;
       }
     }
 

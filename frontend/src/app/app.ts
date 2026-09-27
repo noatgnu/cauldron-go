@@ -95,6 +95,14 @@ export class App implements OnInit {
       this.router.navigate(['/gel-analysis']);
     });
 
+    Events.On('menu:view-recipes', () => {
+      this.router.navigate(['/recipes']);
+    });
+
+    Events.On('menu:view-job-chains', () => {
+      this.router.navigate(['/job-chains']);
+    });
+
     Events.On('menu:settings', () => {
       this.router.navigate(['/settings']);
     });

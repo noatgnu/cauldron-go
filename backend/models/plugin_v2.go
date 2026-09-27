@@ -23,6 +23,7 @@ const (
 	TransformSpaceJoin  InputTransform = "space-join"
 	TransformJSONEncode InputTransform = "json-encode"
 	TransformColorMap   InputTransform = "color-map"
+	TransformMap        InputTransform = "map"
 )
 
 type VisibilityCondition struct {
@@ -140,11 +141,12 @@ type PluginPlot struct {
 }
 
 type ArgMapping struct {
-	Flag        *string         `yaml:"flag,omitempty" json:"flag,omitempty"`
-	Transform   *InputTransform `yaml:"transform,omitempty" json:"transform,omitempty"`
-	When        *string         `yaml:"when,omitempty" json:"when,omitempty"`
-	Value       *string         `yaml:"value,omitempty" json:"value,omitempty"`
-	PassAsValue bool            `yaml:"passAsValue,omitempty" json:"passAsValue,omitempty"`
+	Flag        *string           `yaml:"flag,omitempty" json:"flag,omitempty"`
+	Transform   *InputTransform   `yaml:"transform,omitempty" json:"transform,omitempty"`
+	When        *string           `yaml:"when,omitempty" json:"when,omitempty"`
+	Value       *string           `yaml:"value,omitempty" json:"value,omitempty"`
+	Values      map[string]string `yaml:"values,omitempty" json:"values,omitempty"`
+	PassAsValue bool              `yaml:"passAsValue,omitempty" json:"passAsValue,omitempty"`
 }
 
 type Requirements struct {

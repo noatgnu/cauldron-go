@@ -89,7 +89,7 @@ func (e *PluginExecutor) BuildArguments(plugin *models.PluginV2, parameters map[
 		}
 
 		if value == nil {
-			transformedValue, err := e.transformValue(paramValue, mapping.Transform)
+			transformedValue, err := e.transformValue(paramValue, mapping.Transform, mapping.Values)
 			if err != nil {
 				return nil, fmt.Errorf("failed to transform value for %s: %w", inputName, err)
 			}
@@ -136,12 +136,19 @@ func (e *PluginExecutor) parseArgMapping(mappingInterface interface{}) (*models.
 	}
 }
 
-func (e *PluginExecutor) transformValue(value interface{}, transform *models.InputTransform) (interface{}, error) {
+func (e *PluginExecutor) transformValue(value interface{}, transform *models.InputTransform, values map[string]string) (interface{}, error) {
 	if transform == nil {
 		return value, nil
 	}
 
 	switch *transform {
+	case models.TransformMap:
+		key := fmt.Sprintf("%v", value)
+		if mapped, ok := values[key]; ok {
+			return mapped, nil
+		}
+		return value, nil
+
 	case models.TransformCommaJoin:
 		if arr, ok := value.([]interface{}); ok {
 			strs := make([]string, len(arr))

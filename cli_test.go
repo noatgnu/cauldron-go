@@ -526,7 +526,7 @@ func TestCLIJobRun_Integration(t *testing.T) {
 		t.Fatalf("coercePluginParams error: %v", err)
 	}
 
-	jobID, err := executePluginJob(ctx.pluginExecutor, ctx.jobQueue, ctx.settings, plugin, params, "")
+	jobID, err := services.ExecutePluginJob(ctx.pluginExecutor, ctx.jobQueue, ctx.settings, plugin, params, "", "", 0)
 	if err != nil {
 		t.Fatalf("executePluginJob error: %v", err)
 	}
@@ -588,7 +588,7 @@ func TestCLIJobRun_BatchIntegration(t *testing.T) {
 		if err != nil {
 			t.Fatalf("coercePluginParams error: %v", err)
 		}
-		jobID, err := executePluginJob(ctx.pluginExecutor, ctx.jobQueue, ctx.settings, plugin, params, batch.ID)
+		jobID, err := services.ExecutePluginJob(ctx.pluginExecutor, ctx.jobQueue, ctx.settings, plugin, params, batch.ID, "", 0)
 		if err != nil {
 			t.Fatalf("executePluginJob error: %v", err)
 		}
@@ -893,5 +893,379 @@ func TestNewTerminalOutputLines_EmptyOutputAfterHavingSeenLines(t *testing.T) {
 	}
 	if len(lines) != 0 {
 		t.Errorf("expected no lines from an empty buffer, got %v", lines)
+	}
+}
+
+func TestCLIRecipe_Dispatch(t *testing.T) {
+	if err := cliRecipe(nil); err == nil {
+		t.Error("expected usage error with no subcommand, got nil")
+	}
+	if err := cliRecipe([]string{"frobnicate"}); err == nil {
+		t.Error("expected error for unknown recipe subcommand, got nil")
+	}
+}
+
+func TestCLIChain_Dispatch(t *testing.T) {
+	if err := cliChain(nil); err == nil {
+		t.Error("expected usage error with no subcommand, got nil")
+	}
+	if err := cliChain([]string{"frobnicate"}); err == nil {
+		t.Error("expected error for unknown chain subcommand, got nil")
+	}
+}
+
+func TestCLIRecipeRun_UsageErrors(t *testing.T) {
+	if err := cliRecipeRun(nil); err == nil {
+		t.Error("expected usage error with no id/label, got nil")
+	}
+	if err := cliRecipeRun([]string{"a", "b"}); err == nil {
+		t.Error("expected usage error with more than one positional argument, got nil")
+	}
+}
+
+func TestCLIRecipeExport_UsageErrors(t *testing.T) {
+	if err := cliRecipeExport(nil); err == nil {
+		t.Error("expected usage error with no arguments, got nil")
+	}
+	if err := cliRecipeExport([]string{"only-one"}); err == nil {
+		t.Error("expected usage error with only one argument, got nil")
+	}
+}
+
+func TestCLIRecipeExport_WithInstallInfoFlag(t *testing.T) {
+	ctx, err := newCLIContext()
+	if err != nil {
+		t.Fatalf("newCLIContext error: %v", err)
+	}
+	defer ctx.close()
+
+	recipe, err := ctx.recipeService.SaveRecipe("cli-export-install-info", "", []services.RecipeStageSpec{
+		{
+			PluginID:      "cli-export-missing-plugin",
+			PluginVersion: "1.0.0",
+			Params:        map[string]interface{}{},
+			Bindings:      map[string]models.RecipeStageBinding{},
+			Repository:    "https://github.com/example/cli-export-missing-plugin",
+			CommitHash:    "abc1234",
+		},
+	})
+	if err != nil {
+		t.Fatalf("SaveRecipe error: %v", err)
+	}
+	defer ctx.recipeService.DeleteRecipe(recipe.ID)
+
+	pathWithout := filepath.Join(t.TempDir(), "without-install-info.json")
+	if err := cliRecipeExport([]string{recipe.ID, pathWithout}); err != nil {
+		t.Fatalf("cliRecipeExport error: %v", err)
+	}
+	withoutRaw, err := os.ReadFile(pathWithout)
+	if err != nil {
+		t.Fatalf("failed to read export file: %v", err)
+	}
+	if strings.Contains(string(withoutRaw), "abc1234") {
+		t.Errorf("expected no install info without --with-install-info, got: %s", withoutRaw)
+	}
+
+	pathWith := filepath.Join(t.TempDir(), "with-install-info.json")
+	if err := cliRecipeExport([]string{"--with-install-info", recipe.ID, pathWith}); err != nil {
+		t.Fatalf("cliRecipeExport error: %v", err)
+	}
+	withRaw, err := os.ReadFile(pathWith)
+	if err != nil {
+		t.Fatalf("failed to read export file: %v", err)
+	}
+	if !strings.Contains(string(withRaw), "abc1234") || !strings.Contains(string(withRaw), "cli-export-missing-plugin") {
+		t.Errorf("expected --with-install-info to embed repository/commit, got: %s", withRaw)
+	}
+}
+
+func TestCLIRecipeCompat_PrintsInstallHintForMissingStageWithRepository(t *testing.T) {
+	ctx, err := newCLIContext()
+	if err != nil {
+		t.Fatalf("newCLIContext error: %v", err)
+	}
+	defer ctx.close()
+
+	recipe, err := ctx.recipeService.SaveRecipe("cli-compat-install-hint", "", []services.RecipeStageSpec{
+		{
+			PluginID:      "cli-compat-missing-plugin",
+			PluginVersion: "1.0.0",
+			Params:        map[string]interface{}{},
+			Bindings:      map[string]models.RecipeStageBinding{},
+			Repository:    "https://github.com/example/cli-compat-missing-plugin",
+			CommitHash:    "deadbeef",
+		},
+	})
+	if err != nil {
+		t.Fatalf("SaveRecipe error: %v", err)
+	}
+	defer ctx.recipeService.DeleteRecipe(recipe.ID)
+
+	output := captureStdout(t, func() {
+		if err := cliRecipeCompat([]string{recipe.ID}); err == nil {
+			t.Error("expected cliRecipeCompat to return an error since the plugin is missing")
+		}
+	})
+	want := "cauldron plugin install https://github.com/example/cli-compat-missing-plugin --ref deadbeef"
+	if !strings.Contains(output, want) {
+		t.Errorf("expected compat output to contain %q, got: %q", want, output)
+	}
+}
+
+func TestCLIRecipeImport_UsageErrors(t *testing.T) {
+	if err := cliRecipeImport(nil); err == nil {
+		t.Error("expected usage error with no path, got nil")
+	}
+}
+
+func TestCLIRecipeDelete_UsageErrors(t *testing.T) {
+	if err := cliRecipeDelete(nil); err == nil {
+		t.Error("expected usage error with no id/label, got nil")
+	}
+}
+
+func TestCLIChainStatus_UsageErrors(t *testing.T) {
+	if err := cliChainStatus(nil); err == nil {
+		t.Error("expected usage error with no id, got nil")
+	}
+}
+
+func TestFindRecipe_NotFound(t *testing.T) {
+	ctx, err := newCLIContext()
+	if err != nil {
+		t.Fatalf("newCLIContext error: %v", err)
+	}
+	defer ctx.close()
+
+	if _, err := findRecipe(ctx.recipeService, "definitely-not-a-real-recipe-id-or-label"); err == nil {
+		t.Error("expected error for a nonexistent recipe reference, got nil")
+	}
+}
+
+func TestFindRecipe_ByLabel_AmbiguousMatchListsCandidateIDs(t *testing.T) {
+	ctx, err := newCLIContext()
+	if err != nil {
+		t.Fatalf("newCLIContext error: %v", err)
+	}
+	defer ctx.close()
+
+	label := "cli-find-recipe-ambiguous-label"
+	var ids []string
+	for i := 0; i < 2; i++ {
+		r, err := ctx.recipeService.SaveRecipe(label, "", []services.RecipeStageSpec{
+			{PluginID: "does-not-matter", PluginVersion: "1.0.0", Params: map[string]interface{}{}},
+		})
+		if err != nil {
+			t.Fatalf("SaveRecipe error: %v", err)
+		}
+		ids = append(ids, r.ID)
+		defer ctx.recipeService.DeleteRecipe(r.ID)
+	}
+
+	_, err = findRecipe(ctx.recipeService, label)
+	if err == nil {
+		t.Fatal("expected an ambiguous-match error, got nil")
+	}
+	for _, id := range ids {
+		if !strings.Contains(err.Error(), id) {
+			t.Errorf("expected error to list candidate id %s, got: %v", id, err)
+		}
+	}
+}
+
+func TestFindRecipe_ByIDAndByLabel(t *testing.T) {
+	ctx, err := newCLIContext()
+	if err != nil {
+		t.Fatalf("newCLIContext error: %v", err)
+	}
+	defer ctx.close()
+
+	label := "cli-find-recipe-unique-label"
+	recipe, err := ctx.recipeService.SaveRecipe(label, "", []services.RecipeStageSpec{
+		{PluginID: "does-not-matter", PluginVersion: "1.0.0", Params: map[string]interface{}{}},
+	})
+	if err != nil {
+		t.Fatalf("SaveRecipe error: %v", err)
+	}
+	defer ctx.recipeService.DeleteRecipe(recipe.ID)
+
+	byID, err := findRecipe(ctx.recipeService, recipe.ID)
+	if err != nil {
+		t.Fatalf("findRecipe by id error: %v", err)
+	}
+	if byID.ID != recipe.ID {
+		t.Errorf("expected id lookup to return %s, got %s", recipe.ID, byID.ID)
+	}
+
+	byLabel, err := findRecipe(ctx.recipeService, label)
+	if err != nil {
+		t.Fatalf("findRecipe by label error: %v", err)
+	}
+	if byLabel.ID != recipe.ID {
+		t.Errorf("expected label lookup to return %s, got %s", recipe.ID, byLabel.ID)
+	}
+}
+
+func TestCLIRecipeList_ChainListEmpty(t *testing.T) {
+	if err := cliRecipeList(); err != nil {
+		t.Fatalf("cliRecipeList error: %v", err)
+	}
+	if err := cliChainList(); err != nil {
+		t.Fatalf("cliChainList error: %v", err)
+	}
+}
+
+func TestCLIChainStatus_NotFound(t *testing.T) {
+	if err := cliChainStatus([]string{"not-a-real-chain-id"}); err == nil {
+		t.Error("expected error for a nonexistent chain id, got nil")
+	}
+}
+
+// TestCLIRecipeRun_Integration exercises "cauldron recipe run" end to end using this
+// repo's real wide-to-long and long-to-wide built-in plugins: it chains a melt then a
+// pivot back, with the second stage's input bound to the first stage's output, and
+// asserts the final table is byte-for-byte identical to the original input -- the same
+// round trip verified manually earlier, now checked by the CLI path specifically.
+func TestCLIRecipeRun_Integration(t *testing.T) {
+	pluginsRoot := t.TempDir()
+	installRealPlugin(t, pluginsRoot, "wide-to-long")
+	installRealPlugin(t, pluginsRoot, "long-to-wide")
+
+	t.Setenv("CAULDRON_PLUGINS_DIR", pluginsRoot)
+
+	ctx, err := newCLIContext()
+	if err != nil {
+		t.Fatalf("newCLIContext error: %v", err)
+	}
+	defer ctx.close()
+
+	wideToLong, err := findPlugin(ctx.pluginLoaderV2, "wide-to-long")
+	if err != nil {
+		t.Fatalf("findPlugin(wide-to-long) error: %v", err)
+	}
+	longToWide, err := findPlugin(ctx.pluginLoaderV2, "long-to-wide")
+	if err != nil {
+		t.Fatalf("findPlugin(long-to-wide) error: %v", err)
+	}
+
+	original := "Protein.Group\tGenes\tSample1\tSample2\tSample3\n" +
+		"P12345\tGENE1\t10.5\t11.2\t9.8\n" +
+		"P67890\tGENE2\t20.1\t19.8\t21.0\n" +
+		"P11111\tGENE3\t5.5\t6.1\t5.9\n"
+
+	inputPath := filepath.Join(t.TempDir(), "original.tsv")
+	if err := os.WriteFile(inputPath, []byte(original), 0644); err != nil {
+		t.Fatalf("failed to write input file: %v", err)
+	}
+
+	label := "cli-recipe-run-integration"
+	recipe, err := ctx.recipeService.SaveRecipe(label, "", []services.RecipeStageSpec{
+		{
+			PluginID:      wideToLong.Definition.Plugin.ID,
+			PluginVersion: wideToLong.Definition.Plugin.Version,
+			Params: map[string]interface{}{
+				"input_file": inputPath,
+				"id_vars":    []string{"Protein.Group", "Genes"},
+				"value_vars": []string{},
+				"var_name":   "Sample",
+				"value_name": "Intensity",
+				"delimiter":  "tab",
+			},
+		},
+		{
+			PluginID:      longToWide.Definition.Plugin.ID,
+			PluginVersion: longToWide.Definition.Plugin.Version,
+			Params: map[string]interface{}{
+				"id_vars":      []string{"Protein.Group", "Genes"},
+				"names_from":   "Sample",
+				"values_from":  "Intensity",
+				"on_duplicate": "error",
+				"delimiter":    "tab",
+			},
+			Bindings: map[string]models.RecipeStageBinding{
+				"input_file": {Stage: 0, Output: "long_data"},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("SaveRecipe error: %v", err)
+	}
+	defer ctx.recipeService.DeleteRecipe(recipe.ID)
+
+	// cliRecipeRun opens its own newCLIContext() internally, a separate connection to the
+	// same on-disk database as ctx; sqlite's WAL mode plus this DSN's busy timeout make
+	// that safe, and it exercises the CLI entry point exactly as a real invocation would.
+	output := captureStdout(t, func() {
+		if err := cliRecipeRun([]string{"--timeout", "60s", label}); err != nil {
+			t.Errorf("cliRecipeRun error: %v", err)
+		}
+	})
+	if !strings.Contains(output, "completed") {
+		t.Errorf("expected output to report the chain completed, got: %q", output)
+	}
+
+	chains, err := ctx.chainService.GetAllChains(1000, 0)
+	if err != nil {
+		t.Fatalf("GetAllChains error: %v", err)
+	}
+	var chain *models.JobChain
+	for _, c := range chains {
+		if c.RecipeID == recipe.ID {
+			chain = c
+			break
+		}
+	}
+	if chain == nil {
+		t.Fatal("could not find the chain started by cliRecipeRun")
+	}
+	defer ctx.chainService.DeleteChain(chain.ID)
+
+	status, err := ctx.chainService.GetChainStatus(chain.ID)
+	if err != nil {
+		t.Fatalf("GetChainStatus error: %v", err)
+	}
+	if status.Status != "completed" {
+		t.Fatalf("expected chain to complete, got status %q", status.Status)
+	}
+	finalJob := status.Stages[1].Job
+	if finalJob == nil {
+		t.Fatal("second stage has no job")
+	}
+	defer os.RemoveAll(finalJob.OutputPath)
+	if status.Stages[0].Job != nil {
+		defer os.RemoveAll(status.Stages[0].Job.OutputPath)
+	}
+
+	finalContent, err := os.ReadFile(filepath.Join(finalJob.OutputPath, "pivoted.data.tsv"))
+	if err != nil {
+		t.Fatalf("failed to read final stage output: %v", err)
+	}
+	if string(finalContent) != original {
+		t.Errorf("expected pivoted table to round-trip back to the original input via the CLI, got:\n%s\nwant:\n%s", finalContent, original)
+	}
+
+	if err := cliRecipeCompat([]string{recipe.ID}); err != nil {
+		t.Errorf("cliRecipeCompat error: %v", err)
+	}
+
+	exportPath := filepath.Join(t.TempDir(), "exported-recipe.json")
+	if err := cliRecipeExport([]string{recipe.ID, exportPath}); err != nil {
+		t.Errorf("cliRecipeExport error: %v", err)
+	}
+	if _, err := os.Stat(exportPath); err != nil {
+		t.Errorf("expected exported recipe file to exist: %v", err)
+	}
+
+	if err := cliRecipeImport([]string{exportPath}); err != nil {
+		t.Errorf("cliRecipeImport error: %v", err)
+	}
+	importedRecipes, err := ctx.recipeService.GetAllRecipes(1000, 0)
+	if err != nil {
+		t.Fatalf("GetAllRecipes error: %v", err)
+	}
+	for _, r := range importedRecipes {
+		if r.Label == label && r.ID != recipe.ID {
+			defer ctx.recipeService.DeleteRecipe(r.ID)
+		}
 	}
 }

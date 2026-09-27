@@ -1,0 +1,45 @@
+<div class="job-chains-container">
+  <mat-card>
+    <mat-card-header>
+      <mat-card-title>Job Chains</mat-card-title>
+    </mat-card-header>
+    <mat-card-content>
+      @if (loading()) {
+        <p>Loading...</p>
+      } @else if (chains().length === 0) {
+        <p class="empty-state">No chains yet. Run a recipe from the Recipes page to start one.</p>
+      } @else {
+        <table mat-table [dataSource]="chains()" class="chains-table">
+          <ng-container matColumnDef="label">
+            <th mat-header-cell *matHeaderCellDef>Label</th>
+            <td mat-cell *matCellDef="let c">{{ c.label }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="status">
+            <th mat-header-cell *matHeaderCellDef>Status</th>
+            <td mat-cell *matCellDef="let c">
+              <mat-chip [color]="statusColor(c.status)">{{ c.status }}</mat-chip>
+            </td>
+          </ng-container>
+
+          <ng-container matColumnDef="createdAt">
+            <th mat-header-cell *matHeaderCellDef>Created</th>
+            <td mat-cell *matCellDef="let c">{{ c.createdAt | date: 'short' }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="actions">
+            <th mat-header-cell *matHeaderCellDef></th>
+            <td mat-cell *matCellDef="let c">
+              <button class="delete-chain-list-btn" mat-icon-button (click)="deleteChain($event, c.chainId)" matTooltip="Delete chain">
+                <mat-icon>delete</mat-icon>
+              </button>
+            </td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+          <tr mat-row *matRowDef="let row; columns: displayedColumns;" (click)="viewChainDetail(row.chainId)" class="clickable-row" [attr.data-chain-id]="row.chainId"></tr>
+        </table>
+      }
+    </mat-card-content>
+  </mat-card>
+</div>
