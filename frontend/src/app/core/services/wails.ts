@@ -489,6 +489,12 @@ export class Wails {
     return WailsApp.ExportRecipe(id, path, includeInstallInfo);
   }
 
+  async exportRecipeNextflow(id: string, outputDir: string): Promise<void> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.ExportRecipeNextflow(id, outputDir);
+  }
+
   async importRecipeFromFile(path: string): Promise<RecipeImportResult> {
     if (!this.isWails) throw new Error('Wails not available');
     await this.waitForBackend();

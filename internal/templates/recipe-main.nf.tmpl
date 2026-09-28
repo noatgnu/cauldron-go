@@ -1,0 +1,30 @@
+#!/usr/bin/env nextflow
+
+nextflow.enable.dsl = 2
+
+{{ range .Stages }}
+include { {{ .ProcessName | upper }} as {{ .CallAlias | upper }} } from './modules/local/{{ .ModulePath }}/main'
+{{- end }}
+
+workflow PIPELINE {
+    main:
+    {{- range .Stages }}
+    {{ .CallAlias | upper }} (
+        {{- range .Args }}
+        {{- if .FromParam }}
+        {{- if .IsFile }}
+        params.{{ .ParamName }} ? Channel.fromPath(params.{{ .ParamName }}).collect() : Channel.of([]),
+        {{- else }}
+        Channel.value(params.{{ .ParamName }} != null ? params.{{ .ParamName }} : ''),
+        {{- end }}
+        {{- else }}
+        {{ .SourceCallAlias | upper }}.out.{{ .SourceEmit }}.collect(),
+        {{- end }}
+        {{- end }}
+    )
+    {{- end }}
+}
+
+workflow {
+    PIPELINE ()
+}

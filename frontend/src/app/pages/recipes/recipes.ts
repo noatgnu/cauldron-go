@@ -115,6 +115,18 @@ export class Recipes implements OnInit {
     }
   }
 
+  async exportRecipeNextflow(event: Event, row: RecipeRow): Promise<void> {
+    event.stopPropagation();
+    try {
+      const outputDir = await this.wails.openDirectoryDialog('Export Nextflow Pipeline To');
+      if (!outputDir) return;
+
+      await this.recipeService.exportRecipeNextflow(row.recipe.id, outputDir);
+    } catch (error: any) {
+      await this.wails.logToFile(`[Recipes] Failed to export recipe as a Nextflow pipeline: ${error?.message || String(error)}`);
+    }
+  }
+
   async importRecipe(): Promise<void> {
     try {
       const path = await this.wails.openFileDialog('Import Recipe');

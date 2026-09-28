@@ -934,6 +934,15 @@ func TestCLIRecipeExport_UsageErrors(t *testing.T) {
 	}
 }
 
+func TestCLIRecipeExportNextflow_UsageErrors(t *testing.T) {
+	if err := cliRecipeExportNextflow(nil); err == nil {
+		t.Error("expected usage error with no arguments, got nil")
+	}
+	if err := cliRecipeExportNextflow([]string{"only-one"}); err == nil {
+		t.Error("expected usage error with only one argument, got nil")
+	}
+}
+
 func TestCLIRecipeExport_WithInstallInfoFlag(t *testing.T) {
 	ctx, err := newCLIContext()
 	if err != nil {
@@ -1373,6 +1382,22 @@ func TestCLIRecipeRun_Integration(t *testing.T) {
 	for _, r := range importedRecipes {
 		if r.Label == label && r.ID != recipe.ID {
 			defer ctx.recipeService.DeleteRecipe(r.ID)
+		}
+	}
+
+	nextflowDir := filepath.Join(t.TempDir(), "nextflow-pipeline")
+	if err := cliRecipeExportNextflow([]string{recipe.ID, nextflowDir}); err != nil {
+		t.Errorf("cliRecipeExportNextflow error: %v", err)
+	}
+	for _, expected := range []string{
+		"main.nf",
+		"nextflow.config",
+		"README.md",
+		filepath.Join("modules", "local", wideToLong.Definition.Plugin.ID, "main.nf"),
+		filepath.Join("modules", "local", longToWide.Definition.Plugin.ID, "main.nf"),
+	} {
+		if _, err := os.Stat(filepath.Join(nextflowDir, expected)); err != nil {
+			t.Errorf("expected exported Nextflow pipeline to contain %s: %v", expected, err)
 		}
 	}
 }

@@ -27,8 +27,8 @@ func GenerateWorkflow(definition *models.PluginDefinition, tmplStr string) (stri
 	}
 
 	data := WorkflowData{
-		WorkflowName: toNextflowID(definition.Plugin.ID),
-		ProcessName:  toNextflowID(definition.Plugin.ID),
+		WorkflowName: ToNextflowID(definition.Plugin.ID),
+		ProcessName:  ToNextflowID(definition.Plugin.ID),
 		ModulePath:   definition.Plugin.ID,
 	}
 
@@ -45,6 +45,48 @@ func GenerateWorkflow(definition *models.PluginDefinition, tmplStr string) (stri
 	var buf bytes.Buffer
 	if err := tmpl.Execute(&buf, data); err != nil {
 		return "", fmt.Errorf("failed to execute workflow template: %w", err)
+	}
+
+	return buf.String(), nil
+}
+
+// RecipeWorkflowStage is one stage of a multi-plugin Recipe pipeline: which
+// process to call, under what per-stage alias (so the same plugin can be
+// used in more than one stage via Nextflow's `include { X as ALIAS }`), and
+// where each of its declared inputs' values come from.
+type RecipeWorkflowStage struct {
+	ProcessName string // ToNextflowID(pluginID), upper — the process's own declared name in its module file
+	CallAlias   string // unique per stage: ToNextflowID(pluginID) + "_S" + stage index
+	ModulePath  string // pluginID, matches modules/local/<ModulePath>/main
+	Args        []RecipeArgSource
+}
+
+// RecipeArgSource describes where one process input's value comes from: an
+// unbound (namespaced) pipeline param, or an upstream stage's output channel.
+type RecipeArgSource struct {
+	Name            string
+	IsFile          bool
+	FromParam       bool
+	ParamName       string
+	SourceCallAlias string
+	SourceEmit      string
+}
+
+func GenerateRecipeWorkflow(stages []RecipeWorkflowStage, tmplStr string) (string, error) {
+	tmpl, err := template.New("recipe-workflow").Funcs(template.FuncMap{
+		"upper": strings.ToUpper,
+	}).Parse(tmplStr)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse recipe workflow template: %w", err)
+	}
+
+	data := struct {
+		Stages []RecipeWorkflowStage
+	}{Stages: stages}
+
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, data); err != nil {
+		return "", fmt.Errorf("failed to execute recipe workflow template: %w", err)
 	}
 
 	return buf.String(), nil

@@ -108,7 +108,7 @@ func processOutputsForDynamicFormat(outputs []models.PluginOutputV2, inputs []mo
 	return processed
 }
 
-func toNextflowID(id string) string {
+func ToNextflowID(id string) string {
 	result := strings.ReplaceAll(id, "-", "_")
 	result = strings.ReplaceAll(result, ".", "_")
 	return result
@@ -118,7 +118,7 @@ func GenerateProcess(definition *models.PluginDefinition, tmplStr string) (strin
 	tmpl, err := template.New("process").Funcs(template.FuncMap{
 		"upper":      strings.ToUpper,
 		"replace":    strings.ReplaceAll,
-		"nextflowID": toNextflowID,
+		"nextflowID": ToNextflowID,
 	}).Parse(tmplStr)
 	if err != nil {
 		return "", fmt.Errorf("failed to parse process template: %w", err)
@@ -143,7 +143,7 @@ func GenerateProcess(definition *models.PluginDefinition, tmplStr string) (strin
 	processedOutputs := processOutputsForDynamicFormat(definition.Outputs, definition.Inputs)
 
 	data := ProcessData{
-		ProcessName:               toNextflowID(definition.Plugin.ID),
+		ProcessName:               ToNextflowID(definition.Plugin.ID),
 		ModulePath:                definition.Plugin.ID,
 		Label:                     "process_medium",
 		ContainerImageSingularity: singularityImage,
@@ -264,7 +264,7 @@ func GenerateREADME(definition *models.PluginDefinition, tmplStr string) (string
 	}
 
 	data := ProcessData{
-		ProcessName:          toNextflowID(definition.Plugin.ID),
+		ProcessName:          ToNextflowID(definition.Plugin.ID),
 		ModulePath:           definition.Plugin.ID,
 		ToolName:             definition.Plugin.Name,
 		Version:              definition.Plugin.Version,

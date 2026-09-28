@@ -19,13 +19,15 @@ describe('Recipes', () => {
     wailsMock = {
       logToFile: vi.fn().mockResolvedValue(undefined),
       saveFileDialog: vi.fn().mockResolvedValue('/tmp/recipe.json'),
-      openFileDialog: vi.fn().mockResolvedValue('/tmp/recipe.json')
+      openFileDialog: vi.fn().mockResolvedValue('/tmp/recipe.json'),
+      openDirectoryDialog: vi.fn().mockResolvedValue('/tmp/nextflow-pipeline')
     };
     recipeServiceMock = {
       getAllRecipes: vi.fn().mockResolvedValue([{ id: 'recipe-1', label: 'Recipe 1', createdAt: new Date().toISOString() }]),
       checkCompatibility: vi.fn().mockResolvedValue({ recipeId: 'recipe-1', allOk: true, stages: [] }),
       runRecipe: vi.fn().mockResolvedValue({ id: 'chain-1' }),
       exportRecipe: vi.fn().mockResolvedValue(undefined),
+      exportRecipeNextflow: vi.fn().mockResolvedValue(undefined),
       importRecipeFromFile: vi.fn().mockResolvedValue({ recipe: { id: 'recipe-2' }, compatibility: { allOk: true, stages: [] } }),
       deleteRecipe: vi.fn().mockResolvedValue(undefined)
     };
@@ -90,6 +92,20 @@ describe('Recipes', () => {
     await component.loadRecipes();
     await component.exportRecipe(new Event('click'), component['rows']()[0]);
     expect(recipeServiceMock.exportRecipe).toHaveBeenCalledWith('recipe-1', '/tmp/recipe.json', false);
+  });
+
+  it('exports a recipe as a Nextflow pipeline to the chosen directory', async () => {
+    await component.loadRecipes();
+    await component.exportRecipeNextflow(new Event('click'), component['rows']()[0]);
+    expect(wailsMock.openDirectoryDialog).toHaveBeenCalled();
+    expect(recipeServiceMock.exportRecipeNextflow).toHaveBeenCalledWith('recipe-1', '/tmp/nextflow-pipeline');
+  });
+
+  it('does not export a Nextflow pipeline when the user cancels the directory dialog', async () => {
+    wailsMock.openDirectoryDialog.mockResolvedValue('');
+    await component.loadRecipes();
+    await component.exportRecipeNextflow(new Event('click'), component['rows']()[0]);
+    expect(recipeServiceMock.exportRecipeNextflow).not.toHaveBeenCalled();
   });
 
   it('imports a recipe and navigates to its editor', async () => {

@@ -35,6 +35,10 @@ export class RecipeService {
     return this.wails.exportRecipe(id, path, includeInstallInfo);
   }
 
+  async exportRecipeNextflow(id: string, outputDir: string): Promise<void> {
+    return this.wails.exportRecipeNextflow(id, outputDir);
+  }
+
   async importRecipeFromFile(path: string): Promise<RecipeImportResult> {
     return this.wails.importRecipeFromFile(path);
   }
