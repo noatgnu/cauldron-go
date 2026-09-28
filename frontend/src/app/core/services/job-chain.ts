@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { Wails, JobChain, ChainStatus } from './wails';
+import { Wails, JobChain, ChainStatus, Recipe } from './wails';
 
 @Injectable({
   providedIn: 'root'
@@ -21,5 +21,9 @@ export class JobChainService {
 
   async deleteChain(id: string): Promise<void> {
     return this.wails.deleteJobChain(id);
+  }
+
+  async saveAsRecipe(chainId: string, label: string, description: string): Promise<Recipe> {
+    return this.wails.createRecipeFromChain(chainId, label, description);
   }
 }

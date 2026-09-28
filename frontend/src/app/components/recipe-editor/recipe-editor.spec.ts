@@ -8,6 +8,10 @@ import { RecipeService } from '../../core/services/recipe';
 import { PluginV2Service } from '../../core/services/plugin-v2';
 import { NotificationService } from '../../core/services/notification.service';
 
+vi.doMock('svg-pan-zoom', () => ({
+  default: vi.fn().mockReturnValue({ destroy: vi.fn() })
+}));
+
 describe('RecipeEditor', () => {
   let component: RecipeEditor;
   let fixture: ComponentFixture<RecipeEditor>;
@@ -58,7 +62,8 @@ describe('RecipeEditor', () => {
       checkCompatibility: vi.fn(),
       saveRecipe: vi.fn().mockResolvedValue({ id: 'recipe-1', label: 'My Recipe' }),
       updateRecipe: vi.fn().mockResolvedValue({ id: 'recipe-1', label: 'My Recipe' }),
-      runRecipe: vi.fn().mockResolvedValue({ id: 'chain-1' })
+      runRecipe: vi.fn().mockResolvedValue({ id: 'chain-1' }),
+      generateDiagram: vi.fn().mockResolvedValue('flowchart TD\n')
     };
     mockPluginService = {
       getAllPlugins: vi.fn().mockResolvedValue([pluginA, pluginB])

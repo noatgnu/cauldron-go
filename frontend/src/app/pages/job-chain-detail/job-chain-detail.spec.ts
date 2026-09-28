@@ -7,6 +7,7 @@ import { vi } from 'vitest';
 import { JobChainDetail } from './job-chain-detail';
 import { Wails } from '../../core/services/wails';
 import { JobChainService } from '../../core/services/job-chain';
+import { NotificationService } from '../../core/services/notification.service';
 
 describe('JobChainDetail', () => {
   let component: JobChainDetail;
@@ -16,6 +17,7 @@ describe('JobChainDetail', () => {
   let routerMock: any;
   let activatedRouteMock: any;
   let dialogMock: any;
+  let notificationMock: any;
 
   const mockChainStatus = {
     chainId: 'chain-1',
@@ -35,7 +37,8 @@ describe('JobChainDetail', () => {
     };
     jobChainServiceMock = {
       getChainStatus: vi.fn().mockResolvedValue(mockChainStatus),
-      deleteChain: vi.fn().mockResolvedValue(undefined)
+      deleteChain: vi.fn().mockResolvedValue(undefined),
+      saveAsRecipe: vi.fn().mockResolvedValue({ id: 'recipe-1', label: 'My Chain' })
     };
     routerMock = {
       navigate: vi.fn()
@@ -46,6 +49,10 @@ describe('JobChainDetail', () => {
     dialogMock = {
       open: vi.fn()
     };
+    notificationMock = {
+      showSuccess: vi.fn(),
+      showError: vi.fn()
+    };
 
     await TestBed.configureTestingModule({
       imports: [JobChainDetail],
@@ -54,7 +61,8 @@ describe('JobChainDetail', () => {
         { provide: JobChainService, useValue: jobChainServiceMock },
         { provide: Router, useValue: routerMock },
         { provide: ActivatedRoute, useValue: activatedRouteMock },
-        { provide: MatDialog, useValue: dialogMock }
+        { provide: MatDialog, useValue: dialogMock },
+        { provide: NotificationService, useValue: notificationMock }
       ]
     })
       .compileComponents();
@@ -97,5 +105,35 @@ describe('JobChainDetail', () => {
     dialogMock.open.mockReturnValue({ afterClosed: () => of(false) });
     await component.deleteChain();
     expect(jobChainServiceMock.deleteChain).not.toHaveBeenCalled();
+  });
+
+  describe('saveAsRecipe', () => {
+    it('saves the chain as a recipe and navigates to its editor on confirm', async () => {
+      dialogMock.open.mockReturnValue({ afterClosed: () => of('My Recipe') });
+
+      await component.saveAsRecipe();
+
+      expect(jobChainServiceMock.saveAsRecipe).toHaveBeenCalledWith('chain-1', 'My Recipe', 'Saved from job chain chain-1');
+      expect(notificationMock.showSuccess).toHaveBeenCalled();
+      expect(routerMock.navigate).toHaveBeenCalledWith(['/recipe', 'recipe-1']);
+    });
+
+    it('does not save when the prompt is cancelled', async () => {
+      dialogMock.open.mockReturnValue({ afterClosed: () => of(null) });
+
+      await component.saveAsRecipe();
+
+      expect(jobChainServiceMock.saveAsRecipe).not.toHaveBeenCalled();
+    });
+
+    it('shows an error notification and clears saving state when the save fails', async () => {
+      dialogMock.open.mockReturnValue({ afterClosed: () => of('My Recipe') });
+      jobChainServiceMock.saveAsRecipe.mockRejectedValue(new Error('boom'));
+
+      await component.saveAsRecipe();
+
+      expect(notificationMock.showError).toHaveBeenCalled();
+      expect(component['savingRecipe']()).toBe(false);
+    });
   });
 });

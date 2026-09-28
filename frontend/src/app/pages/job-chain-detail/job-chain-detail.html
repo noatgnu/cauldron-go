@@ -13,6 +13,10 @@
         </div>
       </mat-card-content>
       <mat-card-actions>
+        <button class="save-as-recipe-btn" mat-button (click)="saveAsRecipe()" [disabled]="savingRecipe()">
+          <mat-icon>save</mat-icon>
+          Save as Recipe
+        </button>
         <button class="delete-chain-btn" mat-button color="warn" (click)="deleteChain()">
           <mat-icon>delete</mat-icon>
           Delete Chain

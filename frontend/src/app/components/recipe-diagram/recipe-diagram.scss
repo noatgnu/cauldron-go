@@ -1,0 +1,42 @@
+.recipe-diagram {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.diagram-status {
+  margin: 0;
+  color: rgba(0, 0, 0, 0.6);
+  font-size: 0.9rem;
+}
+
+.diagram-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.diagram-hint {
+  margin: 0;
+  color: rgba(0, 0, 0, 0.5);
+  font-size: 0.8rem;
+}
+
+.diagram-actions {
+  display: flex;
+  flex-shrink: 0;
+}
+
+.diagram-canvas {
+  overflow: hidden;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 4px;
+  height: 60vh;
+
+  ::ng-deep svg {
+    width: 100%;
+    height: 100%;
+    cursor: grab;
+  }
+}

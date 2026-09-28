@@ -1,0 +1,112 @@
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 64px;
+  gap: 16px;
+}
+
+.detail-container {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+
+  h1 {
+    margin: 0;
+    font-size: 24px;
+    font-weight: 500;
+  }
+
+  button mat-spinner {
+    display: inline-block;
+    margin-right: 8px;
+  }
+}
+
+.description {
+  color: var(--on-surface-variant);
+  line-height: 1.5;
+}
+
+.metadata-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+
+  .metadata-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+
+    .label {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--on-surface-variant);
+    }
+
+    .value {
+      font-size: 14px;
+    }
+  }
+}
+
+.tags-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.stages-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: var(--surface);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  padding: 8px;
+}
+
+.stage-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: 4px;
+
+  &:hover {
+    background: var(--hover);
+  }
+
+  .stage-index {
+    width: 24px;
+    color: var(--on-surface-variant);
+    font-size: 12px;
+  }
+
+  .stage-plugin {
+    flex: 1;
+  }
+
+  .stage-version {
+    color: var(--on-surface-variant);
+    font-size: 12px;
+  }
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 64px;
+  gap: 16px;
+}

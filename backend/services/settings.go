@@ -31,6 +31,7 @@ func newSettingsServiceInternal(db *DatabaseService) *SettingsService {
 		config: &models.Config{
 			CurtainBackendURL: "https://celsus.muttsu.xyz",
 			PluginRegistryURL: "https://cauldron.proteo.info",
+			RecipeRegistryURL: "https://cauldron.proteo.info",
 		},
 	}
 
@@ -64,6 +65,12 @@ func (s *SettingsService) Load() error {
 	}
 	if val, ok := settings["curtainBackendUrl"]; ok {
 		s.config.CurtainBackendURL = val
+	}
+	if val, ok := settings["pluginRegistryUrl"]; ok {
+		s.config.PluginRegistryURL = val
+	}
+	if val, ok := settings["recipeRegistryUrl"]; ok {
+		s.config.RecipeRegistryURL = val
 	}
 	if val, ok := settings["useRenvCache"]; ok {
 		s.config.UseRenvCache = val == "true"
@@ -119,6 +126,8 @@ func (s *SettingsService) Save() error {
 	s.db.SaveSetting("rPath", s.config.RPath)
 	s.db.SaveSetting("rLibPath", s.config.RLibPath)
 	s.db.SaveSetting("curtainBackendUrl", s.config.CurtainBackendURL)
+	s.db.SaveSetting("pluginRegistryUrl", s.config.PluginRegistryURL)
+	s.db.SaveSetting("recipeRegistryUrl", s.config.RecipeRegistryURL)
 	s.db.SaveSetting("useRenvCache", fmt.Sprintf("%v", s.config.UseRenvCache))
 	s.db.SaveSetting("venvStoragePath", s.config.VenvStoragePath)
 	s.db.SaveSetting("renvStoragePath", s.config.RenvStoragePath)
@@ -149,6 +158,10 @@ func (s *SettingsService) Get(key string) interface{} {
 		return s.config.RLibPath
 	case "curtainBackendUrl":
 		return s.config.CurtainBackendURL
+	case "pluginRegistryUrl":
+		return s.config.PluginRegistryURL
+	case "recipeRegistryUrl":
+		return s.config.RecipeRegistryURL
 	case "useRenvCache":
 		return s.config.UseRenvCache
 	case "venvStoragePath":
@@ -237,6 +250,10 @@ func (s *SettingsService) Set(key string, value interface{}) error {
 		s.config.RLibPath = value.(string)
 	case "curtainBackendUrl":
 		s.config.CurtainBackendURL = value.(string)
+	case "pluginRegistryUrl":
+		s.config.PluginRegistryURL = value.(string)
+	case "recipeRegistryUrl":
+		s.config.RecipeRegistryURL = value.(string)
 	case "useRenvCache":
 		s.config.UseRenvCache = value.(bool)
 	case "venvStoragePath":

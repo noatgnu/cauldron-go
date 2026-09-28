@@ -19,6 +19,7 @@ import {
   RecipeEarlierStage
 } from '../recipe-stage-row-dialog/recipe-stage-row-dialog';
 import { CompatibilityBadge } from '../compatibility-badge/compatibility-badge';
+import { RecipeDiagram } from '../recipe-diagram/recipe-diagram';
 import { RecipeService } from '../../core/services/recipe';
 import { PluginV2Service } from '../../core/services/plugin-v2';
 import { NotificationService } from '../../core/services/notification.service';
@@ -50,7 +51,8 @@ interface StageRow {
     MatInputModule,
     MatSelectModule,
     MatTooltipModule,
-    CompatibilityBadge
+    CompatibilityBadge,
+    RecipeDiagram
   ],
   templateUrl: './recipe-editor.html',
   styleUrl: './recipe-editor.scss',
@@ -76,6 +78,8 @@ export class RecipeEditor implements OnInit {
   loading = signal(true);
 
   columns = ['summary', 'actions'];
+
+  protected diagramGenerator = (expandedStages: number[]) => this.recipeService.generateDiagram(this.recipeId!, expandedStages);
 
   async ngOnInit() {
     try {

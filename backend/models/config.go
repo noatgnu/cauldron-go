@@ -8,6 +8,7 @@ type Config struct {
 	RLibPath                       string   `json:"rLibPath"`
 	CurtainBackendURL              string   `json:"curtainBackendUrl"`
 	PluginRegistryURL              string   `json:"pluginRegistryUrl"`
+	RecipeRegistryURL              string   `json:"recipeRegistryUrl"`
 	UseRenvCache                   bool     `json:"useRenvCache"`
 	VenvStoragePath                string   `json:"venvStoragePath"`
 	RenvStoragePath                string   `json:"renvStoragePath"`

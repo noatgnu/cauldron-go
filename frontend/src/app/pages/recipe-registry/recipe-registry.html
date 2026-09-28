@@ -1,0 +1,162 @@
+<div class="registry-container">
+  <div class="registry-header">
+    <div class="header-main">
+      <h1>
+        <mat-icon>cloud</mat-icon>
+        Recipe Registry
+      </h1>
+      <p class="header-description">Browse and download shared job-chain recipes from the registry</p>
+    </div>
+    <div class="header-actions">
+      <button mat-icon-button (click)="refreshRegistry()" [disabled]="loading()" matTooltip="Refresh registry data" aria-label="Refresh registry data">
+        <mat-icon>refresh</mat-icon>
+      </button>
+    </div>
+  </div>
+
+  <div class="search-filters">
+    <mat-form-field appearance="outline" class="search-field">
+      <mat-label>Search recipes</mat-label>
+      <input matInput [(ngModel)]="searchQuery" (keyup.enter)="onSearch()">
+      <mat-icon matPrefix>search</mat-icon>
+      <button mat-icon-button matSuffix (click)="onSearch()" [disabled]="loading()" aria-label="Search recipes">
+        <mat-icon>arrow_forward</mat-icon>
+      </button>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="category-filter">
+      <mat-label>Category</mat-label>
+      <mat-select [(ngModel)]="selectedCategory" (selectionChange)="onCategoryChange()">
+        <mat-option value="">All Categories</mat-option>
+        @for (category of filterOptions().categories; track category) {
+          <mat-option [value]="category">{{ category }}</mat-option>
+        }
+      </mat-select>
+      <mat-icon matPrefix>filter_list</mat-icon>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="registry-filter">
+      <mat-label>Tag</mat-label>
+      <mat-select [(ngModel)]="selectedTag" (selectionChange)="onTagChange()">
+        <mat-option value="">All Tags</mat-option>
+        @for (tag of filterOptions().tags; track tag) {
+          <mat-option [value]="tag">{{ tag }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    @if (searchQuery || selectedCategory || selectedTag) {
+      <button mat-button (click)="clearFilters()" class="clear-filters-button">
+        <mat-icon>clear</mat-icon>
+        Clear
+      </button>
+    }
+  </div>
+
+  @if (loading()) {
+    <div class="loading-container">
+      <mat-spinner diameter="48"></mat-spinner>
+      <p>Loading recipes from registry...</p>
+    </div>
+  } @else if (recipes().length === 0) {
+    <div class="empty-state">
+      <mat-icon>cloud_off</mat-icon>
+      <h3>No recipes found</h3>
+      <p>No recipes match your search criteria. Try adjusting your filters or check your recipe registry URL in settings.</p>
+    </div>
+  } @else {
+    <div class="table-container">
+      <table mat-table [dataSource]="recipes()" class="recipes-table">
+
+        <ng-container matColumnDef="label">
+          <th mat-header-cell *matHeaderCellDef>Recipe</th>
+          <td mat-cell *matCellDef="let recipe">
+            <div class="name-cell">
+              <mat-icon class="recipe-icon-small">account_tree</mat-icon>
+              <span class="recipe-name">{{ recipe.label }}</span>
+            </div>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="revision">
+          <th mat-header-cell *matHeaderCellDef>Revision</th>
+          <td mat-cell *matCellDef="let recipe">
+            <code class="version-badge">{{ recipe.latest_version?.revision ?? '-' }}</code>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="category">
+          <th mat-header-cell *matHeaderCellDef>Category</th>
+          <td mat-cell *matCellDef="let recipe">
+            <mat-chip class="category-chip-small">
+              {{ getCategoryName(recipe) }}
+            </mat-chip>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="author">
+          <th mat-header-cell *matHeaderCellDef>Author</th>
+          <td mat-cell *matCellDef="let recipe">
+            {{ getAuthorName(recipe) }}
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="updated">
+          <th mat-header-cell *matHeaderCellDef>Updated</th>
+          <td mat-cell *matCellDef="let recipe" class="date-cell">
+            <mat-icon class="date-icon">access_time</mat-icon>
+            {{ formatDate(recipe.updated_at) }}
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="actions">
+          <th mat-header-cell *matHeaderCellDef>Actions</th>
+          <td mat-cell *matCellDef="let recipe" class="actions-cell">
+            <button
+              mat-icon-button
+              (click)="viewDetails(recipe)"
+              matTooltip="View Details"
+              aria-label="View recipe details">
+              <mat-icon>info</mat-icon>
+            </button>
+            <button
+              mat-icon-button
+              color="primary"
+              (click)="downloadRecipe(recipe)"
+              [disabled]="downloadingId() === recipe.id"
+              matTooltip="Download Recipe"
+              aria-label="Download recipe">
+              @if (downloadingId() === recipe.id) {
+                <mat-spinner diameter="18"></mat-spinner>
+              } @else {
+                <mat-icon>download</mat-icon>
+              }
+            </button>
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="description">
+          <td mat-cell *matCellDef="let recipe" [attr.colspan]="displayedColumns.length" class="description-row">
+            <div class="description-content">
+              {{ recipe.description || 'No description available' }}
+            </div>
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns;" class="recipe-row"></tr>
+        <tr mat-row *matRowDef="let row; columns: ['description'];" class="description-row-container"></tr>
+      </table>
+    </div>
+
+    <mat-paginator
+      [length]="totalCount()"
+      [pageSize]="pageSize"
+      [pageIndex]="pageIndex"
+      [pageSizeOptions]="[5, 10, 20]"
+      (page)="onPageChange($event)"
+      showFirstLastButtons
+      class="registry-paginator">
+    </mat-paginator>
+  }
+</div>

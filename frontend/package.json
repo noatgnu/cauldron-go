@@ -42,8 +42,10 @@
     "angular-plotly.js": "^22.0.1",
     "data-forge": "^1.10.4",
     "material-icons": "^1.13.14",
+    "mermaid": "^11.17.2",
     "plotly.js-dist-min": "^3.3.0",
     "rxjs": "~7.8.0",
+    "svg-pan-zoom": "^3.6.2",
     "tslib": "^2.3.0",
     "typeface-roboto": "^1.1.13",
     "uniprotparserjs": "^1.0.31"

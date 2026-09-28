@@ -1,0 +1,20 @@
+<div class="recipe-diagram">
+  @if (loading()) {
+    <p class="diagram-status">Rendering diagram...</p>
+  } @else if (svg(); as svgContent) {
+    <div class="diagram-toolbar">
+      <p class="diagram-hint">Click a stage to expand or collapse it. Scroll to zoom, drag to pan, or use the on-diagram controls.</p>
+      <div class="diagram-actions">
+        <button mat-icon-button type="button" (click)="exportSvg()" matTooltip="Export as SVG (editable in Illustrator/Inkscape/PowerPoint)">
+          <mat-icon>save_alt</mat-icon>
+        </button>
+        <button mat-icon-button type="button" (click)="exportPdf()" matTooltip="Print / Export as PDF">
+          <mat-icon>picture_as_pdf</mat-icon>
+        </button>
+      </div>
+    </div>
+    <div class="diagram-canvas" [innerHTML]="svgContent"></div>
+  } @else {
+    <p class="diagram-status">No diagram available.</p>
+  }
+</div>

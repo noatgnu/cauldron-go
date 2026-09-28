@@ -71,6 +71,13 @@
       }
     </div>
 
+    @if (recipeId) {
+      <div class="form-section">
+        <h3>Diagram</h3>
+        <app-recipe-diagram [subjectId]="recipeId" [generate]="diagramGenerator"></app-recipe-diagram>
+      </div>
+    }
+
     <div class="submit-row">
       <button class="save-recipe-btn" mat-stroked-button type="button" (click)="saveRecipe()" [disabled]="saving() || running()">
         @if (saving()) { Saving... } @else { Save Recipe }
