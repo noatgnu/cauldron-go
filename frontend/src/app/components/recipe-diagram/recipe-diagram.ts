@@ -13,11 +13,15 @@ import {
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
+import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { NotificationService } from '../../core/services/notification.service';
+import { Wails } from '../../core/services/wails';
 
 @Component({
   selector: 'app-recipe-diagram',
-  imports: [CommonModule],
+  imports: [CommonModule, MatButtonModule, MatIconModule, MatTooltipModule],
   templateUrl: './recipe-diagram.html',
   styleUrl: './recipe-diagram.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -31,6 +35,7 @@ export class RecipeDiagram implements OnChanges, OnDestroy {
   private sanitizer = inject(DomSanitizer);
   private elementRef = inject<ElementRef<HTMLElement>>(ElementRef);
   private injector = inject(Injector);
+  private wails = inject(Wails);
 
   protected loading = signal(false);
   protected svg = signal<SafeHtml | null>(null);
@@ -39,6 +44,7 @@ export class RecipeDiagram implements OnChanges, OnDestroy {
   private renderCount = 0;
   private currentRenderId = '';
   private panZoom: SvgPanZoom.Instance | null = null;
+  private rawSvg: string | null = null;
 
   async ngOnChanges(changes: SimpleChanges) {
     if (changes['subjectId']) {
@@ -59,13 +65,21 @@ export class RecipeDiagram implements OnChanges, OnDestroy {
     try {
       const source = await this.generate(Array.from(this.expandedStages()));
       const mermaid = (await import('mermaid')).default;
-      mermaid.initialize({ startOnLoad: false, theme: 'default', securityLevel: 'strict' });
+      mermaid.initialize({
+        startOnLoad: false,
+        theme: 'default',
+        securityLevel: 'strict',
+        htmlLabels: false,
+        flowchart: { htmlLabels: false }
+      });
       this.currentRenderId = `recipe-diagram-${this.renderCount++}`;
       const { svg } = await mermaid.render(this.currentRenderId, source);
+      this.rawSvg = svg;
       this.svg.set(this.sanitizer.bypassSecurityTrustHtml(svg));
       afterNextRender(() => void this.attachInteractivity(), { injector: this.injector });
     } catch (err) {
       this.notification.showError(`Failed to render diagram: ${err}`);
+      this.rawSvg = null;
       this.svg.set(null);
     } finally {
       this.loading.set(false);
@@ -119,4 +133,49 @@ export class RecipeDiagram implements OnChanges, OnDestroy {
     });
     void this.render();
   }
+
+  protected async exportSvg() {
+    if (!this.rawSvg) return;
+    try {
+      const defaultName = `recipe-diagram-${this.subjectId}.svg`;
+      const path = await this.wails.saveFileDialog('Export Diagram as SVG', defaultName);
+      if (!path) return;
+      await this.wails.exportDiagramSVG(path, this.rawSvg);
+      this.notification.showSuccess('Diagram exported.');
+    } catch (err) {
+      this.notification.showError(`Failed to export diagram: ${err}`);
+    }
+  }
+
+  protected exportPdf() {
+    if (!this.rawSvg) return;
+    printDiagram(this.rawSvg);
+  }
+}
+
+/**
+ * Prints just the diagram by temporarily injecting it as a direct child of
+ * <body> and hiding every other direct child for the duration of the print,
+ * via the global `body.printing-diagram` rule in styles.scss. A popup-window
+ * print (the more common technique) doesn't work here: window.open() is
+ * blocked inside the desktop app's WebKitGTK webview, but window.print() on
+ * the current window works fine and opens the real native print dialog
+ * (which offers "Print to File" / Save as PDF on Linux).
+ */
+export function printDiagram(svg: string): void {
+  const target = document.createElement('div');
+  target.className = 'print-diagram-target';
+  target.innerHTML = svg;
+  document.body.appendChild(target);
+  document.body.classList.add('printing-diagram');
+
+  const cleanup = () => {
+    document.body.classList.remove('printing-diagram');
+    target.remove();
+    window.removeEventListener('afterprint', cleanup);
+  };
+  window.addEventListener('afterprint', cleanup);
+
+  window.print();
+  cleanup();
 }

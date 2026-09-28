@@ -301,6 +301,12 @@ export class Wails {
     return WailsApp.SaveFile(title, defaultName);
   }
 
+  async exportDiagramSVG(path: string, svgContent: string): Promise<void> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.ExportDiagramSVG(path, svgContent);
+  }
+
   async createSettingsBackup(path: string, includeSecrets: boolean): Promise<services.BackupSummary | null> {
     if (!this.isWails) throw new Error('Wails not available');
     await this.waitForBackend();

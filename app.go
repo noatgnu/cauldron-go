@@ -462,6 +462,10 @@ func (a *App) ListJobOutputFiles(jobID string) ([]string, error) {
 	return files, nil
 }
 
+func (a *App) ExportDiagramSVG(path string, svgContent string) error {
+	return os.WriteFile(path, []byte(svgContent), 0644)
+}
+
 func (a *App) WriteJobOutputFile(jobID string, filename string, content string) error {
 	job, err := a.jobQueue.GetJob(jobID)
 	if err != nil {

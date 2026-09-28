@@ -1,17 +1,23 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { vi } from 'vitest';
-import { RecipeDiagram } from './recipe-diagram';
+import { RecipeDiagram, printDiagram } from './recipe-diagram';
 import { NotificationService } from '../../core/services/notification.service';
+import { Wails } from '../../core/services/wails';
 
 describe('RecipeDiagram', () => {
   let component: RecipeDiagram;
   let fixture: ComponentFixture<RecipeDiagram>;
   let generateMock: any;
   let notificationMock: any;
+  let wailsMock: any;
 
   beforeEach(async () => {
     generateMock = vi.fn().mockResolvedValue('flowchart TD\n    S0["Stage 1"]\n');
-    notificationMock = { showError: vi.fn() };
+    notificationMock = { showError: vi.fn(), showSuccess: vi.fn() };
+    wailsMock = {
+      saveFileDialog: vi.fn().mockResolvedValue('/tmp/recipe-diagram.svg'),
+      exportDiagramSVG: vi.fn().mockResolvedValue(undefined)
+    };
 
     vi.doMock('mermaid', () => ({
       default: {
@@ -25,7 +31,10 @@ describe('RecipeDiagram', () => {
 
     await TestBed.configureTestingModule({
       imports: [RecipeDiagram],
-      providers: [{ provide: NotificationService, useValue: notificationMock }]
+      providers: [
+        { provide: NotificationService, useValue: notificationMock },
+        { provide: Wails, useValue: wailsMock }
+      ]
     }).compileComponents();
 
     fixture = TestBed.createComponent(RecipeDiagram);
@@ -89,6 +98,95 @@ describe('RecipeDiagram', () => {
     expect(notificationMock.showError).toHaveBeenCalled();
     expect(component['svg']()).toBeNull();
     expect(component['loading']()).toBe(false);
+  });
+
+  describe('exportSvg', () => {
+    beforeEach(() => {
+      component['rawSvg'] = '<svg></svg>';
+    });
+
+    it('saves the raw SVG to the dialog-picked path', async () => {
+      await component['exportSvg']();
+
+      expect(wailsMock.saveFileDialog).toHaveBeenCalledWith('Export Diagram as SVG', 'recipe-diagram-recipe-1.svg');
+      expect(wailsMock.exportDiagramSVG).toHaveBeenCalledWith('/tmp/recipe-diagram.svg', '<svg></svg>');
+      expect(notificationMock.showSuccess).toHaveBeenCalled();
+    });
+
+    it('does nothing when the dialog is cancelled', async () => {
+      wailsMock.saveFileDialog.mockResolvedValue('');
+
+      await component['exportSvg']();
+
+      expect(wailsMock.exportDiagramSVG).not.toHaveBeenCalled();
+    });
+
+    it('shows an error notification when the export fails', async () => {
+      wailsMock.exportDiagramSVG.mockRejectedValue(new Error('disk full'));
+
+      await component['exportSvg']();
+
+      expect(notificationMock.showError).toHaveBeenCalled();
+    });
+
+    it('does nothing when there is no diagram to export', async () => {
+      component['rawSvg'] = null;
+
+      await component['exportSvg']();
+
+      expect(wailsMock.saveFileDialog).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('exportPdf', () => {
+    afterEach(() => {
+      document.body.classList.remove('printing-diagram');
+      document.querySelectorAll('.print-diagram-target').forEach(el => el.remove());
+    });
+
+    it('injects the raw SVG as a print target and prints the current window', () => {
+      component['rawSvg'] = '<svg><text>hi</text></svg>';
+      const printSpy = vi.spyOn(window, 'print').mockImplementation(() => {});
+
+      component['exportPdf']();
+
+      expect(printSpy).toHaveBeenCalled();
+      expect(document.body.classList.contains('printing-diagram')).toBe(false);
+      expect(document.querySelector('.print-diagram-target')).toBeNull();
+      printSpy.mockRestore();
+    });
+
+    it('does nothing when there is no diagram to print', () => {
+      component['rawSvg'] = null;
+      const printSpy = vi.spyOn(window, 'print').mockImplementation(() => {});
+
+      component['exportPdf']();
+
+      expect(printSpy).not.toHaveBeenCalled();
+      printSpy.mockRestore();
+    });
+  });
+
+  describe('printDiagram', () => {
+    afterEach(() => {
+      document.body.classList.remove('printing-diagram');
+      document.querySelectorAll('.print-diagram-target').forEach(el => el.remove());
+    });
+
+    it('appends the svg as a direct child of body, toggles the print class, and cleans up', () => {
+      const printSpy = vi.spyOn(window, 'print').mockImplementation(() => {
+        expect(document.body.classList.contains('printing-diagram')).toBe(true);
+        const target = document.body.querySelector(':scope > .print-diagram-target');
+        expect(target?.innerHTML).toContain('<text>hi</text>');
+      });
+
+      printDiagram('<svg><text>hi</text></svg>');
+
+      expect(printSpy).toHaveBeenCalled();
+      expect(document.body.classList.contains('printing-diagram')).toBe(false);
+      expect(document.querySelector('.print-diagram-target')).toBeNull();
+      printSpy.mockRestore();
+    });
   });
 
   describe('stageIndexForToggle', () => {
