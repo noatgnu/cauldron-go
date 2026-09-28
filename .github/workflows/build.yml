@@ -227,7 +227,7 @@ jobs:
             libwebkitgtk-6.0-dev
 
       - name: Install Wails CLI
-        run: go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.15
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.26
 
       - name: Generate Wails bindings
         run: wails3 generate bindings -ts
@@ -358,7 +358,7 @@ jobs:
         run: chmod +x build.sh
 
       - name: Install Wails CLI
-        run: go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.15
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.26
 
       - name: Generate Wails bindings
         run: wails3 generate bindings -ts
@@ -475,7 +475,7 @@ jobs:
         run: chmod +x build.sh
 
       - name: Install Wails CLI
-        run: go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.15
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.26
 
       - name: Generate Wails bindings
         run: wails3 generate bindings -ts
@@ -635,7 +635,7 @@ jobs:
         run: chmod +x build.sh
 
       - name: Install Wails CLI
-        run: go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.15
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.26
 
       - name: Generate Wails bindings
         run: wails3 generate bindings -ts

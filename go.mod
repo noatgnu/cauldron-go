@@ -9,7 +9,7 @@ require (
 	github.com/noatgnu/uniprotparser-go v0.0.0-20251201170658-be6b6f22f793
 	github.com/parquet-go/parquet-go v0.32.0
 	github.com/ulikunitz/xz v0.5.15
-	github.com/wailsapp/wails/v3 v3.0.0-beta.15
+	github.com/wailsapp/wails/v3 v3.0.0-beta.26
 	github.com/yuin/goldmark v1.7.16
 	golang.org/x/crypto v0.53.0
 	golang.org/x/image v0.45.0
@@ -36,7 +36,6 @@ require (
 	github.com/godbus/dbus/v5 v5.2.2 // indirect
 	github.com/golang/groupcache v0.0.0-20241129210726-2c02b8208cf8 // indirect
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 // indirect
-	github.com/jchv/go-winloader v0.0.0-20250406163304-c1995be93bd1 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/kevinburke/ssh_config v1.4.0 // indirect

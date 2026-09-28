@@ -107,7 +107,7 @@ jobs:
           echo "${{ github.workspace }}/bin/win/python" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: Install Wails
-        run: go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.15
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.26
         shell: bash
 
       - name: Build Developer Tools
@@ -314,7 +314,7 @@ jobs:
 
 
       - name: Install Wails
-        run: go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.15
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.26
 
       - name: Build Developer Tools
         run: ./build.sh tools
@@ -492,7 +492,7 @@ jobs:
           echo "${{ github.workspace }}/python/bin" >> $GITHUB_PATH
 
       - name: Install Wails
-        run: go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.15
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-beta.26
 
       - name: Build Developer Tools
         run: ./build.sh tools
