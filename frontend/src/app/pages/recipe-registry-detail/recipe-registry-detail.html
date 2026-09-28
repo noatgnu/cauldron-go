@@ -1,0 +1,75 @@
+@if (loading()) {
+  <div class="loading-container">
+    <mat-spinner diameter="48"></mat-spinner>
+    <p>Loading recipe...</p>
+  </div>
+} @else if (recipe(); as r) {
+  <div class="detail-container">
+    <button mat-icon-button (click)="goBack()" matTooltip="Back to registry" aria-label="Back to registry">
+      <mat-icon>arrow_back</mat-icon>
+    </button>
+
+    <div class="detail-header">
+      <h1>{{ r.label }}</h1>
+      <button mat-raised-button color="primary" (click)="downloadRecipe()" [disabled]="downloading()">
+        @if (downloading()) {
+          <mat-spinner diameter="18"></mat-spinner>
+        } @else {
+          <mat-icon>download</mat-icon>
+        }
+        Download Recipe
+      </button>
+    </div>
+
+    <p class="description">{{ r.description || 'No description available' }}</p>
+
+    <div class="metadata-grid">
+      <div class="metadata-item">
+        <span class="label">Category</span>
+        <span class="value">{{ getCategoryName(r) }}</span>
+      </div>
+      <div class="metadata-item">
+        <span class="label">Author</span>
+        <span class="value">{{ getAuthorName(r) }}</span>
+      </div>
+      <div class="metadata-item">
+        <span class="label">Revision</span>
+        <span class="value">{{ r.latest_version?.revision ?? '-' }}</span>
+      </div>
+      <div class="metadata-item">
+        <span class="label">Status</span>
+        <span class="value">{{ r.status }}</span>
+      </div>
+    </div>
+
+    <div class="tags-row">
+      @for (tag of r.tags; track tag.id) {
+        <mat-chip>{{ tag.name }}</mat-chip>
+      }
+    </div>
+
+    <h3>Stages</h3>
+    <div class="stages-list">
+      @for (stage of stages(); track stage.index) {
+        <div class="stage-row">
+          <span class="stage-index">{{ stage.index }}</span>
+          <code class="stage-plugin">{{ stage.pluginId }}</code>
+          <span class="stage-version">{{ stage.pluginVersion }}</span>
+          @if (stage.bound) {
+            <mat-icon matTooltip="One or more inputs are bound to an earlier stage's output">link</mat-icon>
+          }
+        </div>
+      }
+    </div>
+
+    @if (r.latest_version?.data) {
+      <h3>Diagram</h3>
+      <app-recipe-diagram [subjectId]="r.id" [generate]="diagramGenerator"></app-recipe-diagram>
+    }
+  </div>
+} @else {
+  <div class="empty-state">
+    <p>Recipe not found.</p>
+    <button mat-button (click)="goBack()">Back to registry</button>
+  </div>
+}

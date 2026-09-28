@@ -27,7 +27,9 @@ import { NotificationService } from '../../../core/services/notification.service
 export class SettingsRegistry implements OnInit {
   protected config = signal<Partial<Config>>({});
   protected saving = signal(false);
+  protected savingRecipeRegistry = signal(false);
   pluginRegistryURL = '';
+  recipeRegistryURL = '';
 
   constructor(
     private wails: Wails,
@@ -37,6 +39,7 @@ export class SettingsRegistry implements OnInit {
   async ngOnInit(): Promise<void> {
     await this.loadSettings();
     this.pluginRegistryURL = this.config().pluginRegistryUrl || '';
+    this.recipeRegistryURL = this.config().recipeRegistryUrl || '';
   }
 
   async loadSettings(): Promise<void> {
@@ -58,6 +61,19 @@ export class SettingsRegistry implements OnInit {
       this.notification.showError(`Failed to save registry URL: ${error}`);
     } finally {
       this.saving.set(false);
+    }
+  }
+
+  async saveRecipeRegistryURL(): Promise<void> {
+    try {
+      this.savingRecipeRegistry.set(true);
+      await this.saveSetting('recipeRegistryUrl', this.recipeRegistryURL);
+      this.config.update(c => ({ ...c, recipeRegistryUrl: this.recipeRegistryURL }));
+      this.notification.showSuccess('Recipe registry URL saved successfully');
+    } catch (error) {
+      this.notification.showError(`Failed to save recipe registry URL: ${error}`);
+    } finally {
+      this.savingRecipeRegistry.set(false);
     }
   }
 

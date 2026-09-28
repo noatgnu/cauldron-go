@@ -1,0 +1,10 @@
+<div class="recipe-diagram">
+  @if (loading()) {
+    <p class="diagram-status">Rendering diagram...</p>
+  } @else if (svg(); as svgContent) {
+    <p class="diagram-hint">Click a stage to expand or collapse it. Scroll to zoom, drag to pan, or use the on-diagram controls.</p>
+    <div class="diagram-canvas" [innerHTML]="svgContent"></div>
+  } @else {
+    <p class="diagram-status">No diagram available.</p>
+  }
+</div>

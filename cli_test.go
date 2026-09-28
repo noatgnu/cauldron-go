@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -1009,6 +1011,111 @@ func TestCLIRecipeCompat_PrintsInstallHintForMissingStageWithRepository(t *testi
 	want := "cauldron plugin install https://github.com/example/cli-compat-missing-plugin --ref deadbeef"
 	if !strings.Contains(output, want) {
 		t.Errorf("expected compat output to contain %q, got: %q", want, output)
+	}
+}
+
+func TestCLIRecipeRegistry_Dispatch(t *testing.T) {
+	if err := cliRecipeRegistry(nil); err == nil {
+		t.Error("expected usage error with no subcommand, got nil")
+	}
+	if err := cliRecipeRegistry([]string{"frobnicate"}); err == nil {
+		t.Error("expected error for unknown recipe-registry subcommand, got nil")
+	}
+}
+
+func TestCLIRecipeRegistryShow_UsageErrors(t *testing.T) {
+	if err := cliRecipeRegistryShow(nil); err == nil {
+		t.Error("expected usage error with no id, got nil")
+	}
+}
+
+func TestCLIRecipeRegistryDownload_UsageErrors(t *testing.T) {
+	if err := cliRecipeRegistryDownload(nil); err == nil {
+		t.Error("expected usage error with no id, got nil")
+	}
+}
+
+func TestCLIRecipeRegistry_Integration(t *testing.T) {
+	recipeData := map[string]interface{}{
+		"version": float64(1),
+		"label":   "Registry Recipe",
+		"stages": []interface{}{
+			map[string]interface{}{"pluginId": "does-not-need-to-exist", "pluginVersion": "1.0.0", "params": map[string]interface{}{}, "bindings": map[string]interface{}{}},
+		},
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case r.URL.Path == "/api/recipes/" && r.Method == http.MethodGet:
+			if got := r.URL.Query().Get("search"); got != "registry" {
+				t.Errorf("expected search 'registry', got %q", got)
+			}
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"count": 1,
+				"results": []map[string]interface{}{
+					{"id": "registry-recipe-1", "label": "Registry Recipe", "status": "approved",
+						"latest_version": map[string]interface{}{"revision": 1, "data": recipeData}},
+				},
+			})
+		case r.URL.Path == "/api/recipes/registry-recipe-1/":
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"id": "registry-recipe-1", "label": "Registry Recipe", "status": "approved",
+				"latest_version": map[string]interface{}{"revision": 1, "data": recipeData},
+			})
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	ctx, err := newCLIContext()
+	if err != nil {
+		t.Fatalf("newCLIContext error: %v", err)
+	}
+	defer ctx.close()
+
+	originalRecipeRegistryURL := ctx.settings.GetConfig().RecipeRegistryURL
+	if err := ctx.settings.Set("recipeRegistryUrl", server.URL); err != nil {
+		t.Fatalf("failed to set recipeRegistryUrl: %v", err)
+	}
+	defer ctx.settings.Set("recipeRegistryUrl", originalRecipeRegistryURL)
+
+	listOutput := captureStdout(t, func() {
+		if err := cliRecipeRegistryList([]string{"--search", "registry"}); err != nil {
+			t.Errorf("cliRecipeRegistryList error: %v", err)
+		}
+	})
+	if !strings.Contains(listOutput, "Registry Recipe") {
+		t.Errorf("expected list output to mention the recipe, got: %q", listOutput)
+	}
+
+	showOutput := captureStdout(t, func() {
+		if err := cliRecipeRegistryShow([]string{"registry-recipe-1"}); err != nil {
+			t.Errorf("cliRecipeRegistryShow error: %v", err)
+		}
+	})
+	if !strings.Contains(showOutput, "does-not-need-to-exist") {
+		t.Errorf("expected show output to list the stage's plugin id, got: %q", showOutput)
+	}
+
+	downloadOutput := captureStdout(t, func() {
+		if err := cliRecipeRegistryDownload([]string{"registry-recipe-1"}); err != nil {
+			t.Errorf("cliRecipeRegistryDownload error: %v", err)
+		}
+	})
+	if !strings.Contains(downloadOutput, "Downloaded recipe") {
+		t.Errorf("expected download output to confirm success, got: %q", downloadOutput)
+	}
+
+	recipes, err := ctx.recipeService.GetAllRecipes(1000, 0)
+	if err != nil {
+		t.Fatalf("GetAllRecipes error: %v", err)
+	}
+	for _, r := range recipes {
+		if r.Label == "Registry Recipe" {
+			defer ctx.recipeService.DeleteRecipe(r.ID)
+		}
 	}
 }
 

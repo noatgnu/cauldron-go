@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/noatgnu/cauldron-go/backend/models"
 )
@@ -422,5 +423,117 @@ func TestRecipeService_DeleteRecipe_RemovesStages(t *testing.T) {
 	db.GetDB().Where("recipe_id = ?", recipe.ID).Find(&remaining)
 	if len(remaining) != 0 {
 		t.Errorf("expected all stage rows to be deleted, got %d remaining", len(remaining))
+	}
+}
+
+func seedTestChain(t *testing.T, db *DatabaseService, pluginLoader *PluginLoaderV2) *models.JobChain {
+	t.Helper()
+
+	upstream, err := pluginLoader.GetPluginByStringID("chain-upstream")
+	if err != nil {
+		t.Fatalf("failed to look up chain-upstream: %v", err)
+	}
+	downstream, err := pluginLoader.GetPluginByStringID("chain-downstream")
+	if err != nil {
+		t.Fatalf("failed to look up chain-downstream: %v", err)
+	}
+
+	chain := &models.JobChain{ID: "chain-1", Label: "My Chain Run", CreatedAt: time.Now()}
+	if err := db.GetDB().Create(chain).Error; err != nil {
+		t.Fatalf("failed to create chain: %v", err)
+	}
+
+	stages := []models.JobChainStage{
+		{
+			ChainID:       chain.ID,
+			StageIndex:    0,
+			PluginID:      upstream.ID,
+			PluginVersion: "1.0.0",
+			Params:        models.JSONMap{},
+			Bindings:      models.JSONMap{},
+		},
+		{
+			ChainID:       chain.ID,
+			StageIndex:    1,
+			PluginID:      downstream.ID,
+			PluginVersion: "1.0.0",
+			Params:        models.JSONMap{},
+			Bindings: models.JSONMap{
+				"input_file": map[string]interface{}{"stage": float64(0), "output": "result"},
+			},
+		},
+	}
+	for i := range stages {
+		if err := db.GetDB().Create(&stages[i]).Error; err != nil {
+			t.Fatalf("failed to create chain stage %d: %v", i, err)
+		}
+	}
+
+	return chain
+}
+
+func TestRecipeService_CreateRecipeFromChain(t *testing.T) {
+	db, recipeService, pluginLoader := setupRecipeTestServices(t)
+	chain := seedTestChain(t, db, pluginLoader)
+
+	recipe, err := recipeService.CreateRecipeFromChain(chain.ID, "Recovered Recipe", "recovered from a past run")
+	if err != nil {
+		t.Fatalf("CreateRecipeFromChain failed: %v", err)
+	}
+	if recipe.Label != "Recovered Recipe" {
+		t.Errorf("expected label %q, got %q", "Recovered Recipe", recipe.Label)
+	}
+
+	stages, err := recipeService.GetRecipeStages(recipe.ID)
+	if err != nil {
+		t.Fatalf("GetRecipeStages failed: %v", err)
+	}
+	if len(stages) != 2 {
+		t.Fatalf("expected 2 stages, got %d", len(stages))
+	}
+	if stages[0].PluginID != "chain-upstream" {
+		t.Errorf("expected stage 0 plugin id %q, got %q", "chain-upstream", stages[0].PluginID)
+	}
+	if stages[1].PluginID != "chain-downstream" {
+		t.Errorf("expected stage 1 plugin id %q, got %q", "chain-downstream", stages[1].PluginID)
+	}
+	binding, ok := stages[1].Bindings["input_file"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected stage 1 to carry the input_file binding, got %#v", stages[1].Bindings)
+	}
+	if outputName, _ := binding["output"].(string); outputName != "result" {
+		t.Errorf("expected binding output %q, got %q", "result", outputName)
+	}
+}
+
+func TestRecipeService_CreateRecipeFromChain_DefaultsLabelToChainLabel(t *testing.T) {
+	db, recipeService, pluginLoader := setupRecipeTestServices(t)
+	chain := seedTestChain(t, db, pluginLoader)
+
+	recipe, err := recipeService.CreateRecipeFromChain(chain.ID, "", "")
+	if err != nil {
+		t.Fatalf("CreateRecipeFromChain failed: %v", err)
+	}
+	if recipe.Label != chain.Label {
+		t.Errorf("expected label to default to chain label %q, got %q", chain.Label, recipe.Label)
+	}
+}
+
+func TestRecipeService_CreateRecipeFromChain_UninstalledPlugin(t *testing.T) {
+	db, recipeService, pluginLoader := setupRecipeTestServices(t)
+	chain := seedTestChain(t, db, pluginLoader)
+
+	pluginLoader.plugins = map[uint]*models.PluginV2{}
+
+	if _, err := recipeService.CreateRecipeFromChain(chain.ID, "Recovered", ""); err == nil {
+		t.Fatal("expected an error when a stage's plugin is no longer installed")
+	}
+}
+
+func TestRecipeService_CreateRecipeFromChain_ChainNotFound(t *testing.T) {
+	_, recipeService, _ := setupRecipeTestServices(t)
+
+	if _, err := recipeService.CreateRecipeFromChain("does-not-exist", "Recovered", ""); err == nil {
+		t.Fatal("expected an error for a chain that doesn't exist")
 	}
 }

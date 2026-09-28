@@ -46,4 +46,8 @@ export class RecipeService {
   async runRecipe(id: string): Promise<JobChain> {
     return this.wails.runRecipe(id);
   }
+
+  async generateDiagram(id: string, expandedStages: number[]): Promise<string> {
+    return this.wails.generateRecipeDiagram(id, expandedStages);
+  }
 }

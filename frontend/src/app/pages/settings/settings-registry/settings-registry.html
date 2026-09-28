@@ -28,4 +28,34 @@
       </div>
     </div>
   }
+
+  <p class="section-description">
+    Configure the recipe registry URL to browse and download shared job-chain recipes from the community.
+  </p>
+
+  <mat-form-field appearance="outline" class="full-width-field">
+    <mat-label>Recipe Registry URL</mat-label>
+    <input matInput [(ngModel)]="recipeRegistryURL">
+    <mat-icon matPrefix>cloud</mat-icon>
+  </mat-form-field>
+
+  <div class="button-row">
+    <button mat-raised-button color="primary" (click)="saveRecipeRegistryURL()" [disabled]="savingRecipeRegistry()">
+      <mat-icon>save</mat-icon>
+      Save
+    </button>
+    @if (savingRecipeRegistry()) {
+      <mat-spinner diameter="20"></mat-spinner>
+    }
+  </div>
+
+  @if (config().recipeRegistryUrl) {
+    <div class="info-box">
+      <mat-icon>info</mat-icon>
+      <div>
+        <strong>Current registry:</strong><br>
+        <code>{{ config().recipeRegistryUrl }}</code>
+      </div>
+    </div>
+  }
 </div>

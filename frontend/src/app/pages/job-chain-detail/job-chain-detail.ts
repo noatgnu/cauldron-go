@@ -12,6 +12,8 @@ import { MatDialog } from '@angular/material/dialog';
 import { Wails, ChainStatus } from '../../core/services/wails';
 import { JobChainService } from '../../core/services/job-chain';
 import { ConfirmDialogComponent } from '../../components/confirm-dialog/confirm-dialog';
+import { PromptDialogComponent } from '../../components/prompt-dialog/prompt-dialog';
+import { NotificationService } from '../../core/services/notification.service';
 
 @Component({
   selector: 'app-job-chain-detail',
@@ -31,6 +33,7 @@ import { ConfirmDialogComponent } from '../../components/confirm-dialog/confirm-
 export class JobChainDetail implements OnInit, OnDestroy {
   protected chain = signal<ChainStatus | null>(null);
   protected loading = signal(true);
+  protected savingRecipe = signal(false);
   protected displayedColumns: string[] = ['status', 'stage', 'createdAt', 'actions'];
   private chainId = '';
   private paramMapSubscription?: Subscription;
@@ -40,7 +43,8 @@ export class JobChainDetail implements OnInit, OnDestroy {
     private router: Router,
     private wails: Wails,
     private jobChainService: JobChainService,
-    private dialog: MatDialog
+    private dialog: MatDialog,
+    private notification: NotificationService
   ) {
     effect(() => {
       const job = this.wails.jobUpdate();
@@ -103,6 +107,38 @@ export class JobChainDetail implements OnInit, OnDestroy {
       await this.router.navigate(['/job-chains']);
     } catch (error: any) {
       await this.wails.logToFile(`[JobChainDetail] Failed to delete chain: ${error?.message || String(error)}`);
+    }
+  }
+
+  async saveAsRecipe(): Promise<void> {
+    const chain = this.chain();
+    if (!chain) return;
+
+    const dialogRef = this.dialog.open(PromptDialogComponent, {
+      width: '440px',
+      disableClose: true,
+      data: {
+        title: 'Save chain as recipe',
+        message: 'This reconstructs a reusable recipe from exactly what ran in this chain.',
+        label: 'Recipe label',
+        value: chain.label,
+        confirmText: 'Save'
+      }
+    });
+
+    const label = await firstValueFrom(dialogRef.afterClosed());
+    if (!label) return;
+
+    this.savingRecipe.set(true);
+    try {
+      const recipe = await this.jobChainService.saveAsRecipe(this.chainId, label, `Saved from job chain ${chain.chainId}`);
+      this.notification.showSuccess('Recipe saved.');
+      await this.router.navigate(['/recipe', recipe.id]);
+    } catch (error: any) {
+      await this.wails.logToFile(`[JobChainDetail] Failed to save chain as recipe: ${error?.message || String(error)}`);
+      this.notification.showError('Failed to save chain as a recipe');
+    } finally {
+      this.savingRecipe.set(false);
     }
   }
 

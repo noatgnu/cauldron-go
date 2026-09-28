@@ -15,6 +15,8 @@ import { PluginExecute } from './pages/plugin-execute/plugin-execute';
 import { PluginEditor } from './pages/plugin-editor/plugin-editor';
 import { PluginRegistry } from './pages/plugin-registry/plugin-registry';
 import { PluginRegistryDetail } from './pages/plugin-registry-detail/plugin-registry-detail';
+import { RecipeRegistry } from './pages/recipe-registry/recipe-registry';
+import { RecipeRegistryDetail } from './pages/recipe-registry-detail/recipe-registry-detail';
 import { About } from './pages/about/about';
 import { TableBrowser } from './pages/table-browser/table-browser';
 import { authGuard } from './core/guards/auth.guard';
@@ -38,6 +40,8 @@ export const routes: Routes = [
       { path: 'recipes', component: Recipes },
       { path: 'recipe/new', component: RecipeEditorPage },
       { path: 'recipe/:id', component: RecipeEditorPage },
+      { path: 'recipe-registry', component: RecipeRegistry },
+      { path: 'recipe-registry/:id', component: RecipeRegistryDetail },
       { path: 'job-chains', component: JobChains },
       { path: 'job-chain/:id', component: JobChainDetail },
       { path: 'plugins', component: Plugins },

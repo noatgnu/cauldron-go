@@ -507,6 +507,18 @@ export class Wails {
     return result;
   }
 
+  async generateRecipeDiagram(id: string, expandedStages: number[]): Promise<string> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.GenerateRecipeDiagram(id, expandedStages);
+  }
+
+  async generateRecipeDiagramFromData(recipeDataJSON: string, expandedStages: number[]): Promise<string> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.GenerateRecipeDiagramFromData(recipeDataJSON, expandedStages);
+  }
+
   async getJobChain(id: string): Promise<JobChain> {
     if (!this.isWails) throw new Error('Wails not available');
     await this.waitForBackend();
@@ -534,6 +546,14 @@ export class Wails {
     if (!this.isWails) throw new Error('Wails not available');
     await this.waitForBackend();
     return WailsApp.DeleteJobChain(id);
+  }
+
+  async createRecipeFromChain(chainId: string, label: string, description: string): Promise<Recipe> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    const result = await WailsApp.CreateRecipeFromChain(chainId, label, description);
+    if (!result) throw new Error('Failed to save chain as a recipe');
+    return result;
   }
 
   async getPythonVersion(): Promise<string> {
@@ -1303,6 +1323,32 @@ export class Wails {
     if (!this.isWails) throw new Error('Wails not available');
     await this.waitForBackend();
     return WailsApp.GetRegistryFilterOptions();
+  }
+
+  async listRegistryRecipes(searchQuery: string, categoryName: string, authorName: string, tag: string, limit: number, offset: number): Promise<any> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.ListRegistryRecipes(searchQuery, categoryName, authorName, tag, limit, offset);
+  }
+
+  async getRegistryRecipe(id: string): Promise<any> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.GetRegistryRecipe(id);
+  }
+
+  async getRecipeRegistryFilterOptions(): Promise<any> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.GetRecipeRegistryFilterOptions();
+  }
+
+  async downloadRecipeFromRegistry(id: string): Promise<RecipeImportResult> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    const result = await WailsApp.DownloadRecipeFromRegistry(id);
+    if (!result) throw new Error('Download did not return a result');
+    return result;
   }
 
   async installPluginFromRegistry(pluginID: string, commitHash: string = ''): Promise<void> {

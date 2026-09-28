@@ -51,6 +51,7 @@ type App struct {
 	protocolHandler        *services.ProtocolHandler
 	httpInstallServer      *services.HTTPInstallServer
 	pluginRegistryService  *services.PluginRegistryService
+	recipeRegistryService  *services.RecipeRegistryService
 	gitAuthService         *services.GitAuthService
 	backupService          *services.BackupService
 	pluginMigrationService *services.PluginMigrationService
@@ -255,6 +256,10 @@ func (a *App) Initialize() {
 	log.Println("[App.Initialize] Initializing plugin registry service...")
 	a.pluginRegistryService = services.NewPluginRegistryServiceV3(a.settings, a.gitAuthService)
 	log.Println("[App.Initialize] Plugin registry service initialized")
+
+	log.Println("[App.Initialize] Initializing recipe registry service...")
+	a.recipeRegistryService = services.NewRecipeRegistryServiceV3(a.settings)
+	log.Println("[App.Initialize] Recipe registry service initialized")
 
 	log.Println("[App.Initialize] Initializing protocol handler...")
 	a.protocolHandler = services.NewProtocolHandlerV3(a.pluginInstaller, a.wailsApp, a.settings)
@@ -1532,6 +1537,18 @@ func (a *App) RunRecipe(id string) (*models.JobChain, error) {
 	return a.recipeService.InstantiateChain(id, nil)
 }
 
+func (a *App) GenerateRecipeDiagram(id string, expandedStages []int) (string, error) {
+	return a.recipeService.GenerateRecipeDiagram(id, expandedStages)
+}
+
+func (a *App) CreateRecipeFromChain(chainID string, label string, description string) (*models.Recipe, error) {
+	return a.recipeService.CreateRecipeFromChain(chainID, label, description)
+}
+
+func (a *App) GenerateRecipeDiagramFromData(recipeDataJSON string, expandedStages []int) (string, error) {
+	return a.recipeService.GenerateRecipeDiagramFromData([]byte(recipeDataJSON), expandedStages)
+}
+
 func (a *App) GetJobChain(id string) (*models.JobChain, error) {
 	return a.chainService.GetChain(id)
 }
@@ -2218,6 +2235,40 @@ func (a *App) ListRegistryCategories() (interface{}, error) {
 func (a *App) GetRegistryFilterOptions() (interface{}, error) {
 	log.Printf("[App] Getting registry filter options")
 	return a.pluginRegistryService.ListFilterOptions()
+}
+
+func (a *App) ListRegistryRecipes(searchQuery string, categoryName string, authorName string, tag string, limit int, offset int) (interface{}, error) {
+	log.Printf("[App] Listing registry recipes - search: %s, category: %s, author: %s, tag: %s, limit: %d, offset: %d", searchQuery, categoryName, authorName, tag, limit, offset)
+	return a.recipeRegistryService.ListRecipes(searchQuery, categoryName, authorName, tag, limit, offset)
+}
+
+func (a *App) GetRegistryRecipe(recipeID string) (interface{}, error) {
+	log.Printf("[App] Getting registry recipe: %s", recipeID)
+	return a.recipeRegistryService.GetRecipe(recipeID)
+}
+
+func (a *App) GetRecipeRegistryFilterOptions() (interface{}, error) {
+	log.Printf("[App] Getting recipe registry filter options")
+	return a.recipeRegistryService.ListFilterOptions()
+}
+
+func (a *App) DownloadRecipeFromRegistry(recipeID string) (*services.RecipeImportResult, error) {
+	log.Printf("[App] Downloading recipe from registry: %s", recipeID)
+
+	recipe, err := a.recipeRegistryService.GetRecipe(recipeID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch recipe from registry: %w", err)
+	}
+	if recipe.LatestVersion == nil {
+		return nil, fmt.Errorf("recipe %s has no published version", recipeID)
+	}
+
+	raw, err := json.Marshal(recipe.LatestVersion.Data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode recipe data: %w", err)
+	}
+
+	return a.recipeService.ImportRecipeFromData(raw)
 }
 
 func (a *App) InstallPluginFromRegistry(pluginID string, commitHash string) error {

@@ -299,6 +299,10 @@ func (r *RecipeService) ImportRecipeFromFile(path string) (*RecipeImportResult, 
 	if err != nil {
 		return nil, fmt.Errorf("failed to read %s: %w", path, err)
 	}
+	return r.ImportRecipeFromData(raw)
+}
+
+func (r *RecipeService) ImportRecipeFromData(raw []byte) (*RecipeImportResult, error) {
 	var data RecipeData
 	if err := json.Unmarshal(raw, &data); err != nil {
 		return nil, fmt.Errorf("failed to parse recipe file: %w", err)
@@ -480,4 +484,65 @@ func (r *RecipeService) InstantiateChain(recipeID string, paramOverrides map[int
 	}
 
 	return r.chainService.CreateChain(recipe.Label, recipe.ID, chainStages)
+}
+
+// CreateRecipeFromChain reconstructs a Recipe from an already-created
+// JobChain's stage rows, so a specific run can be recovered as a reusable
+// recipe even if the chain's original recipe was since edited or deleted
+// (JobChain rows outlive the Recipe they were instantiated from). Every
+// stage's plugin must still be installed, since JobChainStage only stores
+// the plugin's internal numeric ID, which only PluginLoaderV2 can resolve
+// back to the string plugin ID a Recipe needs.
+func (r *RecipeService) CreateRecipeFromChain(chainID, label, description string) (*models.Recipe, error) {
+	var chain models.JobChain
+	if err := r.db.GetDB().First(&chain, "id = ?", chainID).Error; err != nil {
+		return nil, fmt.Errorf("chain not found: %w", err)
+	}
+
+	var stageRows []models.JobChainStage
+	if err := r.db.GetDB().Where("chain_id = ?", chainID).Order("stage_index ASC").Find(&stageRows).Error; err != nil {
+		return nil, err
+	}
+	if len(stageRows) == 0 {
+		return nil, fmt.Errorf("chain %s has no stages", chainID)
+	}
+
+	specs := make([]RecipeStageSpec, len(stageRows))
+	for i, row := range stageRows {
+		plugin, err := r.pluginLoader.GetPlugin(row.PluginID)
+		if err != nil {
+			return nil, fmt.Errorf("cannot reconstruct recipe: the plugin used by stage %d is no longer installed", row.StageIndex)
+		}
+
+		bindings := map[string]models.RecipeStageBinding{}
+		for inputName, raw := range row.Bindings {
+			bindingMap, ok := raw.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			stageIdx, _ := bindingMap["stage"].(float64)
+			outputName, _ := bindingMap["output"].(string)
+			bindings[inputName] = models.RecipeStageBinding{Stage: int(stageIdx), Output: outputName}
+		}
+
+		params := make(map[string]interface{}, len(row.Params))
+		for k, v := range row.Params {
+			params[k] = v
+		}
+
+		specs[i] = RecipeStageSpec{
+			PluginID:      plugin.Definition.Plugin.ID,
+			PluginVersion: row.PluginVersion,
+			Params:        params,
+			Bindings:      bindings,
+			Repository:    plugin.Repository,
+			CommitHash:    plugin.CommitHash,
+		}
+	}
+
+	if label == "" {
+		label = chain.Label
+	}
+
+	return r.SaveRecipe(label, description, specs)
 }

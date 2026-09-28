@@ -105,6 +105,15 @@ func runCLI(args []string) bool {
 			os.Exit(1)
 		}
 		return true
+	case "recipe-registry":
+		if !verbose {
+			log.SetOutput(io.Discard)
+		}
+		if err := cliRecipeRegistry(filtered[1:]); err != nil {
+			fmt.Fprintln(os.Stderr, "Error:", err)
+			os.Exit(1)
+		}
+		return true
 	default:
 		return false
 	}
@@ -135,19 +144,20 @@ func cliVersion() {
 
 // cliContext bundles backend services usable headlessly; every constructor here accepts a nil *application.App and degrades gracefully.
 type cliContext struct {
-	db                 *services.DatabaseService
-	settings           *services.SettingsService
-	envService         *services.EnvironmentService
-	uvService          *services.UvService
-	dockerImageBuilder *services.DockerImageBuilder
-	pluginLoaderV2     *services.PluginLoaderV2
-	pluginInstaller    *services.PluginInstaller
-	pluginExecutor     *services.PluginExecutor
-	jobQueue           *services.JobQueueService
-	backupService      *services.BackupService
-	batchService       *services.BatchService
-	chainService       *services.ChainService
-	recipeService      *services.RecipeService
+	db                    *services.DatabaseService
+	settings              *services.SettingsService
+	envService            *services.EnvironmentService
+	uvService             *services.UvService
+	dockerImageBuilder    *services.DockerImageBuilder
+	pluginLoaderV2        *services.PluginLoaderV2
+	pluginInstaller       *services.PluginInstaller
+	pluginExecutor        *services.PluginExecutor
+	jobQueue              *services.JobQueueService
+	backupService         *services.BackupService
+	batchService          *services.BatchService
+	chainService          *services.ChainService
+	recipeService         *services.RecipeService
+	recipeRegistryService *services.RecipeRegistryService
 }
 
 // close shuts down the job queue (killing any in-flight subprocess first, same as App.Shutdown) before closing the database.
@@ -238,21 +248,23 @@ func newCLIContextWithPluginsDir(pluginsDir string) (*cliContext, error) {
 	chainService := services.NewChainService(db, jobQueue, pluginLoaderV2, pluginExecutor, settings)
 	jobQueue.SetChainService(chainService)
 	recipeService := services.NewRecipeService(db, pluginLoaderV2, chainService)
+	recipeRegistryService := services.NewRecipeRegistryServiceV3(settings)
 
 	return &cliContext{
-		db:                 db,
-		settings:           settings,
-		envService:         envService,
-		uvService:          uvService,
-		dockerImageBuilder: dockerImageBuilder,
-		pluginLoaderV2:     pluginLoaderV2,
-		pluginInstaller:    pluginInstaller,
-		pluginExecutor:     pluginExecutor,
-		jobQueue:           jobQueue,
-		backupService:      services.NewBackupService(db),
-		batchService:       services.NewBatchServiceV3(db, jobQueue),
-		chainService:       chainService,
-		recipeService:      recipeService,
+		db:                    db,
+		settings:              settings,
+		envService:            envService,
+		uvService:             uvService,
+		dockerImageBuilder:    dockerImageBuilder,
+		pluginLoaderV2:        pluginLoaderV2,
+		pluginInstaller:       pluginInstaller,
+		pluginExecutor:        pluginExecutor,
+		jobQueue:              jobQueue,
+		backupService:         services.NewBackupService(db),
+		batchService:          services.NewBatchServiceV3(db, jobQueue),
+		chainService:          chainService,
+		recipeService:         recipeService,
+		recipeRegistryService: recipeRegistryService,
 	}, nil
 }
 
@@ -1157,7 +1169,7 @@ func waitForChain(ctx *cliContext, chainID string, timeout time.Duration) (*serv
 
 func cliRecipe(args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("usage: cauldron recipe list | cauldron recipe run <id-or-label> | cauldron recipe compat <id-or-label> | cauldron recipe export <id-or-label> <path> | cauldron recipe import <path> | cauldron recipe delete <id-or-label>")
+		return fmt.Errorf("usage: cauldron recipe list | cauldron recipe run <id-or-label> | cauldron recipe compat <id-or-label> | cauldron recipe export <id-or-label> <path> | cauldron recipe import <path> | cauldron recipe delete <id-or-label> | cauldron recipe diagram <id-or-label>")
 	}
 
 	switch args[0] {
@@ -1173,6 +1185,8 @@ func cliRecipe(args []string) error {
 		return cliRecipeImport(args[1:])
 	case "delete":
 		return cliRecipeDelete(args[1:])
+	case "diagram":
+		return cliRecipeDiagram(args[1:])
 	default:
 		return fmt.Errorf("unknown recipe subcommand: %s", args[0])
 	}
@@ -1288,6 +1302,65 @@ func cliRecipeCompat(args []string) error {
 	return nil
 }
 
+func cliRecipeDiagram(args []string) error {
+	fs := flag.NewFlagSet("recipe diagram", flag.ContinueOnError)
+	expandAll := fs.Bool("expand-all", false, "expand every stage's resolved step diagram or input/output ports")
+	expand := fs.String("expand", "", "comma-separated stage indices to expand, e.g. 0,2")
+	output := fs.String("output", "", "write the Mermaid source to a file instead of stdout")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if fs.NArg() != 1 {
+		return fmt.Errorf("usage: cauldron recipe diagram [--expand-all | --expand 0,2] [--output file.mmd] <id-or-label>")
+	}
+
+	ctx, err := newCLIContext()
+	if err != nil {
+		return fmt.Errorf("failed to initialize: %w", err)
+	}
+	defer ctx.close()
+
+	recipe, err := findRecipe(ctx.recipeService, fs.Arg(0))
+	if err != nil {
+		return err
+	}
+
+	var expandedStages []int
+	if *expandAll {
+		stages, err := ctx.recipeService.GetRecipeStages(recipe.ID)
+		if err != nil {
+			return fmt.Errorf("failed to load stages: %w", err)
+		}
+		for _, s := range stages {
+			expandedStages = append(expandedStages, s.StageIndex)
+		}
+	} else if *expand != "" {
+		for _, part := range strings.Split(*expand, ",") {
+			idx, err := strconv.Atoi(strings.TrimSpace(part))
+			if err != nil {
+				return fmt.Errorf("invalid stage index %q in --expand: %w", part, err)
+			}
+			expandedStages = append(expandedStages, idx)
+		}
+	}
+
+	diagram, err := ctx.recipeService.GenerateRecipeDiagram(recipe.ID, expandedStages)
+	if err != nil {
+		return fmt.Errorf("failed to generate diagram: %w", err)
+	}
+
+	if *output != "" {
+		if err := os.WriteFile(*output, []byte(diagram), 0o644); err != nil {
+			return fmt.Errorf("failed to write %s: %w", *output, err)
+		}
+		fmt.Printf("Wrote diagram for recipe %q to %s\n", recipe.Label, *output)
+		return nil
+	}
+
+	fmt.Println(diagram)
+	return nil
+}
+
 func cliRecipeExport(args []string) error {
 	fs := flag.NewFlagSet("recipe export", flag.ContinueOnError)
 	withInstallInfo := fs.Bool("with-install-info", false, "embed each plugin's repository, commit, and dependency requirements, so a missing plugin can be reinstalled from the exported file")
@@ -1366,7 +1439,7 @@ func cliRecipeDelete(args []string) error {
 
 func cliChain(args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("usage: cauldron chain list | cauldron chain status <id>")
+		return fmt.Errorf("usage: cauldron chain list | cauldron chain status <id> | cauldron chain save-as-recipe <id> [--label ...] [--description ...]")
 	}
 
 	switch args[0] {
@@ -1374,6 +1447,8 @@ func cliChain(args []string) error {
 		return cliChainList()
 	case "status":
 		return cliChainStatus(args[1:])
+	case "save-as-recipe":
+		return cliChainSaveAsRecipe(args[1:])
 	default:
 		return fmt.Errorf("unknown chain subcommand: %s", args[0])
 	}
@@ -1428,6 +1503,170 @@ func cliChainStatus(args []string) error {
 			}
 			if s.Job.Error != "" {
 				fmt.Printf("    error:  %s\n", s.Job.Error)
+			}
+		}
+	}
+	return nil
+}
+
+func cliChainSaveAsRecipe(args []string) error {
+	fs := flag.NewFlagSet("chain save-as-recipe", flag.ContinueOnError)
+	label := fs.String("label", "", "label for the new recipe (defaults to the chain's own label)")
+	description := fs.String("description", "", "description for the new recipe")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if fs.NArg() != 1 {
+		return fmt.Errorf("usage: cauldron chain save-as-recipe [--label ...] [--description ...] <chain-id>")
+	}
+
+	ctx, err := newCLIContext()
+	if err != nil {
+		return fmt.Errorf("failed to initialize: %w", err)
+	}
+	defer ctx.close()
+
+	recipe, err := ctx.recipeService.CreateRecipeFromChain(fs.Arg(0), *label, *description)
+	if err != nil {
+		return fmt.Errorf("failed to save chain as recipe: %w", err)
+	}
+	fmt.Printf("Saved chain %s as recipe %q (%s)\n", fs.Arg(0), recipe.Label, recipe.ID)
+	return nil
+}
+
+func cliRecipeRegistry(args []string) error {
+	if len(args) == 0 {
+		return fmt.Errorf("usage: cauldron recipe-registry list [--search q] [--category c] [--author a] [--tag t] [--limit N] [--offset N] | cauldron recipe-registry show <id> | cauldron recipe-registry download <id>")
+	}
+
+	switch args[0] {
+	case "list":
+		return cliRecipeRegistryList(args[1:])
+	case "show":
+		return cliRecipeRegistryShow(args[1:])
+	case "download":
+		return cliRecipeRegistryDownload(args[1:])
+	default:
+		return fmt.Errorf("unknown recipe-registry subcommand: %s", args[0])
+	}
+}
+
+func cliRecipeRegistryList(args []string) error {
+	fs := flag.NewFlagSet("recipe-registry list", flag.ContinueOnError)
+	search := fs.String("search", "", "free-text search")
+	category := fs.String("category", "", "filter by category name")
+	author := fs.String("author", "", "filter by author name")
+	tag := fs.String("tag", "", "filter by tag")
+	limit := fs.Int("limit", 20, "max results")
+	offset := fs.Int("offset", 0, "result offset")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+
+	ctx, err := newCLIContext()
+	if err != nil {
+		return fmt.Errorf("failed to initialize: %w", err)
+	}
+	defer ctx.close()
+
+	result, err := ctx.recipeRegistryService.ListRecipes(*search, *category, *author, *tag, *limit, *offset)
+	if err != nil {
+		return fmt.Errorf("failed to list registry recipes: %w", err)
+	}
+	if len(result.Results) == 0 {
+		fmt.Println("No recipes found.")
+		return nil
+	}
+	for _, r := range result.Results {
+		revision := 0
+		if r.LatestVersion != nil {
+			revision = r.LatestVersion.Revision
+		}
+		fmt.Printf("%-38s %-30s rev %-4d %s\n", r.ID, r.Label, revision, r.Status)
+	}
+	fmt.Printf("%d of %d total\n", len(result.Results), result.Count)
+	return nil
+}
+
+func cliRecipeRegistryShow(args []string) error {
+	if len(args) == 0 {
+		return fmt.Errorf("usage: cauldron recipe-registry show <id>")
+	}
+
+	ctx, err := newCLIContext()
+	if err != nil {
+		return fmt.Errorf("failed to initialize: %w", err)
+	}
+	defer ctx.close()
+
+	recipe, err := ctx.recipeRegistryService.GetRecipe(args[0])
+	if err != nil {
+		return fmt.Errorf("recipe not found: %w", err)
+	}
+
+	fmt.Printf("ID:      %s\n", recipe.ID)
+	fmt.Printf("Label:   %s\n", recipe.Label)
+	if recipe.Author != nil {
+		fmt.Printf("Author:  %s\n", recipe.Author.Name)
+	}
+	if recipe.Category != nil {
+		fmt.Printf("Category: %s\n", recipe.Category.Name)
+	}
+	fmt.Printf("Status:  %s\n", recipe.Status)
+	if recipe.Description != "" {
+		fmt.Printf("Description: %s\n", recipe.Description)
+	}
+	if recipe.LatestVersion != nil {
+		fmt.Printf("Latest revision: %d\n", recipe.LatestVersion.Revision)
+		if stages, ok := recipe.LatestVersion.Data["stages"].([]interface{}); ok {
+			fmt.Println("Stages:")
+			for i, raw := range stages {
+				stage, ok := raw.(map[string]interface{})
+				if !ok {
+					continue
+				}
+				fmt.Printf("  %d: %v (version %v)\n", i, stage["pluginId"], stage["pluginVersion"])
+			}
+		}
+	}
+	return nil
+}
+
+func cliRecipeRegistryDownload(args []string) error {
+	if len(args) == 0 {
+		return fmt.Errorf("usage: cauldron recipe-registry download <id>")
+	}
+
+	ctx, err := newCLIContext()
+	if err != nil {
+		return fmt.Errorf("failed to initialize: %w", err)
+	}
+	defer ctx.close()
+
+	recipe, err := ctx.recipeRegistryService.GetRecipe(args[0])
+	if err != nil {
+		return fmt.Errorf("failed to fetch recipe from registry: %w", err)
+	}
+	if recipe.LatestVersion == nil {
+		return fmt.Errorf("recipe %s has no published version", args[0])
+	}
+
+	raw, err := json.Marshal(recipe.LatestVersion.Data)
+	if err != nil {
+		return fmt.Errorf("failed to encode recipe data: %w", err)
+	}
+
+	result, err := ctx.recipeService.ImportRecipeFromData(raw)
+	if err != nil {
+		return fmt.Errorf("failed to import downloaded recipe: %w", err)
+	}
+
+	fmt.Printf("Downloaded recipe %q as %s\n", result.Recipe.Label, result.Recipe.ID)
+	if !result.Compatibility.AllOK {
+		fmt.Println("Warning: recipe is not fully compatible with installed plugins:")
+		for _, s := range result.Compatibility.Stages {
+			if s.Status != services.CompatibilityCompatible {
+				fmt.Printf("  stage %d: %s -- %s\n", s.StageIndex, s.PluginID, s.Status)
 			}
 		}
 	}

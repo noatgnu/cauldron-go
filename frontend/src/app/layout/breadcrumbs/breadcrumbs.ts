@@ -7,6 +7,7 @@ import { PluginV2Service } from '../../core/services/plugin-v2';
 import { JobBatchService } from '../../core/services/job-batch';
 import { RecipeService } from '../../core/services/recipe';
 import { JobChainService } from '../../core/services/job-chain';
+import { Wails } from '../../core/services/wails';
 
 interface Breadcrumb {
   label: string;
@@ -42,6 +43,8 @@ export class Breadcrumbs implements OnInit {
     'plugin': { label: 'Plugins', listRoute: '/plugin-list' },
     'plugin-list': { label: 'Plugin List' },
     'plugins': { label: 'Plugin Management' },
+    'plugin-registry': { label: 'Plugin Registry' },
+    'recipe-registry': { label: 'Recipe Registry' },
     'table-browser': { label: 'Table Browser' },
     'gel-analysis': { label: 'Gel Analysis' }
   };
@@ -52,7 +55,8 @@ export class Breadcrumbs implements OnInit {
     private pluginService: PluginV2Service,
     private jobBatchService: JobBatchService,
     private recipeService: RecipeService,
-    private jobChainService: JobChainService
+    private jobChainService: JobChainService,
+    private wails: Wails
   ) {}
 
   ngOnInit() {
@@ -156,6 +160,15 @@ export class Breadcrumbs implements OnInit {
         return chain.label;
       } catch (err) {
         return `Chain ${id.substring(0, 8)}...`;
+      }
+    }
+
+    if (parentRoute === 'recipe-registry' && this.isUUID(id)) {
+      try {
+        const recipe = await this.wails.getRegistryRecipe(id);
+        return recipe.label;
+      } catch (err) {
+        return `Recipe ${id.substring(0, 8)}...`;
       }
     }
 
