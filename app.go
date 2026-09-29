@@ -1529,6 +1529,10 @@ func (a *App) ExportRecipe(id string, path string, includeInstallInfo bool) erro
 	return a.recipeService.ExportRecipe(id, path, includeInstallInfo)
 }
 
+func (a *App) ExportRecipeNextflow(id string, outputDir string) error {
+	return a.recipeService.ExportRecipeNextflow(id, outputDir)
+}
+
 func (a *App) ImportRecipeFromFile(path string) (*services.RecipeImportResult, error) {
 	return a.recipeService.ImportRecipeFromFile(path)
 }

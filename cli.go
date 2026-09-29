@@ -1169,7 +1169,7 @@ func waitForChain(ctx *cliContext, chainID string, timeout time.Duration) (*serv
 
 func cliRecipe(args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("usage: cauldron recipe list | cauldron recipe run <id-or-label> | cauldron recipe compat <id-or-label> | cauldron recipe export <id-or-label> <path> | cauldron recipe import <path> | cauldron recipe delete <id-or-label> | cauldron recipe diagram <id-or-label>")
+		return fmt.Errorf("usage: cauldron recipe list | cauldron recipe run <id-or-label> | cauldron recipe compat <id-or-label> | cauldron recipe export <id-or-label> <path> | cauldron recipe export-nextflow <id-or-label> <output-dir> | cauldron recipe import <path> | cauldron recipe delete <id-or-label> | cauldron recipe diagram <id-or-label>")
 	}
 
 	switch args[0] {
@@ -1181,6 +1181,8 @@ func cliRecipe(args []string) error {
 		return cliRecipeCompat(args[1:])
 	case "export":
 		return cliRecipeExport(args[1:])
+	case "export-nextflow":
+		return cliRecipeExportNextflow(args[1:])
 	case "import":
 		return cliRecipeImport(args[1:])
 	case "delete":
@@ -1385,6 +1387,28 @@ func cliRecipeExport(args []string) error {
 		return fmt.Errorf("failed to export recipe: %w", err)
 	}
 	fmt.Printf("Exported recipe %q to %s\n", recipe.Label, fs.Arg(1))
+	return nil
+}
+
+func cliRecipeExportNextflow(args []string) error {
+	if len(args) != 2 {
+		return fmt.Errorf("usage: cauldron recipe export-nextflow <id-or-label> <output-dir>")
+	}
+
+	ctx, err := newCLIContext()
+	if err != nil {
+		return fmt.Errorf("failed to initialize: %w", err)
+	}
+	defer ctx.close()
+
+	recipe, err := findRecipe(ctx.recipeService, args[0])
+	if err != nil {
+		return err
+	}
+	if err := ctx.recipeService.ExportRecipeNextflow(recipe.ID, args[1]); err != nil {
+		return fmt.Errorf("failed to export recipe as a Nextflow pipeline: %w", err)
+	}
+	fmt.Printf("Exported recipe %q as a Nextflow pipeline to %s\n", recipe.Label, args[1])
 	return nil
 }
 
