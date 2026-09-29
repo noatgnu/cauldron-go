@@ -47,7 +47,7 @@
               <button class="export-recipe-btn" mat-icon-button (click)="exportRecipe($event, row)" matTooltip="Export to a file">
                 <mat-icon>download</mat-icon>
               </button>
-              <button class="export-nextflow-btn" mat-icon-button (click)="exportRecipeNextflow($event, row)" matTooltip="Export as a Nextflow pipeline">
+              <button class="export-nextflow-btn" mat-icon-button (click)="exportRecipeNextflow($event, row)" matTooltip="Export as a Nextflow pipeline" aria-label="Export as a Nextflow pipeline">
                 <mat-icon>account_tree</mat-icon>
               </button>
               <button class="delete-recipe-btn" mat-icon-button (click)="deleteRecipe($event, row.recipe.id)" matTooltip="Delete recipe">
