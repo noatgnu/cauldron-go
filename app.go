@@ -54,6 +54,7 @@ type App struct {
 	recipeRegistryService  *services.RecipeRegistryService
 	gitAuthService         *services.GitAuthService
 	backupService          *services.BackupService
+	dbBackupScheduler      *services.DatabaseBackupScheduler
 	pluginMigrationService *services.PluginMigrationService
 	parquetService         *services.ParquetService
 	delimitedFileService   *services.DelimitedFileService
@@ -123,6 +124,9 @@ func (a *App) Initialize() {
 	}
 	a.db = db
 	log.Println("[App.Initialize] Database initialized successfully")
+
+	a.dbBackupScheduler = services.NewDatabaseBackupScheduler(a.db, 24*time.Hour, 7)
+	a.dbBackupScheduler.Start()
 
 	if isServerMode() {
 		authService, err := services.NewServerAuthService(a.db)
@@ -312,6 +316,9 @@ func (a *App) Shutdown() {
 	}
 	if a.jobQueue != nil {
 		a.jobQueue.Shutdown()
+	}
+	if a.dbBackupScheduler != nil {
+		a.dbBackupScheduler.Shutdown()
 	}
 	if a.db != nil {
 		a.db.Close()
