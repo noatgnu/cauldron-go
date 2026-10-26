@@ -86,11 +86,11 @@ jobs:
         run: cauldron job run --params-json "$(cat examples/params.json)" [[ .ID ]]
 
       - name: Resolve output directory
-        if: hashFiles('examples/params.json') != ''
+        if: always() && hashFiles('examples/params.json') != ''
         run: echo "CAULDRON_OUTPUT_DIR=$HOME/Documents/CauldronOutputs" >> "$GITHUB_ENV"
 
       - name: Upload plugin output
-        if: hashFiles('examples/params.json') != ''
+        if: always() && hashFiles('examples/params.json') != ''
         uses: actions/upload-artifact@v4
         with:
           name: plugin-output
@@ -130,6 +130,8 @@ jobs:
     needs: generate-deps
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout plugin repo
         uses: actions/checkout@v4

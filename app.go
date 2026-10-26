@@ -294,11 +294,10 @@ func (a *App) Initialize() {
 }
 
 func getUserDataPath() (string, error) {
-	configDir, err := os.UserConfigDir()
+	dataPath, err := resolveAppDataRoot()
 	if err != nil {
 		return "", err
 	}
-	dataPath := filepath.Join(configDir, "cauldron")
 	if err := os.MkdirAll(dataPath, 0755); err != nil {
 		return "", err
 	}
@@ -713,12 +712,12 @@ func (a *App) GetVirtualEnvironments() ([]services.VirtualEnvironment, error) {
 }
 
 func (a *App) GetDefaultVenvPath(pluginID string) (string, error) {
-	userConfigDir, err := os.UserConfigDir()
+	dataRoot, err := resolveAppDataRoot()
 	if err != nil {
-		return "", fmt.Errorf("failed to get user config dir: %w", err)
+		return "", fmt.Errorf("failed to resolve app data root: %w", err)
 	}
 
-	venvBaseDir := filepath.Join(userConfigDir, "cauldron", "venvs")
+	venvBaseDir := filepath.Join(dataRoot, "venvs")
 	if err := os.MkdirAll(venvBaseDir, 0755); err != nil {
 		return "", fmt.Errorf("failed to create venv base directory: %w", err)
 	}
@@ -1686,13 +1685,11 @@ func (a *App) GetLogFilePath() (string, error) {
 
 	log.Printf("[GetLogFilePath] No stored path, searching for latest log file")
 
-	userConfigDir, err := os.UserConfigDir()
+	logDir, err := resolveAppDataRoot()
 	if err != nil {
-		log.Printf("[GetLogFilePath] Failed to get user config dir: %v", err)
-		return "", fmt.Errorf("failed to get user config dir: %v", err)
+		log.Printf("[GetLogFilePath] Failed to resolve app data root: %v", err)
+		return "", fmt.Errorf("failed to resolve app data root: %v", err)
 	}
-
-	logDir := filepath.Join(userConfigDir, "cauldron")
 	log.Printf("[GetLogFilePath] Log directory: %s", logDir)
 
 	entries, err := os.ReadDir(logDir)
@@ -1821,12 +1818,10 @@ func (a *App) getNPMLicenses() ([]LicenseInfo, error) {
 }
 
 func (a *App) OpenLogDirectory() error {
-	userConfigDir, err := os.UserConfigDir()
+	logDir, err := resolveAppDataRoot()
 	if err != nil {
-		return fmt.Errorf("failed to get user config dir: %v", err)
+		return fmt.Errorf("failed to resolve app data root: %v", err)
 	}
-
-	logDir := filepath.Join(userConfigDir, "cauldron")
 
 	if _, err := os.Stat(logDir); os.IsNotExist(err) {
 		return fmt.Errorf("log directory does not exist: %s", logDir)

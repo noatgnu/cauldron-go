@@ -16,6 +16,36 @@ import (
 // appVersion is set at build time via -ldflags "-X main.appVersion=...".
 var appVersion = "dev"
 
+var portableMode bool
+
+func extractPortableFlag(args []string) ([]string, bool) {
+	portable := false
+	filtered := make([]string, 0, len(args))
+	for _, a := range args {
+		if a == "--portable" {
+			portable = true
+			continue
+		}
+		filtered = append(filtered, a)
+	}
+	return filtered, portable
+}
+
+func resolveAppDataRoot() (string, error) {
+	if portableMode {
+		exePath, err := os.Executable()
+		if err != nil {
+			return "", fmt.Errorf("failed to resolve executable path for portable mode: %w", err)
+		}
+		return filepath.Join(filepath.Dir(exePath), "data"), nil
+	}
+	userConfigDir, err := os.UserConfigDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(userConfigDir, "cauldron"), nil
+}
+
 //go:embed all:frontend/dist/browser
 var assets embed.FS
 
@@ -147,12 +177,20 @@ func cleanOldLogs(logDir string, maxFiles int) {
 }
 
 func main() {
-	if runCLI(os.Args[1:]) {
+	args, portable := extractPortableFlag(os.Args[1:])
+	portableMode = portable
+
+	if runCLI(args) {
 		return
 	}
 
-	userConfigDir, _ := os.UserConfigDir()
-	logDir := filepath.Join(userConfigDir, "cauldron")
+	dataRoot, err := resolveAppDataRoot()
+	if err != nil {
+		log.Printf("WARNING: failed to resolve app data root: %v\n", err)
+		dataRoot, _ = os.UserConfigDir()
+		dataRoot = filepath.Join(dataRoot, "cauldron")
+	}
+	logDir := dataRoot
 
 	logFile, err := setupLogRotation(logDir)
 	var logFilePath string
@@ -164,6 +202,9 @@ func main() {
 
 	log.Println("========================================")
 	log.Println("Cauldron starting...")
+	if portableMode {
+		log.Println("Running in PORTABLE mode -- data directory is relative to this executable")
+	}
 	log.Printf("Log directory: %s\n", logDir)
 	fmt.Println("Cauldron starting - logs at:", logDir)
 
