@@ -94,7 +94,7 @@ jobs:
   build-backend:
     name: Build Backend
     needs: [resolve-r-env]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -547,7 +547,7 @@ jobs:
   e2e-playwright-tests:
     name: Playwright E2E Tests
     needs: [build-dev-tools, build-backend, build-frontend, resolve-r-env]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
