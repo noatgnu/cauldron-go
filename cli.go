@@ -514,7 +514,11 @@ func cliDoctor(args []string) error {
 		fmt.Printf("[%-7s] %-24s %s\n", status, label, detail)
 	}
 
-	report(true, "Database", "opened successfully")
+	dataDirDetail := ctx.db.GetDataDir()
+	if portableMode {
+		dataDirDetail += " (portable)"
+	}
+	report(true, "Database", dataDirDetail)
 
 	pyEnvs, err := ctx.envService.DetectPythonEnvironments()
 	if err != nil || len(pyEnvs) == 0 {

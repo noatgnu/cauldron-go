@@ -302,8 +302,7 @@ func (s *SettingsService) GetConfig() *models.Config {
 
 func (s *SettingsService) initializeDefaults() {
 	if s.config.ResultStoragePath == "" {
-		userConfigDir, _ := os.UserConfigDir()
-		s.config.ResultStoragePath = filepath.Join(userConfigDir, "cauldron", "results")
+		s.config.ResultStoragePath = filepath.Join(s.db.GetDataDir(), "results")
 		os.MkdirAll(s.config.ResultStoragePath, 0755)
 	}
 

@@ -121,7 +121,7 @@ test.describe.serial('Batch Job UI lifecycle', () => {
     expect(await mcp.clickOptionByText('Label')).toBe(true);
 
     expect(await mcp.waitForElement('.bulk-field-value .form-field[data-field="label"] input')).toBe(true);
-    await mcp.fill('.bulk-field-value .form-field[data-field="label"] input', 'e2e-bulk-label');
+    await mcp.fill('.bulk-field-value .form-field[data-field="label"] input', 'e2e-bulk-label');``
 
     await mcp.click('.apply-bulk-btn');
   });

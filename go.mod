@@ -1,6 +1,6 @@
 module github.com/noatgnu/cauldron-go
 
-go 1.25.0
+go 1.26.0
 
 require (
 	github.com/go-git/go-git/v5 v5.19.2
@@ -9,9 +9,9 @@ require (
 	github.com/noatgnu/uniprotparser-go v0.0.0-20251201170658-be6b6f22f793
 	github.com/parquet-go/parquet-go v0.32.0
 	github.com/ulikunitz/xz v0.5.15
-	github.com/wailsapp/wails/v3 v3.0.0-beta.26
-	github.com/yuin/goldmark v1.7.16
-	golang.org/x/crypto v0.53.0
+	github.com/wailsapp/wails/v3 v3.0.0
+	github.com/yuin/goldmark v1.7.17
+	golang.org/x/crypto v0.57.0
 	golang.org/x/image v0.45.0
 	gopkg.in/yaml.v3 v3.0.1
 	gorm.io/driver/sqlite v1.6.0
@@ -39,7 +39,7 @@ require (
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/kevinburke/ssh_config v1.4.0 // indirect
-	github.com/klauspost/compress v1.18.3 // indirect
+	github.com/klauspost/compress v1.18.7 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
@@ -55,9 +55,9 @@ require (
 	github.com/twpayne/go-geom v1.6.1 // indirect
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
 	golang.org/x/exp v0.0.0-20260410095643-746e56fc9e2f // indirect
-	golang.org/x/net v0.56.0 // indirect
-	golang.org/x/sys v0.47.0 // indirect
-	golang.org/x/text v0.41.0 // indirect
+	golang.org/x/net v0.60.0 // indirect
+	golang.org/x/sys v0.48.0 // indirect
+	golang.org/x/text v0.42.0 // indirect
 	google.golang.org/protobuf v1.34.2 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 	modernc.org/libc v1.67.6 // indirect
