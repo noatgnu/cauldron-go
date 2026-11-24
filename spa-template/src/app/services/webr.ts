@@ -183,9 +183,16 @@ export class WebRService {
     const wrappedScript = `options(webr = TRUE);
 Sys.setenv(WEBR = "1");
 options(device = webr::canvas);
-pdf <- function(file = NULL, ...) { webr::canvas(...) };
-svg <- function(filename = NULL, ...) { webr::canvas(...) };
-png <- function(filename = NULL, ...) { webr::canvas(...) };
+pdf <- function(file = NULL, width = 7, height = 7, ...) {
+  webr::canvas(width = width * 96, height = height * 96, capture = TRUE)
+};
+svg <- function(filename = NULL, width = 7, height = 7, ...) {
+  webr::canvas(width = width * 96, height = height * 96, capture = TRUE)
+};
+png <- function(filename = NULL, width = 480, height = 480, units = "px", res = 72, ...) {
+  px_per_unit <- switch(units, "in" = res, "cm" = res / 2.54, "mm" = res / 25.4, 1);
+  webr::canvas(width = width * px_per_unit, height = height * px_per_unit, capture = TRUE)
+};
 commandArgs <- function(trailingOnly = FALSE) {
   args <- get("webrArgs", envir = globalenv());
   if (trailingOnly) args[-1] else args
