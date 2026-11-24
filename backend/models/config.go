@@ -6,6 +6,7 @@ type Config struct {
 	PythonPath                     string   `json:"pythonPath"`
 	RPath                          string   `json:"rPath"`
 	RLibPath                       string   `json:"rLibPath"`
+	ContainerEngine                string   `json:"containerEngine"`
 	CurtainBackendURL              string   `json:"curtainBackendUrl"`
 	PluginRegistryURL              string   `json:"pluginRegistryUrl"`
 	RecipeRegistryURL              string   `json:"recipeRegistryUrl"`

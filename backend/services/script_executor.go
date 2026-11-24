@@ -405,8 +405,20 @@ func (s *ScriptExecutor) ExecuteDirectScript(ctx context.Context, jobID string, 
 	return s.executeCommand(ctx, jobID, cmd, config.OutputDir, envInfo)
 }
 
+// resolveContainerEngine returns the configured container engine binary name
+// ("docker" or "podman"), defaulting to "docker" when no settings service is
+// wired (e.g. in tests that construct ScriptExecutor directly with nil).
+func (s *ScriptExecutor) resolveContainerEngine() string {
+	if s.settingsService == nil {
+		return "docker"
+	}
+	return s.settingsService.GetContainerEngine()
+}
+
 func (s *ScriptExecutor) ExecuteDockerScript(ctx context.Context, jobID string, config ScriptConfig) error {
 	log.Printf("[ExecuteDockerScript] Starting execution for job %s", jobID)
+
+	engine := s.resolveContainerEngine()
 
 	plugin, err := s.pluginLoader.GetPlugin(config.PluginID)
 	if err != nil {
@@ -422,10 +434,10 @@ func (s *ScriptExecutor) ExecuteDockerScript(ctx context.Context, jobID string, 
 		imageName = plugin.Definition.Runtime.Docker.Image
 	}
 
-	checkCmd := exec.Command("docker", "image", "inspect", imageName)
+	checkCmd := exec.Command(engine, "image", "inspect", imageName)
 	hideConsoleWindow(checkCmd)
 	if err := checkCmd.Run(); err != nil {
-		return fmt.Errorf("docker image not found: %s (hint: plugin may need reinstallation)", imageName)
+		return fmt.Errorf("%s image not found: %s (hint: plugin may need reinstallation)", engine, imageName)
 	}
 
 	pluginDir := config.FolderPath
@@ -469,7 +481,16 @@ func (s *ScriptExecutor) ExecuteDockerScript(ctx context.Context, jobID string, 
 	}
 	args = append(args, "--cpus", cpus)
 
-	args = append(args, "-v", fmt.Sprintf("%s:/output", outputDir))
+	// Podman's rootless containers can't read host bind mounts on an
+	// SELinux-enforcing host (Fedora/RHEL) without the ":z" relabel suffix;
+	// Docker never needs it, so it's only added on the podman path to keep
+	// Docker's command line unchanged.
+	mountSuffix := ""
+	if engine == "podman" {
+		mountSuffix = ":z"
+	}
+
+	args = append(args, "-v", fmt.Sprintf("%s:/output%s", outputDir, mountSuffix))
 
 	log.Printf("[ExecuteDockerScript] Volume mounts: /output <- %s", outputDir)
 
@@ -490,7 +511,7 @@ func (s *ScriptExecutor) ExecuteDockerScript(ctx context.Context, jobID string, 
 		return fmt.Errorf("docker must be primary environment when using docker runtime")
 	}
 
-	remappedArgs, volumeMounts, err := s.prepareDockerInputFiles(config.Args, outputDir)
+	remappedArgs, volumeMounts, err := s.prepareDockerInputFiles(config.Args, outputDir, mountSuffix)
 	if err != nil {
 		return fmt.Errorf("failed to prepare input files: %w", err)
 	}
@@ -517,21 +538,25 @@ func (s *ScriptExecutor) ExecuteDockerScript(ctx context.Context, jobID string, 
 		log.Printf("[ExecuteDockerScript] Using direct entrypoint: %s", config.ScriptName)
 	}
 
-	log.Printf("[ExecuteDockerScript] Full docker command: docker %v", args)
+	log.Printf("[ExecuteDockerScript] Full %s command: %s %v", engine, engine, args)
 
-	cmd := exec.CommandContext(ctx, "docker", args...)
+	cmd := exec.CommandContext(ctx, engine, args...)
 	hideConsoleWindow(cmd)
 	setProcessGroup(cmd)
 
 	cmd.Dir = pluginDir
 	cmd.Env = os.Environ()
 
-	envInfo := fmt.Sprintf("Docker image: %s", imageName)
+	engineLabel := "Docker"
+	if engine == "podman" {
+		engineLabel = "Podman"
+	}
+	envInfo := fmt.Sprintf("%s image: %s", engineLabel, imageName)
 
 	return s.executeCommand(ctx, jobID, cmd, outputDir, envInfo)
 }
 
-func (s *ScriptExecutor) prepareDockerInputFiles(args []string, outputDir string) ([]string, []string, error) {
+func (s *ScriptExecutor) prepareDockerInputFiles(args []string, outputDir string, mountSuffix string) ([]string, []string, error) {
 	remappedArgs := make([]string, len(args))
 	copy(remappedArgs, args)
 
@@ -567,9 +592,13 @@ func (s *ScriptExecutor) prepareDockerInputFiles(args []string, outputDir string
 		ext := filepath.Ext(arg)
 		containerPath := fmt.Sprintf("/input_%d%s", fileIndex, ext)
 
-		volumeMount := fmt.Sprintf("%s:%s:ro", cleanArg, containerPath)
+		roFlag := "ro"
+		if mountSuffix != "" {
+			roFlag = "ro,z"
+		}
+		volumeMount := fmt.Sprintf("%s:%s:%s", cleanArg, containerPath, roFlag)
 		volumeMounts = append(volumeMounts, volumeMount)
-		log.Printf("[prepareDockerInputFiles] Mounting %s -> %s:ro", cleanArg, containerPath)
+		log.Printf("[prepareDockerInputFiles] Mounting %s -> %s:%s", cleanArg, containerPath, roFlag)
 
 		remappedArgs[i] = containerPath
 		fileIndex++

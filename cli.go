@@ -190,7 +190,7 @@ func newCLIContextWithPluginsDir(pluginsDir string) (*cliContext, error) {
 	envService := services.NewEnvironmentServiceV3(db, settings, services.NewProgressNotifierV3(nil))
 	uvService := services.NewUvServiceV3(fileService, db, settings, nil)
 	gitAuthService := services.NewGitAuthService(db)
-	dockerImageBuilder := services.NewDockerImageBuilder(db)
+	dockerImageBuilder := services.NewDockerImageBuilder(db, settings)
 
 	pluginLoaderV2 := services.NewPluginLoaderV2(pluginsDir, db, dockerImageBuilder)
 	if err := pluginLoaderV2.LoadPlugins(); err != nil {
@@ -554,11 +554,19 @@ func cliDoctor(args []string) error {
 		report(false, "uv", "not installed (install from Settings > Python)")
 	}
 
-	if err := ctx.dockerImageBuilder.CheckDockerAvailable(); err != nil {
-		report(false, "Docker", err.Error())
+	if err := exec.Command("docker", "version").Run(); err != nil {
+		report(false, "Docker", "not available")
 	} else {
 		report(true, "Docker", "daemon reachable")
 	}
+
+	if err := exec.Command("podman", "version").Run(); err != nil {
+		report(false, "Podman", "not available")
+	} else {
+		report(true, "Podman", "available")
+	}
+
+	report(true, "Container engine", fmt.Sprintf("%s (configured in Settings)", ctx.settings.GetContainerEngine()))
 
 	plugins := ctx.pluginLoaderV2.GetAllPlugins()
 	report(true, "Plugins", fmt.Sprintf("%d loaded", len(plugins)))

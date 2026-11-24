@@ -38,6 +38,7 @@ export class Home implements OnInit {
   protected rVersion = signal('');
   protected rPath = signal('');
   protected dockerVersion = signal('');
+  protected podmanVersion = signal('');
   protected jobs = signal<Job[]>([]);
   protected recentJobs = computed(() => this.jobs().slice(0, 5));
   protected importedFiles = signal<ImportedFile[]>([]);
@@ -240,6 +241,13 @@ export class Home implements OnInit {
       this.dockerVersion.set(dockerVer);
     } catch (e) {
       this.dockerVersion.set('Not installed');
+    }
+
+    try {
+      const podmanVer = await this.wails.checkPodmanVersion();
+      this.podmanVersion.set(podmanVer);
+    } catch (e) {
+      this.podmanVersion.set('Not installed');
     }
 
     this.loadingVersions.set(false);

@@ -34,6 +34,18 @@
   </div>
 
   <div class="form-section">
+    <h3>Container Engine</h3>
+    <p class="section-description">Which engine runs docker-runtime plugins. Applies to every installed plugin that declares a docker runtime.</p>
+    <mat-form-field appearance="outline" class="param-field">
+      <mat-label>Container engine</mat-label>
+      <mat-select [ngModel]="containerEngine()" (ngModelChange)="setContainerEngine($event)">
+        <mat-option value="docker">Docker</mat-option>
+        <mat-option value="podman">Podman</mat-option>
+      </mat-select>
+    </mat-form-field>
+  </div>
+
+  <div class="form-section">
     <h3>Allowed Repository Hosts</h3>
     <p class="section-description">Self-hosted git hosts (e.g. an internal GitLab/Gitea server) to trust for plugin install links, even when they resolve to a private network address. Public HTTPS hosts are always allowed; this list is only needed for private ones.</p>
     <mat-form-field appearance="outline" class="full-width-field">

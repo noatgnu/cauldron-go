@@ -65,14 +65,14 @@ func loadDockerTestPlugin(t *testing.T, yamlContent, pluginID string) (*ScriptEx
 	}
 
 	db := createTestDB(t)
-	imageBuilder := NewDockerImageBuilder(db)
+	ctx := context.WithValue(context.Background(), "wails-test", true)
+	settings := NewSettingsService(ctx, db)
+	imageBuilder := NewDockerImageBuilder(db, settings)
 	loader := NewPluginLoaderV2(pluginsDir, db, imageBuilder)
 	if err := loader.LoadPlugins(); err != nil {
 		t.Fatalf("LoadPlugins error: %v", err)
 	}
 
-	ctx := context.WithValue(context.Background(), "wails-test", true)
-	settings := NewSettingsService(ctx, db)
 	executor := NewScriptExecutor(settings, db, "test")
 	executor.SetPluginLoader(loader)
 

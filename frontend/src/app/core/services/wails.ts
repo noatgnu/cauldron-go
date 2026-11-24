@@ -586,6 +586,12 @@ export class Wails {
     return WailsApp.CheckDockerVersion();
   }
 
+  async checkPodmanVersion(): Promise<string> {
+    if (!this.isWails) throw new Error('Wails not available');
+    await this.waitForBackend();
+    return WailsApp.CheckPodmanVersion();
+  }
+
   async greet(name: string): Promise<string> {
     if (!this.isWails) throw new Error('Wails not available');
     await this.waitForBackend();

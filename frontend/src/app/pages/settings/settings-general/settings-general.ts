@@ -42,6 +42,7 @@ export class SettingsGeneral implements OnInit {
   protected allowedRepoHosts = signal<string[]>([]);
   protected newRepoHost = signal('');
   protected restrictRepoHostsToAllowlist = signal(false);
+  protected containerEngine = signal<'docker' | 'podman'>('docker');
   protected checkingForUpdate = signal(false);
   protected forceUpdating = signal(false);
   protected forceUpdatingSingle = signal(false);
@@ -69,6 +70,7 @@ export class SettingsGeneral implements OnInit {
       this.jobTimeoutMinutes.set(config.jobTimeoutMinutes || 0);
       this.allowedRepoHosts.set(config.allowedRepoHosts || []);
       this.restrictRepoHostsToAllowlist.set(!!config.restrictRepoHostsToAllowlist);
+      this.containerEngine.set(config.containerEngine === 'podman' ? 'podman' : 'docker');
     } catch (error) {
       await this.wails.logToFile(`[SettingsGeneral] Failed to load settings: ${error}`);
     }
@@ -120,6 +122,11 @@ export class SettingsGeneral implements OnInit {
   async setRestrictRepoHostsToAllowlist(value: boolean): Promise<void> {
     this.restrictRepoHostsToAllowlist.set(value);
     await this.saveSetting('restrictRepoHostsToAllowlist', value);
+  }
+
+  async setContainerEngine(value: 'docker' | 'podman'): Promise<void> {
+    this.containerEngine.set(value);
+    await this.saveSetting('containerEngine', value);
   }
 
   async checkForUpdateNow(): Promise<void> {

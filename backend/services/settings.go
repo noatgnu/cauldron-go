@@ -63,6 +63,9 @@ func (s *SettingsService) Load() error {
 	if val, ok := settings["rLibPath"]; ok {
 		s.config.RLibPath = val
 	}
+	if val, ok := settings["containerEngine"]; ok {
+		s.config.ContainerEngine = val
+	}
 	if val, ok := settings["curtainBackendUrl"]; ok {
 		s.config.CurtainBackendURL = val
 	}
@@ -125,6 +128,7 @@ func (s *SettingsService) Save() error {
 	s.db.SaveSetting("pythonPath", s.config.PythonPath)
 	s.db.SaveSetting("rPath", s.config.RPath)
 	s.db.SaveSetting("rLibPath", s.config.RLibPath)
+	s.db.SaveSetting("containerEngine", s.config.ContainerEngine)
 	s.db.SaveSetting("curtainBackendUrl", s.config.CurtainBackendURL)
 	s.db.SaveSetting("pluginRegistryUrl", s.config.PluginRegistryURL)
 	s.db.SaveSetting("recipeRegistryUrl", s.config.RecipeRegistryURL)
@@ -156,6 +160,8 @@ func (s *SettingsService) Get(key string) interface{} {
 		return s.config.RPath
 	case "rLibPath":
 		return s.config.RLibPath
+	case "containerEngine":
+		return s.config.ContainerEngine
 	case "curtainBackendUrl":
 		return s.config.CurtainBackendURL
 	case "pluginRegistryUrl":
@@ -248,6 +254,13 @@ func (s *SettingsService) Set(key string, value interface{}) error {
 		s.config.RPath = value.(string)
 	case "rLibPath":
 		s.config.RLibPath = value.(string)
+	case "containerEngine":
+		if v, ok := value.(string); ok {
+			v = strings.ToLower(strings.TrimSpace(v))
+			if v == "docker" || v == "podman" {
+				s.config.ContainerEngine = v
+			}
+		}
 	case "curtainBackendUrl":
 		s.config.CurtainBackendURL = value.(string)
 	case "pluginRegistryUrl":
@@ -300,6 +313,15 @@ func (s *SettingsService) GetConfig() *models.Config {
 	return s.config
 }
 
+// GetContainerEngine returns the configured container engine binary name
+// ("docker" or "podman"), defaulting to "docker" if unset.
+func (s *SettingsService) GetContainerEngine() string {
+	if s.config.ContainerEngine == "" {
+		return "docker"
+	}
+	return s.config.ContainerEngine
+}
+
 func (s *SettingsService) initializeDefaults() {
 	if s.config.ResultStoragePath == "" {
 		s.config.ResultStoragePath = filepath.Join(s.db.GetDataDir(), "results")
@@ -322,6 +344,10 @@ func (s *SettingsService) initializeDefaults() {
 
 	if s.config.CurtainBackendURL == "" {
 		s.config.CurtainBackendURL = "https://celsus.muttsu.xyz"
+	}
+
+	if s.config.ContainerEngine == "" {
+		s.config.ContainerEngine = "docker"
 	}
 
 	if s.config.AccessibilityFontScale == "" {

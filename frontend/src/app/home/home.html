@@ -185,6 +185,21 @@
                 </mat-chip>
               }
             </div>
+
+            <div class="status-row">
+              <span class="status-label">Podman</span>
+              @if (podmanVersion() && podmanVersion() !== 'Not installed') {
+                <mat-chip class="status-chip">
+                  <mat-icon>check_circle</mat-icon>
+                  <span [matTooltip]="'Podman installed'">{{ podmanVersion() }}</span>
+                </mat-chip>
+              } @else {
+                <mat-chip class="status-chip warn">
+                  <mat-icon>error</mat-icon>
+                  <span>Not installed</span>
+                </mat-chip>
+              }
+            </div>
           </div>
         }
       </mat-card-content>

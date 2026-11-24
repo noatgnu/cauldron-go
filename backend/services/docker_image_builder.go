@@ -12,18 +12,30 @@ import (
 )
 
 type DockerImageBuilder struct {
-	db *DatabaseService
+	db              *DatabaseService
+	settingsService *SettingsService
 }
 
-func NewDockerImageBuilder(db *DatabaseService) *DockerImageBuilder {
-	return &DockerImageBuilder{db: db}
+func NewDockerImageBuilder(db *DatabaseService, settingsService *SettingsService) *DockerImageBuilder {
+	return &DockerImageBuilder{db: db, settingsService: settingsService}
+}
+
+// resolveEngine returns the container engine binary name ("docker" or
+// "podman") from the live global setting, defaulting to "docker" when no
+// settings service is wired (e.g. in tests that construct this directly).
+func (d *DockerImageBuilder) resolveEngine() string {
+	if d.settingsService == nil {
+		return "docker"
+	}
+	return d.settingsService.GetContainerEngine()
 }
 
 func (d *DockerImageBuilder) CheckDockerAvailable() error {
-	cmd := exec.Command("docker", "version")
+	engine := d.resolveEngine()
+	cmd := exec.Command(engine, "version")
 	hideConsoleWindow(cmd)
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("docker daemon not available: %w", err)
+		return fmt.Errorf("%s daemon not available: %w", engine, err)
 	}
 	return nil
 }
@@ -49,15 +61,16 @@ func (d *DockerImageBuilder) BuildImage(
 	args = append(args, "-f", dockerfile)
 	args = append(args, ".")
 
-	cmd := exec.Command("docker", args...)
+	engine := d.resolveEngine()
+	cmd := exec.Command(engine, args...)
 	hideConsoleWindow(cmd)
 	cmd.Dir = pluginDir
 
-	log.Printf("[DockerImageBuilder] Building image: docker %s", strings.Join(args, " "))
+	log.Printf("[DockerImageBuilder] Building image: %s %s", engine, strings.Join(args, " "))
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("docker build failed: %w\nOutput: %s", err, string(output))
+		return fmt.Errorf("%s build failed: %w\nOutput: %s", engine, err, string(output))
 	}
 
 	log.Printf("[DockerImageBuilder] Successfully built image: %s", imageName)
@@ -65,14 +78,15 @@ func (d *DockerImageBuilder) BuildImage(
 }
 
 func (d *DockerImageBuilder) PullImage(imageName string) error {
-	cmd := exec.Command("docker", "pull", imageName)
+	engine := d.resolveEngine()
+	cmd := exec.Command(engine, "pull", imageName)
 	hideConsoleWindow(cmd)
 
 	log.Printf("[DockerImageBuilder] Pulling image: %s", imageName)
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("docker pull failed: %w\nOutput: %s", err, string(output))
+		return fmt.Errorf("%s pull failed: %w\nOutput: %s", engine, err, string(output))
 	}
 
 	log.Printf("[DockerImageBuilder] Successfully pulled image: %s", imageName)
@@ -80,7 +94,7 @@ func (d *DockerImageBuilder) PullImage(imageName string) error {
 }
 
 func (d *DockerImageBuilder) ImageExists(imageName string) bool {
-	cmd := exec.Command("docker", "image", "inspect", imageName)
+	cmd := exec.Command(d.resolveEngine(), "image", "inspect", imageName)
 	hideConsoleWindow(cmd)
 	err := cmd.Run()
 	return err == nil
@@ -102,7 +116,7 @@ func (d *DockerImageBuilder) RecordBuiltImage(
 	platform string,
 	buildArgs map[string]string,
 ) error {
-	cmd := exec.Command("docker", "image", "inspect", "--format={{.Id}}", imageName)
+	cmd := exec.Command(d.resolveEngine(), "image", "inspect", "--format={{.Id}}", imageName)
 	hideConsoleWindow(cmd)
 	output, err := cmd.Output()
 	if err != nil {

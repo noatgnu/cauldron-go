@@ -221,11 +221,11 @@ func (a *App) Initialize() {
 	a.pluginService = services.NewPluginService()
 
 	log.Println("[App.Initialize] Initializing Docker image builder...")
-	dockerImageBuilder := services.NewDockerImageBuilder(a.db)
+	dockerImageBuilder := services.NewDockerImageBuilder(a.db, a.settings)
 	if err := dockerImageBuilder.CheckDockerAvailable(); err != nil {
-		log.Printf("[App.Initialize] Warning: Docker daemon not available. Docker-based plugins will not work: %v", err)
+		log.Printf("[App.Initialize] Warning: %s not available. Docker-based plugins will not work: %v", a.settings.GetContainerEngine(), err)
 	} else {
-		log.Println("[App.Initialize] Docker is available")
+		log.Printf("[App.Initialize] %s is available", a.settings.GetContainerEngine())
 	}
 
 	log.Println("[App.Initialize] Initializing plugin system V2...")
@@ -602,6 +602,21 @@ func (a *App) CheckDockerVersion() (string, error) {
 	}
 	version := strings.TrimSpace(string(output))
 	version = strings.TrimPrefix(version, "Docker version ")
+	if idx := strings.Index(version, ","); idx != -1 {
+		version = version[:idx]
+	}
+	return version, nil
+}
+
+func (a *App) CheckPodmanVersion() (string, error) {
+	cmd := exec.Command("podman", "--version")
+	hideConsoleWindow(cmd)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("podman not available: %w", err)
+	}
+	version := strings.TrimSpace(string(output))
+	version = strings.TrimPrefix(version, "podman version ")
 	if idx := strings.Index(version, ","); idx != -1 {
 		version = version[:idx]
 	}
