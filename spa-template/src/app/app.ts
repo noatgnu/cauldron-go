@@ -311,7 +311,7 @@ export class AppComponent implements OnInit {
     return environment.pluginDefinition.plugin.name;
   }
 
-  private base64ToBytes(base64: string): Uint8Array {
+  private base64ToBytes(base64: string): Uint8Array<ArrayBuffer> {
     const binaryString = atob(base64);
     const bytes = new Uint8Array(binaryString.length);
     for (let i = 0; i < binaryString.length; i++) {
