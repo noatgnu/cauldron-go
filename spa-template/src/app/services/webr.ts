@@ -221,6 +221,9 @@ tryCatch({
       }
     }
 
+    const capturedImageCount = result.images ? result.images.length : 0;
+    this._outputs.update(arr => [...arr, '[stderr] Captured ' + capturedImageCount + ' plot image(s)']);
+
     if (result.images && result.images.length > 0) {
       for (let i = 0; i < result.images.length; i++) {
         const img = result.images[i];
@@ -240,8 +243,9 @@ tryCatch({
               type: 'image'
             });
           }
-        } catch {
-          // Failed to convert plot image
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : String(err);
+          this._outputs.update(arr => [...arr, '[stderr] Failed to convert captured plot image: ' + message]);
         }
       }
     }
