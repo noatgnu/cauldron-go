@@ -183,9 +183,6 @@ export class WebRService {
     const wrappedScript = `options(webr = TRUE);
 Sys.setenv(WEBR = "1");
 options(device = webr::canvas);
-pdf <- function(file = NULL, width = 7, height = 7, ...) {
-  webr::canvas(width = width * 96, height = height * 96, capture = TRUE)
-};
 svg <- function(filename = NULL, width = 7, height = 7, ...) {
   webr::canvas(width = width * 96, height = height * 96, capture = TRUE)
 };
@@ -232,8 +229,8 @@ tryCatch({
     this._outputs.update(arr => [...arr, '[stderr] Captured ' + capturedImageCount + ' plot image(s)']);
 
     if (result.images && result.images.length > 0) {
-      for (let i = 0; i < result.images.length; i++) {
-        const img = result.images[i];
+      const uniqueImages: string[] = [];
+      for (const img of result.images) {
         try {
           const canvas = new OffscreenCanvas(img.width, img.height);
           const ctx = canvas.getContext('2d');
@@ -243,17 +240,23 @@ tryCatch({
             const arrayBuffer = await blob.arrayBuffer();
             const binaryContent = new Uint8Array(arrayBuffer);
             const base64 = this.uint8ArrayToBase64(binaryContent);
-            const filename = result.images.length === 1 ? 'plot.png' : 'plot_' + (i + 1) + '.png';
-            outputs.push({
-              name: filename,
-              content: 'data:image/png;base64,' + base64,
-              type: 'image'
-            });
+            if (!uniqueImages.includes(base64)) {
+              uniqueImages.push(base64);
+            }
           }
         } catch (err: unknown) {
           const message = err instanceof Error ? err.message : String(err);
           this._outputs.update(arr => [...arr, '[stderr] Failed to convert captured plot image: ' + message]);
         }
+      }
+
+      for (let i = 0; i < uniqueImages.length; i++) {
+        const filename = uniqueImages.length === 1 ? 'plot.png' : 'plot_' + (i + 1) + '.png';
+        outputs.push({
+          name: filename,
+          content: 'data:image/png;base64,' + uniqueImages[i],
+          type: 'image'
+        });
       }
     }
 

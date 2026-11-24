@@ -264,6 +264,9 @@ export class AppComponent implements OnInit {
     let url: string;
     if (output.content.startsWith('data:')) {
       url = output.content;
+    } else if (output.type === 'binary') {
+      const blob = new Blob([this.base64ToBytes(output.content)], { type: 'application/octet-stream' });
+      url = URL.createObjectURL(blob);
     } else {
       const mimeType = output.type === 'image' ? 'image/png' : 'text/plain';
       const blob = new Blob([output.content], { type: mimeType });
@@ -287,12 +290,9 @@ export class AppComponent implements OnInit {
     for (const output of this.outputs()) {
       if (output.content.startsWith('data:')) {
         const base64Data = output.content.split(',')[1];
-        const binaryString = atob(base64Data);
-        const bytes = new Uint8Array(binaryString.length);
-        for (let i = 0; i < binaryString.length; i++) {
-          bytes[i] = binaryString.charCodeAt(i);
-        }
-        zip.file(output.name, bytes);
+        zip.file(output.name, this.base64ToBytes(base64Data));
+      } else if (output.type === 'binary') {
+        zip.file(output.name, this.base64ToBytes(output.content));
       } else {
         zip.file(output.name, output.content);
       }
@@ -309,6 +309,15 @@ export class AppComponent implements OnInit {
 
   get pluginName(): string {
     return environment.pluginDefinition.plugin.name;
+  }
+
+  private base64ToBytes(base64: string): Uint8Array {
+    const binaryString = atob(base64);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    return bytes;
   }
 
   get pluginDescription(): string {
